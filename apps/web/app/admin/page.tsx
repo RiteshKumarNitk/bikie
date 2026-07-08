@@ -3,6 +3,7 @@ import type { AdminOverviewStatsDTO } from "@bikie/types";
 import { getJson } from "@/lib/api";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { formatCurrency } from "@bikie/utils";
+import { MonthlyBookingsChart, BookingsByStatusChart, BikesByCityChart } from "@/components/admin/Charts";
 
 export const metadata: Metadata = { title: "Admin Dashboard" };
 
@@ -18,7 +19,14 @@ export default async function AdminOverviewPage() {
         <StatCard label="Bikes" value={stats.totalBikes} />
         <StatCard label="Bookings" value={stats.totalBookings} />
         <StatCard label="Trips" value={stats.totalTrips} />
-        <StatCard label="Revenue" value={formatCurrency(stats.revenueTotal)} />
+        <StatCard label="Revenue" value={formatCurrency(stats.revenueTotal)} highlight />
+      </div>
+      <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <MonthlyBookingsChart data={stats.monthlyBookings} />
+        <BookingsByStatusChart data={stats.bookingsByStatus} />
+      </div>
+      <div className="mt-6 lg:w-1/2">
+        <BikesByCityChart data={stats.bikesByCity} />
       </div>
     </div>
   );

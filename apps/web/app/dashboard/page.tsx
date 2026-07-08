@@ -30,7 +30,25 @@ export default async function DashboardHomePage() {
         <StatCard label="Total Spent" value={formatCurrency(bookings.reduce((sum, b) => sum + b.totalPrice, 0))} />
       </div>
 
-      <div className="mt-8 grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 text-lg">🆘</span>
+            <div>
+              <p className="font-semibold text-red-400">SOS Emergency</p>
+              <p className="text-xs text-foreground/50">Need help? Send an alert to nearby users and admins.</p>
+            </div>
+          </div>
+          <Link
+            href="/dashboard/sos"
+            className="rounded-xl bg-red-500 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600"
+          >
+            Alert
+          </Link>
+        </div>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-3xl bg-card p-6">
           <p className="font-semibold">Current / Upcoming Booking</p>
           {active || upcoming ? (

@@ -6,6 +6,7 @@ const navItems = [
   { label: "Overview", href: "/partner" },
   { label: "Fleet", href: "/partner/fleet" },
   { label: "Bookings", href: "/partner/bookings" },
+  { label: "Messages", href: "/partner/messages" },
   { label: "Analytics", href: "/partner/analytics" },
   { label: "Trips", href: "/partner/trips" },
   { label: "Reviews", href: "/partner/reviews" },

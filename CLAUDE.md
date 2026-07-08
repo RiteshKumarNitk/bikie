@@ -34,3 +34,9 @@ These are the source of truth. Don't contradict them without updating them.
   (`./generated/prisma/client.js`), which is real compiled JS.
 - Real secrets only ever go in `apps/web/.env.local` (gitignored). `.env.example`
   at the repo root documents variable names only — never real values.
+
+
+
+ADMIN	admin@bikie.app	Admin@12345
+PARTNER	partner@bikie.app	Partner@12345
+RENTER	rider@bikie.app	Rider@12345

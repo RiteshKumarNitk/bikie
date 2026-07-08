@@ -5,40 +5,50 @@
 @theme {
   --font-display: var(--font-geist-sans);
   --font-body: var(--font-inter);
+  --color-navy-950: #030712;
+  --color-navy-900: #050a18;
+  --color-navy-800: #0b1226;
+  --color-navy-700: #111933;
+  --color-navy-600: #182244;
+  --color-navy-500: #243056;
+  --color-navy-400: #334677;
 }
 
 /* Light mode: accessibility toggle only — dark is the default look (see ADR-002) */
 :root {
-  --color-primary: #0f172a;
-  --color-secondary: #1e293b;
-  --color-accent: #ff6b00;
+  --color-primary: #0a1628;
+  --color-secondary: #182244;
+  --color-accent: #d4942b;
   --color-success: #22c55e;
   --color-warning: #f59e0b;
-  --color-background: #fafafa;
-  --color-surface: #f1f5f9;
+  --color-background: #f0f2f5;
+  --color-surface: #e2e6ed;
   --color-card: #ffffff;
-  --color-foreground: #0f172a;
-  --glass-bg: rgba(255, 255, 255, 0.65);
-  --glass-border: rgba(255, 255, 255, 0.35);
+  --color-foreground: #0a1628;
+  --glass-bg: rgba(255, 255, 255, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.3);
+  --color-accent-hover: #b87d1f;
 }
 
-/* Dark mode: Dark Navy / Midnight Blue / Deep Slate — the primary BIKIE look */
+/* Dark mode: Rich navy blue — the primary BIKIE look */
 .dark {
-  --color-primary: #0f172a;
-  --color-background: #0a0e1a;
-  --color-surface: #0f172a;
-  --color-card: #111827;
-  --color-foreground: #f8fafc;
-  --color-secondary: #1e293b;
-  --color-accent: #ff7a1f;
-  --glass-bg: rgba(17, 24, 39, 0.55);
-  --glass-border: rgba(255, 255, 255, 0.08);
+  --color-primary: #0b1226;
+  --color-background: #050a18;
+  --color-surface: #0b1226;
+  --color-card: #111933;
+  --color-foreground: #edf0f7;
+  --color-secondary: #182244;
+  --color-accent: #e8a838;
+  --color-accent-hover: #d4942b;
+  --glass-bg: rgba(17, 25, 51, 0.7);
+  --glass-border: rgba(255, 255, 255, 0.06);
 }
 
 @theme inline {
   --color-primary: var(--color-primary);
   --color-secondary: var(--color-secondary);
   --color-accent: var(--color-accent);
+  --color-accent-hover: var(--color-accent-hover);
   --color-success: var(--color-success);
   --color-warning: var(--color-warning);
   --color-background: var(--color-background);
@@ -61,7 +71,32 @@
 
 .glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--glass-border);
+}
+
+.glass-card {
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+}
+
+.nav-blur {
+  background: rgba(5, 10, 24, 0.8);
+  backdrop-filter: blur(32px);
+  -webkit-backdrop-filter: blur(32px);
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: var(--color-navy-500);
+  border-radius: 4px;
 }

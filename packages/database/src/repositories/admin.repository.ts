@@ -11,7 +11,38 @@ export async function getAdminOverviewStats() {
     sumCompletedBookingRevenue(),
   ]);
 
-  return { totalUsers, totalPartners, totalBikes, totalBookings, totalTrips, revenueTotal };
+  const bookings = await prisma.booking.findMany({ select: { status: true, createdAt: true, totalPrice: true } });
+  const bikes = await prisma.bike.findMany({ select: { city: true } });
+
+  const monthlyMap = new Map<string, { count: number; amount: number }>();
+  const statusCount: Record<string, number> = {};
+  const cityCount: Record<string, number> = {};
+
+  for (const b of bookings) {
+    const key = b.createdAt.toISOString().slice(0, 7);
+    const cur = monthlyMap.get(key) ?? { count: 0, amount: 0 };
+    cur.count++;
+    cur.amount += Number(b.totalPrice);
+    monthlyMap.set(key, cur);
+    statusCount[b.status] = (statusCount[b.status] ?? 0) + 1;
+  }
+
+  for (const b of bikes) {
+    cityCount[b.city] = (cityCount[b.city] ?? 0) + 1;
+  }
+
+  const monthlyBookings = Array.from(monthlyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, d]) => ({ month, count: d.count }));
+
+  const monthlyRevenue = Array.from(monthlyMap.entries())
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, d]) => ({ month, amount: d.amount }));
+
+  const bookingsByStatus = Object.entries(statusCount).map(([status, count]) => ({ status, count }));
+  const bikesByCity = Object.entries(cityCount).map(([city, count]) => ({ city, count }));
+
+  return { totalUsers, totalPartners, totalBikes, totalBookings, totalTrips, revenueTotal, monthlyBookings, monthlyRevenue, bookingsByStatus, bikesByCity };
 }
 
 export async function findAllUsers() {
@@ -20,6 +51,19 @@ export async function findAllUsers() {
     select: { id: true, name: true, email: true, role: true, createdAt: true, image: true },
   });
   return users.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() }));
+}
+
+export async function updateUserRole(userId: string, role: string) {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { role: role as any },
+    select: { id: true, name: true, email: true, role: true, createdAt: true, image: true },
+  });
+  return { ...user, createdAt: user.createdAt.toISOString() };
+}
+
+export async function deleteUser(userId: string) {
+  await prisma.user.delete({ where: { id: userId } });
 }
 
 export async function findAllPartners() {
@@ -39,6 +83,17 @@ export async function findAllPartners() {
   }));
 }
 
+export async function updatePartnerVerification(partnerId: string, isVerified: boolean) {
+  await prisma.partner.update({
+    where: { id: partnerId },
+    data: { isVerified },
+  });
+}
+
+export async function deletePartner(partnerId: string) {
+  await prisma.partner.delete({ where: { id: partnerId } });
+}
+
 export async function findAllBookingsAdmin() {
   const bookings = await prisma.booking.findMany({
     orderBy: { createdAt: "desc" },
@@ -54,4 +109,90 @@ export async function findAllBookingsAdmin() {
     bike: { name: b.bike.name, slug: b.bike.slug },
     renter: { name: b.user.name, email: b.user.email },
   }));
+}
+
+export async function updateBookingStatus(bookingId: string, status: string) {
+  await prisma.booking.update({
+    where: { id: bookingId },
+    data: { status: status as any },
+  });
+}
+
+export async function deleteBooking(bookingId: string) {
+  await prisma.booking.delete({ where: { id: bookingId } });
+}
+
+export async function createBike(data: {
+  name: string;
+  slug: string;
+  brand: string;
+  categoryId: string;
+  city: string;
+  pricePerDay: number;
+  imageUrl: string;
+  ownerId?: string;
+  description?: string;
+}) {
+  const bike = await prisma.bike.create({ data: { ...data } as any });
+  return bike;
+}
+
+export async function updateBike(
+  bikeId: string,
+  data: Partial<{
+    name: string;
+    slug: string;
+    brand: string;
+    categoryId: string;
+    city: string;
+    pricePerDay: number;
+    imageUrl: string;
+    description: string;
+  }>,
+) {
+  const bike = await prisma.bike.update({ where: { id: bikeId }, data: data as any });
+  return bike;
+}
+
+export async function deleteBike(bikeId: string) {
+  await prisma.bike.delete({ where: { id: bikeId } });
+}
+
+// --- Testimonials ---
+
+export async function findAllTestimonials() {
+  return prisma.testimonial.findMany({ orderBy: { createdAt: "desc" } });
+}
+
+export async function createTestimonial(data: {
+  authorName: string;
+  authorLocation?: string;
+  authorAvatarUrl?: string;
+  rating: number;
+  quote: string;
+}) {
+  return prisma.testimonial.create({
+    data: {
+      authorName: data.authorName,
+      authorLocation: data.authorLocation,
+      authorAvatarUrl: data.authorAvatarUrl,
+      rating: data.rating,
+      quote: data.quote,
+      isFeatured: true,
+    },
+  });
+}
+
+export async function updateTestimonial(id: string, data: any) {
+  return prisma.testimonial.update({ where: { id }, data });
+}
+
+export async function deleteTestimonial(id: string) {
+  await prisma.testimonial.delete({ where: { id } });
+}
+
+// --- Audit Logs ---
+
+export async function findAllAuditLogs() {
+  return prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
 }

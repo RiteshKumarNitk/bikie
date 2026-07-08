@@ -8,3 +8,8 @@ export { ReviewService } from "./review.service";
 export { WishlistService } from "./wishlist.service";
 export { PartnerService } from "./partner.service";
 export { AdminService } from "./admin.service";
+export { MessageService } from "./message.service";
+export { MembershipService } from "./membership.service";
+export { SOSService } from "./sos.service";
+export { EmailService } from "./email.service";
+export { SMSService } from "./sms.service";

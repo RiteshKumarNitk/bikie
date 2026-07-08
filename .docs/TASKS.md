@@ -2,17 +2,39 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
-## Milestone 2 — Full Site + Dashboards
+## Milestone 3 — Real-time + Admin Overhaul
 
 | Task | Status |
 |---|---|
-| Docs governance scaffolding | Completed |
-| Schema: Booking, Review, Trip, TripParticipant, Partner | In Progress |
-| Seed: Super Admin, Demo Partner, Demo User, sample data | Planned |
-| Theme: dark-default, navy/midnight/slate palette | Planned |
-| Layout: mega nav, breadcrumbs, skeletons, empty states, 404/500, transitions | Planned |
-| Pages: Home restructure, Explore Bikes, Bike Details, Destinations, Community, Trips, Become a Partner | Planned |
-| Pages: About, Contact, FAQ/Help Center, Safety Center, Privacy, Terms, Cookies | Planned |
-| Pages: Blog, Careers, Press, Membership, Gift Cards, Roadside Assistance, SEO landing pages | Planned |
-| Dashboards: User, Partner, Admin (role-gated) | Planned |
-| Code quality pass: broken routes, unused components, lint/typecheck | Planned |
+| SSE endpoint + React hook | Completed |
+| AuditLog model + migration + repo + service + API | Completed |
+| Audit logging in all admin CRUD routes | Completed |
+| Admin charts (recharts) on overview | Completed |
+| CSV export API (users/bookings/partners) | Completed |
+| Email service (Resend-compatible stub) | Completed |
+| SMS gateway (Twilio-compatible stub) | Completed |
+| Admin email/SMS send pages | Completed |
+| SOS auto-resolve cron endpoint | Completed |
+| SOS history API route | Completed |
+| CMS testimonial management API + admin page | Completed |
+| New admin nav items: SOS, Audit Logs, Testimonials, Email, SMS | Completed |
+
+## Milestone 2 — Messaging, Membership, SOS
+
+| Task | Status |
+|---|---|
+| Messaging schema + repo + service + API + UI | Completed |
+| Membership schema + repo + service + API + UI | Completed |
+| SOS schema + repo + service + API + UI | Completed |
+| SSE manager | Completed |
+| Partner fleet management | Completed |
+
+## Milestone 1 — Foundation
+
+| Task | Status |
+|---|---|
+| Theme + globals | Completed |
+| Login/Register | Completed |
+| Navbar + Footer | Completed |
+| Admin CRUD (users, partners, bikes, bookings) | Completed |
+| Layouts (admin, dashboard, partner) | Completed |

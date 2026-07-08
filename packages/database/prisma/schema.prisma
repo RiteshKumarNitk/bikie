@@ -69,6 +69,27 @@ enum ParticipantStatus {
   CANCELLED
 }
 
+enum SOSAlertType {
+  ACCIDENT
+  BIKE_BREAKDOWN
+  FUEL_EMPTY
+  MEDICAL
+  LOST
+  OTHER
+}
+
+enum SOSStatus {
+  ACTIVE
+  RESOLVED
+  FALSE_ALARM
+}
+
+enum MembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
 // --- Better Auth core models ---
 
 model User {
@@ -77,6 +98,7 @@ model User {
   email         String    @unique
   emailVerified Boolean   @default(false)
   image         String?
+  phone         String?
   role          UserRole  @default(RENTER)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -89,6 +111,11 @@ model User {
   wishlist      Wishlist[]
   tripsOrganized Trip[]       @relation("TripOrganizer")
   tripsJoined   TripParticipant[]
+  conversations ConversationParticipant[]
+  messagesSent  Message[]
+  membership    UserMembership[]
+  sosAlerts     SOSAlert[]
+  sosResponses  SOSAlertResponse[]
 
   @@map("user")
 }
@@ -320,4 +347,131 @@ model Wishlist {
   createdAt DateTime @default(now())
 
   @@unique([userId, bikeId])
+}
+
+// --- Messaging ---
+
+model Conversation {
+  id           String                     @id @default(cuid())
+  subject      String?
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@map("conversation")
+}
+
+model ConversationParticipant {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt       DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participant")
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  content        String
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId])
+  @@index([senderId])
+  @@map("message")
+}
+
+// --- Membership ---
+
+model MembershipPlan {
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  price         Decimal  @db.Decimal(10, 2)
+  durationDays  Int
+  benefits      String[]
+  isActive      Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  memberships   UserMembership[]
+
+  @@map("membership_plan")
+}
+
+model UserMembership {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      MembershipPlan   @relation(fields: [planId], references: [id])
+  startDate DateTime
+  endDate   DateTime
+  status    MembershipStatus @default(ACTIVE)
+  paymentId String?
+  createdAt DateTime         @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@map("user_membership")
+}
+
+// --- SOS / Emergency ---
+
+model SOSAlert {
+  id          String      @id @default(cuid())
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        SOSAlertType
+  description String?
+  latitude    Float
+  longitude   Float
+  city        String
+  status      SOSStatus   @default(ACTIVE)
+  resolvedAt  DateTime?
+  resolvedBy  String?
+  createdAt   DateTime    @default(now())
+  responses   SOSAlertResponse[]
+
+  @@index([city, status])
+  @@index([status])
+  @@map("sos_alert")
+}
+
+model SOSAlertResponse {
+  id          String   @id @default(cuid())
+  alertId     String
+  alert       SOSAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  responderId String
+  responder   User     @relation(fields: [responderId], references: [id])
+  message     String?
+  status      String   @default("RESPONDING")
+  createdAt   DateTime @default(now())
+
+  @@unique([alertId, responderId])
+  @@map("sos_alert_response")
+}
+
+// --- Audit Log ---
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([createdAt])
+  @@map("audit_log")
 }

@@ -9,3 +9,7 @@ export * as reviewRepository from "./repositories/review.repository";
 export * as wishlistRepository from "./repositories/wishlist.repository";
 export * as partnerRepository from "./repositories/partner.repository";
 export * as adminRepository from "./repositories/admin.repository";
+export * as messageRepository from "./repositories/message.repository";
+export * as membershipRepository from "./repositories/membership.repository";
+export * as sosRepository from "./repositories/sos.repository";
+export * as auditRepository from "./repositories/audit.repository";

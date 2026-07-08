@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { getServerSession } from "@/lib/get-session";
+import { ProfileSettings } from "@/components/dashboard/ProfileSettings";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -12,17 +13,11 @@ export default async function DashboardSettingsPage() {
 
       <section className="mt-6 rounded-3xl bg-card p-6">
         <p className="font-semibold">Profile</p>
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
-            <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Name</label>
-            <input readOnly value={session?.user.name ?? ""} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm" />
-          </div>
-          <div>
-            <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Email</label>
-            <input readOnly value={session?.user.email ?? ""} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm" />
-          </div>
-        </div>
-        <p className="mt-3 text-xs text-foreground/50">Profile editing is coming soon.</p>
+        <ProfileSettings
+          name={session?.user.name ?? ""}
+          email={session?.user.email ?? ""}
+          phone={(session?.user as any).phone ?? null}
+        />
       </section>
 
       <section className="mt-6 rounded-3xl bg-card p-6">

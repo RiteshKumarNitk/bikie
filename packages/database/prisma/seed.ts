@@ -267,6 +267,40 @@ async function main() {
   }
 
   console.log("Seed complete.");
+  // --- Seed Membership Plans ---
+  const planCount = await prisma.membershipPlan.count();
+  if (planCount === 0) {
+    await prisma.membershipPlan.createMany({
+      data: [
+        {
+          name: "Basic",
+          description: "Essential coverage for occasional riders",
+          price: 0,
+          durationDays: 36500,
+          benefits: ["Standard booking", "Email support", "Community access"],
+          sortOrder: 0,
+        },
+        {
+          name: "Premium",
+          description: "Best value for regular riders",
+          price: 999,
+          durationDays: 365,
+          benefits: ["Up to 15% off every booking", "Free cancellation", "Priority support", "Early access to trips", "Exclusive community rides", "Reward points on every ride"],
+          sortOrder: 1,
+        },
+        {
+          name: "Pro",
+          description: "For power riders who want it all",
+          price: 2499,
+          durationDays: 365,
+          benefits: ["Up to 25% off every booking", "Free cancellation & reschedule", "24/7 priority support", "Early access to all trips", "Exclusive Pro-only trips", "Double reward points", "Free delivery & pickup", "VIP roadside assistance"],
+          sortOrder: 2,
+        },
+      ],
+    });
+    console.log("Seeded membership plans.");
+  }
+
   console.log("Admin:", SEED_ACCOUNTS.admin.email, "/", SEED_ACCOUNTS.admin.password);
   console.log("Partner:", SEED_ACCOUNTS.partner.email, "/", SEED_ACCOUNTS.partner.password);
   console.log("Demo user:", SEED_ACCOUNTS.user.email, "/", SEED_ACCOUNTS.user.password);
