@@ -7,6 +7,7 @@
   --font-body: var(--font-inter);
 }
 
+/* Light mode: accessibility toggle only — dark is the default look (see ADR-002) */
 :root {
   --color-primary: #0f172a;
   --color-secondary: #1e293b;
@@ -14,14 +15,18 @@
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-background: #fafafa;
+  --color-surface: #f1f5f9;
   --color-card: #ffffff;
   --color-foreground: #0f172a;
   --glass-bg: rgba(255, 255, 255, 0.65);
   --glass-border: rgba(255, 255, 255, 0.35);
 }
 
+/* Dark mode: Dark Navy / Midnight Blue / Deep Slate — the primary BIKIE look */
 .dark {
-  --color-background: #0b1120;
+  --color-primary: #0f172a;
+  --color-background: #0a0e1a;
+  --color-surface: #0f172a;
   --color-card: #111827;
   --color-foreground: #f8fafc;
   --color-secondary: #1e293b;
@@ -37,6 +42,7 @@
   --color-success: var(--color-success);
   --color-warning: var(--color-warning);
   --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
   --color-card: var(--color-card);
   --color-foreground: var(--color-foreground);
 }

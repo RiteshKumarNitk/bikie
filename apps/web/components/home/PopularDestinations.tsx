@@ -1,5 +1,6 @@
 import type { DestinationSummaryDTO } from "@bikie/types";
 import Image from "next/image";
+import Link from "next/link";
 import { Reveal } from "@/components/shared/Reveal";
 
 export function PopularDestinations({
@@ -9,15 +10,20 @@ export function PopularDestinations({
 }) {
   return (
     <section id="destinations" className="mx-auto max-w-7xl px-6 py-24">
-      <Reveal>
-        <h2 className="text-3xl font-semibold md:text-4xl">Popular Destinations</h2>
-        <p className="mt-2 text-foreground/60">Curated road trips riders love the most.</p>
+      <Reveal className="flex items-end justify-between">
+        <div>
+          <h2 className="text-3xl font-semibold md:text-4xl">Popular Destinations</h2>
+          <p className="mt-2 text-foreground/60">Curated road trips riders love the most.</p>
+        </div>
+        <Link href="/destinations" className="hidden text-sm font-medium text-accent md:inline">
+          See all destinations →
+        </Link>
       </Reveal>
 
       <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {destinations.map((destination, index) => (
           <Reveal key={destination.id} delay={index * 0.05}>
-            <div className="group relative aspect-[4/3] overflow-hidden rounded-3xl">
+            <Link href={`/destinations/${destination.slug}`} className="group relative block aspect-[4/3] overflow-hidden rounded-3xl">
               <Image
                 src={destination.imageUrl}
                 alt={destination.name}
@@ -32,7 +38,7 @@ export function PopularDestinations({
                   {destination.state} · {destination.bikeCount} bikes
                 </p>
               </div>
-            </div>
+            </Link>
           </Reveal>
         ))}
       </div>

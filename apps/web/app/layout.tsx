@@ -6,7 +6,8 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { LenisProvider } from "@/components/providers/LenisProvider";
 import { GsapProvider } from "@/components/providers/GsapProvider";
 import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/home/Footer";
+import { Footer } from "@/components/layout/Footer";
+import { PageTransition } from "@/components/shared/PageTransition";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -15,7 +16,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "BIKIE — Find Your Next Ride",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:4000"),
+  title: {
+    default: "BIKIE — Find Your Next Ride",
+    template: "%s | BIKIE",
+  },
   description: "India's premium motorcycle travel platform. Rent premium motorcycles anywhere.",
 };
 
@@ -31,11 +36,13 @@ export default function RootLayout({
       className={`${GeistSans.variable} ${inter.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <LenisProvider>
             <GsapProvider>
               <Navbar />
-              <main className="flex-1">{children}</main>
+              <main className="flex-1">
+                <PageTransition>{children}</PageTransition>
+              </main>
               <Footer />
             </GsapProvider>
           </LenisProvider>

@@ -25,6 +25,50 @@ enum BikeCategory {
   OFF_ROAD
 }
 
+enum PartnerType {
+  RENTAL
+  MECHANIC
+  FUEL_DELIVERY
+  TOUR_GUIDE
+  HOTEL
+  CAMPING
+  ACCESSORIES
+  PHOTOGRAPHY
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TripType {
+  WEEKEND
+  ADVENTURE
+  ROAD_TRIP
+  INTERNATIONAL
+  GUIDED_TOUR
+}
+
+enum TripDifficulty {
+  EASY
+  MODERATE
+  HARD
+}
+
+enum TripStatus {
+  UPCOMING
+  COMPLETED
+  CANCELLED
+}
+
+enum ParticipantStatus {
+  JOINED
+  CANCELLED
+}
+
 // --- Better Auth core models ---
 
 model User {
@@ -38,7 +82,13 @@ model User {
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
   accounts      Account[]
-  bikes         Bike[]    @relation("BikeOwner")
+  bikes         Bike[]        @relation("BikeOwner")
+  partner       Partner?
+  bookings      Booking[]
+  reviews       Review[]
+  wishlist      Wishlist[]
+  tripsOrganized Trip[]       @relation("TripOrganizer")
+  tripsJoined   TripParticipant[]
 
   @@map("user")
 }
@@ -90,7 +140,7 @@ model Verification {
   @@map("verification")
 }
 
-// --- Homepage content models ---
+// --- Content models ---
 
 model Category {
   id        String       @id @default(cuid())
@@ -114,30 +164,44 @@ model Destination {
   isPopular   Boolean  @default(false)
   bikeCount   Int      @default(0)
   bikes       Bike[]
+  trips       Trip[]
   createdAt   DateTime @default(now())
 }
 
 model Bike {
-  id            String       @id @default(cuid())
-  slug          String       @unique
-  name          String
-  brand         String
-  categoryId    String
-  category      Category     @relation(fields: [categoryId], references: [id])
-  destinationId String?
-  destination   Destination? @relation(fields: [destinationId], references: [id])
-  ownerId       String?
-  owner         User?        @relation("BikeOwner", fields: [ownerId], references: [id])
-  pricePerDay   Decimal      @db.Decimal(10, 2)
-  city          String
-  imageUrl      String
-  gallery       String[]     @default([])
-  ratingAvg     Decimal      @default(0) @db.Decimal(2, 1)
-  ratingCount   Int          @default(0)
-  isFeatured    Boolean      @default(false)
-  description   String?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id                String       @id @default(cuid())
+  slug              String       @unique
+  name              String
+  brand             String
+  categoryId        String
+  category          Category     @relation(fields: [categoryId], references: [id])
+  destinationId     String?
+  destination       Destination? @relation(fields: [destinationId], references: [id])
+  ownerId           String?
+  owner             User?        @relation("BikeOwner", fields: [ownerId], references: [id])
+  pricePerDay       Decimal      @db.Decimal(10, 2)
+  securityDeposit   Decimal      @default(2000) @db.Decimal(10, 2)
+  city              String
+  imageUrl          String
+  gallery           String[]     @default([])
+  ratingAvg         Decimal      @default(0) @db.Decimal(2, 1)
+  ratingCount       Int          @default(0)
+  isFeatured        Boolean      @default(false)
+  description       String?
+  engineCc          Int?
+  mileageKmpl       Int?
+  fuelTankLitres    Int?
+  hasAbs            Boolean      @default(false)
+  seatHeightMm      Int?
+  luggageCapacityL  Int?
+  instantBooking    Boolean      @default(true)
+  helmetIncluded    Boolean      @default(true)
+  deliveryAvailable Boolean      @default(false)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  bookings          Booking[]
+  reviews           Review[]
+  wishlistedBy      Wishlist[]
 
   @@index([isFeatured])
 }
@@ -151,4 +215,109 @@ model Testimonial {
   quote           String
   isFeatured      Boolean  @default(true)
   createdAt       DateTime @default(now())
+}
+
+// --- Partner profile ---
+
+model Partner {
+  id           String      @id @default(cuid())
+  userId       String      @unique
+  user         User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  businessName String
+  type         PartnerType
+  city         String
+  description  String?
+  logoUrl      String?
+  isVerified   Boolean     @default(false)
+  ratingAvg    Decimal     @default(0) @db.Decimal(2, 1)
+  ratingCount  Int         @default(0)
+  createdAt    DateTime    @default(now())
+}
+
+// --- Bookings & reviews ---
+
+model Booking {
+  id           String        @id @default(cuid())
+  bikeId       String
+  bike         Bike          @relation(fields: [bikeId], references: [id])
+  userId       String
+  user         User          @relation(fields: [userId], references: [id])
+  startDate    DateTime
+  endDate      DateTime
+  totalPrice   Decimal       @db.Decimal(10, 2)
+  status       BookingStatus @default(PENDING)
+  pickupCity   String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  review       Review?
+
+  @@index([userId])
+  @@index([bikeId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  bikeId    String
+  bike      Bike     @relation(fields: [bikeId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  bookingId String?  @unique
+  booking   Booking? @relation(fields: [bookingId], references: [id])
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+
+  @@index([bikeId])
+}
+
+// --- Trips ---
+
+model Trip {
+  id            String            @id @default(cuid())
+  slug          String            @unique
+  title         String
+  description   String
+  imageUrl      String
+  gallery       String[]          @default([])
+  type          TripType
+  difficulty    TripDifficulty    @default(MODERATE)
+  price         Decimal           @db.Decimal(10, 2)
+  seatsTotal    Int
+  seatsLeft     Int
+  startDate     DateTime
+  endDate       DateTime
+  status        TripStatus        @default(UPCOMING)
+  organizerId   String
+  organizer     User              @relation("TripOrganizer", fields: [organizerId], references: [id])
+  destinationId String?
+  destination   Destination?      @relation(fields: [destinationId], references: [id])
+  participants  TripParticipant[]
+  createdAt     DateTime          @default(now())
+
+  @@index([status])
+}
+
+model TripParticipant {
+  id       String            @id @default(cuid())
+  tripId   String
+  trip     Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User              @relation(fields: [userId], references: [id])
+  status   ParticipantStatus @default(JOINED)
+  joinedAt DateTime          @default(now())
+
+  @@unique([tripId, userId])
+}
+
+// --- Wishlist ---
+
+model Wishlist {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bikeId    String
+  bike      Bike     @relation(fields: [bikeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, bikeId])
 }
