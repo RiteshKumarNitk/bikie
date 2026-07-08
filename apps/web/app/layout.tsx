@@ -35,7 +35,7 @@ export default function RootLayout({
       suppressHydrationWarning
       className={`${GeistSans.variable} ${inter.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col">
+      <body className="flex min-h-full flex-col" suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <LenisProvider>
             <GsapProvider>

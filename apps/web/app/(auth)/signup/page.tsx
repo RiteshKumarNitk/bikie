@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signUpSchema, type SignUpInput } from "@bikie/validation";
@@ -19,7 +18,6 @@ const partnerTypes = [
 ];
 
 export default function SignUpPage() {
-  const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState("RENTER");
   const [partnerType, setPartnerType] = useState("RENTAL");
@@ -50,8 +48,7 @@ export default function SignUpPage() {
         body: JSON.stringify({ businessName, type: partnerType, city }),
       });
     }
-    router.push(selectedRole === "PARTNER" ? "/partner" : "/");
-    router.refresh();
+    window.location.href = selectedRole === "PARTNER" ? "/partner" : "/";
   }
 
   return (

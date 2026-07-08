@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signInSchema, type SignInInput } from "@bikie/validation";
@@ -16,7 +15,6 @@ const roles = [
 ];
 
 export default function LoginPage() {
-  const router = useRouter();
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState("RENTER");
   const {
@@ -35,8 +33,7 @@ export default function LoginPage() {
       setServerError(error.message ?? "Invalid email or password.");
       return;
     }
-    router.push("/");
-    router.refresh();
+    window.location.href = "/";
   }
 
   return (

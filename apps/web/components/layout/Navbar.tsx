@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "./ThemeToggle";
@@ -28,7 +27,6 @@ function UserAvatar({ name }: { name: string }) {
 }
 
 export function Navbar() {
-  const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -144,8 +142,7 @@ export function Navbar() {
                         onClick={async () => {
                           await authClient.signOut();
                           setUserMenuOpen(false);
-                          router.push("/");
-                          router.refresh();
+                          window.location.href = "/";
                         }}
                         className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-400 hover:bg-red-500/10"
                       >

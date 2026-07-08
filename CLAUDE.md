@@ -40,3 +40,4 @@ These are the source of truth. Don't contradict them without updating them.
 ADMIN	admin@bikie.app	Admin@12345
 PARTNER	partner@bikie.app	Partner@12345
 RENTER	rider@bikie.app	Rider@12345
+RENTER	Riteshkumar.nitk21@gmail.com	12345678
