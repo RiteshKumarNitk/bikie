@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "moduleDetection": "force",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "declaration": false,
+    "baseUrl": ".",
+    "paths": {
+      "@bikie/database": ["packages/database/src/index.ts"],
+      "@bikie/database/*": ["packages/database/src/*"],
+      "@bikie/auth": ["packages/auth/src/index.ts"],
+      "@bikie/services": ["packages/services/src/index.ts"],
+      "@bikie/validation": ["packages/validation/src/index.ts"],
+      "@bikie/types": ["packages/types/src/index.ts"],
+      "@bikie/ui": ["packages/ui/src/index.ts"],
+      "@bikie/utils": ["packages/utils/src/index.ts"]
+    }
+  }
+}

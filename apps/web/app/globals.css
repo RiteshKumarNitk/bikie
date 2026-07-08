@@ -1,0 +1,61 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --font-display: var(--font-geist-sans);
+  --font-body: var(--font-inter);
+}
+
+:root {
+  --color-primary: #0f172a;
+  --color-secondary: #1e293b;
+  --color-accent: #ff6b00;
+  --color-success: #22c55e;
+  --color-warning: #f59e0b;
+  --color-background: #fafafa;
+  --color-card: #ffffff;
+  --color-foreground: #0f172a;
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --glass-border: rgba(255, 255, 255, 0.35);
+}
+
+.dark {
+  --color-background: #0b1120;
+  --color-card: #111827;
+  --color-foreground: #f8fafc;
+  --color-secondary: #1e293b;
+  --color-accent: #ff7a1f;
+  --glass-bg: rgba(17, 24, 39, 0.55);
+  --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+@theme inline {
+  --color-primary: var(--color-primary);
+  --color-secondary: var(--color-secondary);
+  --color-accent: var(--color-accent);
+  --color-success: var(--color-success);
+  --color-warning: var(--color-warning);
+  --color-background: var(--color-background);
+  --color-card: var(--color-card);
+  --color-foreground: var(--color-foreground);
+}
+
+@layer base {
+  body {
+    @apply bg-background text-foreground font-body;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+}
+
+.glass {
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+}

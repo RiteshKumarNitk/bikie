@@ -1,0 +1,154 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  RENTER
+  PARTNER
+  ADMIN
+}
+
+enum BikeCategory {
+  ADVENTURE
+  CRUISER
+  ROYAL_ENFIELD
+  SPORTS
+  SCOOTER
+  ELECTRIC
+  TOURING
+  LUXURY
+  OFF_ROAD
+}
+
+// --- Better Auth core models ---
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          UserRole  @default(RENTER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  bikes         Bike[]    @relation("BikeOwner")
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+  @@map("verification")
+}
+
+// --- Homepage content models ---
+
+model Category {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  type      BikeCategory @unique
+  iconUrl   String?
+  imageUrl  String
+  sortOrder Int          @default(0)
+  bikes     Bike[]
+  createdAt DateTime     @default(now())
+}
+
+model Destination {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  state       String
+  imageUrl    String
+  description String?
+  isPopular   Boolean  @default(false)
+  bikeCount   Int      @default(0)
+  bikes       Bike[]
+  createdAt   DateTime @default(now())
+}
+
+model Bike {
+  id            String       @id @default(cuid())
+  slug          String       @unique
+  name          String
+  brand         String
+  categoryId    String
+  category      Category     @relation(fields: [categoryId], references: [id])
+  destinationId String?
+  destination   Destination? @relation(fields: [destinationId], references: [id])
+  ownerId       String?
+  owner         User?        @relation("BikeOwner", fields: [ownerId], references: [id])
+  pricePerDay   Decimal      @db.Decimal(10, 2)
+  city          String
+  imageUrl      String
+  gallery       String[]     @default([])
+  ratingAvg     Decimal      @default(0) @db.Decimal(2, 1)
+  ratingCount   Int          @default(0)
+  isFeatured    Boolean      @default(false)
+  description   String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  @@index([isFeatured])
+}
+
+model Testimonial {
+  id              String   @id @default(cuid())
+  authorName      String
+  authorAvatarUrl String?
+  authorLocation  String?
+  rating          Int
+  quote           String
+  isFeatured      Boolean  @default(true)
+  createdAt       DateTime @default(now())
+}
