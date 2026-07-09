@@ -18,18 +18,23 @@ Real Razorpay integration, availability calendar, cancellation policy engine, se
 ## Milestone 5 — Advanced Notifications & Location (future)
 Push notifications, Mapbox-powered destination maps, nearby attractions, route planning.
 
-## Milestone 6 — Mobile App (in progress)
-Flutter app consuming the existing REST API, renter-facing only (no partner/admin
-dashboards on mobile). See `.docs/TASKS.md` for the phase-by-phase task list.
+## Milestone 6 — Mobile App ✅ Built, pending on-device verification
+Flutter app (`apps/mobile`) consuming the existing REST API, renter-facing only (no
+partner/admin dashboards on mobile). See `.docs/TASKS.md` for the phase-by-phase task list.
 
 - **Phase 0 — Backend prep** ✅ Completed: Better Auth `bearer` plugin (ADR-007), real
   `POST /api/bookings`, `POST /api/bikes/[slug]/reviews`, wishlist add/remove
   (`POST`/`DELETE /api/wishlist/[bikeId]`).
-- **Phase 1 — Flutter scaffolding, theme, auth**
-- **Phase 2 — Browse/search (bikes, destinations, trips) — read-only**
-- **Phase 3 — Bookings, reviews, wishlist (writes, auth-gated)**
-- **Phase 4 — SOS, membership, referrals**
-- **Phase 5 — Messaging (polling), profile, polish**
+- **Phase 1 — Flutter scaffolding, theme, auth** ✅ Completed
+- **Phase 2 — Browse/search (bikes, destinations, trips) — read-only** ✅ Completed
+- **Phase 3 — Bookings, reviews, wishlist (writes, auth-gated)** ✅ Completed
+- **Phase 4 — SOS, membership, referrals** ✅ Completed
+- **Phase 5 — Messaging (polling), profile, polish** ✅ Completed
+
+`flutter analyze` and `flutter test` pass; the app builds, installs, and launched cleanly
+(no runtime exceptions) on an Android emulator. Full interactive on-device smoke testing is
+blocked by Android emulator instability on the dev machine used to build this (see
+`.docs/TASKS.md`) — needs a stable device/emulator to finish end-to-end verification.
 
 ### Milestone 6b — Mobile Realtime (future)
 Deliberately trimmed from v1: mobile messaging uses polling against the existing

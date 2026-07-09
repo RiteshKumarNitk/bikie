@@ -1,6 +1,28 @@
 # Changelog
 
-## Milestone 6 (in progress) — Mobile App, Phase 0
+## Milestone 6 — Mobile App, Phases 1-5
+- Flutter app (`apps/mobile`) built end-to-end: Riverpod + go_router + dio, feature-first
+  structure mirroring `packages/*`. Dark-navy/orange theme ported from
+  `.docs/UI_GUIDELINES.md` tokens; Inter font bundled locally as
+  `assets/fonts/Inter-Variable.ttf` rather than fetched at runtime via `google_fonts` —
+  the runtime-fetch approach crashed on an Android emulator with no general internet DNS
+  during verification, a realistic failure mode for any offline/restricted-network device
+  at first launch (see ADR-008).
+- Auth: sign up/in/out via Better Auth's bearer flow, session bootstrap + token persistence
+  via `flutter_secure_storage`, auth-gated routing via `go_router` redirects.
+- Renter feature set: browse/search bikes (filters, detail), destinations, trips; bookings
+  (create with date range + pickup city, list, status display); reviews (view + create,
+  gated on completed bookings); wishlist (toggle add/remove); SOS emergency (send with
+  device geolocation, respond, resolve, membership-gated upsell); membership (view active
+  plan, purchase via a dummy `DUMMY-<uuid>` checkout mirroring the web's
+  `PaymentModal.tsx`); referrals (view/copy code, link a code); messaging (polling-based,
+  a deliberate scope trim vs. the web's SSE — see ROADMAP.md Milestone 6b); profile
+  (phone number update, logout).
+- App default API base URL points at the deployed production API
+  (`https://bikie-web-rs8i.vercel.app`), overridable via `--dart-define=API_BASE_URL=...`
+  for local dev.
+
+## Milestone 6 — Mobile App, Phase 0
 - Better Auth `bearer` plugin so non-browser clients (the Flutter app) can authenticate via
   `Authorization: Bearer <token>` alongside the web app's existing cookie sessions — zero
   route-handler changes needed since session resolution already reads from headers.

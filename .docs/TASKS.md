@@ -11,11 +11,14 @@ Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 | `POST /api/bikes/[slug]/reviews` (review creation, gated on completed booking) | Completed |
 | Wishlist add/remove (`POST`/`DELETE /api/wishlist/[bikeId]`) | Completed |
 | `.docs/API.md` reconciliation (undocumented routes, stale entries, bearer auth section) | Completed |
-| Flutter scaffolding (`apps/mobile`), theme parity, networking layer, auth flow | Planned |
-| Browse/search screens (bikes, destinations, trips) | Planned |
-| Bookings, reviews, wishlist screens | Planned |
-| SOS, membership, referrals screens | Planned |
-| Messaging (polling), profile, polish | Planned |
+| Flutter scaffolding (`apps/mobile`), theme parity, networking layer, auth flow | Completed |
+| Browse/search screens (bikes, destinations, trips) | Completed |
+| Bookings, reviews, wishlist screens | Completed |
+| SOS, membership, referrals screens | Completed |
+| Messaging (polling), profile, polish | Completed |
+| Bundle Inter font locally instead of `google_fonts` runtime fetch (ADR-008 correction — crashed on a device/emulator with no general internet DNS) | Completed |
+| Full on-device smoke test (Android emulator) | Blocked — emulator (`Pixel_9` and `Pixel_3a_API_34`) repeatedly crashes/disconnects within seconds of app launch on this dev machine; appears to be a local virtualization/resource issue, not an app defect. `flutter analyze`/`flutter test` pass; app builds, installs, and launched without runtime exceptions in the one run that got far enough to confirm the font fix. Needs a stable device/emulator to finish. |
+| Point mobile app at production API (`https://bikie-web-rs8i.vercel.app`) | Done, with caveat — production has not yet deployed the Phase 0 backend routes (confirmed via curl: no `set-auth-token` header, `POST /api/bookings` → 405, wishlist route → 404) even though the commit is on `origin/master`. App falls back to a local dev server via `--dart-define=API_BASE_URL=...` in the meantime. |
 
 ## Milestone 3b — SOS Hardening, Membership Gating, Referrals
 
