@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { gsap } from "gsap";
 import { SearchBar } from "./SearchBar";
+import { LandingAccordionItem } from "@/components/ui/interactive-image-accordion";
 
 export function Hero() {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -11,29 +12,14 @@ export function Hero() {
     const ctx = gsap.context(() => {
       gsap
         .timeline()
-        .from("[data-hero-eyebrow]", { opacity: 0, y: 16, duration: 0.6, ease: "power3.out" })
-        .from(
-          "[data-hero-title]",
-          { opacity: 0, y: 32, duration: 0.8, ease: "power3.out" },
-          "-=0.3",
-        )
+        .from("[data-hero-title]", { opacity: 0, y: 32, duration: 0.8, ease: "power3.out" })
         .from(
           "[data-hero-subtitle]",
           { opacity: 0, y: 20, duration: 0.6, ease: "power3.out" },
           "-=0.5",
         )
+        .from("[data-hero-accordion]", { opacity: 0, x: 32, duration: 0.8, ease: "power3.out" }, "-=0.6")
         .from("[data-hero-search]", { opacity: 0, y: 24, duration: 0.6, ease: "power3.out" }, "-=0.4");
-
-      gsap.to("[data-hero-bg]", {
-        yPercent: 15,
-        ease: "none",
-        scrollTrigger: {
-          trigger: rootRef.current,
-          start: "top top",
-          end: "bottom top",
-          scrub: true,
-        },
-      });
     }, rootRef);
 
     return () => ctx.revert();
@@ -42,31 +28,30 @@ export function Hero() {
   return (
     <section
       ref={rootRef}
-      className="relative flex min-h-screen items-center justify-center overflow-hidden"
+      className="relative flex min-h-[calc(100vh-80px)] flex-col items-center justify-center overflow-hidden py-12 md:py-24"
     >
-      <div
-        data-hero-bg
-        className="absolute inset-0 -z-10 scale-110 bg-[url('https://picsum.photos/seed/bikie-hero/1920/1080')] bg-cover bg-center"
-      />
-      <div className="absolute inset-0 -z-10 bg-gradient-to-b from-black/50 via-black/30 to-black/60" />
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-16 px-6">
+        <div className="flex flex-col items-center justify-between gap-12 md:flex-row">
+          {/* Left Side: Text Content */}
+          <div className="w-full text-center md:w-1/2 md:text-left">
+            <h1 data-hero-title className="text-4xl font-bold leading-tight tracking-tighter text-foreground md:text-6xl">
+              Join Group Road Trips Across India
+            </h1>
+            <p data-hero-subtitle className="mx-auto mt-6 max-w-xl text-lg text-foreground/70 md:mx-0">
+              Connect with fellow riders, form a group, and explore India's most beautiful destinations together. Ride safe with our community and SOS support.
+            </p>
+          </div>
 
-      <div className="mx-auto flex max-w-5xl flex-col items-center gap-8 px-6 text-center text-white">
-        <span
-          data-hero-eyebrow
-          className="rounded-full border border-white/30 bg-white/10 px-4 py-1.5 text-xs font-medium uppercase tracking-widest backdrop-blur"
-        >
-          Find your next ride
-        </span>
-        <h1 data-hero-title className="text-4xl font-semibold leading-tight md:text-6xl">
-          Explore India on Two Wheels
-        </h1>
-        <p data-hero-subtitle className="max-w-xl text-base text-white/80 md:text-lg">
-          Rent premium motorcycles anywhere — adventure bikes, cruisers, and scooters, ready for
-          your next road trip.
-        </p>
-        <div data-hero-search className="w-full">
-          <SearchBar />
+          {/* Right Side: Image Accordion */}
+          <div className="w-full md:w-1/2" data-hero-accordion>
+            <LandingAccordionItem />
+          </div>
         </div>
+
+        {/* Search Bar at the bottom */}
+        {/* <div data-hero-search className="mx-auto w-full max-w-5xl">
+          <SearchBar />
+        </div> */}
       </div>
     </section>
   );

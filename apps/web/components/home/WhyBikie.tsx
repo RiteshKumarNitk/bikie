@@ -2,16 +2,16 @@ import { Reveal } from "@/components/shared/Reveal";
 
 const points = [
   {
-    title: "Curated, not crowded",
-    body: "Every bike is verified for condition and reliability before it ever appears in search.",
+    title: "Verified Community",
+    body: "Ride with confidence. Every member is verified to ensure a safe and friendly group trip experience.",
   },
   {
-    title: "Instant booking",
-    body: "No back-and-forth with providers — reserve in a few taps and get pickup instructions right away.",
+    title: "Seamless Planning",
+    body: "No hassle planning. Join an existing itinerary or create your own route and invite others.",
   },
   {
-    title: "Built for road trips",
-    body: "Destination guides, route tips, and nearby stops come with every booking.",
+    title: "Built for Safety",
+    body: "Travel together, stay safe together. Built-in SOS features and roadside assistance on every trip.",
   },
 ];
 

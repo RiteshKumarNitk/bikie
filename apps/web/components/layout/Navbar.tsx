@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { authClient } from "@/lib/auth-client";
 import { ThemeToggle } from "./ThemeToggle";
+import { MegaMenu } from "./MegaMenu";
 
 function dashboardHrefForRole(role: string | undefined) {
   if (role === "ADMIN") return "/admin";
@@ -53,13 +54,6 @@ export function Navbar() {
 
   const dashboardHref = dashboardHrefForRole(session?.user.role);
 
-  const navLinks = [
-    { label: "Explore", href: "/explore-bikes" },
-    { label: "Destinations", href: "/destinations" },
-    { label: "Trips", href: "/trips" },
-    { label: "Become a Partner", href: "/become-a-partner" },
-  ];
-
   const navLinkClass = "text-sm font-medium text-foreground/70 hover:text-foreground transition-colors";
 
   return (
@@ -77,11 +71,13 @@ export function Navbar() {
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
-          {navLinks.map((link) => (
-            <Link key={link.href} href={link.href} className={navLinkClass}>
-              {link.label}
-            </Link>
-          ))}
+          <Link href="/explore-bikes" className={navLinkClass}>
+            Explore Bikes
+          </Link>
+          <Link href="/trips" className={navLinkClass}>
+            Trips
+          </Link>
+          <MegaMenu label="More" />
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
@@ -199,50 +195,34 @@ export function Navbar() {
               animate={{ x: 0 }}
               exit={{ x: "100%" }}
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
-              className="absolute right-0 top-0 h-full w-80 bg-surface p-6 pt-20 shadow-xl"
+              className="absolute right-0 top-0 flex h-full w-80 flex-col overflow-y-auto bg-surface p-6 pt-20 shadow-xl"
               onClick={(e) => e.stopPropagation()}
             >
-              <nav className="flex flex-col gap-1">
-                {navLinks.map((link) => (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    onClick={() => setMenuOpen(false)}
-                    className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-foreground/5 transition-colors"
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-                <hr className="my-3 border-foreground/10" />
-                <Link
-                  href="/community"
-                  onClick={() => setMenuOpen(false)}
-                  className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-foreground/5 transition-colors"
-                >
-                  Community
-                </Link>
-                <Link
-                  href="/roadside-assistance"
-                  onClick={() => setMenuOpen(false)}
-                  className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-foreground/5 transition-colors"
-                >
-                  Roadside Assistance
-                </Link>
-                <Link
-                  href="/about"
-                  onClick={() => setMenuOpen(false)}
-                  className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-foreground/5 transition-colors"
-                >
-                  About Us
-                </Link>
-                <Link
-                  href="/faq"
-                  onClick={() => setMenuOpen(false)}
-                  className="rounded-xl px-4 py-3 text-sm font-medium hover:bg-foreground/5 transition-colors"
-                >
-                  Help Center
-                </Link>
-              </nav>
+              <div className="flex flex-col gap-6">
+                <div>
+                  <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-foreground/50">Explore</p>
+                  <nav className="flex flex-col gap-1">
+                    <Link href="/explore-bikes" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Explore Bikes</Link>
+                    <Link href="/destinations" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Destinations</Link>
+                    <Link href="/trips" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Trips</Link>
+                    <Link href="/community" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Community</Link>
+                  </nav>
+                </div>
+                <div>
+                  <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-foreground/50">Company</p>
+                  <nav className="flex flex-col gap-1">
+                    <Link href="/about" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>About Us</Link>
+                    <Link href="/become-a-partner" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Become a Partner</Link>
+                  </nav>
+                </div>
+                <div>
+                  <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-foreground/50">Support</p>
+                  <nav className="flex flex-col gap-1">
+                    <Link href="/faq" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Help Center</Link>
+                    <Link href="/roadside-assistance" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Roadside Assistance</Link>
+                  </nav>
+                </div>
+              </div>
               <div className="mt-6 flex items-center gap-3 border-t border-foreground/10 pt-6">
                 <ThemeToggle />
                 {!isPending && session ? (

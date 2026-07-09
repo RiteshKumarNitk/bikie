@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { homeSearchSchema, type HomeSearchInput } from "@bikie/validation";
@@ -19,7 +20,8 @@ const bikeTypes = [
 ];
 
 export function SearchBar() {
-  const [comingSoon, setComingSoon] = useState(false);
+  const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const {
     register,
     handleSubmit,
@@ -29,9 +31,15 @@ export function SearchBar() {
     defaultValues: { passengers: 1 },
   });
 
-  function onSubmit() {
-    setComingSoon(true);
-    setTimeout(() => setComingSoon(false), 3000);
+  function onSubmit(data: HomeSearchInput) {
+    setIsSubmitting(true);
+    const params = new URLSearchParams();
+    if (data.location) params.set("location", data.location);
+    if (data.pickupDate) params.set("pickup", data.pickupDate);
+    if (data.returnDate) params.set("return", data.returnDate);
+    if (data.bikeType) params.set("type", data.bikeType);
+
+    router.push(`/explore-bikes?${params.toString()}`);
   }
 
   return (
@@ -100,7 +108,7 @@ export function SearchBar() {
           type="submit"
           className="rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent/90 md:col-span-5"
         >
-          {comingSoon ? "Search coming soon" : "Search"}
+          {isSubmitting ? "Searching..." : "Search"}
         </button>
       </form>
     </GlassPanel>

@@ -42,7 +42,7 @@ const columns: MegaMenuColumn[] = [
   },
 ];
 
-export function MegaMenu() {
+export function MegaMenu({ label = "Explore" }: { label?: string }) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -59,11 +59,11 @@ export function MegaMenu() {
     <div className="relative" onMouseEnter={show} onMouseLeave={hide}>
       <button
         type="button"
-        className="flex items-center gap-1 text-sm font-medium"
+        className="flex items-center gap-1 text-sm font-medium text-foreground/70 hover:text-foreground transition-colors"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
       >
-        Explore
+        {label}
         <span className={`transition-transform ${open ? "rotate-180" : ""}`}>⌄</span>
       </button>
 
