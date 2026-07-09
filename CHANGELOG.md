@@ -1,5 +1,12 @@
 # Changelog
 
+## Milestone 3b
+- SOS alerts now show complete reporter info (email, phone, exact coordinates with a Google Maps link) in both the dashboard and admin feeds.
+- SOS Emergency (send, view, respond) gated behind an active membership; admins bypass the gate. Non-members see an upsell instead of the form.
+- Referral system: auto-generated per-user referral code (`User.referralCode`, `User.referredById`), signup accepts an optional code (or `?ref=` link), dashboard Referrals page to share the link and see who joined, admin Referrals page listing all referrer/referee pairs. Tracking only — no automatic reward.
+- Dummy payment checkout modal for membership purchase (simulated card form, fake processing delay, generates a `DUMMY-*` paymentId) replacing the instant-activate button.
+- Admin Membership Plans management (create/toggle active/delete plans) — previously plans could only be seeded, not managed.
+
 ## Milestone 3
 - SSE endpoint (`GET /api/sse`) + React hook (`useSSE`)
 - `AuditLog` model, migration, repository, API route (`/api/admin/audit-logs`)

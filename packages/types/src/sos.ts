@@ -3,6 +3,7 @@ export interface SOSAlertDTO {
   userId: string;
   userName: string;
   userPhone: string | null;
+  userEmail: string;
   type: string;
   description: string | null;
   latitude: number;

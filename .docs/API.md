@@ -45,6 +45,21 @@ No route imports `@prisma/client` directly.
 | `/api/partner/bookings` | GET |
 | `/api/partner/analytics` | GET |
 
+## SOS Emergency (membership required — admins bypass)
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/sos/alerts` | GET/POST | List active alerts / send a new one. `SOSAlertDTO` includes `userEmail`, `userPhone`, `latitude`/`longitude` for full reporter info. |
+| `/api/sos/alerts/[id]/respond` | POST | Notify the reporter you're nearby. |
+| `/api/sos/alerts/[id]/resolve` | POST | Mark an alert resolved. |
+
+## Referrals (auth required)
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/referrals/me` | GET | Returns (and lazily creates) the caller's referral code, plus who they've referred. |
+| `/api/referrals/link` | POST | `{ code }` — links the caller as referred by the code owner. Tracking only, no auto-reward. |
+
 ## Admin (role: ADMIN)
 
 | Route | Method |
@@ -52,6 +67,9 @@ No route imports `@prisma/client` directly.
 | `/api/admin/users` | GET |
 | `/api/admin/partners` | GET |
 | `/api/admin/bookings` | GET |
+| `/api/admin/membership/plans` | GET/POST |
+| `/api/admin/membership/plans/[id]` | PATCH/DELETE |
+| `/api/admin/referrals` | GET |
 
 ## Conventions
 

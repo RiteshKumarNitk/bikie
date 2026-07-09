@@ -7,8 +7,11 @@ type Alert = {
   userId: string;
   userName: string;
   userPhone: string | null;
+  userEmail: string;
   type: string;
   description: string | null;
+  latitude: number;
+  longitude: number;
   city: string;
   status: string;
   createdAt: string;
@@ -64,10 +67,23 @@ export function SOSAlertsFeed({ alerts: initial, live }: { alerts: Alert[]; live
                 <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
                 <span className="text-sm font-semibold">{alertLabels[alert.type] ?? alert.type}</span>
               </div>
-              <p className="mt-1 text-sm text-white/60">
-                {alert.userName} · {alert.city}
-              </p>
-              {alert.userPhone && <p className="mt-1 text-sm text-white/50">📞 {alert.userPhone}</p>}
+              <p className="mt-1 text-sm font-medium text-white/80">{alert.userName}</p>
+              <div className="mt-1 space-y-0.5 text-sm text-white/60">
+                <p>📧 {alert.userEmail}</p>
+                {alert.userPhone && <p>📞 {alert.userPhone}</p>}
+                <p>🏙️ {alert.city}</p>
+                <p>
+                  📍{" "}
+                  <a
+                    href={`https://www.google.com/maps?q=${alert.latitude},${alert.longitude}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-accent hover:underline"
+                  >
+                    {alert.latitude.toFixed(5)}, {alert.longitude.toFixed(5)} — view on map
+                  </a>
+                </p>
+              </div>
               {alert.description && <p className="mt-2 text-sm text-white/70">{alert.description}</p>}
               <p className="mt-2 text-xs text-white/40">{new Date(alert.createdAt).toLocaleString("en-IN")}</p>
             </div>

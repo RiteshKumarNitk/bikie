@@ -13,3 +13,4 @@ export { MembershipService } from "./membership.service";
 export { SOSService } from "./sos.service";
 export { EmailService } from "./email.service";
 export { SMSService } from "./sms.service";
+export { ReferralService } from "./referral.service";

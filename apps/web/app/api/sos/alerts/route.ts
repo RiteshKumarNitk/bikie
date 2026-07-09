@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { SOSService, EmailService } from "@bikie/services";
-import { requireSession } from "@/lib/require-role";
+import { requireMembership } from "@/lib/require-role";
 import { broadcastEvent } from "@/lib/sse-manager";
 import { prisma } from "@bikie/database";
 
 export async function GET(request: Request) {
-  const { session, error } = await requireSession();
+  const { session, error } = await requireMembership();
   if (error) return error;
 
   const url = new URL(request.url);
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { session, error } = await requireSession();
+  const { session, error } = await requireMembership();
   if (error) return error;
 
   const body = await request.json();

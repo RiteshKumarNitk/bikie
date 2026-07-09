@@ -17,13 +17,14 @@ export async function createAlert(data: {
       longitude: data.longitude,
       city: data.city,
     },
-    include: { user: { select: { id: true, name: true, phone: true } } },
+    include: { user: { select: { id: true, name: true, phone: true, email: true } } },
   });
   return {
     id: alert.id,
     userId: alert.userId,
     userName: alert.user.name,
     userPhone: alert.user.phone,
+    userEmail: alert.user.email,
     type: alert.type,
     description: alert.description,
     latitude: alert.latitude,
@@ -42,7 +43,7 @@ export async function getActiveAlerts(city?: string) {
   const alerts = await prisma.sOSAlert.findMany({
     where,
     orderBy: { createdAt: "desc" },
-    include: { user: { select: { id: true, name: true, phone: true } } },
+    include: { user: { select: { id: true, name: true, phone: true, email: true } } },
   });
 
   return alerts.map((a) => ({
@@ -50,6 +51,7 @@ export async function getActiveAlerts(city?: string) {
     userId: a.userId,
     userName: a.user.name,
     userPhone: a.user.phone,
+    userEmail: a.user.email,
     type: a.type,
     description: a.description,
     latitude: a.latitude,

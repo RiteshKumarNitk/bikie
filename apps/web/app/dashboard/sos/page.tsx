@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 
 interface SOSAlert {
@@ -8,6 +9,7 @@ interface SOSAlert {
   userId: string;
   userName: string;
   userPhone: string | null;
+  userEmail: string;
   type: string;
   description: string | null;
   latitude: number;
@@ -26,8 +28,31 @@ const alertTypes = [
   { value: "OTHER", label: "❗ Other", desc: "Other emergency" },
 ];
 
+function MembershipUpsell() {
+  return (
+    <div className="mt-6 rounded-2xl border border-foreground/10 bg-card p-8 text-center">
+      <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-red-500/10 text-2xl">
+        🆘
+      </div>
+      <h2 className="mt-4 text-lg font-semibold">SOS Emergency is a Membership perk</h2>
+      <p className="mx-auto mt-2 max-w-md text-sm text-foreground/50">
+        Sending, viewing, and responding to SOS alerts is available to active BIKIE members only —
+        this keeps the safety network trustworthy and limited to verified riders.
+      </p>
+      <Link
+        href="/membership"
+        className="mt-6 inline-flex rounded-xl bg-accent px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+      >
+        View Membership Plans
+      </Link>
+    </div>
+  );
+}
+
 export default function SOSPage() {
   const { data: session } = authClient.useSession();
+  const [checkingMembership, setCheckingMembership] = useState(true);
+  const [isMember, setIsMember] = useState(false);
   const [activeTab, setActiveTab] = useState<"new" | "alerts">("new");
   const [alertType, setAlertType] = useState("ACCIDENT");
   const [description, setDescription] = useState("");
@@ -39,12 +64,27 @@ export default function SOSPage() {
   const [activeAlerts, setActiveAlerts] = useState<SOSAlert[]>([]);
   const [alertSent, setAlertSent] = useState(false);
   const [profileWarning, setProfileWarning] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!session) return;
+    if (session.user.role === "ADMIN") {
+      setIsMember(true);
+      setCheckingMembership(false);
+      return;
+    }
+    fetch("/api/membership/active")
+      .then((r) => r.json())
+      .then((data) => setIsMember(!!data.membership))
+      .finally(() => setCheckingMembership(false));
+  }, [session]);
+
+  useEffect(() => {
+    if (!isMember) return;
     fetch("/api/sos/alerts")
       .then((r) => r.json())
-      .then((data) => setActiveAlerts(data.alerts));
-  }, []);
+      .then((data) => setActiveAlerts(data.alerts ?? []));
+  }, [isMember]);
 
   function getLocation() {
     if (!navigator.geolocation) {
@@ -68,6 +108,7 @@ export default function SOSPage() {
       return;
     }
     setSending(true);
+    setSendError(null);
     const res = await fetch("/api/sos/alerts", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -86,10 +127,31 @@ export default function SOSPage() {
       setAlertSent(true);
       if (data.profileWarning) setProfileWarning(data.profileWarning);
       setTimeout(() => { setActiveTab("alerts"); setSent(false); }, 2000);
+    } else {
+      const data = await res.json().catch(() => null);
+      setSendError(data?.message ?? "Could not send alert. Please try again.");
     }
   }
 
   const isMyAlert = (item: SOSAlert) => item.userId === session?.user.id;
+
+  if (checkingMembership) {
+    return (
+      <div>
+        <h1 className="text-2xl font-semibold">SOS Emergency</h1>
+        <div className="mt-6 h-48 animate-pulse rounded-2xl bg-card" />
+      </div>
+    );
+  }
+
+  if (!isMember) {
+    return (
+      <div>
+        <h1 className="text-2xl font-semibold">SOS Emergency</h1>
+        <MembershipUpsell />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -120,7 +182,7 @@ export default function SOSPage() {
 
       {alertSent && (
         <div className="mt-4 rounded-2xl bg-red-500/15 px-6 py-4 text-sm text-red-400">
-          <p>🆘 SOS alert sent! Nearby users and admins have been notified.</p>
+          <p>🆘 SOS alert sent! Nearby members and admins have been notified.</p>
           {profileWarning && (
             <p className="mt-2 rounded-lg bg-yellow-500/15 p-3 text-yellow-400">
               ⚠️ {profileWarning}
@@ -129,10 +191,16 @@ export default function SOSPage() {
         </div>
       )}
 
+      {sendError && (
+        <div className="mt-4 rounded-2xl bg-red-500/15 px-6 py-4 text-sm text-red-400">
+          {sendError}
+        </div>
+      )}
+
       {activeTab === "new" && (
         <div className="mt-4 rounded-2xl border border-foreground/10 bg-card p-6">
           <p className="text-lg font-semibold">What&apos;s happening?</p>
-          <p className="mt-1 text-sm text-foreground/50">Your location and alert will be shared with nearby users and admins.</p>
+          <p className="mt-1 text-sm text-foreground/50">Your location and alert will be shared with other members and admins.</p>
 
           <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {alertTypes.map((type) => (
@@ -208,7 +276,7 @@ export default function SOSPage() {
             <div className="rounded-2xl border border-foreground/10 bg-card p-8 text-center text-sm text-foreground/50">
               <p className="text-2xl">✅</p>
               <p className="mt-2 font-medium">No active alerts</p>
-              <p className="mt-1">All clear in your area.</p>
+              <p className="mt-1">All clear right now.</p>
             </div>
           ) : (
             activeAlerts.map((a) => (
@@ -218,8 +286,8 @@ export default function SOSPage() {
                   isMyAlert(a) ? "border-red-500/30 bg-red-500/5" : "border-foreground/10"
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="min-w-0">
                     <div className="flex items-center gap-2">
                       <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
                       <span className="text-sm font-semibold">
@@ -229,12 +297,23 @@ export default function SOSPage() {
                         <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-400">You</span>
                       )}
                     </div>
-                    <p className="mt-1 text-sm text-foreground/60">
-                      {a.userName} · {a.city}
-                    </p>
-                    {a.userPhone && (
-                      <p className="mt-1 text-sm text-foreground/50">📞 {a.userPhone}</p>
-                    )}
+                    <p className="mt-1 text-sm font-medium text-foreground/80">{a.userName}</p>
+                    <div className="mt-1 space-y-0.5 text-sm text-foreground/50">
+                      <p>📧 {a.userEmail}</p>
+                      {a.userPhone && <p>📞 {a.userPhone}</p>}
+                      <p>🏙️ {a.city}</p>
+                      <p>
+                        📍{" "}
+                        <a
+                          href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-accent hover:underline"
+                        >
+                          {a.latitude.toFixed(5)}, {a.longitude.toFixed(5)} — view on map
+                        </a>
+                      </p>
+                    </div>
                     {a.description && (
                       <p className="mt-2 text-sm text-foreground/70">{a.description}</p>
                     )}
@@ -242,7 +321,7 @@ export default function SOSPage() {
                       {new Date(a.createdAt).toLocaleString("en-IN")}
                     </p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex shrink-0 gap-2">
                     {!isMyAlert(a) && (
                       <button
                         type="button"

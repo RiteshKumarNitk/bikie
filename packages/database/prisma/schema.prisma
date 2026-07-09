@@ -116,6 +116,10 @@ model User {
   membership    UserMembership[]
   sosAlerts     SOSAlert[]
   sosResponses  SOSAlertResponse[]
+  referralCode  String?   @unique
+  referredById  String?
+  referredBy    User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referrals     User[]    @relation("Referrals")
 
   @@map("user")
 }

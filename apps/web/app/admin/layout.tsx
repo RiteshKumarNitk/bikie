@@ -29,6 +29,13 @@ const navGroups = [
     ],
   },
   {
+    label: "Growth",
+    items: [
+      { label: "Membership Plans", href: "/admin/membership" },
+      { label: "Referrals", href: "/admin/referrals" },
+    ],
+  },
+  {
     label: "Comms",
     items: [
       { label: "Email", href: "/admin/email" },

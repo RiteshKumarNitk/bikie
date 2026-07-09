@@ -12,6 +12,7 @@ const navItems = [
   { label: "Wallet", href: "/dashboard/wallet" },
   { label: "SOS Emergency", href: "/dashboard/sos" },
   { label: "Membership", href: "/dashboard/membership" },
+  { label: "Referrals", href: "/dashboard/referrals" },
   { label: "Reviews", href: "/dashboard/reviews" },
   { label: "Settings", href: "/dashboard/settings" },
 ];

@@ -9,6 +9,9 @@ Multi-page marketing site (full sitemap), dark-default theme, shared layout prim
 ## Milestone 3 — Real-time + Admin Overhaul ✅ Completed
 SSE real-time messaging, AuditLog system with admin CRUD instrumentation, admin dashboard charts (recharts), CSV export, email (Resend) and SMS (Twilio) gateway services, SOS auto-resolve cron, SOS history API, CMS testimonial management.
 
+## Milestone 3b — SOS Hardening, Membership Gating, Referrals ✅ Completed
+SOS alerts show full reporter info (email, phone, map link); SOS send/view/respond gated behind active membership; referral system (auto-generated codes, signup linking, dashboard + admin pages, tracking only); dummy payment checkout modal for membership purchase; admin Membership Plans CRUD.
+
 ## Milestone 4 — Real Bookings & Payments (future)
 Real Razorpay integration, availability calendar, cancellation policy engine, security deposits.
 

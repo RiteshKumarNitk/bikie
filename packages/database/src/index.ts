@@ -13,3 +13,4 @@ export * as messageRepository from "./repositories/message.repository";
 export * as membershipRepository from "./repositories/membership.repository";
 export * as sosRepository from "./repositories/sos.repository";
 export * as auditRepository from "./repositories/audit.repository";
+export * as referralRepository from "./repositories/referral.repository";

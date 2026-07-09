@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { PaymentModal } from "@/components/membership/PaymentModal";
 
 interface Plan {
   id: string;
@@ -20,9 +21,9 @@ export default function MembershipPage() {
   const { data: session } = authClient.useSession();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
-  const [purchasing, setPurchasing] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
   const [successPlan, setSuccessPlan] = useState<string | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
 
   useEffect(() => {
     fetch("/api/membership/plans")
@@ -31,25 +32,18 @@ export default function MembershipPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handlePurchase(planId: string) {
+  function handlePurchase(plan: Plan) {
     if (!session) {
       router.push("/login?next=/membership");
       return;
     }
-    setPurchasing(true);
     setPurchaseError(null);
-    const res = await fetch("/api/membership/purchase", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId }),
-    });
-    if (!res.ok) {
-      setPurchaseError("Purchase failed. Please try again.");
-      setPurchasing(false);
-      return;
-    }
-    setSuccessPlan(planId);
-    setPurchasing(false);
+    setCheckoutPlan(plan);
+  }
+
+  function handleCheckoutSuccess() {
+    setSuccessPlan(checkoutPlan?.id ?? null);
+    setCheckoutPlan(null);
   }
 
   if (loading) {
@@ -115,11 +109,11 @@ export default function MembershipPage() {
               </ul>
               <button
                 type="button"
-                onClick={() => handlePurchase(plan.id)}
-                disabled={purchasing || successPlan !== null}
+                onClick={() => handlePurchase(plan)}
+                disabled={successPlan !== null}
                 className="mt-8 w-full rounded-xl bg-accent py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
               >
-                {purchasing ? "Processing..." : successPlan === plan.id ? "✓ Active" : "Get Started"}
+                {successPlan === plan.id ? "✓ Active" : "Get Started"}
               </button>
             </div>
           ))}
@@ -131,6 +125,14 @@ export default function MembershipPage() {
           </p>
         )}
       </div>
+
+      {checkoutPlan && (
+        <PaymentModal
+          plan={checkoutPlan}
+          onClose={() => setCheckoutPlan(null)}
+          onSuccess={handleCheckoutSuccess}
+        />
+      )}
     </div>
   );
 }

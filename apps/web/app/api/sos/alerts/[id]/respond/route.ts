@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import { SOSService } from "@bikie/services";
-import { requireSession } from "@/lib/require-role";
+import { requireMembership } from "@/lib/require-role";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireSession();
+  const { session, error } = await requireMembership();
   if (error) return error;
 
   const { id } = await params;

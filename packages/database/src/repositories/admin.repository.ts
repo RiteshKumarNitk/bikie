@@ -196,3 +196,97 @@ export async function deleteTestimonial(id: string) {
 export async function findAllAuditLogs() {
   return prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 200 });
 }
+
+// --- Membership Plans ---
+
+function mapPlan(p: {
+  id: string;
+  name: string;
+  description: string;
+  price: { toNumber(): number };
+  durationDays: number;
+  benefits: string[];
+  isActive: boolean;
+}) {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    price: p.price.toNumber(),
+    durationDays: p.durationDays,
+    benefits: p.benefits,
+    isActive: p.isActive,
+  };
+}
+
+export async function findAllPlansAdmin() {
+  const plans = await prisma.membershipPlan.findMany({ orderBy: { sortOrder: "asc" } });
+  return plans.map(mapPlan);
+}
+
+export async function createMembershipPlan(data: {
+  name: string;
+  description: string;
+  price: number;
+  durationDays: number;
+  benefits: string[];
+  sortOrder?: number;
+}) {
+  const plan = await prisma.membershipPlan.create({
+    data: {
+      name: data.name,
+      description: data.description,
+      price: data.price,
+      durationDays: data.durationDays,
+      benefits: data.benefits,
+      sortOrder: data.sortOrder ?? 0,
+    },
+  });
+  return mapPlan(plan);
+}
+
+export async function updateMembershipPlan(
+  id: string,
+  data: Partial<{
+    name: string;
+    description: string;
+    price: number;
+    durationDays: number;
+    benefits: string[];
+    isActive: boolean;
+    sortOrder: number;
+  }>,
+) {
+  const plan = await prisma.membershipPlan.update({ where: { id }, data });
+  return mapPlan(plan);
+}
+
+export async function deleteMembershipPlan(id: string) {
+  await prisma.membershipPlan.delete({ where: { id } });
+}
+
+// --- Referrals ---
+
+export async function findAllReferrals() {
+  const referred = await prisma.user.findMany({
+    where: { referredById: { not: null } },
+    orderBy: { createdAt: "desc" },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      createdAt: true,
+      referredBy: { select: { id: true, name: true, email: true } },
+    },
+  });
+
+  return referred.map((r) => ({
+    refereeId: r.id,
+    refereeName: r.name,
+    refereeEmail: r.email,
+    createdAt: r.createdAt.toISOString(),
+    referrerId: r.referredBy!.id,
+    referrerName: r.referredBy!.name,
+    referrerEmail: r.referredBy!.email,
+  }));
+}

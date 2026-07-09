@@ -1,10 +1,35 @@
 import { NextResponse } from "next/server";
+import { MembershipService } from "@bikie/services";
 import { getServerSession } from "./get-session";
 
 export async function requireSession() {
   const session = await getServerSession();
   if (!session) {
     return { session: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  return { session, error: null };
+}
+
+export async function requireMembership() {
+  const session = await getServerSession();
+  if (!session) {
+    return { session: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+  }
+  if (session.user.role === "ADMIN") {
+    return { session, error: null };
+  }
+  const membership = await MembershipService.getActiveMembership(session.user.id);
+  if (!membership) {
+    return {
+      session,
+      error: NextResponse.json(
+        {
+          error: "MEMBERSHIP_REQUIRED",
+          message: "SOS Emergency is a BIKIE Membership perk. Join a plan to send and view alerts.",
+        },
+        { status: 403 },
+      ),
+    };
   }
   return { session, error: null };
 }

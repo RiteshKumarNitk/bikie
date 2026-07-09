@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { signUpSchema, type SignUpInput } from "@bikie/validation";
@@ -23,11 +23,17 @@ export default function SignUpPage() {
   const [partnerType, setPartnerType] = useState("RENTAL");
   const [businessName, setBusinessName] = useState("");
   const [city, setCity] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<SignUpInput>({ resolver: zodResolver(signUpSchema) });
+
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) setReferralCode(ref);
+  }, []);
 
   async function onSubmit(values: SignUpInput) {
     setServerError(null);
@@ -47,6 +53,13 @@ export default function SignUpPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ businessName, type: partnerType, city }),
       });
+    }
+    if (referralCode.trim()) {
+      await fetch("/api/referrals/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: referralCode.trim() }),
+      }).catch(() => {});
     }
     window.location.href = selectedRole === "PARTNER" ? "/partner" : "/";
   }
@@ -156,6 +169,19 @@ export default function SignUpPage() {
               {errors.password && (
                 <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
               )}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium" htmlFor="referralCode">
+                Referral code <span className="font-normal text-foreground/40">(optional)</span>
+              </label>
+              <input
+                id="referralCode"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                placeholder="e.g. RID4F2A9"
+                className="mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm uppercase outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30"
+              />
             </div>
 
             {selectedRole === "PARTNER" && (

@@ -93,4 +93,35 @@ export const AdminService = {
   async getAllAuditLogs() {
     return adminRepository.findAllAuditLogs();
   },
+
+  // --- Membership Plans ---
+
+  async getAllMembershipPlans() {
+    return adminRepository.findAllPlansAdmin();
+  },
+
+  async createMembershipPlan(data: {
+    name: string;
+    description: string;
+    price: number;
+    durationDays: number;
+    benefits: string[];
+    sortOrder?: number;
+  }) {
+    return adminRepository.createMembershipPlan(data);
+  },
+
+  async updateMembershipPlan(id: string, data: any) {
+    return adminRepository.updateMembershipPlan(id, data);
+  },
+
+  async deleteMembershipPlan(id: string) {
+    return adminRepository.deleteMembershipPlan(id);
+  },
+
+  // --- Referrals ---
+
+  async getAllReferrals() {
+    return adminRepository.findAllReferrals();
+  },
 };
