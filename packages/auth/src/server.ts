@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { bearer } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "@bikie/database";
 
@@ -16,6 +17,10 @@ export const auth = betterAuth({
       },
     },
   },
+  // Cookie sessions remain the primary mechanism for the web app; bearer()
+  // additionally lets non-browser clients (the Flutter app) authenticate via
+  // `Authorization: Bearer <token>` using the same session/getSession machinery.
+  plugins: [bearer()],
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
 });

@@ -1,5 +1,29 @@
 import { prisma } from "../client";
 
+export async function findReviewByBookingId(bookingId: string) {
+  return prisma.review.findUnique({ where: { bookingId } });
+}
+
+export async function createReview(data: { userId: string; bikeId: string; bookingId: string; rating: number; comment: string }) {
+  const review = await prisma.review.create({
+    data: {
+      userId: data.userId,
+      bikeId: data.bikeId,
+      bookingId: data.bookingId,
+      rating: data.rating,
+      comment: data.comment,
+    },
+    include: { user: true },
+  });
+  return {
+    id: review.id,
+    rating: review.rating,
+    comment: review.comment,
+    createdAt: review.createdAt.toISOString(),
+    author: { name: review.user.name, image: review.user.image },
+  };
+}
+
 export async function findReviewsForBike(bikeId: string) {
   const reviews = await prisma.review.findMany({
     where: { bikeId },

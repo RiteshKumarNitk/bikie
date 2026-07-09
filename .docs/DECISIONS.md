@@ -32,3 +32,26 @@ Satoshi/General Sans (Fontshare) require self-hosted licensing; Geist Sans (MIT,
 official Vercel `next/font` package) is a close geometric-grotesque match and adds
 zero licensing friction. Documented upgrade path: swap via `next/font/local` later
 if brand assets are finalized.
+
+## ADR-007: Better Auth `bearer` plugin for mobile auth
+The web app was built cookie-session-only (Better Auth default). A native Flutter app
+can't reasonably manage a browser-style cookie jar, so rather than build a separate
+mobile auth service, `packages/auth/src/server.ts` adds Better Auth's built-in `bearer()`
+plugin. Sign-in/sign-up responses gain a `set-auth-token` header; the Flutter app stores
+that token (`flutter_secure_storage`) and sends `Authorization: Bearer <token>`. Every
+existing route handler already resolves sessions via `auth.api.getSession({ headers })`
+(through `requireSession`/`requireRole`/`requireMembership`), so this required zero
+route-handler changes — cookie and bearer auth now work side by side against the same API.
+
+## ADR-008: Flutter font — Inter, bundled locally (not `google_fonts` runtime fetch)
+No Flutter/Dart package exists for Geist Sans (see ADR-006 for why the web uses it), so the
+Flutter app uses Inter instead — closest available geometric-grotesque match, same
+rationale as ADR-006. Initially wired up via the `google_fonts` package's default runtime
+fetch (downloads the TTF from fonts.gstatic.com on first use); this **crashed the app**
+during Phase 1 verification on a fresh Android emulator with no general internet DNS
+(reachable the host loopback for API calls, but not `fonts.gstatic.com`) — a realistic
+failure mode for any device that's offline or on a restricted network at first launch, not
+just an emulator artifact. Fixed by downloading `Inter[opsz,wght].ttf` (OFL-licensed, from
+Google's official `google/fonts` GitHub repo) and bundling it directly as
+`apps/mobile/assets/fonts/Inter-Variable.ttf`, declared in `pubspec.yaml`'s `fonts:`
+section — zero runtime network dependency for text rendering.

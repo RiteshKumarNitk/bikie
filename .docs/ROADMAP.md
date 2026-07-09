@@ -18,5 +18,22 @@ Real Razorpay integration, availability calendar, cancellation policy engine, se
 ## Milestone 5 — Advanced Notifications & Location (future)
 Push notifications, Mapbox-powered destination maps, nearby attractions, route planning.
 
-## Milestone 6 — Mobile App (future)
-Flutter app consuming the existing REST API.
+## Milestone 6 — Mobile App (in progress)
+Flutter app consuming the existing REST API, renter-facing only (no partner/admin
+dashboards on mobile). See `.docs/TASKS.md` for the phase-by-phase task list.
+
+- **Phase 0 — Backend prep** ✅ Completed: Better Auth `bearer` plugin (ADR-007), real
+  `POST /api/bookings`, `POST /api/bikes/[slug]/reviews`, wishlist add/remove
+  (`POST`/`DELETE /api/wishlist/[bikeId]`).
+- **Phase 1 — Flutter scaffolding, theme, auth**
+- **Phase 2 — Browse/search (bikes, destinations, trips) — read-only**
+- **Phase 3 — Bookings, reviews, wishlist (writes, auth-gated)**
+- **Phase 4 — SOS, membership, referrals**
+- **Phase 5 — Messaging (polling), profile, polish**
+
+### Milestone 6b — Mobile Realtime (future)
+Deliberately trimmed from v1: mobile messaging uses polling against the existing
+`/api/conversations` REST routes instead of the cookie-session `/api/sse` stream (Dart has
+no mature first-party SSE client, and `/api/sse` is a generic heartbeat channel shared with
+SOS, not a per-conversation stream). Revisit by either adapting `/api/sse` for bearer auth
+or introducing WebSockets, once real-time chat becomes a priority.

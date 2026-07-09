@@ -24,6 +24,34 @@ function toDTO(booking: {
   };
 }
 
+export async function createBooking(data: {
+  userId: string;
+  bikeId: string;
+  startDate: Date;
+  endDate: Date;
+  pickupCity: string;
+  totalPrice: number;
+  status: "PENDING" | "CONFIRMED";
+}) {
+  const booking = await prisma.booking.create({
+    data: {
+      userId: data.userId,
+      bikeId: data.bikeId,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      pickupCity: data.pickupCity,
+      totalPrice: data.totalPrice,
+      status: data.status,
+    },
+    include: { bike: true, review: true },
+  });
+  return toDTO(booking);
+}
+
+export async function findBookingById(id: string) {
+  return prisma.booking.findUnique({ where: { id } });
+}
+
 export async function findBookingsByUser(userId: string, status?: string) {
   const bookings = await prisma.booking.findMany({
     where: { userId, ...(status && { status: status as never }) },

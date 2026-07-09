@@ -5,7 +5,8 @@
 ```
 bike/
 ├── apps/
-│   └── web/                # Next.js 16 (App Router) — site + API route handlers
+│   ├── web/                 # Next.js 16 (App Router) — site + API route handlers
+│   └── mobile/               # Flutter renter app — NOT a pnpm/turbo workspace member
 ├── packages/
 │   ├── database/           # Prisma schema, generated client, repositories
 │   ├── auth/                # Better Auth server config
@@ -47,6 +48,13 @@ Better Auth, backed by Neon via the Prisma adapter. `User.role` is one of
 `RENTER | PARTNER | ADMIN`. Dashboard routes are gated by role in a `proxy.ts`
 (Next.js 16 renamed `middleware` → `proxy`) plus a server-side session check in
 each dashboard's layout.
+
+The web app authenticates via Better Auth's HTTP-only session cookie. The Flutter app
+(`apps/mobile`) instead uses **bearer tokens**, enabled by the `bearer()` plugin in
+`packages/auth/src/server.ts` (ADR-007). Both mechanisms are active simultaneously —
+`auth.api.getSession({ headers })`, which every protected route calls via
+`requireSession()`/`requireRole()`/`requireMembership()`, resolves the session from
+either the cookie or an `Authorization: Bearer <token>` header with no per-route changes.
 
 ## Fonts, theme, animation
 

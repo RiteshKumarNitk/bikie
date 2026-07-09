@@ -1,5 +1,17 @@
 import { prisma } from "../client";
 
+export async function addToWishlist(userId: string, bikeId: string) {
+  await prisma.wishlist.upsert({
+    where: { userId_bikeId: { userId, bikeId } },
+    create: { userId, bikeId },
+    update: {},
+  });
+}
+
+export async function removeFromWishlist(userId: string, bikeId: string) {
+  await prisma.wishlist.deleteMany({ where: { userId, bikeId } });
+}
+
 export async function findWishlistByUser(userId: string) {
   const items = await prisma.wishlist.findMany({
     where: { userId },

@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Milestone 6 — Mobile App
+
+| Task | Status |
+|---|---|
+| Better Auth `bearer` plugin (ADR-007) | Completed |
+| `POST /api/bookings` (booking creation, service + repository + route + validation) | Completed |
+| `POST /api/bikes/[slug]/reviews` (review creation, gated on completed booking) | Completed |
+| Wishlist add/remove (`POST`/`DELETE /api/wishlist/[bikeId]`) | Completed |
+| `.docs/API.md` reconciliation (undocumented routes, stale entries, bearer auth section) | Completed |
+| Flutter scaffolding (`apps/mobile`), theme parity, networking layer, auth flow | Planned |
+| Browse/search screens (bikes, destinations, trips) | Planned |
+| Bookings, reviews, wishlist screens | Planned |
+| SOS, membership, referrals screens | Planned |
+| Messaging (polling), profile, polish | Planned |
+
 ## Milestone 3b — SOS Hardening, Membership Gating, Referrals
 
 | Task | Status |

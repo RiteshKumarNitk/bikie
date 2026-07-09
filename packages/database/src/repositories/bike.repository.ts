@@ -117,6 +117,19 @@ export async function findBikeBySlug(slug: string) {
   };
 }
 
+export async function findBikeForBooking(id: string) {
+  const bike = await prisma.bike.findUnique({
+    where: { id },
+    select: { id: true, pricePerDay: true, instantBooking: true },
+  });
+  if (!bike) return null;
+  return {
+    id: bike.id,
+    pricePerDay: bike.pricePerDay.toNumber(),
+    instantBooking: bike.instantBooking,
+  };
+}
+
 export async function findBikesByOwner(ownerId: string) {
   const bikes = await prisma.bike.findMany({
     where: { ownerId },
