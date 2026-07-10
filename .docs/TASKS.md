@@ -43,7 +43,7 @@ Deferred per explicit user decision — tracked here for a future pass:
 | Partner Settings/business-profile page is read-only despite a working `PUT /api/partner/profile` underneath | Partner dashboard |
 | `/partners/services` promises 8 partner types (mechanic, fuel delivery, tour guide, hotel, camping, accessories, photography); dashboard only supports bike-fleet listing | Partner marketing vs. dashboard gap |
 | `lib/partner-content.ts` (services/benefits/pricing/success-stories) is 100% hardcoded, no admin CMS management | Partner marketing |
-| `/community` page is 100% hardcoded fake data (featured riders, ride photos, events, clubs pills) with dead-click cards, zero API calls | Rider public site |
+| `/community` page's "Featured Riders" and "Rider Clubs" sections are still hardcoded fake data with dead-click cards, zero API calls (the "Upcoming Rides" section was fixed — now shows real API-backed rides with working Create/Join CTAs, per direct user report of not being able to find ride creation) | Rider public site |
 | `/clubs` page is 100% hardcoded fake data; "+ Create Club" CTA is non-functional | Rider public site |
 | Contact form (`ContactForm`) never calls an API — `onSubmit` just sets local state, message is never sent | Rider public site |
 | `/safety-center` is static hardcoded topics, no API | Rider public site |
