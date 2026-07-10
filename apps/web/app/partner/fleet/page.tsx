@@ -108,7 +108,7 @@ export default function PartnerFleetPage() {
                 <p className="font-medium">{bike.name}</p>
                 <p className="text-sm text-foreground/50">{bike.brand} · {bike.category.name}</p>
                 <div className="mt-3 flex items-center justify-between">
-                  <p className="font-semibold text-accent">{formatCurrency(bike.pricePerDay)}<span className="text-xs text-foreground/50">/day</span></p>
+                  <p className="font-semibold text-accent-text">{formatCurrency(bike.pricePerDay)}<span className="text-xs text-foreground/50">/day</span></p>
                   <button
                     type="button"
                     onClick={() => setDeletingId(bike.id)}

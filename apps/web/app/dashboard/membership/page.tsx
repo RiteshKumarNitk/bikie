@@ -54,7 +54,7 @@ export default function DashboardMembershipPage() {
       <div className="mt-6 rounded-2xl border border-accent/20 bg-card p-6">
         <div className="flex items-center justify-between">
           <div>
-            <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-medium text-accent">Active</span>
+            <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-medium text-accent-text">Active</span>
             <h2 className="mt-3 text-xl font-semibold">{membership.plan.name} Plan</h2>
             <p className="mt-1 text-sm text-foreground/50">
               {membership.daysLeft} days remaining · Expires{" "}
@@ -75,7 +75,7 @@ export default function DashboardMembershipPage() {
           <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
             {membership.plan.benefits.map((benefit, i) => (
               <li key={i} className="flex items-center gap-2 text-sm text-foreground/70">
-                <span className="text-accent">✓</span>
+                <span className="text-accent-text">✓</span>
                 {benefit}
               </li>
             ))}

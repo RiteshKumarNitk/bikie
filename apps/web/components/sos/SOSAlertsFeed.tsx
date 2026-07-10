@@ -78,7 +78,7 @@ export function SOSAlertsFeed({ alerts: initial, live }: { alerts: Alert[]; live
                     href={`https://www.google.com/maps?q=${alert.latitude},${alert.longitude}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="text-accent hover:underline"
+                    className="text-accent-text hover:underline"
                   >
                     {alert.latitude.toFixed(5)}, {alert.longitude.toFixed(5)} — view on map
                   </a>

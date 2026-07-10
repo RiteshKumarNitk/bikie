@@ -22,12 +22,12 @@ export default async function PartnerReviewsPage() {
             <div key={review.id} className="rounded-3xl bg-card p-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <Link href={`/bikes/${review.bike?.slug}`} className="font-medium hover:text-accent">
+                  <Link href={`/bikes/${review.bike?.slug}`} className="font-medium hover:text-accent-text">
                     {review.bike?.name}
                   </Link>
                   <p className="text-xs text-foreground/50">by {review.author.name}</p>
                 </div>
-                <p className="text-accent">{"★".repeat(review.rating)}</p>
+                <p className="text-accent-text">{"★".repeat(review.rating)}</p>
               </div>
               <p className="mt-2 text-sm text-foreground/70">{review.comment}</p>
             </div>

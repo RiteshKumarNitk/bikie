@@ -186,7 +186,7 @@ export default function SignUpPage() {
 
             {selectedRole === "PARTNER" && (
               <div className="space-y-4 rounded-xl border border-accent/20 bg-accent/[0.02] p-4">
-                <p className="text-xs font-semibold uppercase tracking-wider text-accent">Partner details</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">Partner details</p>
                 <div>
                   <label className="text-sm font-medium" htmlFor="businessName">
                     Business name
@@ -249,7 +249,7 @@ export default function SignUpPage() {
 
           <p className="mt-6 text-center text-sm text-foreground/50">
             Already have an account?{" "}
-            <Link href="/login" className="font-medium text-accent hover:text-accent-hover">
+            <Link href="/login" className="font-medium text-accent-text hover:text-accent-hover">
               Log in
             </Link>
           </p>

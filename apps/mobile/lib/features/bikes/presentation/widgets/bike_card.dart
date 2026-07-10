@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/theme/app_theme.dart';
 import '../../data/bike_models.dart';
 
 class BikeCard extends StatelessWidget {
@@ -37,7 +38,7 @@ class BikeCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.star, size: 16, color: Theme.of(context).colorScheme.primary),
+                      Icon(Icons.star, size: 16, color: AppTheme.accentTextOf(context)),
                       const SizedBox(width: 4),
                       Text('${bike.ratingAvg} (${bike.ratingCount})', style: Theme.of(context).textTheme.bodySmall),
                       const Spacer(),
@@ -60,7 +61,7 @@ class BikeCard extends StatelessWidget {
                         style: Theme.of(context)
                             .textTheme
                             .labelSmall
-                            ?.copyWith(color: Theme.of(context).colorScheme.primary),
+                            ?.copyWith(color: AppTheme.accentTextOf(context)),
                       ),
                     ),
                   ],

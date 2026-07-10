@@ -81,7 +81,7 @@ export default function CommunityPage() {
                     <p className="font-medium">{event.title}</p>
                     <p className="text-sm text-foreground/60">{event.city}</p>
                   </div>
-                  <p className="text-sm font-medium text-accent">{event.date}</p>
+                  <p className="text-sm font-medium text-accent-text">{event.date}</p>
                 </div>
               ))}
             </div>
@@ -102,7 +102,7 @@ export default function CommunityPage() {
               <p className="mt-2 text-sm text-white/70">
                 Join a curated weekend ride and meet riders near you.
               </p>
-              <Link href="/trips?tab=weekend" className="mt-4 inline-flex text-sm font-medium text-accent">
+              <Link href="/trips?tab=weekend" className="mt-4 inline-flex text-sm font-medium text-accent-text">
                 Browse weekend trips →
               </Link>
             </div>

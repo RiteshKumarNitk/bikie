@@ -1,5 +1,23 @@
 # Changelog
 
+## Rebrand — accent color changed to indigo (`#3B3A91`)
+- Web and mobile brand accent changed from orange to `#3B3A91` across both apps (ADR-009).
+- Split into `--color-accent` (solid fills — buttons, badges, backgrounds) vs.
+  `--color-accent-text` (links/labels/icons/star-ratings) since the literal color fails
+  WCAG AA contrast as text against the dark-mode background; dark mode uses a lighter tint
+  (`#8482D6`) for the text variant, light mode uses the literal color for both.
+- Web: `text-accent` renamed to `text-accent-text` across ~32 files (Tailwind utility
+  classes); `bg-accent`/`border-accent`/etc. unchanged.
+- Mobile: bike/review star icons, "Instant booking" badge text, and membership plan
+  checkmarks now use `AppTheme.accentTextOf(context)`; button/badge/avatar backgrounds
+  keep `colorScheme.primary` (the literal accent).
+- Fixed two real bugs found while implementing the mobile app: `BikeRepository.getBySlug`,
+  `DestinationRepository.getBySlug`, and `TripRepository.getBySlug` were parsing detail API
+  responses as if unwrapped, when they're actually wrapped in a singular key
+  (`{ bike: ... }`, `{ destination: ... }`, `{ trip: ... }`) — this was the root cause of
+  bike/destination/trip detail pages always showing a retry error. `.docs/API.md` corrected
+  to match.
+
 ## Milestone 6 — Mobile App, Phases 1-5
 - Flutter app (`apps/mobile`) built end-to-end: Riverpod + go_router + dio, feature-first
   structure mirroring `packages/*`. Dark-navy/orange theme ported from

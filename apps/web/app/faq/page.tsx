@@ -27,7 +27,7 @@ export default function FAQPage() {
         <h1 className="text-center text-3xl font-semibold md:text-4xl">Help Center</h1>
         <p className="mt-2 text-center text-foreground/60">
           Find answers by category, or reach our{" "}
-          <a href="/contact" className="text-accent">
+          <a href="/contact" className="text-accent-text">
             support team
           </a>{" "}
           directly.

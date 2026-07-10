@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../data/membership_model.dart';
 import '../data/membership_repository.dart';
@@ -116,7 +117,7 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Row(
                   children: [
-                    Icon(Icons.check_circle, size: 16, color: Theme.of(context).colorScheme.primary),
+                    Icon(Icons.check_circle, size: 16, color: AppTheme.accentTextOf(context)),
                     const SizedBox(width: 6),
                     Expanded(child: Text(b)),
                   ],

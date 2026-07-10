@@ -37,7 +37,7 @@ export function TestimonialsCarousel({ testimonials }: { testimonials: Testimoni
                 <p className="text-xs text-foreground/60">{testimonial.authorLocation}</p>
               </div>
             </div>
-            <p className="mt-1 text-sm text-accent">{"★".repeat(testimonial.rating)}</p>
+            <p className="mt-1 text-sm text-accent-text">{"★".repeat(testimonial.rating)}</p>
             <p className="mt-3 text-sm text-foreground/80">{testimonial.quote}</p>
           </div>
         ))}

@@ -143,7 +143,7 @@ export default async function BikeDetailPage({ params }: { params: Promise<{ slu
               <h3 className="font-semibold">Safety guidelines</h3>
               <p className="mt-2 text-sm text-foreground/70">
                 Helmets are mandatory at all times. Review our full{" "}
-                <a href="/safety-center" className="text-accent">
+                <a href="/safety-center" className="text-accent-text">
                   Safety Center
                 </a>{" "}
                 before setting off, especially for mountain routes.
@@ -160,7 +160,7 @@ export default async function BikeDetailPage({ params }: { params: Promise<{ slu
                     <div key={review.id} className="rounded-2xl bg-card p-5">
                       <div className="flex items-center justify-between">
                         <p className="font-medium">{review.author.name}</p>
-                        <p className="text-accent">{"★".repeat(review.rating)}</p>
+                        <p className="text-accent-text">{"★".repeat(review.rating)}</p>
                       </div>
                       <p className="mt-2 text-sm text-foreground/70">{review.comment}</p>
                     </div>

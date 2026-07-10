@@ -55,3 +55,16 @@ just an emulator artifact. Fixed by downloading `Inter[opsz,wght].ttf` (OFL-lice
 Google's official `google/fonts` GitHub repo) and bundling it directly as
 `apps/mobile/assets/fonts/Inter-Variable.ttf`, declared in `pubspec.yaml`'s `fonts:`
 section — zero runtime network dependency for text rendering.
+
+## ADR-009: Brand accent changed to indigo (`#3B3A91`), split into fill vs. text tokens
+Requested rebrand from the orange CTA accent to `#3B3A91` across both web and mobile.
+`#3B3A91` contrasts well as a solid fill with white text (~7.5:1) and as text against the
+light-mode background (~9.8:1), but as text/icon color against the dark-mode background
+(the default theme, ADR-002) it's only ~1.8:1 — well under WCAG AA's 4.5:1 minimum. Rather
+than accept that regression or water down the requested color, the accent was split into
+two tokens: `--color-accent` (`#3B3A91` literal, for solid fills — buttons, badges, avatar
+and chat-bubble backgrounds) and `--color-accent-text` (`#3B3A91` in light mode, `#8482D6`
+— a lighter tint of the same hue — in dark mode, for links/labels/star-ratings/badge text).
+Web: Tailwind classes `bg-accent` vs. `text-accent-text` (swapped project-wide from the
+prior single `text-accent`). Mobile: `Theme.of(context).colorScheme.primary` for fills vs.
+`AppTheme.accentTextOf(context)` for text/icons.

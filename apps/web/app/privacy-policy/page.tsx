@@ -42,7 +42,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-foreground">4. Your Rights</h2>
             <p className="mt-2">
               You may request a copy of your data or account deletion at any time by contacting{" "}
-              <a href="mailto:privacy@bikie.app" className="text-accent">
+              <a href="mailto:privacy@bikie.app" className="text-accent-text">
                 privacy@bikie.app
               </a>
               .
@@ -52,7 +52,7 @@ export default function PrivacyPolicyPage() {
             <h2 className="text-lg font-semibold text-foreground">5. Cookies</h2>
             <p className="mt-2">
               See our{" "}
-              <a href="/cookie-policy" className="text-accent">
+              <a href="/cookie-policy" className="text-accent-text">
                 Cookie Policy
               </a>{" "}
               for details on how we use cookies.

@@ -6,7 +6,7 @@ import type { TripSummaryDTO } from "@bikie/types";
 const difficultyColor: Record<string, string> = {
   EASY: "text-green-400",
   MODERATE: "text-warning",
-  HARD: "text-accent",
+  HARD: "text-accent-text",
 };
 
 export function TripCard({ trip }: { trip: TripSummaryDTO }) {

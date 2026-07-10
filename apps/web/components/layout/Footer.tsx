@@ -68,7 +68,7 @@ export function Footer() {
                   href={social.href}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border border-foreground/10 text-xs text-foreground/50 transition-all hover:border-accent hover:text-accent hover:bg-accent/10"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-foreground/10 text-xs text-foreground/50 transition-all hover:border-accent hover:text-accent-text hover:bg-accent/10"
                   aria-label={social.label}
                 >
                   {social.label[0]}

@@ -58,14 +58,14 @@ export default async function DashboardHomePage() {
                 {new Date((active ?? upcoming)!.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} –{" "}
                 {new Date((active ?? upcoming)!.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
               </p>
-              <Link href="/dashboard/bookings" className="mt-3 inline-flex text-sm font-medium text-accent">
+              <Link href="/dashboard/bookings" className="mt-3 inline-flex text-sm font-medium text-accent-text">
                 View booking →
               </Link>
             </div>
           ) : (
             <div className="mt-4">
               <p className="text-sm text-foreground/60">No active or upcoming bookings.</p>
-              <Link href="/explore-bikes" className="mt-3 inline-flex text-sm font-medium text-accent">
+              <Link href="/explore-bikes" className="mt-3 inline-flex text-sm font-medium text-accent-text">
                 Explore bikes →
               </Link>
             </div>
@@ -77,7 +77,7 @@ export default async function DashboardHomePage() {
           <p className="mt-2 text-sm text-foreground/60">
             Roadside assistance is available 24/7 for every active booking.
           </p>
-          <Link href="/roadside-assistance" className="mt-3 inline-flex text-sm font-medium text-accent">
+          <Link href="/roadside-assistance" className="mt-3 inline-flex text-sm font-medium text-accent-text">
             Get Roadside Assistance →
           </Link>
         </div>

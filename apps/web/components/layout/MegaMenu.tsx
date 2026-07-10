@@ -85,7 +85,7 @@ export function MegaMenu({ label = "Explore" }: { label?: string }) {
                   <ul className="mt-3 space-y-2.5">
                     {column.links.map((link) => (
                       <li key={link.href}>
-                        <Link href={link.href} className="text-sm hover:text-accent" onClick={() => setOpen(false)}>
+                        <Link href={link.href} className="text-sm hover:text-accent-text" onClick={() => setOpen(false)}>
                           {link.label}
                         </Link>
                       </li>

@@ -102,7 +102,7 @@ export default function MembershipPage() {
               <ul className="mt-6 space-y-3">
                 {plan.benefits.map((benefit, i) => (
                   <li key={i} className="flex items-start gap-2 text-sm">
-                    <span className="mt-0.5 text-accent">✓</span>
+                    <span className="mt-0.5 text-accent-text">✓</span>
                     {benefit}
                   </li>
                 ))}
@@ -121,7 +121,7 @@ export default function MembershipPage() {
 
         {!session && (
           <p className="mt-6 text-sm text-foreground/50">
-            <Link href="/login?next=/membership" className="text-accent hover:underline">Log in</Link> to purchase a membership.
+            <Link href="/login?next=/membership" className="text-accent-text hover:underline">Log in</Link> to purchase a membership.
           </p>
         )}
       </div>

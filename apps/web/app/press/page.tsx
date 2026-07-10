@@ -21,7 +21,7 @@ export default function PressPage() {
         <h1 className="text-3xl font-semibold md:text-4xl">Press</h1>
         <p className="mt-2 text-foreground/60">
           For media inquiries, contact{" "}
-          <a href="mailto:press@bikie.app" className="text-accent">
+          <a href="mailto:press@bikie.app" className="text-accent-text">
             press@bikie.app
           </a>
           .
@@ -30,7 +30,7 @@ export default function PressPage() {
         <div className="mt-10 space-y-4">
           {mentions.map((mention) => (
             <div key={mention.title} className="rounded-2xl bg-card p-5">
-              <p className="text-xs font-medium uppercase tracking-wide text-accent">{mention.outlet}</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-accent-text">{mention.outlet}</p>
               <p className="mt-2 font-medium">{mention.title}</p>
               <p className="mt-1 text-sm text-foreground/50">{mention.date}</p>
             </div>

@@ -11,7 +11,12 @@ class AppColors {
   static const darkCard = Color(0xFF111827);
   static const darkForeground = Color(0xFFF8FAFC);
   static const darkSecondary = Color(0xFF1E293B);
-  static const darkAccent = Color(0xFFFF7A1F);
+  static const darkAccent = Color(0xFF3B3A91);
+  // #3B3A91 as an icon/text foreground against this near-black background is
+  // ~1.8:1 contrast (fails WCAG AA). Lighter tint of the same hue for
+  // text/icon usages; darkAccent stays literal for button/badge fills. See
+  // ADR in .docs/DECISIONS.md and apps/web/app/globals.css --color-accent-text.
+  static const darkAccentText = Color(0xFF8482D6);
 
   // Light
   static const lightBackground = Color(0xFFFAFAFA);
@@ -19,7 +24,9 @@ class AppColors {
   static const lightCard = Color(0xFFFFFFFF);
   static const lightForeground = Color(0xFF0F172A);
   static const lightSecondary = Color(0xFF1E293B);
-  static const lightAccent = Color(0xFFFF6B00);
+  static const lightAccent = Color(0xFF3B3A91);
+  // #3B3A91 already contrasts well (~9.8:1) against the light background.
+  static const lightAccentText = Color(0xFF3B3A91);
 
   // Shared
   static const success = Color(0xFF22C55E);

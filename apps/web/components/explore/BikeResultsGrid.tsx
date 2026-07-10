@@ -27,7 +27,7 @@ export async function BikeResultsGrid({ query }: { query: string }) {
           <BikeCard key={bike.id} bike={bike} />
         ))}
       </div>
-      <Link href="/explore-bikes" className="mt-8 inline-flex text-sm font-medium text-accent">
+      <Link href="/explore-bikes" className="mt-8 inline-flex text-sm font-medium text-accent-text">
         See all bikes with more filters →
       </Link>
     </>

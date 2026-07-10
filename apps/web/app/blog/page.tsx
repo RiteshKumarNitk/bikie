@@ -31,7 +31,7 @@ export default function BlogPage() {
                 />
               </div>
               <div className="p-5">
-                <span className="text-xs font-medium uppercase tracking-wide text-accent">{post.category}</span>
+                <span className="text-xs font-medium uppercase tracking-wide text-accent-text">{post.category}</span>
                 <p className="mt-2 font-semibold">{post.title}</p>
                 <p className="mt-2 text-sm text-foreground/60">{post.excerpt}</p>
               </div>

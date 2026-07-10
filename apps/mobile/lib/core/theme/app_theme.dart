@@ -16,6 +16,15 @@ const String kFontFamily = 'Inter';
 class AppTheme {
   AppTheme._();
 
+  /// Accent color for icons/text/labels (not button or badge fills — use
+  /// `Theme.of(context).colorScheme.primary` for those). See the contrast
+  /// note on `AppColors.darkAccentText`.
+  static Color accentTextOf(BuildContext context) {
+    return Theme.of(context).brightness == Brightness.dark
+        ? AppColors.darkAccentText
+        : AppColors.lightAccentText;
+  }
+
   static ThemeData get dark => _build(
         brightness: Brightness.dark,
         background: AppColors.darkBackground,

@@ -21,10 +21,10 @@ export default async function DashboardReviewsPage() {
           {reviews.map((review) => (
             <div key={review.id} className="rounded-3xl bg-card p-5">
               <div className="flex items-center justify-between">
-                <Link href={`/bikes/${review.bike?.slug}`} className="font-medium hover:text-accent">
+                <Link href={`/bikes/${review.bike?.slug}`} className="font-medium hover:text-accent-text">
                   {review.bike?.name}
                 </Link>
-                <p className="text-accent">{"★".repeat(review.rating)}</p>
+                <p className="text-accent-text">{"★".repeat(review.rating)}</p>
               </div>
               <p className="mt-2 text-sm text-foreground/70">{review.comment}</p>
             </div>

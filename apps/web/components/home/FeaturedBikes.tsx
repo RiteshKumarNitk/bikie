@@ -11,7 +11,7 @@ export function FeaturedBikes({ bikes }: { bikes: BikeSummaryDTO[] }) {
           <h2 className="text-3xl font-semibold md:text-4xl">Featured Bikes</h2>
           <p className="mt-2 text-foreground/60">Hand-picked rides ready for your next trip.</p>
         </div>
-        <Link href="/explore-bikes" className="hidden text-sm font-medium text-accent md:inline">
+        <Link href="/explore-bikes" className="hidden text-sm font-medium text-accent-text md:inline">
           Explore all bikes →
         </Link>
       </Reveal>

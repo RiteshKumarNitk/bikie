@@ -21,7 +21,7 @@ function UserAvatar({ name }: { name: string }) {
     .toUpperCase()
     .slice(0, 2);
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 text-sm font-semibold text-accent">
+    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-accent/20 text-sm font-semibold text-accent-text">
       {initials}
     </div>
   );
@@ -107,7 +107,7 @@ export function Navbar() {
                     <div className="border-b border-foreground/10 px-3 py-2">
                       <p className="text-sm font-medium">{session.user.name}</p>
                       <p className="text-xs text-foreground/50">{session.user.email}</p>
-                      <span className="mt-1 inline-block rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent">
+                      <span className="mt-1 inline-block rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent-text">
                         {session.user.role}
                       </span>
                     </div>

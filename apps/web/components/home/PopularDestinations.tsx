@@ -15,7 +15,7 @@ export function PopularDestinations({
           <h2 className="text-3xl font-semibold md:text-4xl">Popular Destinations</h2>
           <p className="mt-2 text-foreground/60">Curated road trips riders love the most.</p>
         </div>
-        <Link href="/destinations" className="hidden text-sm font-medium text-accent md:inline">
+        <Link href="/destinations" className="hidden text-sm font-medium text-accent-text md:inline">
           See all destinations →
         </Link>
       </Reveal>

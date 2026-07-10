@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../bookings/data/booking_model.dart';
 import '../../bookings/domain/booking_providers.dart';
 import '../data/review_repository.dart';
@@ -86,7 +87,7 @@ class _CreateReviewSheetState extends ConsumerState<CreateReviewSheet> {
                 onPressed: () => setState(() => _rating = starValue),
                 icon: Icon(
                   starValue <= _rating ? Icons.star : Icons.star_border,
-                  color: Theme.of(context).colorScheme.primary,
+                  color: AppTheme.accentTextOf(context),
                 ),
               );
             }),

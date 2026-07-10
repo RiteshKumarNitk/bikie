@@ -35,7 +35,7 @@ class DestinationRepository {
   Future<DestinationDetail> getBySlug(String slug) {
     return apiGuard(() async {
       final res = await _dio.get('/api/destinations/$slug');
-      return DestinationDetail.fromJson(res.data as Map<String, dynamic>);
+      return DestinationDetail.fromJson(res.data['destination'] as Map<String, dynamic>);
     });
   }
 }

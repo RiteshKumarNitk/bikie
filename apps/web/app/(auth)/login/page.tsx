@@ -120,7 +120,7 @@ export default function LoginPage() {
                 <label className="text-sm font-medium" htmlFor="password">
                   Password
                 </label>
-                <button type="button" className="text-xs text-accent hover:text-accent-hover">
+                <button type="button" className="text-xs text-accent-text hover:text-accent-hover">
                   Forgot?
                 </button>
               </div>
@@ -149,7 +149,7 @@ export default function LoginPage() {
 
           <p className="mt-6 text-center text-sm text-foreground/50">
             Don&apos;t have an account?{" "}
-            <Link href="/signup" className="font-medium text-accent hover:text-accent-hover">
+            <Link href="/signup" className="font-medium text-accent-text hover:text-accent-hover">
               Create one
             </Link>
           </p>

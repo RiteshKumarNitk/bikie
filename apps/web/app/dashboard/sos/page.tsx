@@ -308,7 +308,7 @@ export default function SOSPage() {
                           href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-accent hover:underline"
+                          className="text-accent-text hover:underline"
                         >
                           {a.latitude.toFixed(5)}, {a.longitude.toFixed(5)} — view on map
                         </a>

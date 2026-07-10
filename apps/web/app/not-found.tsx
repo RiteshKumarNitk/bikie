@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function NotFound() {
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-6 text-center">
-      <p className="font-display text-8xl font-semibold text-accent">404</p>
+      <p className="font-display text-8xl font-semibold text-accent-text">404</p>
       <h1 className="text-2xl font-semibold">This road doesn&apos;t exist</h1>
       <p className="max-w-sm text-foreground/60">
         The page you&apos;re looking for took a wrong turn. Let&apos;s get you back on route.

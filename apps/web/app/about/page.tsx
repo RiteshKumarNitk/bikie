@@ -56,7 +56,7 @@ export default function AboutPage() {
             {timeline.map((item) => (
               <div key={item.year} className="relative">
                 <span className="absolute -left-[27px] top-1 h-3 w-3 rounded-full bg-accent" />
-                <p className="text-sm font-semibold text-accent">{item.year}</p>
+                <p className="text-sm font-semibold text-accent-text">{item.year}</p>
                 <p className="mt-1 text-foreground/70">{item.event}</p>
               </div>
             ))}

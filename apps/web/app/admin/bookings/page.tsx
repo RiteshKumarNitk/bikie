@@ -102,7 +102,7 @@ export default function AdminBookingsPage() {
                     booking.status === "COMPLETED" ? "bg-success/15 text-success" :
                     booking.status === "CANCELLED" ? "bg-red-500/15 text-red-400" :
                     booking.status === "ACTIVE" ? "bg-blue-500/15 text-blue-400" :
-                    booking.status === "CONFIRMED" ? "bg-accent/15 text-accent" :
+                    booking.status === "CONFIRMED" ? "bg-accent/15 text-accent-text" :
                     "bg-warning/15 text-warning"
                   }`}>
                     {booking.status}
@@ -148,7 +148,7 @@ export default function AdminBookingsPage() {
                   onClick={() => setNewStatus(s)}
                   className={`w-full rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all ${
                     newStatus === s
-                      ? "border-accent bg-accent/10 text-accent"
+                      ? "border-accent bg-accent/10 text-accent-text"
                       : "border-foreground/10 hover:border-foreground/20"
                   }`}
                 >

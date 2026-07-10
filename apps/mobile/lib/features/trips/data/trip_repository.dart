@@ -24,7 +24,7 @@ class TripRepository {
   Future<TripDetail> getBySlug(String slug) {
     return apiGuard(() async {
       final res = await _dio.get('/api/trips/$slug');
-      return TripDetail.fromJson(res.data as Map<String, dynamic>);
+      return TripDetail.fromJson(res.data['trip'] as Map<String, dynamic>);
     });
   }
 }

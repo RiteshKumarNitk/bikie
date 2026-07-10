@@ -18,7 +18,7 @@
 :root {
   --color-primary: #0a1628;
   --color-secondary: #182244;
-  --color-accent: #d4942b;
+  --color-accent: #3b3a91;
   --color-success: #22c55e;
   --color-warning: #f59e0b;
   --color-background: #f0f2f5;
@@ -27,7 +27,10 @@
   --color-foreground: #0a1628;
   --glass-bg: rgba(255, 255, 255, 0.7);
   --glass-border: rgba(255, 255, 255, 0.3);
-  --color-accent-hover: #b87d1f;
+  --color-accent-hover: #2e2d74;
+  /* Text/link usages of accent (not backgrounds): same as --color-accent here,
+     since #3b3a91 already contrasts ~9.8:1 against this light background. */
+  --color-accent-text: #3b3a91;
 }
 
 /* Dark mode: Rich navy blue — the primary BIKIE look */
@@ -38,8 +41,12 @@
   --color-card: #111933;
   --color-foreground: #edf0f7;
   --color-secondary: #182244;
-  --color-accent: #e8a838;
-  --color-accent-hover: #d4942b;
+  --color-accent: #3b3a91;
+  --color-accent-hover: #2e2d74;
+  /* #3b3a91 as TEXT against this near-black background is ~1.8:1 contrast
+     (fails WCAG AA). Lighter tint of the same hue keeps links/badges/labels
+     readable while --color-accent stays literal for button/badge fills. */
+  --color-accent-text: #8482d6;
   --glass-bg: rgba(17, 25, 51, 0.7);
   --glass-border: rgba(255, 255, 255, 0.06);
 }
@@ -49,6 +56,7 @@
   --color-secondary: var(--color-secondary);
   --color-accent: var(--color-accent);
   --color-accent-hover: var(--color-accent-hover);
+  --color-accent-text: var(--color-accent-text);
   --color-success: var(--color-success);
   --color-warning: var(--color-warning);
   --color-background: var(--color-background);

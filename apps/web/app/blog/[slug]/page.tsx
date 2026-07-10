@@ -25,7 +25,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Blog", href: "/blog" }, { label: post.title }]} />
 
       <div className="mx-auto max-w-3xl px-6 pt-6">
-        <span className="text-xs font-medium uppercase tracking-wide text-accent">{post.category}</span>
+        <span className="text-xs font-medium uppercase tracking-wide text-accent-text">{post.category}</span>
         <h1 className="mt-2 text-3xl font-semibold md:text-4xl">{post.title}</h1>
         <p className="mt-2 text-sm text-foreground/50">
           {post.author} ·{" "}

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../../auth/domain/auth_state.dart';
@@ -75,7 +76,7 @@ class _BikeDetailBody extends ConsumerWidget {
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    Icon(Icons.star, size: 18, color: Theme.of(context).colorScheme.primary),
+                    Icon(Icons.star, size: 18, color: AppTheme.accentTextOf(context)),
                     const SizedBox(width: 4),
                     Text('${bike.ratingAvg} (${bike.ratingCount} reviews)'),
                     const Spacer(),
@@ -119,7 +120,7 @@ class _BikeDetailBody extends ConsumerWidget {
                                         children: [
                                           Text(r.author.name, style: Theme.of(context).textTheme.titleSmall),
                                           const SizedBox(width: 8),
-                                          Icon(Icons.star, size: 14, color: Theme.of(context).colorScheme.primary),
+                                          Icon(Icons.star, size: 14, color: AppTheme.accentTextOf(context)),
                                           Text('${r.rating}'),
                                         ],
                                       ),

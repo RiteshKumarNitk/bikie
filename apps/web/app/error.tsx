@@ -16,7 +16,7 @@ export default function GlobalError({
 
   return (
     <div className="flex min-h-[70vh] flex-col items-center justify-center gap-4 px-6 text-center">
-      <p className="font-display text-8xl font-semibold text-accent">500</p>
+      <p className="font-display text-8xl font-semibold text-accent-text">500</p>
       <h1 className="text-2xl font-semibold">Something stalled out</h1>
       <p className="max-w-sm text-foreground/60">
         An unexpected error occurred. Our team has been notified — try again in a moment.

@@ -85,7 +85,7 @@ export default function AdminUsersPage() {
                 <td className="px-5 py-3 text-foreground/60">{user.email}</td>
                 <td className="px-5 py-3">
                   <span className={`rounded-full px-3 py-1 text-xs font-medium ${
-                    user.role === "ADMIN" ? "bg-accent/15 text-accent" :
+                    user.role === "ADMIN" ? "bg-accent/15 text-accent-text" :
                     user.role === "PARTNER" ? "bg-blue-500/15 text-blue-400" :
                     "bg-foreground/5 text-foreground/60"
                   }`}>
@@ -132,7 +132,7 @@ export default function AdminUsersPage() {
                   onClick={() => setNewRole(role)}
                   className={`w-full rounded-xl border px-4 py-3 text-left text-sm font-medium transition-all ${
                     newRole === role
-                      ? "border-accent bg-accent/10 text-accent"
+                      ? "border-accent bg-accent/10 text-accent-text"
                       : "border-foreground/10 hover:border-foreground/20"
                   }`}
                 >

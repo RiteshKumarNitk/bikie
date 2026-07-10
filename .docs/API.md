@@ -32,14 +32,14 @@ route below, no per-route changes needed.
 |---|---|---|
 | `GET /api/bikes/featured` | `limit` (default 8, max 20) | `{ bikes: BikeSummaryDTO[] }` |
 | `GET /api/bikes` | `location, category, priceMin, priceMax, brand, instantBooking, sort, page, pageSize` | `{ bikes: BikeSummaryDTO[], total, page, pageSize }` |
-| `GET /api/bikes/[slug]` | — | `BikeDetailDTO` |
+| `GET /api/bikes/[slug]` | — | `{ bike: BikeDetailDTO }` |
 | `GET /api/destinations` | — | `{ destinations: DestinationSummaryDTO[] }` (all destinations, `revalidate: 300`) |
 | `GET /api/destinations/popular` | `limit` | `{ destinations: DestinationSummaryDTO[] }` |
-| `GET /api/destinations/[slug]` | — | `DestinationDetailDTO` |
+| `GET /api/destinations/[slug]` | — | `{ destination: DestinationDetailDTO }` |
 | `GET /api/categories` | — | `{ categories: CategoryDTO[] }` |
 | `GET /api/testimonials` | `limit` | `{ testimonials: TestimonialDTO[] }` |
 | `GET /api/trips` | `tab` (upcoming/weekend/adventure/road-trip/international/guided-tour/completed) | `{ trips: TripSummaryDTO[] }` |
-| `GET /api/trips/[slug]` | — | `TripDetailDTO` |
+| `GET /api/trips/[slug]` | — | `{ trip: TripDetailDTO }` |
 
 ## Bookings (auth required)
 

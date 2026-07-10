@@ -34,7 +34,7 @@ export default function CareersPage() {
                   {role.team} · {role.location}
                 </p>
               </div>
-              <a href="mailto:careers@bikie.app" className="text-sm font-medium text-accent">
+              <a href="mailto:careers@bikie.app" className="text-sm font-medium text-accent-text">
                 Apply →
               </a>
             </div>
