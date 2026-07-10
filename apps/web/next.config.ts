@@ -21,6 +21,13 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "i.pravatar.cc", pathname: "/**" },
     ],
   },
+  async redirects() {
+    return [
+      // Superseded by the /partners/* public site (ADR-012) — kept for any
+      // existing inbound links/SEO.
+      { source: "/become-a-partner", destination: "/partners", permanent: true },
+    ];
+  },
 };
 
 export default nextConfig;

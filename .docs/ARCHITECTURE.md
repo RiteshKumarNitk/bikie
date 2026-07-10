@@ -56,6 +56,23 @@ The web app authenticates via Better Auth's HTTP-only session cookie. The Flutte
 `requireSession()`/`requireRole()`/`requireMembership()`, resolves the session from
 either the cookie or an `Authorization: Bearer <token>` header with no per-route changes.
 
+## Rides (community rides)
+
+User-organized group rides (`Trip`/`TripParticipant` models — internal name unchanged,
+user-facing copy says "Ride", see ADR-010) follow a request-then-approve flow instead of
+instant join: `TripParticipant.status` moves `PENDING → APPROVED|REJECTED`, with `CANCELLED`
+for withdrawals. `Trip.seatsLeft` is a real counter, decremented atomically on approval
+(conditional `UPDATE ... WHERE seatsLeft > 0`, not a naive read-then-write) and incremented
+back if an approved rider later leaves.
+
+The "Ride Group" chat is **not** a new subsystem — it's the existing `Conversation` /
+`ConversationParticipant` / `Message` models (already group-capable, see
+`packages/database/src/repositories/message.repository.ts`), linked to its ride via a
+nullable `Conversation.tripId` FK. The conversation is created on the ride's first approval
+and subsequent approvals just add a `ConversationParticipant` row — the group chat UI is the
+same `/dashboard/messages` page used for partner 1:1 chats, entered via a
+`?conversation=<id>` deep link.
+
 ## Fonts, theme, animation
 
 - Fonts: Geist Sans (display) via `geist/font/sans`, Inter (body) via

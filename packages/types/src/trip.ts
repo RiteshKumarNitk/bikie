@@ -17,5 +17,26 @@ export interface TripSummaryDTO {
 export interface TripDetailDTO extends TripSummaryDTO {
   description: string;
   gallery: string[];
-  organizer: { name: string; image: string | null };
+  meetingPoint: string | null;
+  organizer: { id: string; name: string; image: string | null };
+}
+
+export interface RideJoinRequestDTO {
+  id: string;
+  message: string | null;
+  createdAt: string;
+  rider: { id: string; name: string; image: string | null };
+}
+
+export interface MyRideRequestStatusDTO {
+  status: string;
+  message: string | null;
+}
+
+export interface RideStatsDTO {
+  ridesOrganized: number;
+  requestsSent: number;
+  requestsApproved: number;
+  ridesCancelled: number;
+  approvalRate: number | null;
 }

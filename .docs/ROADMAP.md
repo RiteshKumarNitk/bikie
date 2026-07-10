@@ -42,3 +42,33 @@ Deliberately trimmed from v1: mobile messaging uses polling against the existing
 no mature first-party SSE client, and `/api/sse` is a generic heartbeat channel shared with
 SOS, not a per-conversation stream). Revisit by either adapting `/api/sse` for bearer auth
 or introducing WebSockets, once real-time chat becomes a priority.
+
+## Milestone 7 — Rides: Community v1 ✅ Built (web), pending mobile port
+Pivot in product framing: "find riders, plan adventures, ride together" as a retention layer
+alongside rentals — see ADR-010. Web-first per plan; Flutter port not yet started.
+
+- Backend: `ParticipantStatus` request/approve flow (`PENDING → APPROVED|REJECTED`,
+  `CANCELLED` on withdrawal), atomic seat accounting, ride creation (`POST /api/trips`,
+  membership-gated), organizer request review + approve/reject, ride Group chat auto-created
+  by reusing the existing `Conversation` model (no new chat infrastructure), simple
+  computed reputation stats on `/api/trips/mine`.
+- Web UI: `/trips/create` (ride creation form), `RideActionsPanel` (replaces the old
+  no-op `JoinTripCard` stub — request-to-join form / pending state / approved state /
+  organizer's request-review queue, all in one component branching on session), ride Group
+  entry via a `?conversation=` deep link into the existing `/dashboard/messages` page,
+  `/dashboard/trips` "My Rides" page extended with a Requested section and stat tiles.
+  Verified end-to-end in a real browser (Playwright) — full loop: create → browse →
+  request → approve → group chat, zero console errors.
+- Nav/copy relabeled "Trips" → "Rides" (Navbar, Footer, MegaMenu, dashboard sidebar,
+  breadcrumbs) — cosmetic only, per ADR-010.
+
+**Deferred** (see ADR-010 for why): rider-to-rider reviews, badges, membership tiers
+(Guest/Member/Verified Member), clubs, live location, photo albums, checklists. "Required
+Bike Type" and structured "Rules" (helmet/no-rash-riding/follow-leader) from the original
+product brief were folded into the free-text description for v1 rather than becoming
+structured fields — revisit if organizers want filtering/enforcement on them.
+
+### Milestone 7b — Rides on Mobile (future)
+Port the Milestone 7 web flow to `apps/mobile`: ride creation form, request-to-join,
+organizer's request-review screen, and a Ride Group entry point into the existing
+polling-based messaging screens (Milestone 6b).

@@ -1,5 +1,32 @@
-import { tripRepository } from "@bikie/database";
-import type { TripDetailDTO, TripSummaryDTO } from "@bikie/types";
+import { messageRepository, tripRepository } from "@bikie/database";
+import type {
+  MyRideRequestStatusDTO,
+  RideJoinRequestDTO,
+  RideStatsDTO,
+  TripDetailDTO,
+  TripSummaryDTO,
+} from "@bikie/types";
+import type { CreateTripInput } from "@bikie/validation";
+
+const DEFAULT_TRIP_IMAGE = "https://picsum.photos/seed/ride-default/900/600";
+
+export type RequestToJoinResult =
+  | { ok: true }
+  | { ok: false; reason: "TRIP_NOT_FOUND" | "NOT_OPEN" | "IS_ORGANIZER" | "FULL" | "ALREADY_REQUESTED" };
+
+export type DecideRequestResult =
+  | { ok: true }
+  | { ok: false; reason: "NOT_FOUND" | "FORBIDDEN" | "ALREADY_DECIDED" | "NO_SEATS" };
+
+export type LeaveRideResult = { ok: true } | { ok: false; reason: "TRIP_NOT_FOUND" | "NOT_A_PARTICIPANT" };
+
+export type GetRequestsResult =
+  | { ok: true; requests: RideJoinRequestDTO[] }
+  | { ok: false; reason: "TRIP_NOT_FOUND" | "FORBIDDEN" };
+
+export type GetGroupResult =
+  | { ok: true; conversationId: string }
+  | { ok: false; reason: "TRIP_NOT_FOUND" | "FORBIDDEN" | "NOT_STARTED" };
 
 export const TripService = {
   async getByTab(tab?: string): Promise<TripSummaryDTO[]> {
@@ -16,5 +43,132 @@ export const TripService = {
 
   async getJoinedBy(userId: string): Promise<TripSummaryDTO[]> {
     return tripRepository.findTripsJoinedBy(userId);
+  },
+
+  async getRequestedBy(userId: string): Promise<TripSummaryDTO[]> {
+    return tripRepository.findTripsRequestedBy(userId);
+  },
+
+  async create(organizerId: string, input: CreateTripInput): Promise<TripSummaryDTO> {
+    return tripRepository.createTrip({
+      title: input.title,
+      description: input.description,
+      imageUrl: input.imageUrl ?? DEFAULT_TRIP_IMAGE,
+      type: input.type,
+      difficulty: input.difficulty,
+      price: input.price,
+      seatsTotal: input.seatsTotal,
+      meetingPoint: input.meetingPoint,
+      startDate: new Date(input.startDate),
+      endDate: new Date(input.endDate),
+      organizerId,
+      destinationId: input.destinationId,
+    });
+  },
+
+  async requestToJoin(slug: string, userId: string, message?: string): Promise<RequestToJoinResult> {
+    const trip = await tripRepository.findTripBySlug(slug);
+    if (!trip) return { ok: false, reason: "TRIP_NOT_FOUND" };
+    if (trip.status !== "UPCOMING") return { ok: false, reason: "NOT_OPEN" };
+    if (trip.organizer.id === userId) return { ok: false, reason: "IS_ORGANIZER" };
+    if (trip.seatsLeft <= 0) return { ok: false, reason: "FULL" };
+
+    const existing = await tripRepository.findParticipant(trip.id, userId);
+    if (existing && (existing.status === "PENDING" || existing.status === "APPROVED")) {
+      return { ok: false, reason: "ALREADY_REQUESTED" };
+    }
+
+    await tripRepository.upsertJoinRequest(trip.id, userId, message);
+    return { ok: true };
+  },
+
+  async getMyRequestStatus(slug: string, userId: string): Promise<MyRideRequestStatusDTO | null> {
+    const trip = await tripRepository.findTripBySlug(slug);
+    if (!trip) return null;
+    const participant = await tripRepository.findParticipant(trip.id, userId);
+    return participant ? { status: participant.status, message: participant.message } : null;
+  },
+
+  async getPendingRequests(slug: string, organizerId: string): Promise<GetRequestsResult> {
+    const trip = await tripRepository.findTripBySlug(slug);
+    if (!trip) return { ok: false, reason: "TRIP_NOT_FOUND" };
+    if (trip.organizer.id !== organizerId) return { ok: false, reason: "FORBIDDEN" };
+    const requests = await tripRepository.findPendingRequestsForTrip(trip.id);
+    return { ok: true, requests };
+  },
+
+  async decideRequest(
+    participantId: string,
+    organizerId: string,
+    decision: "APPROVED" | "REJECTED",
+  ): Promise<DecideRequestResult> {
+    const participant = await tripRepository.findParticipantById(participantId);
+    if (!participant) return { ok: false, reason: "NOT_FOUND" };
+    if (participant.trip.organizerId !== organizerId) return { ok: false, reason: "FORBIDDEN" };
+    if (participant.status !== "PENDING") return { ok: false, reason: "ALREADY_DECIDED" };
+
+    if (decision === "REJECTED") {
+      await tripRepository.decideParticipant(participantId, "REJECTED");
+      return { ok: true };
+    }
+
+    const seatAvailable = await tripRepository.decrementSeatsLeft(participant.tripId);
+    if (!seatAvailable) return { ok: false, reason: "NO_SEATS" };
+
+    await tripRepository.decideParticipant(participantId, "APPROVED");
+
+    let conversationId = await tripRepository.findConversationIdForTrip(participant.tripId);
+    if (!conversationId) {
+      const conversation = await messageRepository.createConversation(
+        [organizerId, participant.userId],
+        `Ride: ${participant.trip.title}`,
+      );
+      conversationId = conversation.id;
+      await tripRepository.linkConversationToTrip(participant.tripId, conversationId);
+    } else {
+      await messageRepository.addParticipant(conversationId, participant.userId);
+    }
+
+    return { ok: true };
+  },
+
+  async leaveRide(slug: string, userId: string): Promise<LeaveRideResult> {
+    const trip = await tripRepository.findTripBySlug(slug);
+    if (!trip) return { ok: false, reason: "TRIP_NOT_FOUND" };
+
+    const participant = await tripRepository.findParticipant(trip.id, userId);
+    if (!participant || (participant.status !== "PENDING" && participant.status !== "APPROVED")) {
+      return { ok: false, reason: "NOT_A_PARTICIPANT" };
+    }
+
+    const wasApproved = participant.status === "APPROVED";
+    await tripRepository.cancelParticipant(participant.id);
+    if (wasApproved) {
+      await tripRepository.incrementSeatsLeft(trip.id);
+    }
+
+    return { ok: true };
+  },
+
+  async getGroup(slug: string, userId: string): Promise<GetGroupResult> {
+    const trip = await tripRepository.findTripBySlug(slug);
+    if (!trip) return { ok: false, reason: "TRIP_NOT_FOUND" };
+
+    const isOrganizer = trip.organizer.id === userId;
+    const participant = isOrganizer ? null : await tripRepository.findParticipant(trip.id, userId);
+    const isApprovedMember = participant?.status === "APPROVED";
+    if (!isOrganizer && !isApprovedMember) return { ok: false, reason: "FORBIDDEN" };
+
+    const conversationId = await tripRepository.findConversationIdForTrip(trip.id);
+    if (!conversationId) return { ok: false, reason: "NOT_STARTED" };
+
+    return { ok: true, conversationId };
+  },
+
+  async getRideStats(userId: string): Promise<RideStatsDTO> {
+    const stats = await tripRepository.getRideStatsForUser(userId);
+    const approvalRate =
+      stats.requestsSent > 0 ? Math.round((stats.requestsApproved / stats.requestsSent) * 100) : null;
+    return { ...stats, approvalRate };
   },
 };

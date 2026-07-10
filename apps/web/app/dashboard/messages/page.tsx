@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 
 interface Conversation {
@@ -23,6 +24,7 @@ interface Message {
 
 export default function MessagesPage() {
   const { data: session } = authClient.useSession();
+  const searchParams = useSearchParams();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConv, setSelectedConv] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -33,7 +35,13 @@ export default function MessagesPage() {
   useEffect(() => {
     fetch("/api/conversations")
       .then((r) => r.json())
-      .then((data) => { setConversations(data.conversations); setLoading(false); });
+      .then((data) => {
+        setConversations(data.conversations);
+        setLoading(false);
+        const fromQuery = searchParams.get("conversation");
+        if (fromQuery) setSelectedConv(fromQuery);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -61,6 +69,10 @@ export default function MessagesPage() {
 
   const activeConv = conversations.find((c) => c.id === selectedConv);
   const otherParticipant = activeConv?.participants.find((p) => p.id !== session?.user.id);
+  const activeConvLabel =
+    activeConv?.subject ?? (activeConv && activeConv.participants.length > 2
+      ? `${activeConv.participants.length} riders`
+      : otherParticipant?.name ?? "Chat");
 
   if (loading) {
     return (
@@ -86,6 +98,7 @@ export default function MessagesPage() {
           ) : (
             conversations.map((conv) => {
               const other = conv.participants.find((p) => p.id !== session?.user.id);
+              const label = conv.subject ?? (conv.participants.length > 2 ? `${conv.participants.length} riders` : other?.name ?? "Unknown");
               return (
                 <button
                   key={conv.id}
@@ -97,7 +110,7 @@ export default function MessagesPage() {
                       : "border-foreground/10 hover:border-foreground/20"
                   }`}
                 >
-                  <p className="text-sm font-medium">{other?.name ?? "Unknown"}</p>
+                  <p className="text-sm font-medium">{label}</p>
                   <p className="mt-0.5 truncate text-xs text-foreground/50">
                     {conv.lastMessage?.content ?? "No messages"}
                   </p>
@@ -111,7 +124,7 @@ export default function MessagesPage() {
           {selectedConv && activeConv ? (
             <>
               <div className="border-b border-foreground/10 px-5 py-4">
-                <p className="font-medium">{otherParticipant?.name ?? "Chat"}</p>
+                <p className="font-medium">{activeConvLabel}</p>
                 <p className="text-xs text-foreground/50">
                   {activeConv.participants
                     .filter((p) => p.id !== session?.user.id)

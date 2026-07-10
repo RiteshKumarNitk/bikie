@@ -68,3 +68,29 @@ and chat-bubble backgrounds) and `--color-accent-text` (`#3B3A91` in light mode,
 Web: Tailwind classes `bg-accent` vs. `text-accent-text` (swapped project-wide from the
 prior single `text-accent`). Mobile: `Theme.of(context).colorScheme.primary` for fills vs.
 `AppTheme.accentTextOf(context)` for text/icons.
+
+## ADR-010: Rides — request/approve join, keep the `Trip` model name, reuse `Conversation` for group chat, defer reputation/badges/tiers/clubs
+Product direction shifted from "rent a bike" toward "find riders, plan adventures, ride
+together" — a community layer on top of the existing `Trip` concept (which previously had no
+working join mechanism at all; the web "Join Trip" button was a literal no-op stub). Four
+scoped decisions, each chosen to minimize new surface area:
+- **Keep `Trip`/`TripParticipant` as the model names** (DB table, API routes, DTOs) and only
+  relabel user-facing copy to "Ride"/"Rides". A full rename would touch the DB schema, every
+  route path, the DTOs, and the already-working Flutter trip screens for zero functional
+  gain — Prisma model names aren't user-visible.
+- **Request-then-approve, not instant join.** `ParticipantStatus` changed from
+  `JOINED | CANCELLED` to `PENDING | APPROVED | REJECTED | CANCELLED` (migration:
+  `packages/database/prisma/migrations/20260710120000_ride_request_flow` — the 2 existing
+  `JOINED` rows in the live DB were remapped to `APPROVED` inline during the enum type swap).
+  `seatsTotal`/`seatsLeft` unchanged; `seatsLeft` now decrements atomically on approval
+  instead of on request.
+- **Reuse `Conversation`/`ConversationParticipant`/`Message` for the "Ride Group" chat**
+  instead of a new `RideChat` model — those models already support N participants with zero
+  schema changes (only addition: a nullable `Conversation.tripId` FK). See ARCHITECTURE.md.
+- **Deferred to a later pass, not built now:** rider-to-rider reviews (the existing `Review`
+  model is hard-locked to `Bike`+`Booking`, can't flex — would need a new `RideReview` model),
+  badges, membership tiers (Guest/Member/Verified Member — membership today is binary
+  active/inactive, reused as-is via the existing `requireMembership()` gate for ride
+  creation), and clubs. Reputation in v1 is a simple computed stat
+  (`ridesOrganized`/`requestsSent`/`requestsApproved`/`ridesCancelled`/`approvalRate`), not a
+  stored field.

@@ -262,7 +262,7 @@ async function main() {
     await prisma.tripParticipant.upsert({
       where: { tripId_userId: { tripId: trip.id, userId: demoUser.id } },
       update: {},
-      create: { tripId: trip.id, userId: demoUser.id },
+      create: { tripId: trip.id, userId: demoUser.id, status: "APPROVED", decidedAt: new Date() },
     });
   }
 

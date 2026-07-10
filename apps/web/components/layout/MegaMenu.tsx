@@ -3,46 +3,10 @@
 import { useState, useRef } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
+import type { NavColumn } from "./nav-config";
+import { riderMegaMenuColumns } from "./nav-config";
 
-interface MegaMenuColumn {
-  heading: string;
-  links: { label: string; href: string }[];
-}
-
-const columns: MegaMenuColumn[] = [
-  {
-    heading: "Explore",
-    links: [
-      { label: "Explore Bikes", href: "/explore-bikes" },
-      { label: "Destinations", href: "/destinations" },
-      { label: "Trips", href: "/trips" },
-      { label: "Community", href: "/community" },
-      { label: "Roadside Assistance", href: "/roadside-assistance" },
-    ],
-  },
-  {
-    heading: "Company",
-    links: [
-      { label: "About Us", href: "/about" },
-      { label: "Careers", href: "/careers" },
-      { label: "Press", href: "/press" },
-      { label: "Blog", href: "/blog" },
-      { label: "Become a Partner", href: "/become-a-partner" },
-    ],
-  },
-  {
-    heading: "Support",
-    links: [
-      { label: "Help Center", href: "/faq" },
-      { label: "Safety Center", href: "/safety-center" },
-      { label: "Contact Us", href: "/contact" },
-      { label: "Membership", href: "/membership" },
-      { label: "Gift Cards", href: "/gift-cards" },
-    ],
-  },
-];
-
-export function MegaMenu({ label = "Explore" }: { label?: string }) {
+export function MegaMenu({ label = "Explore", columns = riderMegaMenuColumns }: { label?: string; columns?: NavColumn[] }) {
   const [open, setOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 

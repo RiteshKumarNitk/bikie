@@ -6,7 +6,7 @@ const navItems = [
   { label: "Home", href: "/dashboard" },
   { label: "My Bookings", href: "/dashboard/bookings" },
   { label: "Wishlist", href: "/dashboard/wishlist" },
-  { label: "My Trips", href: "/dashboard/trips" },
+  { label: "My Rides", href: "/dashboard/trips" },
   { label: "Messages", href: "/dashboard/messages" },
   { label: "Notifications", href: "/dashboard/notifications" },
   { label: "Wallet", href: "/dashboard/wallet" },

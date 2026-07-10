@@ -88,6 +88,14 @@ export async function createConversation(participantIds: string[], subject?: str
   return conversation;
 }
 
+export async function addParticipant(conversationId: string, userId: string) {
+  await prisma.conversationParticipant.upsert({
+    where: { conversationId_userId: { conversationId, userId } },
+    create: { conversationId, userId },
+    update: {},
+  });
+}
+
 export async function findConversationByParticipants(participantIds: string[]) {
   const sortedIds = [...participantIds].sort();
   const conversations = await prisma.conversation.findMany({

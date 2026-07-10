@@ -2,6 +2,25 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Milestone 7 — Rides: Community v1
+
+| Task | Status |
+|---|---|
+| Schema: `ParticipantStatus` request/approve enum, `TripParticipant.message`/`decidedAt`, `Trip.meetingPoint`, `Conversation.tripId` (ADR-010) | Completed |
+| Data migration: remap 2 live `JOINED` rows → `APPROVED` inline during enum swap | Completed |
+| Repository + service: request/approve/reject/leave, atomic seat accounting, group conversation creation, ride stats | Completed |
+| `POST /api/trips` (ride creation, membership-gated) | Completed |
+| `/api/trips/[slug]/requests` (POST request, GET organizer queue), `/requests/mine`, `/requests/[id]/approve`, `/requests/[id]/reject`, `/leave`, `/group` | Completed |
+| `/api/trips/mine` extended with `requested` + `stats` | Completed |
+| Web: `/trips/create` ride creation form | Completed |
+| Web: `RideActionsPanel` (replaces `JoinTripCard` stub) — request/pending/approved states + organizer request-review queue | Completed |
+| Web: Ride Group entry via `?conversation=` deep link into `/dashboard/messages` | Completed |
+| Web: `/dashboard/trips` extended with Requested section + reputation stat tiles | Completed |
+| Nav/copy relabel "Trips" → "Rides" | Completed |
+| End-to-end browser verification (Playwright: create → browse → request → approve → group chat) | Completed — found and fixed a real bug (unauthenticated visitors could see the full create-ride form before the redirect fired; now gated on `session` before render, not just a `useEffect` side-effect) |
+| Mobile port (Milestone 7b) | Backlog |
+| Rider-to-rider reviews, badges, membership tiers, clubs (deferred per ADR-10) | Backlog |
+
 ## Milestone 6 — Mobile App
 
 | Task | Status |

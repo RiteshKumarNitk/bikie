@@ -8,15 +8,8 @@ import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
 import Link from "next/link";
 
-const roles = [
-  { value: "RENTER", label: "Rider", description: "Rent bikes & join trips" },
-  { value: "PARTNER", label: "Partner", description: "List bikes & manage fleet" },
-  { value: "ADMIN", label: "Admin", description: "Platform management" },
-];
-
 export default function LoginPage() {
   const [serverError, setServerError] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState("RENTER");
   const {
     register,
     handleSubmit,
@@ -79,27 +72,6 @@ export default function LoginPage() {
             <p className="mt-1 text-sm text-foreground/50">Log in to your account</p>
           </div>
 
-          <div className="mt-6 space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-foreground/40">I am a</p>
-            <div className="grid grid-cols-3 gap-2">
-              {roles.map((role) => (
-                <button
-                  key={role.value}
-                  type="button"
-                  onClick={() => setSelectedRole(role.value)}
-                  className={`rounded-xl border px-3 py-2.5 text-left transition-all ${
-                    selectedRole === role.value
-                      ? "border-accent bg-accent/10 ring-1 ring-accent"
-                      : "border-foreground/10 hover:border-foreground/20"
-                  }`}
-                >
-                  <p className="text-sm font-medium">{role.label}</p>
-                  <p className="mt-0.5 text-[10px] text-foreground/40">{role.description}</p>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
             <div>
               <label className="text-sm font-medium" htmlFor="email">
@@ -143,7 +115,7 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" className="w-full" disabled={isSubmitting} size="lg">
-              {isSubmitting ? "Signing in..." : `Continue as ${roles.find((r) => r.value === selectedRole)?.label}`}
+              {isSubmitting ? "Signing in..." : "Sign in"}
             </Button>
           </form>
 

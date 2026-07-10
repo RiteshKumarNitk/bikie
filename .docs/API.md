@@ -51,6 +51,24 @@ route below, no per-route changes needed.
 There is no single-booking `GET /api/bookings/[id]` — the list response carries everything
 a detail screen needs (`hasReview`, bike summary, etc.).
 
+## Rides (community rides — the `Trip` model internally, user-facing copy says "Ride")
+
+Renter-organized group rides: create a ride, other members request to join, the organizer
+approves/rejects, approved members get a shared group chat (an auto-created `Conversation`,
+reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md ADR-010.
+
+| Route | Method | Auth | Notes |
+|---|---|---|---|
+| `/api/trips` | POST | Membership required | Body: `{ title, description, type, difficulty, seatsTotal, meetingPoint?, destinationId?, startDate, endDate, imageUrl?, price? }`. `type` ∈ `WEEKEND\|ADVENTURE\|ROAD_TRIP\|INTERNATIONAL\|GUIDED_TOUR`, `difficulty` ∈ `EASY\|MODERATE\|HARD` (default `MODERATE`), `price` defaults to `0` (free/community ride). Slug auto-generated from title (deduped with a numeric suffix). Returns `{ trip: TripSummaryDTO }`, 201. |
+| `/api/trips/[slug]/requests` | POST | Session | Body: `{ message? }`. 404 if trip not found, 400 if trip isn't `UPCOMING` or caller is the organizer, 400 if no seats left, 409 if already requested (PENDING/APPROVED). Re-requesting after a REJECTED/CANCELLED decision is allowed (upserts back to PENDING). Returns `{ success: true }`, 201. |
+| `/api/trips/[slug]/requests` | GET | Session, organizer only | Pending requests for the ride. 403 if caller isn't the organizer. Returns `{ requests: RideJoinRequestDTO[] }`. |
+| `/api/trips/[slug]/requests/mine` | GET | Session | Caller's own request status for this ride, or `{ request: null }` if never requested. |
+| `/api/trips/[slug]/requests/[participantId]/approve` | POST | Session, organizer only | Atomically decrements `seatsLeft` (409 `NO_SEATS` if none left — race-safe conditional update). Creates the ride's group `Conversation` on first approval, or adds the rider to the existing one on subsequent approvals. 403 if not organizer, 400 if request already decided. |
+| `/api/trips/[slug]/requests/[participantId]/reject` | POST | Session, organizer only | No seat change (rejected requests never held a seat). |
+| `/api/trips/[slug]/leave` | POST | Session | Rider withdraws (PENDING or APPROVED → `CANCELLED`). If was `APPROVED`, increments `seatsLeft` back. 400 if not currently a participant. |
+| `/api/trips/[slug]/group` | GET | Session, organizer or approved participant | Returns `{ conversationId }` for the ride's group chat — hand this to the existing `/api/conversations/[id]/messages` endpoints. 403 if caller isn't organizer/approved, 404 `NOT_STARTED` if no one's been approved yet. |
+| `/api/trips/mine` | GET | Session | Extended: now returns `{ organized, joined, requested, stats }` — `requested` is rides with a caller-sent PENDING request; `stats: RideStatsDTO` is `{ ridesOrganized, requestsSent, requestsApproved, ridesCancelled, approvalRate }` (`approvalRate` is `requestsApproved / requestsSent` as a 0-100 int, `null` if no requests sent yet). |
+
 ## Reviews
 
 | Route | Method | Notes |

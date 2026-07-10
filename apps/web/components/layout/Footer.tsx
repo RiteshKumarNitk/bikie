@@ -1,47 +1,17 @@
 import Link from "next/link";
+import type { SelectedRole } from "@/lib/role";
+import {
+  legalFooterColumn,
+  otherRole,
+  partnerFooterColumns,
+  riderFooterColumns,
+  switchRoleLabel,
+} from "./nav-config";
+import { SwitchRoleLink } from "./SwitchRoleLink";
 
-const columns = [
-  {
-    heading: "Explore",
-    links: [
-      { label: "Explore Bikes", href: "/explore-bikes" },
-      { label: "Destinations", href: "/destinations" },
-      { label: "Trips", href: "/trips" },
-      { label: "Community", href: "/community" },
-      { label: "Roadside Assistance", href: "/roadside-assistance" },
-    ],
-  },
-  {
-    heading: "Company",
-    links: [
-      { label: "About", href: "/about" },
-      { label: "Careers", href: "/careers" },
-      { label: "Blog", href: "/blog" },
-      { label: "Press", href: "/press" },
-      { label: "Become a Partner", href: "/become-a-partner" },
-    ],
-  },
-  {
-    heading: "Support",
-    links: [
-      { label: "Help Center", href: "/faq" },
-      { label: "Safety Center", href: "/safety-center" },
-      { label: "Contact", href: "/contact" },
-      { label: "Membership", href: "/membership" },
-      { label: "Gift Cards", href: "/gift-cards" },
-    ],
-  },
-  {
-    heading: "Legal",
-    links: [
-      { label: "Privacy Policy", href: "/privacy-policy" },
-      { label: "Terms & Conditions", href: "/terms-and-conditions" },
-      { label: "Cookie Policy", href: "/cookie-policy" },
-    ],
-  },
-];
+export function Footer({ role }: { role: SelectedRole | null }) {
+  const columns = [...(role === "PARTNER" ? partnerFooterColumns : riderFooterColumns), legalFooterColumn];
 
-export function Footer() {
   return (
     <footer className="border-t border-foreground/10 bg-surface/50">
       <div className="mx-auto max-w-7xl px-6 py-16">
@@ -113,10 +83,15 @@ export function Footer() {
           <p className="text-xs text-foreground/40">
             © {new Date().getFullYear()} BIKIE. All rights reserved.
           </p>
-          <div className="flex gap-6 text-xs text-foreground/40">
+          <div className="flex items-center gap-6 text-xs text-foreground/40">
             <Link href="/privacy-policy" className="hover:text-foreground/60">Privacy</Link>
             <Link href="/terms-and-conditions" className="hover:text-foreground/60">Terms</Link>
             <Link href="/cookie-policy" className="hover:text-foreground/60">Cookies</Link>
+            {role && (
+              <SwitchRoleLink to={otherRole(role)} className="text-accent-text hover:underline">
+                {switchRoleLabel(role)}
+              </SwitchRoleLink>
+            )}
           </div>
         </div>
       </div>

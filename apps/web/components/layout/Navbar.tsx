@@ -4,8 +4,18 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { authClient } from "@/lib/auth-client";
+import type { SelectedRole } from "@/lib/role";
 import { ThemeToggle } from "./ThemeToggle";
 import { MegaMenu } from "./MegaMenu";
+import { SwitchRoleLink } from "./SwitchRoleLink";
+import {
+  otherRole,
+  partnerMegaMenuColumns,
+  partnerPrimaryLinks,
+  riderMegaMenuColumns,
+  riderPrimaryLinks,
+  switchRoleLabel,
+} from "./nav-config";
 
 function dashboardHrefForRole(role: string | undefined) {
   if (role === "ADMIN") return "/admin";
@@ -27,12 +37,15 @@ function UserAvatar({ name }: { name: string }) {
   );
 }
 
-export function Navbar() {
+export function Navbar({ role }: { role: SelectedRole | null }) {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { data: session, isPending } = authClient.useSession();
   const userMenuRef = useRef<HTMLDivElement>(null);
+
+  const primaryLinks = role === "PARTNER" ? partnerPrimaryLinks : role === "RIDER" ? riderPrimaryLinks : [];
+  const megaMenuColumns = role === "PARTNER" ? partnerMegaMenuColumns : riderMegaMenuColumns;
 
   useEffect(() => {
     function onScroll() {
@@ -71,13 +84,12 @@ export function Navbar() {
         </Link>
 
         <nav className="hidden items-center gap-8 md:flex">
-          <Link href="/explore-bikes" className={navLinkClass}>
-            Explore Bikes
-          </Link>
-          <Link href="/trips" className={navLinkClass}>
-            Trips
-          </Link>
-          <MegaMenu label="More" />
+          {primaryLinks.map((link) => (
+            <Link key={link.href} href={link.href} className={navLinkClass}>
+              {link.label}
+            </Link>
+          ))}
+          {role && <MegaMenu label="More" columns={megaMenuColumns} />}
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
@@ -133,6 +145,17 @@ export function Navbar() {
                         </svg>
                         Settings
                       </Link>
+                      {role && (
+                        <SwitchRoleLink
+                          to={otherRole(role)}
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-foreground/5"
+                        >
+                          <svg className="h-4 w-4 text-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4" />
+                          </svg>
+                          {switchRoleLabel(role)}
+                        </SwitchRoleLink>
+                      )}
                       <button
                         type="button"
                         onClick={async () => {
@@ -199,30 +222,34 @@ export function Navbar() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col gap-6">
-                <div>
-                  <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-foreground/50">Explore</p>
-                  <nav className="flex flex-col gap-1">
-                    <Link href="/explore-bikes" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Explore Bikes</Link>
-                    <Link href="/destinations" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Destinations</Link>
-                    <Link href="/trips" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Trips</Link>
-                    <Link href="/community" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Community</Link>
-                  </nav>
-                </div>
-                <div>
-                  <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-foreground/50">Company</p>
-                  <nav className="flex flex-col gap-1">
-                    <Link href="/about" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>About Us</Link>
-                    <Link href="/become-a-partner" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Become a Partner</Link>
-                  </nav>
-                </div>
-                <div>
-                  <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-foreground/50">Support</p>
-                  <nav className="flex flex-col gap-1">
-                    <Link href="/faq" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Help Center</Link>
-                    <Link href="/roadside-assistance" className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors" onClick={() => setMenuOpen(false)}>Roadside Assistance</Link>
-                  </nav>
-                </div>
+                {(role ? megaMenuColumns : []).map((column) => (
+                  <div key={column.heading}>
+                    <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-foreground/50">{column.heading}</p>
+                    <nav className="flex flex-col gap-1">
+                      {column.links.map((link) => (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          className="rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-foreground/5 transition-colors"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          {link.label}
+                        </Link>
+                      ))}
+                    </nav>
+                  </div>
+                ))}
               </div>
+              {role && (
+                <div className="mt-2">
+                  <SwitchRoleLink
+                    to={otherRole(role)}
+                    className="w-full rounded-xl px-4 py-2.5 text-left text-sm font-medium text-accent-text hover:bg-foreground/5"
+                  >
+                    {switchRoleLabel(role)}
+                  </SwitchRoleLink>
+                </div>
+              )}
               <div className="mt-6 flex items-center gap-3 border-t border-foreground/10 pt-6">
                 <ThemeToggle />
                 {!isPending && session ? (

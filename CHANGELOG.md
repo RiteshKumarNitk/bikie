@@ -1,5 +1,30 @@
 # Changelog
 
+## Milestone 7 — Rides: Community v1
+- Pivoted product framing toward "find riders, plan adventures, ride together" — a
+  request-then-approve group ride flow layered on the existing `Trip` model (previously had
+  no working join mechanism at all; the web "Join Trip" button was a no-op stub). See
+  ADR-010 for the scoping decisions (keep `Trip` internally, reuse `Conversation` for group
+  chat, defer reviews/badges/tiers/clubs).
+- `ParticipantStatus` changed from `JOINED | CANCELLED` to
+  `PENDING | APPROVED | REJECTED | CANCELLED`; `seatsLeft` now decrements atomically on
+  approval (race-safe conditional update) instead of on request, and reverses on a later
+  cancellation. Migration remapped the 2 existing live `JOINED` rows to `APPROVED`.
+- New: `POST /api/trips` (ride creation, membership-gated), request/approve/reject/leave
+  routes, `/api/trips/[slug]/group` (ride Group conversation lookup), `/api/trips/mine`
+  extended with `requested` rides and computed reputation stats.
+- Web: ride creation form (`/trips/create`), a real join/request/approve UI
+  (`RideActionsPanel`) replacing the old stub, Ride Group entry into the existing messaging
+  UI via a `?conversation=` deep link, "My Rides" dashboard page extended with a Requested
+  section and stats. Nav copy relabeled "Trips" → "Rides" throughout (cosmetic only — the
+  `Trip` model name is unchanged).
+- Verified end-to-end in a real browser (Playwright, since no project-specific run skill or
+  `chromium-cli` was available in this environment): full loop from ride creation through
+  request, organizer approval, and opening the shared group chat, with zero console errors.
+  Caught and fixed one real bug this way — the create-ride form rendered fully for
+  unauthenticated visitors before a `useEffect` redirect fired; now gated on session state
+  before the form renders at all.
+
 ## Rebrand — accent color changed to indigo (`#3B3A91`)
 - Web and mobile brand accent changed from orange to `#3B3A91` across both apps (ADR-009).
 - Split into `--color-accent` (solid fills — buttons, badges, backgrounds) vs.

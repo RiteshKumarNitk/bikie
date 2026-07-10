@@ -5,7 +5,7 @@ import type { TripDetailDTO } from "@bikie/types";
 import { getJson } from "@/lib/api";
 import { formatCurrency } from "@bikie/utils";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-import { JoinTripCard } from "@/components/trips/JoinTripCard";
+import { RideActionsPanel } from "@/components/trips/RideActionsPanel";
 
 async function getTrip(slug: string) {
   try {
@@ -38,7 +38,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ slu
 
   return (
     <div className="pb-24">
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Trips", href: "/trips" }, { label: trip.title }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Rides", href: "/trips" }, { label: trip.title }]} />
 
       <div className="mx-auto max-w-7xl px-6 pt-6">
         <div className="relative aspect-[21/9] w-full overflow-hidden rounded-3xl">
@@ -73,13 +73,20 @@ export default async function TripDetailPage({ params }: { params: Promise<{ slu
                 <p className="mt-1 font-medium">{trip.organizer.name}</p>
               </div>
             </div>
+
+            {trip.meetingPoint && (
+              <div className="mt-6 rounded-2xl bg-card p-4">
+                <p className="text-xs text-foreground/50">Meeting Point</p>
+                <p className="mt-1 font-medium">{trip.meetingPoint}</p>
+              </div>
+            )}
           </div>
 
           <div>
             <div className="sticky top-24 rounded-3xl bg-card p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
-              <p className="text-2xl font-semibold">{formatCurrency(trip.price)}</p>
-              <p className="text-sm text-foreground/60">per rider</p>
-              <JoinTripCard tripId={trip.id} tripSlug={trip.slug} seatsLeft={trip.seatsLeft} />
+              <p className="text-2xl font-semibold">{trip.price > 0 ? formatCurrency(trip.price) : "Free"}</p>
+              <p className="text-sm text-foreground/60">{trip.price > 0 ? "per rider" : "community ride"}</p>
+              <RideActionsPanel tripSlug={trip.slug} organizerId={trip.organizer.id} seatsLeft={trip.seatsLeft} />
             </div>
           </div>
         </div>

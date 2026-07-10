@@ -7,8 +7,8 @@ import { TripCard } from "@/components/trips/TripCard";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export const metadata: Metadata = {
-  title: "Trips",
-  description: "Join community and guided motorcycle trips across India — weekend rides, adventure tours, and international expeditions.",
+  title: "Rides",
+  description: "Find riders, plan adventures, ride together — community-organized motorcycle rides across India.",
 };
 
 const tabs = [
@@ -31,11 +31,21 @@ export default async function TripsPage({
 
   return (
     <div className="pb-24">
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Trips" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Rides" }]} />
 
       <div className="mx-auto max-w-7xl px-6 pt-6">
-        <h1 className="text-3xl font-semibold md:text-4xl">Trips</h1>
-        <p className="mt-2 text-foreground/60">Ride together — organized and community trips across India.</p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold md:text-4xl">Rides</h1>
+            <p className="mt-2 text-foreground/60">Find riders. Plan adventures. Ride together.</p>
+          </div>
+          <Link
+            href="/trips/create"
+            className="rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-accent/90"
+          >
+            + Create a Ride
+          </Link>
+        </div>
 
         <div className="mt-8 flex flex-wrap gap-2 border-b border-foreground/10 pb-4">
           {tabs.map((t) => (
@@ -53,7 +63,7 @@ export default async function TripsPage({
 
         {trips.length === 0 ? (
           <div className="mt-10">
-            <EmptyState icon="🗺️" title="No trips in this category yet" description="Check back soon or explore another tab." />
+            <EmptyState icon="🏍️" title="No rides in this category yet" description="Check back soon, explore another tab, or create your own." />
           </div>
         ) : (
           <div className="mt-10 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">

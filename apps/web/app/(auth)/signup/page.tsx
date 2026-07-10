@@ -6,20 +6,21 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { signUpSchema, type SignUpInput } from "@bikie/validation";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
+import { SELECTED_ROLE_COOKIE, selectedRoleToDbRole } from "@/lib/role";
 import Link from "next/link";
-
-const roles = [
-  { value: "RENTER", label: "Rider", description: "Rent bikes & join trips" },
-  { value: "PARTNER", label: "Partner", description: "List bikes & earn" },
-];
 
 const partnerTypes = [
   "RENTAL", "MECHANIC", "TOUR_GUIDE", "HOTEL", "CAMPING", "ACCESSORIES", "PHOTOGRAPHY",
 ];
 
+function readSelectedRoleCookie(): "RIDER" | "PARTNER" {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${SELECTED_ROLE_COOKIE}=([^;]*)`));
+  return match?.[1] === "PARTNER" ? "PARTNER" : "RIDER";
+}
+
 export default function SignUpPage() {
   const [serverError, setServerError] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState("RENTER");
+  const [selectedRole, setSelectedRole] = useState<"RIDER" | "PARTNER">("RIDER");
   const [partnerType, setPartnerType] = useState("RENTAL");
   const [businessName, setBusinessName] = useState("");
   const [city, setCity] = useState("");
@@ -31,9 +32,18 @@ export default function SignUpPage() {
   } = useForm<SignUpInput>({ resolver: zodResolver(signUpSchema) });
 
   useEffect(() => {
-    const ref = new URLSearchParams(window.location.search).get("ref");
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
     if (ref) setReferralCode(ref);
+
+    // `?role=partner` (e.g. from the "Apply Now" CTA on /partners) overrides
+    // whatever the selectedRole cookie currently says, since that link
+    // expresses explicit intent even if the visitor is mid-Rider-session.
+    const roleParam = params.get("role");
+    setSelectedRole(roleParam === "partner" ? "PARTNER" : readSelectedRoleCookie());
   }, []);
+
+  const dbRole = selectedRoleToDbRole(selectedRole);
 
   async function onSubmit(values: SignUpInput) {
     setServerError(null);
@@ -41,7 +51,7 @@ export default function SignUpPage() {
       name: values.name,
       email: values.email,
       password: values.password,
-      role: selectedRole,
+      role: dbRole,
     });
     if (error) {
       setServerError(error.message ?? "Something went wrong. Please try again.");
@@ -103,29 +113,14 @@ export default function SignUpPage() {
           </div>
 
           <div className="mt-8 lg:mt-0">
-            <h2 className="font-display text-2xl font-semibold">Create account</h2>
-            <p className="mt-1 text-sm text-foreground/50">Choose your account type</p>
-          </div>
-
-          <div className="mt-6 space-y-1">
-            <p className="text-xs font-medium uppercase tracking-wider text-foreground/40">I want to</p>
-            <div className="grid grid-cols-2 gap-2">
-              {roles.map((role) => (
-                <button
-                  key={role.value}
-                  type="button"
-                  onClick={() => setSelectedRole(role.value)}
-                  className={`rounded-xl border px-4 py-3 text-left transition-all ${
-                    selectedRole === role.value
-                      ? "border-accent bg-accent/10 ring-1 ring-accent"
-                      : "border-foreground/10 hover:border-foreground/20"
-                  }`}
-                >
-                  <p className="text-sm font-medium">{role.label}</p>
-                  <p className="mt-0.5 text-[10px] text-foreground/40">{role.description}</p>
-                </button>
-              ))}
-            </div>
+            <h2 className="font-display text-2xl font-semibold">
+              {selectedRole === "PARTNER" ? "Create your partner account" : "Create your rider account"}
+            </h2>
+            <p className="mt-1 text-sm text-foreground/50">
+              {selectedRole === "PARTNER"
+                ? "List your bikes, organize rides, and grow your business."
+                : "Join the community, book rides, and explore India."}
+            </p>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">

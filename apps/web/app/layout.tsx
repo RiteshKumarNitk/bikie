@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { GeistSans } from "geist/font/sans";
 import { Inter } from "next/font/google";
 import "./globals.css";
@@ -8,6 +9,7 @@ import { GsapProvider } from "@/components/providers/GsapProvider";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
 import { PageTransition } from "@/components/shared/PageTransition";
+import { SELECTED_ROLE_COOKIE, isSelectedRole } from "@/lib/role";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -24,11 +26,14 @@ export const metadata: Metadata = {
   description: "India's premium motorcycle travel platform. Rent premium motorcycles anywhere.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const cookieValue = (await cookies()).get(SELECTED_ROLE_COOKIE)?.value;
+  const role = isSelectedRole(cookieValue) ? cookieValue : null;
+
   return (
     <html
       lang="en"
@@ -39,11 +44,11 @@ export default function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <LenisProvider>
             <GsapProvider>
-              <Navbar />
+              <Navbar role={role} />
               <main className="flex-1">
                 <PageTransition>{children}</PageTransition>
               </main>
-              <Footer />
+              <Footer role={role} />
             </GsapProvider>
           </LenisProvider>
         </ThemeProvider>

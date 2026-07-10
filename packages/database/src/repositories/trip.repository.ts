@@ -70,7 +70,8 @@ export async function findTripBySlug(slug: string) {
     ...toSummary(trip),
     description: trip.description,
     gallery: trip.gallery,
-    organizer: { name: trip.organizer.name, image: trip.organizer.image },
+    meetingPoint: trip.meetingPoint,
+    organizer: { id: trip.organizer.id, name: trip.organizer.name, image: trip.organizer.image },
   };
 }
 
@@ -85,9 +86,159 @@ export async function findTripsOrganizedBy(userId: string) {
 
 export async function findTripsJoinedBy(userId: string) {
   const participants = await prisma.tripParticipant.findMany({
-    where: { userId, status: "JOINED" },
+    where: { userId, status: "APPROVED" },
     include: { trip: { include: { destination: true } } },
     orderBy: { joinedAt: "desc" },
   });
   return participants.map((p) => toSummary(p.trip));
+}
+
+export async function findTripsRequestedBy(userId: string) {
+  const participants = await prisma.tripParticipant.findMany({
+    where: { userId, status: "PENDING" },
+    include: { trip: { include: { destination: true } } },
+    orderBy: { joinedAt: "desc" },
+  });
+  return participants.map((p) => toSummary(p.trip));
+}
+
+function slugify(title: string) {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+export async function createTrip(data: {
+  title: string;
+  description: string;
+  imageUrl: string;
+  type: string;
+  difficulty: string;
+  price: number;
+  seatsTotal: number;
+  meetingPoint?: string;
+  startDate: Date;
+  endDate: Date;
+  organizerId: string;
+  destinationId?: string;
+}) {
+  const base = slugify(data.title);
+  let slug = base;
+  let suffix = 1;
+  while (await prisma.trip.findUnique({ where: { slug }, select: { id: true } })) {
+    slug = `${base}-${suffix}`;
+    suffix += 1;
+  }
+
+  const trip = await prisma.trip.create({
+    data: {
+      slug,
+      title: data.title,
+      description: data.description,
+      imageUrl: data.imageUrl,
+      type: data.type as never,
+      difficulty: data.difficulty as never,
+      price: data.price,
+      seatsTotal: data.seatsTotal,
+      seatsLeft: data.seatsTotal,
+      meetingPoint: data.meetingPoint,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      organizerId: data.organizerId,
+      destinationId: data.destinationId,
+    },
+    include: { destination: true },
+  });
+  return toSummary(trip);
+}
+
+export async function findTripById(id: string) {
+  return prisma.trip.findUnique({ where: { id } });
+}
+
+export async function findParticipant(tripId: string, userId: string) {
+  return prisma.tripParticipant.findUnique({ where: { tripId_userId: { tripId, userId } } });
+}
+
+export async function findParticipantById(participantId: string) {
+  return prisma.tripParticipant.findUnique({
+    where: { id: participantId },
+    include: { trip: true, user: true },
+  });
+}
+
+export async function upsertJoinRequest(tripId: string, userId: string, message?: string) {
+  return prisma.tripParticipant.upsert({
+    where: { tripId_userId: { tripId, userId } },
+    create: { tripId, userId, message, status: "PENDING" },
+    update: { message, status: "PENDING", decidedAt: null },
+  });
+}
+
+export async function findPendingRequestsForTrip(tripId: string) {
+  const requests = await prisma.tripParticipant.findMany({
+    where: { tripId, status: "PENDING" },
+    include: { user: true },
+    orderBy: { joinedAt: "asc" },
+  });
+  return requests.map((r) => ({
+    id: r.id,
+    message: r.message,
+    createdAt: r.joinedAt.toISOString(),
+    rider: { id: r.user.id, name: r.user.name, image: r.user.image },
+  }));
+}
+
+export async function decideParticipant(participantId: string, status: "APPROVED" | "REJECTED") {
+  return prisma.tripParticipant.update({
+    where: { id: participantId },
+    data: { status, decidedAt: new Date() },
+  });
+}
+
+export async function cancelParticipant(participantId: string) {
+  return prisma.tripParticipant.update({
+    where: { id: participantId },
+    data: { status: "CANCELLED", decidedAt: new Date() },
+  });
+}
+
+/** Atomic conditional decrement — returns false if no seats were available. */
+export async function decrementSeatsLeft(tripId: string) {
+  const result = await prisma.trip.updateMany({
+    where: { id: tripId, seatsLeft: { gt: 0 } },
+    data: { seatsLeft: { decrement: 1 } },
+  });
+  return result.count === 1;
+}
+
+/** Only called to reverse a prior decrementSeatsLeft (cancelling an approved
+ * participant), so the increment/decrement pair stays balanced without
+ * needing a cross-column comparison. */
+export async function incrementSeatsLeft(tripId: string) {
+  await prisma.trip.update({
+    where: { id: tripId },
+    data: { seatsLeft: { increment: 1 } },
+  });
+}
+
+export async function linkConversationToTrip(tripId: string, conversationId: string) {
+  await prisma.conversation.update({ where: { id: conversationId }, data: { tripId } });
+}
+
+export async function findConversationIdForTrip(tripId: string) {
+  const conversation = await prisma.conversation.findUnique({ where: { tripId }, select: { id: true } });
+  return conversation?.id ?? null;
+}
+
+export async function getRideStatsForUser(userId: string) {
+  const [ridesOrganized, requestsSent, requestsApproved, ridesCancelled] = await Promise.all([
+    prisma.trip.count({ where: { organizerId: userId } }),
+    prisma.tripParticipant.count({ where: { userId, status: { not: "PENDING" } } }),
+    prisma.tripParticipant.count({ where: { userId, status: "APPROVED" } }),
+    prisma.tripParticipant.count({ where: { userId, status: "CANCELLED" } }),
+  ]);
+  return { ridesOrganized, requestsSent, requestsApproved, ridesCancelled };
 }

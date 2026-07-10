@@ -11,10 +11,10 @@ export function PartnerTeaser() {
             Are you an experienced rider? Become a trip organizer, guide fellow enthusiasts, and earn while you ride.
           </p>
           <Link
-            href="/partner"
+            href="/trips/create"
             className="mt-8 inline-flex rounded-full bg-accent px-8 py-3 text-sm font-semibold text-white hover:bg-accent/90"
           >
-            Become a Partner
+            Create a Ride
           </Link>
         </div>
       </Reveal>

@@ -65,7 +65,9 @@ enum TripStatus {
 }
 
 enum ParticipantStatus {
-  JOINED
+  PENDING
+  APPROVED
+  REJECTED
   CANCELLED
 }
 
@@ -315,6 +317,7 @@ model Trip {
   price         Decimal           @db.Decimal(10, 2)
   seatsTotal    Int
   seatsLeft     Int
+  meetingPoint  String?
   startDate     DateTime
   endDate       DateTime
   status        TripStatus        @default(UPCOMING)
@@ -323,19 +326,22 @@ model Trip {
   destinationId String?
   destination   Destination?      @relation(fields: [destinationId], references: [id])
   participants  TripParticipant[]
+  conversation  Conversation?
   createdAt     DateTime          @default(now())
 
   @@index([status])
 }
 
 model TripParticipant {
-  id       String            @id @default(cuid())
-  tripId   String
-  trip     Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
-  userId   String
-  user     User              @relation(fields: [userId], references: [id])
-  status   ParticipantStatus @default(JOINED)
-  joinedAt DateTime          @default(now())
+  id        String            @id @default(cuid())
+  tripId    String
+  trip      Trip              @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation(fields: [userId], references: [id])
+  status    ParticipantStatus @default(PENDING)
+  message   String?
+  joinedAt  DateTime          @default(now())
+  decidedAt DateTime?
 
   @@unique([tripId, userId])
 }
@@ -358,6 +364,8 @@ model Wishlist {
 model Conversation {
   id           String                     @id @default(cuid())
   subject      String?
+  tripId       String?                    @unique
+  trip         Trip?                      @relation(fields: [tripId], references: [id], onDelete: SetNull)
   createdAt    DateTime                   @default(now())
   updatedAt    DateTime                   @updatedAt
   participants ConversationParticipant[]
