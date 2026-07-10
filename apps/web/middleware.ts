@@ -1,8 +1,23 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { auth } from "@bikie/auth";
 import { SELECTED_ROLE_COOKIE, dbRoleToSelectedRole, isSelectedRole } from "@/lib/role";
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+
+// Helper to fetch session without importing better-auth server (prevents 1MB Edge Function bloat)
+async function getSession(request: NextRequest) {
+  try {
+    const response = await fetch(new URL("/api/auth/get-session", request.url).toString(), {
+      headers: {
+        cookie: request.headers.get("cookie") || "",
+      },
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data?.session ? data : null;
+  } catch (err) {
+    return null;
+  }
+}
 
 function dashboardHomeForRole(role: string | undefined) {
   if (role === "ADMIN") return "/admin";
@@ -25,7 +40,7 @@ export default async function middleware(request: NextRequest) {
   const isDashboardRoute = isPathOrSubpath(pathname, "/dashboard");
 
   if (isPartnerRoute || isAdminRoute || isDashboardRoute) {
-    const session = await auth.api.getSession({ headers: request.headers });
+    const session = await getSession(request);
 
     if (!session) {
       const loginUrl = new URL("/login", url);
@@ -53,7 +68,7 @@ export default async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const session = await auth.api.getSession({ headers: request.headers });
+  const session = await getSession(request);
   if (session) {
     // Already-authenticated user with no selectedRole cookie (e.g. an
     // account predating this feature, or cleared cookies) — silently
