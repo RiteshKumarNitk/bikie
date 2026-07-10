@@ -18,5 +18,6 @@ export async function selectRole(role: SelectedRole, next?: string) {
     maxAge: ONE_YEAR_SECONDS,
     sameSite: "lax",
   });
-  redirect(isSafeNext(next) ? next : homeHrefForRole(role));
+  const target = (isSafeNext(next) && next !== "/") ? next : homeHrefForRole(role);
+  redirect(target);
 }

@@ -16,7 +16,7 @@ function isPathOrSubpath(pathname: string, base: string) {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
-export async function proxy(request: NextRequest) {
+export default async function middleware(request: NextRequest) {
   const url = new URL(request.url);
   const { pathname } = url;
 

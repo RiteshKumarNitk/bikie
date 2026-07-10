@@ -6,10 +6,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { LenisProvider } from "@/components/providers/LenisProvider";
 import { GsapProvider } from "@/components/providers/GsapProvider";
-import { Navbar } from "@/components/layout/Navbar";
-import { Footer } from "@/components/layout/Footer";
 import { PageTransition } from "@/components/shared/PageTransition";
-import { SELECTED_ROLE_COOKIE, isSelectedRole } from "@/lib/role";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,9 +28,6 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const cookieValue = (await cookies()).get(SELECTED_ROLE_COOKIE)?.value;
-  const role = isSelectedRole(cookieValue) ? cookieValue : null;
-
   return (
     <html
       lang="en"
@@ -44,11 +38,9 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <LenisProvider>
             <GsapProvider>
-              <Navbar role={role} />
-              <main className="flex-1">
+              <main className="flex-1 flex flex-col">
                 <PageTransition>{children}</PageTransition>
               </main>
-              <Footer role={role} />
             </GsapProvider>
           </LenisProvider>
         </ThemeProvider>

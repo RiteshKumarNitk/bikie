@@ -33,21 +33,21 @@
   --color-accent-text: #26258f;
 }
 
-/* Dark mode: Rich navy blue — the primary BIKIE look */
+/* Dark mode: Premium navy blue — the primary BIKIE look */
 .dark {
-  --color-primary: #0b1226;
-  --color-background: #050a18;
-  --color-surface: #0b1226;
-  --color-card: #111933;
+  --color-primary: #26258f;
+  --color-background: #26258f;
+  --color-surface: #1e1d72;
+  --color-card: #1e1d72;
   --color-foreground: #edf0f7;
-  --color-secondary: #182244;
-  --color-accent: #26258f;
-  --color-accent-hover: #1e1d70;
+  --color-secondary: #1e1d72;
+  --color-accent: #3b3a91;
+  --color-accent-hover: #2e2d74;
   /* #26258f as TEXT against this near-black background is ~1.6:1 contrast
      (fails WCAG AA). Lighter tint of the same hue keeps links/badges/labels
      readable while --color-accent stays literal for button/badge fills. */
   --color-accent-text: #8585d6;
-  --glass-bg: rgba(17, 25, 51, 0.7);
+  --glass-bg: rgba(17, 24, 39, 0.7);
   --glass-border: rgba(255, 255, 255, 0.06);
 }
 
@@ -93,7 +93,7 @@
 }
 
 .nav-blur {
-  background: rgba(5, 10, 24, 0.8);
+  background: rgba(38, 37, 143, 0.95);
   backdrop-filter: blur(32px);
   -webkit-backdrop-filter: blur(32px);
 }
