@@ -7,6 +7,8 @@ import type {
   TripSummaryDTO,
 } from "@bikie/types";
 import type { CreateTripInput } from "@bikie/validation";
+import { MessageService } from "./message.service";
+import { NotificationService } from "./notification.service";
 
 const DEFAULT_TRIP_IMAGE = "https://picsum.photos/seed/ride-default/900/600";
 
@@ -79,6 +81,14 @@ export const TripService = {
     }
 
     await tripRepository.upsertJoinRequest(trip.id, userId, message);
+    await NotificationService.notify(
+      trip.organizer.id,
+      "RIDE_REQUEST_RECEIVED",
+      "New ride request",
+      `Someone requested to join "${trip.title}".`,
+      "Trip",
+      trip.id,
+    );
     return { ok: true };
   },
 
@@ -109,6 +119,14 @@ export const TripService = {
 
     if (decision === "REJECTED") {
       await tripRepository.decideParticipant(participantId, "REJECTED");
+      await NotificationService.notify(
+        participant.userId,
+        "RIDE_REQUEST_REJECTED",
+        "Ride request declined",
+        `Your request to join "${participant.trip.title}" was declined.`,
+        "Trip",
+        participant.tripId,
+      );
       return { ok: true };
     }
 
@@ -122,17 +140,31 @@ export const TripService = {
       const conversation = await messageRepository.createConversation(
         [organizerId, participant.userId],
         `Ride: ${participant.trip.title}`,
+        organizerId,
       );
       conversationId = conversation.id;
       await tripRepository.linkConversationToTrip(participant.tripId, conversationId);
     } else {
-      await messageRepository.addParticipant(conversationId, participant.userId);
+      await messageRepository.addParticipant(conversationId, participant.userId, "MEMBER");
     }
+
+    await MessageService.createSystemMessage(
+      conversationId,
+      `${participant.trip.organizer.name} approved ${participant.user.name}.`,
+    );
+    await NotificationService.notify(
+      participant.userId,
+      "RIDE_REQUEST_APPROVED",
+      "Ride request approved",
+      `You're in! Your request to join "${participant.trip.title}" was approved.`,
+      "Trip",
+      participant.tripId,
+    );
 
     return { ok: true };
   },
 
-  async leaveRide(slug: string, userId: string): Promise<LeaveRideResult> {
+  async leaveRide(slug: string, userId: string, userName: string): Promise<LeaveRideResult> {
     const trip = await tripRepository.findTripBySlug(slug);
     if (!trip) return { ok: false, reason: "TRIP_NOT_FOUND" };
 
@@ -145,6 +177,10 @@ export const TripService = {
     await tripRepository.cancelParticipant(participant.id);
     if (wasApproved) {
       await tripRepository.incrementSeatsLeft(trip.id);
+      const conversationId = await tripRepository.findConversationIdForTrip(trip.id);
+      if (conversationId) {
+        await MessageService.createSystemMessage(conversationId, `${userName} left the ride.`);
+      }
     }
 
     return { ok: true };

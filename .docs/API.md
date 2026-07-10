@@ -136,6 +136,12 @@ plain polling-friendly JSON.
 | `/api/conversations/[id]/messages` | POST | `{ content }` — send a message; pushes a `new_message` SSE event to other participants. Returns `{ message }`. |
 | `/api/sse` | GET | Cookie-session-based (uses `getServerSession()` directly, not the shared `requireSession()` helper — bearer-token compatibility not yet verified for this route). Opens a `text/event-stream` connection; emits `connected`/`heartbeat`/`new_message`/SOS events. Not used by the Flutter app in v1 — see ROADMAP.md Milestone 6b. |
 
+**Milestone 8 (in progress, see ADR-011)**: `/api/sse` is being rewritten to drain a
+per-user Upstash Redis inbox instead of the in-process manager above; `Message` gains
+encryption, reply/edit/delete/receipts; new Ride Room, Reports, Moderation, Groups, and
+Notifications routes are being added. This section is updated as each phase lands — see
+`.docs/TASKS.md` Milestone 8 for current status.
+
 ## User
 
 | Route | Method | Notes |

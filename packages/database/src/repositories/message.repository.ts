@@ -1,5 +1,11 @@
 import { prisma } from "../client";
 
+const MESSAGE_INCLUDE = {
+  sender: { select: { id: true, name: true } },
+  attachments: true,
+  receipts: true,
+} as const;
+
 export async function getConversationsForUser(userId: string) {
   const participations = await prisma.conversationParticipant.findMany({
     where: { userId },
@@ -20,78 +26,184 @@ export async function getConversationsForUser(userId: string) {
     return {
       id: conv.id,
       subject: conv.subject,
+      isLocked: conv.isLocked,
       participants: conv.participants.map((pp) => pp.user),
-      lastMessage: lastMsg ? { content: lastMsg.content, createdAt: lastMsg.createdAt.toISOString(), senderId: lastMsg.senderId } : null,
-      unreadCount: 0,
+      lastMessage: lastMsg,
       createdAt: conv.createdAt.toISOString(),
       updatedAt: conv.updatedAt.toISOString(),
     };
   });
 }
 
-export async function getMessages(conversationId: string, userId: string) {
+export async function isParticipant(conversationId: string, userId: string): Promise<boolean> {
   const participant = await prisma.conversationParticipant.findUnique({
     where: { conversationId_userId: { conversationId, userId } },
   });
-  if (!participant) return null;
+  return participant !== null;
+}
 
-  const messages = await prisma.message.findMany({
+export async function getMessagesRaw(conversationId: string) {
+  return prisma.message.findMany({
     where: { conversationId },
     orderBy: { createdAt: "asc" },
-    include: { sender: { select: { id: true, name: true } } },
+    include: MESSAGE_INCLUDE,
   });
-
-  return messages.map((m) => ({
-    id: m.id,
-    conversationId: m.conversationId,
-    senderId: m.senderId,
-    senderName: m.sender.name,
-    content: m.content,
-    readAt: m.readAt?.toISOString() ?? null,
-    createdAt: m.createdAt.toISOString(),
-  }));
 }
 
-export async function sendMessage(conversationId: string, senderId: string, content: string) {
-  const participant = await prisma.conversationParticipant.findUnique({
-    where: { conversationId_userId: { conversationId, userId: senderId } },
+export async function getOtherParticipantIds(conversationId: string, excludeUserId: string): Promise<string[]> {
+  const participants = await prisma.conversationParticipant.findMany({
+    where: { conversationId, userId: { not: excludeUserId } },
+    select: { userId: true },
   });
-  if (!participant) throw new Error("Not a participant in this conversation");
+  return participants.map((p) => p.userId);
+}
 
+export async function getParticipantIds(conversationId: string): Promise<string[]> {
+  const participants = await prisma.conversationParticipant.findMany({
+    where: { conversationId },
+    select: { userId: true },
+  });
+  return participants.map((p) => p.userId);
+}
+
+export async function sendMessage(params: {
+  conversationId: string;
+  senderId: string | null;
+  type: "TEXT" | "SYSTEM";
+  content?: string;
+  ciphertext?: string;
+  iv?: string;
+  authTag?: string;
+  encryptionVersion?: number;
+  replyToId?: string;
+  attachments?: {
+    type: "IMAGE" | "DOCUMENT";
+    url: string;
+    publicId: string;
+    fileName: string;
+    mimeType: string;
+    sizeBytes: number;
+    width?: number;
+    height?: number;
+  }[];
+}) {
   const message = await prisma.message.create({
-    data: { conversationId, senderId, content },
-    include: { sender: { select: { id: true, name: true } } },
+    data: {
+      conversationId: params.conversationId,
+      senderId: params.senderId,
+      type: params.type,
+      content: params.content,
+      ciphertext: params.ciphertext,
+      iv: params.iv,
+      authTag: params.authTag,
+      encryptionVersion: params.encryptionVersion,
+      replyToId: params.replyToId,
+      attachments: params.attachments
+        ? { create: params.attachments.map((a) => ({ ...a })) }
+        : undefined,
+    },
+    include: MESSAGE_INCLUDE,
   });
 
-  await prisma.conversation.update({ where: { id: conversationId }, data: { updatedAt: new Date() } });
+  await prisma.conversation.update({ where: { id: params.conversationId }, data: { updatedAt: new Date() } });
 
-  return {
-    id: message.id,
-    conversationId: message.conversationId,
-    senderId: message.senderId,
-    senderName: message.sender.name,
-    content: message.content,
-    readAt: null,
-    createdAt: message.createdAt.toISOString(),
-  };
+  if (params.senderId) {
+    const otherIds = await getOtherParticipantIds(params.conversationId, params.senderId);
+    if (otherIds.length > 0) {
+      await prisma.messageReceipt.createMany({
+        data: otherIds.map((userId) => ({ messageId: message.id, userId })),
+      });
+    }
+  }
+
+  return message;
 }
 
-export async function createConversation(participantIds: string[], subject?: string) {
+export async function editMessage(messageId: string, encrypted: {
+  ciphertext: string;
+  iv: string;
+  authTag: string;
+  encryptionVersion: number;
+}) {
+  return prisma.message.update({
+    where: { id: messageId },
+    data: { ...encrypted, editedAt: new Date() },
+    include: MESSAGE_INCLUDE,
+  });
+}
+
+export async function deleteMessage(messageId: string, deletedBy: string) {
+  return prisma.message.update({
+    where: { id: messageId },
+    data: {
+      content: null,
+      ciphertext: null,
+      iv: null,
+      authTag: null,
+      deletedAt: new Date(),
+      deletedBy,
+    },
+    include: MESSAGE_INCLUDE,
+  });
+}
+
+export async function findMessageById(messageId: string) {
+  return prisma.message.findUnique({ where: { id: messageId }, include: MESSAGE_INCLUDE });
+}
+
+export async function markDelivered(conversationId: string, userId: string) {
+  await prisma.messageReceipt.updateMany({
+    where: { userId, deliveredAt: null, message: { conversationId } },
+    data: { deliveredAt: new Date() },
+  });
+}
+
+export async function markRead(conversationId: string, userId: string, upToMessageId: string) {
+  const target = await prisma.message.findUnique({ where: { id: upToMessageId }, select: { createdAt: true } });
+  if (!target) return [];
+
+  const toUpdate = await prisma.messageReceipt.findMany({
+    where: {
+      userId,
+      readAt: null,
+      message: { conversationId, createdAt: { lte: target.createdAt } },
+    },
+    select: { id: true, message: { select: { senderId: true } } },
+  });
+
+  if (toUpdate.length === 0) return [];
+
+  await prisma.messageReceipt.updateMany({
+    where: { id: { in: toUpdate.map((r) => r.id) } },
+    data: { readAt: new Date() },
+  });
+
+  return [...new Set(toUpdate.map((r) => r.message.senderId).filter((id): id is string => id !== null))];
+}
+
+export async function createConversation(
+  participantIds: string[],
+  subject?: string,
+  organizerId?: string,
+) {
   const conversation = await prisma.conversation.create({
     data: {
       subject,
       participants: {
-        create: participantIds.map((userId) => ({ userId })),
+        create: participantIds.map((userId) => ({
+          userId,
+          role: organizerId && userId === organizerId ? "ORGANIZER" : "MEMBER",
+        })),
       },
     },
   });
   return conversation;
 }
 
-export async function addParticipant(conversationId: string, userId: string) {
+export async function addParticipant(conversationId: string, userId: string, role: "ORGANIZER" | "MEMBER" = "MEMBER") {
   await prisma.conversationParticipant.upsert({
     where: { conversationId_userId: { conversationId, userId } },
-    create: { conversationId, userId },
+    create: { conversationId, userId, role },
     update: {},
   });
 }
@@ -113,4 +225,11 @@ export async function findConversationByParticipants(participantIds: string[]) {
   });
 
   return match ?? null;
+}
+
+export async function getConversationById(conversationId: string) {
+  return prisma.conversation.findUnique({
+    where: { id: conversationId },
+    include: { participants: true },
+  });
 }

@@ -1,5 +1,22 @@
 # Changelog
 
+## Milestone 8 — Community Platform v2 (in progress)
+- Ran a full-project audit before starting (per explicit request): confirmed Communities,
+  Groups, Clubs, Events, Reports, Moderation, and Notifications have no Prisma models at
+  all, chat messages are stored as plain text with zero encryption infrastructure, and
+  realtime delivery is an in-process `Map` confirmed broken across Vercel's independent
+  serverless function instances. ~15 smaller pre-existing bugs also found (Partner Fleet
+  CRUD 403s, `/community`/`/clubs` fake data, dead Contact form, etc.) — logged to
+  `.docs/TASKS.md` as a tracked backlog, explicitly deferred rather than folded into this
+  milestone.
+- ADR-011 written: resolves the Groups/Communities/Clubs/Events terminology (one `Group`
+  model with a type filter, `Events` becomes a `TripType` value, not new models), Ride Room
+  composition (existing `Trip`↔`Conversation` pair + Announcements + emergency
+  contacts/meeting point + shared media), AES-256-GCM server-side message encryption
+  (Node's built-in `crypto`, no KMS), Upstash Redis for realtime (replacing the broken
+  in-process SSE manager), and a hybrid `User.accountStatus` + `ModerationAction` design for
+  moderation state, layered on top of the existing `AuditLog`.
+
 ## Milestone 7 — Rides: Community v1
 - Pivoted product framing toward "find riders, plan adventures, ride together" — a
   request-then-approve group ride flow layered on the existing `Trip` model (previously had

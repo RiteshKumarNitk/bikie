@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { SOSService, EmailService } from "@bikie/services";
+import { SOSService, EmailService, RealtimeService } from "@bikie/services";
 import { requireMembership } from "@/lib/require-role";
-import { broadcastEvent } from "@/lib/sse-manager";
 import { prisma } from "@bikie/database";
 
 export async function GET(request: Request) {
@@ -30,7 +29,7 @@ export async function POST(request: Request) {
   if (!user?.phone) missingFields.push("phone number");
 
   // Broadcast to all connected clients
-  broadcastEvent("sos_alert", alert);
+  await RealtimeService.publishGlobal("sos_alert", alert);
 
   // Notify user via email
   EmailService.sendSOSAlert(session.user.email, alert.type, alert.city).catch(console.error);

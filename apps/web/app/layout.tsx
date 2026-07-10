@@ -32,9 +32,9 @@ export default async function RootLayout({
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${GeistSans.variable} ${inter.variable} h-full antialiased`}
+      className={`${GeistSans.variable} ${inter.variable} antialiased`}
     >
-      <body className="flex min-h-full flex-col" suppressHydrationWarning>
+      <body className="flex flex-col" suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <LenisProvider>
             <GsapProvider>

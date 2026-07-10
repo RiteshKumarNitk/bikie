@@ -15,6 +15,16 @@ export const auth = betterAuth({
         input: true,
         defaultValue: "RENTER",
       },
+      accountStatus: {
+        type: "string",
+        input: false,
+        defaultValue: "ACTIVE",
+      },
+      accountStatusExpiresAt: {
+        type: "date",
+        input: false,
+        required: false,
+      },
     },
   },
   // Cookie sessions remain the primary mechanism for the web app; bearer()

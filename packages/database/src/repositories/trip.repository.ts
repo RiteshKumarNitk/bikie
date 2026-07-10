@@ -158,6 +158,27 @@ export async function findTripById(id: string) {
   return prisma.trip.findUnique({ where: { id } });
 }
 
+export async function getRoomInfo(tripId: string) {
+  return prisma.trip.findUnique({
+    where: { id: tripId },
+    select: { meetingPoint: true, meetingLat: true, meetingLng: true, emergencyContacts: true },
+  });
+}
+
+export async function updateMeetingPoint(
+  tripId: string,
+  data: { meetingPoint?: string; meetingLat?: number; meetingLng?: number },
+) {
+  return prisma.trip.update({ where: { id: tripId }, data });
+}
+
+export async function updateEmergencyContacts(
+  tripId: string,
+  contacts: { name: string; phone: string; relation: string }[],
+) {
+  return prisma.trip.update({ where: { id: tripId }, data: { emergencyContacts: contacts } });
+}
+
 export async function findParticipant(tripId: string, userId: string) {
   return prisma.tripParticipant.findUnique({ where: { tripId_userId: { tripId, userId } } });
 }
@@ -165,7 +186,7 @@ export async function findParticipant(tripId: string, userId: string) {
 export async function findParticipantById(participantId: string) {
   return prisma.tripParticipant.findUnique({
     where: { id: participantId },
-    include: { trip: true, user: true },
+    include: { trip: { include: { organizer: true } }, user: true },
   });
 }
 

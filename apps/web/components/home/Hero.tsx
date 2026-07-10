@@ -18,8 +18,7 @@ export function Hero() {
           { opacity: 0, y: 20, duration: 0.6, ease: "power3.out" },
           "-=0.5",
         )
-        .from("[data-hero-accordion]", { opacity: 0, x: 32, duration: 0.8, ease: "power3.out" }, "-=0.6")
-        .from("[data-hero-search]", { opacity: 0, y: 24, duration: 0.6, ease: "power3.out" }, "-=0.4");
+        .from("[data-hero-accordion]", { opacity: 0, x: 32, duration: 0.8, ease: "power3.out" }, "-=0.6");
     }, rootRef);
 
     return () => ctx.revert();

@@ -73,6 +73,13 @@ and subsequent approvals just add a `ConversationParticipant` row — the group 
 same `/dashboard/messages` page used for partner 1:1 chats, entered via a
 `?conversation=<id>` deep link.
 
+## Community Platform v2 (Milestone 8 — in progress, see ADR-011)
+
+Ride Rooms, encrypted group chat, moderation, and mobile parity are being built on top of
+the existing Rides feature above. This section is a stub, filled in as each phase lands —
+see `.docs/TASKS.md` Milestone 8 for phase status and `.docs/DECISIONS.md` ADR-011 for the
+full architecture (schema, encryption, realtime, moderation).
+
 ## Fonts, theme, animation
 
 - Fonts: Geist Sans (display) via `geist/font/sans`, Inter (body) via

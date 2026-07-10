@@ -7,7 +7,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ slug: 
   if (error) return error;
 
   const { slug } = await params;
-  const result = await TripService.leaveRide(slug, session.user.id);
+  const result = await TripService.leaveRide(slug, session.user.id, session.user.name);
   if (!result.ok) {
     const status = result.reason === "TRIP_NOT_FOUND" ? 404 : 400;
     return NextResponse.json({ error: result.reason }, { status });

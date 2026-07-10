@@ -72,3 +72,37 @@ structured fields — revisit if organizers want filtering/enforcement on them.
 Port the Milestone 7 web flow to `apps/mobile`: ride creation form, request-to-join,
 organizer's request-review screen, and a Ride Group entry point into the existing
 polling-based messaging screens (Milestone 6b).
+
+## Milestone 8 — Community Platform v2 (in progress)
+Triggered by a full-project audit (pre-build, per user request) that found Communities,
+Groups, Clubs, Events, Reports, Moderation, and Notifications had no Prisma models at all,
+and that chat storage/realtime had real gaps: plaintext messages with zero encryption
+infrastructure, and an in-process SSE `Map` confirmed broken across Vercel's independent
+serverless function instances. See ADR-011 in `.docs/DECISIONS.md` for the full design and
+`.docs/TASKS.md` for phase-by-phase status.
+
+- **Ride Room**: every approved ride auto-gets a private room (existing `Trip`↔`Conversation`
+  pair, extended with Announcements, Meeting Point, Emergency Contacts, Shared Media),
+  access restricted to Organizer + Approved Riders + Admin.
+- **Production-ready chat**: real-time delivery, per-participant read receipts, delivered
+  status, typing indicator, reply/edit/delete, emoji, image/file sharing (Cloudinary),
+  system messages.
+- **Message encryption**: AES-256-GCM, server-only key, never exposed to any client —
+  admin moderation decrypt path goes through the same authorized read path as everyone
+  else, audited via `AuditLog`.
+- **Admin moderation**: view/moderate every Ride Room and conversation, delete messages,
+  warn/mute/suspend/ban users, close/delete rooms — every action written to `AuditLog` plus
+  a new `ModerationAction` trust-and-safety ledger.
+- **Reports**: users can report spam/abuse/fake accounts/dangerous behaviour/harassment/scam;
+  land in Admin → Community Moderation → Reports (previously a stub `EmptyState`, now real).
+- **Realtime infra**: Upstash Redis (REST client) replaces the broken in-process SSE `Map`.
+- **Groups/Communities/Clubs**: one new `Group` model (`GroupType: COMMUNITY | CLUB`),
+  admin-seeded only in this pass — see ADR-011 for why user-facing creation is deferred.
+- **Events**: a new `TripType.EVENT` value, not a new model.
+- **Mobile parity**: Ride Room, Group Chat, Notifications ported to Flutter, consuming the
+  same REST API — no mobile-only endpoints.
+
+**Explicitly deferred**: user-facing Group creation/joining (Milestone 8b), Polls, Live
+Location. **Explicitly out of scope for this milestone**: ~15 pre-existing bugs found during
+the audit (Partner Fleet CRUD 403, Contact form not wired, `/community`/`/clubs` fake data,
+etc.) — tracked as a backlog in `.docs/TASKS.md` for a separate follow-up pass.

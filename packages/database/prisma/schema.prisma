@@ -50,6 +50,7 @@ enum TripType {
   ROAD_TRIP
   INTERNATIONAL
   GUIDED_TOUR
+  EVENT
 }
 
 enum TripDifficulty {
@@ -92,6 +93,97 @@ enum MembershipStatus {
   CANCELLED
 }
 
+// --- Community Platform v2 (Milestone 8, ADR-011) ---
+
+enum GroupType {
+  COMMUNITY
+  CLUB
+}
+
+enum GroupMemberRole {
+  OWNER
+  MODERATOR
+  MEMBER
+}
+
+enum GroupMemberStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REMOVED
+}
+
+enum ConversationRole {
+  ORGANIZER
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  SYSTEM
+}
+
+enum AttachmentType {
+  IMAGE
+  DOCUMENT
+}
+
+enum ReportTargetType {
+  MESSAGE
+  USER
+  TRIP
+  CONVERSATION
+  GROUP
+}
+
+enum ReportReason {
+  SPAM
+  ABUSE
+  FAKE_ACCOUNT
+  DANGEROUS_BEHAVIOUR
+  HARASSMENT
+  SCAM
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+enum ModerationActionType {
+  WARN
+  MUTE
+  SUSPEND
+  BAN
+  UNBAN
+  DELETE_MESSAGE
+  CLOSE_RIDE_ROOM
+  DELETE_RIDE_ROOM
+}
+
+enum UserAccountStatus {
+  ACTIVE
+  WARNED
+  MUTED
+  SUSPENDED
+  BANNED
+}
+
+enum NotificationType {
+  RIDE_REQUEST_RECEIVED
+  RIDE_REQUEST_APPROVED
+  RIDE_REQUEST_REJECTED
+  RIDE_ANNOUNCEMENT
+  NEW_MESSAGE
+  GROUP_JOIN_APPROVED
+  MODERATION_ACTION
+  SOS_ALERT
+  SYSTEM
+}
+
 // --- Better Auth core models ---
 
 model User {
@@ -102,6 +194,8 @@ model User {
   image         String?
   phone         String?
   role          UserRole  @default(RENTER)
+  accountStatus          UserAccountStatus @default(ACTIVE)
+  accountStatusExpiresAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
@@ -122,6 +216,15 @@ model User {
   referredById  String?
   referredBy    User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
   referrals     User[]    @relation("Referrals")
+  groupsOwned         Group[]            @relation("GroupOwner")
+  groupMemberships    GroupMember[]
+  announcements       Announcement[]
+  reportsFiled        Report[]           @relation("ReportsFiled")
+  reportsReviewed     Report[]           @relation("ReportsReviewed")
+  moderationReceived  ModerationAction[] @relation("ModerationTarget")
+  moderationIssued    ModerationAction[] @relation("ModerationActor")
+  notifications       Notification[]
+  messageReceipts     MessageReceipt[]
 
   @@map("user")
 }
@@ -318,6 +421,9 @@ model Trip {
   seatsTotal    Int
   seatsLeft     Int
   meetingPoint  String?
+  meetingLat    Float?
+  meetingLng    Float?
+  emergencyContacts Json?
   startDate     DateTime
   endDate       DateTime
   status        TripStatus        @default(UPCOMING)
@@ -327,6 +433,7 @@ model Trip {
   destination   Destination?      @relation(fields: [destinationId], references: [id])
   participants  TripParticipant[]
   conversation  Conversation?
+  announcements Announcement[]
   createdAt     DateTime          @default(now())
 
   @@index([status])
@@ -366,39 +473,196 @@ model Conversation {
   subject      String?
   tripId       String?                    @unique
   trip         Trip?                      @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  isLocked     Boolean                    @default(false)
+  lockedAt     DateTime?
+  lockedById   String?
   createdAt    DateTime                   @default(now())
   updatedAt    DateTime                   @updatedAt
   participants ConversationParticipant[]
   messages     Message[]
+  group        Group?
 
   @@map("conversation")
 }
 
 model ConversationParticipant {
-  id             String       @id @default(cuid())
+  id             String            @id @default(cuid())
   conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   userId         String
-  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  joinedAt       DateTime     @default(now())
+  user           User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           ConversationRole  @default(MEMBER)
+  joinedAt       DateTime          @default(now())
 
   @@unique([conversationId, userId])
   @@map("conversation_participant")
 }
 
 model Message {
-  id             String       @id @default(cuid())
-  conversationId String
-  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  senderId       String
-  sender         User         @relation(fields: [senderId], references: [id])
-  content        String
-  readAt         DateTime?
-  createdAt      DateTime     @default(now())
+  id                String       @id @default(cuid())
+  conversationId    String
+  conversation      Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId          String?
+  sender            User?        @relation(fields: [senderId], references: [id])
+  type              MessageType  @default(TEXT)
+  content           String?
+  ciphertext        String?
+  iv                String?
+  authTag           String?
+  encryptionVersion Int?
+  replyToId         String?
+  replyTo           Message?     @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies           Message[]    @relation("MessageReplies")
+  editedAt          DateTime?
+  deletedAt         DateTime?
+  deletedBy         String?
+  attachments       MessageAttachment[]
+  receipts          MessageReceipt[]
+  createdAt         DateTime     @default(now())
 
   @@index([conversationId])
   @@index([senderId])
+  @@index([replyToId])
   @@map("message")
+}
+
+model MessageReceipt {
+  id          String    @id @default(cuid())
+  messageId   String
+  message     Message   @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveredAt DateTime?
+  readAt      DateTime?
+
+  @@unique([messageId, userId])
+  @@index([userId])
+  @@map("message_receipt")
+}
+
+model MessageAttachment {
+  id        String         @id @default(cuid())
+  messageId String
+  message   Message        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  type      AttachmentType
+  url       String
+  publicId  String
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+  width     Int?
+  height    Int?
+  createdAt DateTime       @default(now())
+
+  @@index([messageId])
+  @@map("message_attachment")
+}
+
+model Announcement {
+  id        String    @id @default(cuid())
+  tripId    String
+  trip      Trip      @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User      @relation(fields: [authorId], references: [id])
+  content   String
+  pinnedAt  DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([tripId])
+  @@map("announcement")
+}
+
+model Group {
+  id             String        @id @default(cuid())
+  slug           String        @unique
+  name           String
+  description    String
+  imageUrl       String
+  type           GroupType     @default(COMMUNITY)
+  city           String?
+  isPrivate      Boolean       @default(false)
+  ownerId        String
+  owner          User          @relation("GroupOwner", fields: [ownerId], references: [id])
+  conversationId String?       @unique
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  members        GroupMember[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([type])
+  @@map("group_entity")
+}
+
+model GroupMember {
+  id       String            @id @default(cuid())
+  groupId  String
+  group    Group             @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role     GroupMemberRole   @default(MEMBER)
+  status   GroupMemberStatus @default(APPROVED)
+  joinedAt DateTime          @default(now())
+
+  @@unique([groupId, userId])
+  @@map("group_member")
+}
+
+model Report {
+  id                String             @id @default(cuid())
+  reporterId        String
+  reporter          User               @relation("ReportsFiled", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetType        ReportTargetType
+  targetId          String
+  reason            ReportReason
+  details           String?
+  status            ReportStatus       @default(PENDING)
+  reviewedById      String?
+  reviewedBy        User?              @relation("ReportsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt        DateTime?
+  resolutionNote    String?
+  moderationActions ModerationAction[]
+  createdAt         DateTime           @default(now())
+
+  @@index([status])
+  @@index([targetType, targetId])
+  @@map("report")
+}
+
+model ModerationAction {
+  id              String               @id @default(cuid())
+  targetUserId    String?
+  targetUser      User?                @relation("ModerationTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  adminId         String
+  admin           User                 @relation("ModerationActor", fields: [adminId], references: [id])
+  type            ModerationActionType
+  reason          String
+  reportId        String?
+  report          Report?              @relation(fields: [reportId], references: [id])
+  relatedEntity   String?
+  relatedEntityId String?
+  expiresAt       DateTime?
+  createdAt       DateTime             @default(now())
+
+  @@index([targetUserId])
+  @@index([reportId])
+  @@map("moderation_action")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  entity    String?
+  entityId  String?
+  readAt    DateTime?
+  createdAt DateTime         @default(now())
+
+  @@index([userId, readAt])
+  @@index([createdAt])
+  @@map("notification")
 }
 
 // --- Membership ---

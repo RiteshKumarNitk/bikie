@@ -14,3 +14,7 @@ export { SOSService } from "./sos.service";
 export { EmailService } from "./email.service";
 export { SMSService } from "./sms.service";
 export { ReferralService } from "./referral.service";
+export { NotificationService } from "./notification.service";
+export { RealtimeService } from "./lib/realtime";
+export { RideRoomService } from "./ride-room.service";
+export { ReportService, ModerationService } from "./moderation.service";

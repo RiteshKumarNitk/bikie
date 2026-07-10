@@ -14,3 +14,7 @@ export * as membershipRepository from "./repositories/membership.repository";
 export * as sosRepository from "./repositories/sos.repository";
 export * as auditRepository from "./repositories/audit.repository";
 export * as referralRepository from "./repositories/referral.repository";
+export * as notificationRepository from "./repositories/notification.repository";
+export * as announcementRepository from "./repositories/announcement.repository";
+export * as reportRepository from "./repositories/report.repository";
+export * as moderationRepository from "./repositories/moderation.repository";

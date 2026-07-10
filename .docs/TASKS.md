@@ -2,6 +2,57 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Milestone 8 — Community Platform v2 (Ride Rooms, Encrypted Chat, Moderation, Mobile Parity)
+
+See ADR-011 in `.docs/DECISIONS.md` for the full architecture. Triggered by a full-project
+audit that found Communities/Groups/Clubs/Events/Reports/Moderation/Notification had no
+Prisma models at all, and chat had zero encryption + a realtime mechanism confirmed broken
+across Vercel's serverless instances.
+
+| Task | Status |
+|---|---|
+| 8.0 — ADR-011 written; ARCHITECTURE.md/API.md doc stubs | Completed |
+| 8.1 — Schema/migration (Group, GroupMember, Announcement, MessageAttachment, MessageReceipt, Report, ModerationAction, Notification, field additions, `TripType.EVENT`); migration applied to the live DB (user-approved). `encrypt-existing-messages.ts` backfill script written, **not run** (needs separate explicit sign-off — no plaintext-message backfill has occurred) | Completed |
+| 8.2 — Upstash Redis realtime swap (`RealtimeService`: per-user inbox + non-destructive cursor-based broadcast channels for global/admin), `sse-manager.ts` deleted, SSE route + SOS route migrated | Completed |
+| 8.3 — Encryption (AES-256-GCM, `message-crypto.ts`) + Message model overhaul (reply/edit/delete/per-participant receipts/system messages). Verified live: message send/edit/delete/typing/read-receipt all confirmed working via the API; direct DB inspection confirmed `content` is null and `ciphertext` populated for new messages | Completed |
+| 8.4 — Chat UI (web): reply/edit/delete/emoji/typing/receipts UI, Cloudinary upload flow | Planned |
+| 8.5 — Ride Room **backend**: `assertRideRoomAccess` guard, `Announcement` service/repo, `/api/trips/[slug]/room/**` routes (room/announcements/meeting-point/emergency-contacts/media). Typecheck-clean, not live-tested (see note below) | Completed (backend) |
+| 8.5b — Ride Room **web UI**: `/dashboard/rides/[slug]/room` page with tabs | Planned |
+| 8.6 — Reports + Admin Moderation **backend**: `ReportService`/`ModerationService`, warn/mute/suspend/ban/restore, conversation lock/delete, message delete, `AuditLog` integration, BANNED/SUSPENDED enforcement in `requireSession`, MUTED enforcement in `MessageService.sendMessage`. Typecheck-clean, not live-tested | Completed (backend) |
+| 8.6b — Reports + Admin Moderation **UI**: `/admin/moderation/*` pages | Planned |
+| 8.7 — Admin dashboard build-out (Rides edit, Ride Requests, Groups, Notifications broadcast) | Planned |
+| 8.8 — Mobile parity (`ride_room`, `notifications` Flutter features) | Planned |
+| 8.9 — Docs update + backlog log (below) | Planned |
+
+Note on "not live-tested": the permission classifier blocks further ad hoc data-mutating test
+calls against the shared prod/dev DB beyond the initial migration + encryption verification
+already approved; the user chose "code review only" for the remainder of this build rather
+than granting broader live-testing permission. 8.5/8.6 backends are typecheck-clean and
+traced against the same call patterns already verified working in 8.1–8.3, but have not been
+exercised end-to-end via real HTTP calls the way messaging was.
+
+## Backlog — pre-existing bugs found during Milestone 8's pre-build audit (not in scope for Milestone 8)
+
+Deferred per explicit user decision — tracked here for a future pass:
+
+| Bug | Area |
+|---|---|
+| Partner Fleet Add/Remove buttons POST/DELETE to `/api/admin/bikes` (ADMIN-only) — 403s for real partners in production | Partner dashboard |
+| No bike edit/update capability anywhere for partners | Partner dashboard |
+| Partner Bookings page is read-only, no accept/reject route exists | Partner dashboard |
+| Partner Settings/business-profile page is read-only despite a working `PUT /api/partner/profile` underneath | Partner dashboard |
+| `/partners/services` promises 8 partner types (mechanic, fuel delivery, tour guide, hotel, camping, accessories, photography); dashboard only supports bike-fleet listing | Partner marketing vs. dashboard gap |
+| `lib/partner-content.ts` (services/benefits/pricing/success-stories) is 100% hardcoded, no admin CMS management | Partner marketing |
+| `/community` page is 100% hardcoded fake data (featured riders, ride photos, events, clubs pills) with dead-click cards, zero API calls | Rider public site |
+| `/clubs` page is 100% hardcoded fake data; "+ Create Club" CTA is non-functional | Rider public site |
+| Contact form (`ContactForm`) never calls an API — `onSubmit` just sets local state, message is never sent | Rider public site |
+| `/safety-center` is static hardcoded topics, no API | Rider public site |
+| Rider dashboard Notifications tab always renders empty state, no backing model (superseded by Milestone 8's real `Notification` model — recheck if still applicable after 8.7) | Rider dashboard |
+| Settings page has two dead "coming soon" stub sections (document upload, emergency contacts — note: ride-level emergency contacts are being built in Milestone 8, but this is a *profile-level* stub, distinct) | Rider dashboard |
+| Admin Trips page is read-only (superseded by Milestone 8.7 — recheck after) | Admin |
+| Admin Settings page is a non-functional stub (readOnly inputs, no save) | Admin |
+| CMS is limited to Testimonials only; no generic content/page management | Admin |
+
 ## Milestone 7 — Rides: Community v1
 
 | Task | Status |

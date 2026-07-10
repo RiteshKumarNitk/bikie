@@ -94,3 +94,60 @@ scoped decisions, each chosen to minimize new surface area:
   creation), and clubs. Reputation in v1 is a simple computed stat
   (`ridesOrganized`/`requestsSent`/`requestsApproved`/`ridesCancelled`/`approvalRate`), not a
   stored field.
+
+## ADR-011: Community Platform v2 — Groups/Communities/Clubs/Events terminology, Ride Room composition, message encryption, moderation, realtime
+
+A full-project audit (before Milestone 8) confirmed `Communities`, `Groups`, `Clubs`,
+`Events`, `Reports`, `Moderation`, `Notification` had **no Prisma models at all** — not
+missing UI, missing data models — while the spec listed them as five separate
+admin-manageable concepts alongside the existing `Trip`-based Rides. Seven scoped decisions,
+continuing ADR-010's "reuse over new surface area" precedent:
+
+- **`Group` is one new model** (`Group` + `GroupMember`, `GroupType { COMMUNITY, CLUB }`),
+  not three. Admin nav "Groups" = full CRUD table; "Communities"/"Clubs" are the same table
+  pre-filtered by `type`, not separate models or pages. Reuses `Conversation`/`Message` for
+  group chat via a nullable unique `Group.conversationId` — identical shape to
+  `Trip.conversation`, zero new chat infrastructure.
+- **User-facing Group creation/joining is deferred (Milestone 8b).** Nothing in the
+  functional spec describes a user creating or requesting to join a persistent group, only
+  rides. Groups ship admin-seeded only in this pass — the same posture `Destination`,
+  `Category`, and `Testimonial` already have (admin-created-only content, no user-facing
+  creation flow). A future request/approve flow can reuse `TripParticipant`'s
+  `PENDING → APPROVED|REJECTED` pattern directly.
+- **"Events" is a new `TripType` enum value (`EVENT`), not a new model.** Same shape as a
+  Ride (title, date range, location, capacity, organizer) — a separate `Event` model would
+  duplicate `Trip` for zero structural gain, the exact anti-pattern ADR-010 already rejected
+  once. Admin "Events" nav is `/admin/trips?type=EVENT`, reusing the Trips admin page.
+- **Ride Room is a composition, not a new top-level entity**: the existing `Trip` ↔
+  `Conversation` pair (ADR-010) plus a new `Announcement` model, `Trip.emergencyContacts`
+  (`Json?`, following the existing `Bike.gallery: String[]`/`MembershipPlan.benefits: String[]`
+  precedent for small structured lists that don't need their own table), `Trip.meetingLat`/
+  `meetingLng`, and "Shared Media" as a filtered view over `MessageAttachment` joined through
+  the room's conversation — not a parallel media-library table. One shared guard function
+  (`assertRideRoomAccess`) is called on every Ride Room route: Organizer + Approved Riders +
+  Admin only. Polls and Live Location are explicitly deferred (documented extension points:
+  `MessageType.POLL`, `Trip.liveLocationEnabled`), not built now.
+- **Message encryption: AES-256-GCM via Node's built-in `crypto`, server-only key.** New env
+  var `MESSAGE_ENCRYPTION_KEY` (32-byte base64), same posture as `BETTER_AUTH_SECRET` — no
+  KMS, no new npm dependency for crypto itself. `message.repository.ts` stays a dumb
+  ciphertext-in/ciphertext-out store (per the existing layering rule); `message.service.ts`
+  (+ new `lib/message-crypto.ts`) owns encrypt-on-write/decrypt-on-read, including the admin
+  moderation decrypt path — which goes through the *same* `getMessages` call as every other
+  read, gated by a role branch and an `logAdminAction("VIEW_CONVERSATION")` audit write, not
+  a separate code path that could drift out of sync. Deleting a message nulls
+  `ciphertext`/`iv`/`authTag`/`content` outright (true erasure), not a soft-delete flag.
+- **Realtime: Upstash Redis, REST-client inbox-drain — not raw TCP `SUBSCRIBE`.** The
+  existing `apps/web/lib/sse-manager.ts` in-process `Map` is confirmed broken across
+  Vercel's independent serverless function instances (ADR-001). Vercel functions can't hold
+  long-lived TCP subscriptions cleanly, so `@upstash/redis`'s REST client (not `ioredis`) is
+  used: each user gets an `inbox:<userId>` Redis list, publishers `RPUSH`, the SSE route
+  drains+deletes on a 2s poll. This list-per-user design is also the authorization
+  boundary — there is no shared "conversation channel" an unauthorized listener could
+  subscribe to. Mobile has no SSE client and stays on polling (tightened to 3s for an open
+  Ride Room thread), per the existing Milestone 6b decision.
+- **Moderation state: hybrid `User.accountStatus` (denormalized fast-path) + `ModerationAction`
+  (audit-trail source of truth), on top of the existing `AuditLog`, not instead of it.**
+  `AuditLog`/`logAdminAction()` remains the generic cross-feature ledger (unchanged, still
+  feeds CSV export and the Audit Logs page); `ModerationAction` is the trust-and-safety-specific
+  state machine with `expiresAt` semantics (mute/suspend durations) that hot paths
+  (`requireSession`, `sendMessage`) query directly, without joining history on every request.

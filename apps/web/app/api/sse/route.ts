@@ -1,29 +1,55 @@
 import { getServerSession } from "@/lib/get-session";
-import { addClient, removeClient } from "@/lib/sse-manager";
+import { RealtimeService } from "@bikie/services";
+
+const DRAIN_INTERVAL_MS = 2000;
+const HEARTBEAT_INTERVAL_MS = 30000;
 
 export async function GET() {
   const session = await getServerSession();
   if (!session) return new Response("Unauthorized", { status: 401 });
 
-  let clientId: string | null = null;
-  let interval: ReturnType<typeof setInterval> | null = null;
+  const userId = session.user.id;
+  const isAdmin = session.user.role === "ADMIN";
+  let drainInterval: ReturnType<typeof setInterval> | null = null;
+  let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
 
   const stream = new ReadableStream({
-    start(controller) {
-      clientId = addClient(session.user.id, controller);
-      controller.enqueue(new TextEncoder().encode("event: connected\ndata: {}\n\n"));
-      interval = setInterval(() => {
+    async start(controller) {
+      const encoder = new TextEncoder();
+      const emit = (event: string, data: unknown) => {
         try {
-          controller.enqueue(new TextEncoder().encode("event: heartbeat\ndata: {}\n\n"));
+          controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
         } catch {
-          if (interval) clearInterval(interval);
-          if (clientId) removeClient(session.user.id, clientId);
+          if (drainInterval) clearInterval(drainInterval);
+          if (heartbeatInterval) clearInterval(heartbeatInterval);
         }
-      }, 30000);
+      };
+
+      let globalCursor = await RealtimeService.getBroadcastCursor("global");
+      let adminCursor = isAdmin ? await RealtimeService.getBroadcastCursor("admin") : 0;
+
+      emit("connected", {});
+
+      drainInterval = setInterval(async () => {
+        const inboxEvents = await RealtimeService.drainInbox(userId);
+        const global = await RealtimeService.drainBroadcastSince("global", globalCursor);
+        globalCursor = global.cursor;
+        let adminEvents: typeof global.events = [];
+        if (isAdmin) {
+          const admin = await RealtimeService.drainBroadcastSince("admin", adminCursor);
+          adminCursor = admin.cursor;
+          adminEvents = admin.events;
+        }
+        for (const { event, data } of [...inboxEvents, ...global.events, ...adminEvents]) {
+          emit(event, data);
+        }
+      }, DRAIN_INTERVAL_MS);
+
+      heartbeatInterval = setInterval(() => emit("heartbeat", {}), HEARTBEAT_INTERVAL_MS);
     },
     cancel() {
-      if (interval) clearInterval(interval);
-      if (clientId) removeClient(session.user.id, clientId);
+      if (drainInterval) clearInterval(drainInterval);
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
     },
   });
 

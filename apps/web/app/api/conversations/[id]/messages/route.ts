@@ -1,18 +1,27 @@
 import { NextResponse } from "next/server";
 import { MessageService } from "@bikie/services";
+import { sendMessageSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
-import { sendEvent } from "@/lib/sse-manager";
+import { logAdminAction } from "@/lib/audit";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireSession();
   if (error) return error;
 
   const { id } = await params;
-  const messages = await MessageService.getMessages(id, session.user.id);
-  if (messages === null) {
+  const result = await MessageService.getMessages(id, session.user.id, session.user.role === "ADMIN");
+  if (result === null) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  return NextResponse.json({ messages });
+  if (result.viewedAsAdmin) {
+    await logAdminAction({
+      userId: session.user.id,
+      action: "VIEW_CONVERSATION",
+      entity: "Conversation",
+      entityId: id,
+    });
+  }
+  return NextResponse.json({ messages: result.messages });
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -20,23 +29,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   if (error) return error;
 
   const { id } = await params;
-  const body = await request.json();
-  if (!body.content || typeof body.content !== "string" || !body.content.trim()) {
-    return NextResponse.json({ error: "Content is required" }, { status: 400 });
+  const parsed = sendMessageSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const message = await MessageService.sendMessage(id, session.user.id, body.content);
-
-  // Notify other conversation participants via SSE
-  const conversations = await MessageService.getConversations(session.user.id);
-  const conv = conversations.find((c) => c.id === id);
-  if (conv) {
-    for (const p of conv.participants) {
-      if (p.id !== session.user.id) {
-        sendEvent(p.id, "new_message", message);
-      }
-    }
+  const result = await MessageService.sendMessage(id, session.user.id, parsed.data);
+  if (!result.ok) {
+    return NextResponse.json({ error: result.reason }, { status: 403 });
   }
-
-  return NextResponse.json({ message });
+  return NextResponse.json({ message: result.message });
 }

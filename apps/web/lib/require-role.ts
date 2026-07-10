@@ -7,6 +7,17 @@ export async function requireSession() {
   if (!session) {
     return { session: null, error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
+
+  const status = session.user.accountStatus;
+  const expiresAt = session.user.accountStatusExpiresAt;
+  const isExpired = expiresAt ? new Date(expiresAt).getTime() < Date.now() : false;
+  if (status === "BANNED" || (status === "SUSPENDED" && !isExpired)) {
+    return {
+      session: null,
+      error: NextResponse.json({ error: "ACCOUNT_RESTRICTED" }, { status: 403 }),
+    };
+  }
+
   return { session, error: null };
 }
 
