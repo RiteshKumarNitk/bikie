@@ -36,7 +36,7 @@ export async function requireMembership() {
       error: NextResponse.json(
         {
           error: "MEMBERSHIP_REQUIRED",
-          message: "SOS Emergency is a BIKIE Membership perk. Join a plan to send and view alerts.",
+          message: "This is a BIKIE Membership perk. Join a plan to continue.",
         },
         { status: 403 },
       ),

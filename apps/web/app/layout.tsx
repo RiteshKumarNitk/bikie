@@ -6,7 +6,6 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { LenisProvider } from "@/components/providers/LenisProvider";
 import { GsapProvider } from "@/components/providers/GsapProvider";
-import { PageTransition } from "@/components/shared/PageTransition";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -38,9 +37,7 @@ export default async function RootLayout({
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
           <LenisProvider>
             <GsapProvider>
-              <main className="flex-1 flex flex-col">
-                <PageTransition>{children}</PageTransition>
-              </main>
+              <main className="flex-1 flex flex-col">{children}</main>
             </GsapProvider>
           </LenisProvider>
         </ThemeProvider>

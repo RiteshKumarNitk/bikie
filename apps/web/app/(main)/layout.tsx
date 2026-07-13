@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { Navbar } from "@/components/layout/Navbar";
 import { Footer } from "@/components/layout/Footer";
+import { PageTransition } from "@/components/shared/PageTransition";
 import { SELECTED_ROLE_COOKIE, isSelectedRole } from "@/lib/role";
 
 export default async function MainLayout({
@@ -14,7 +15,7 @@ export default async function MainLayout({
   return (
     <>
       <Navbar role={role} />
-      {children}
+      <PageTransition>{children}</PageTransition>
       <Footer role={role} />
     </>
   );

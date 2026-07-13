@@ -69,6 +69,7 @@ Deferred per explicit user decision — tracked here for a future pass:
 | Web: `/dashboard/trips` extended with Requested section + reputation stat tiles | Completed |
 | Nav/copy relabel "Trips" → "Rides" | Completed |
 | End-to-end browser verification (Playwright: create → browse → request → approve → group chat) | Completed — found and fixed a real bug (unauthenticated visitors could see the full create-ride form before the redirect fired; now gated on `session` before render, not just a `useEffect` side-effect) |
+| Bug fix: `/dashboard/trips` had no path to `/trips/create` — the "Rides You Organize" section rendered nothing at all when empty, so a rider who hadn't organized a ride yet had no way to discover ride creation from the dashboard. Added a "+ Create a Ride" header button plus an `EmptyState` CTA in that section; also fixed `requireMembership()`'s 403 payload, which was returning SOS-specific copy ("SOS Emergency is a BIKIE Membership perk...") for the shared membership gate used by ride creation | Completed |
 | Mobile port (Milestone 7b) | Backlog |
 | Rider-to-rider reviews, badges, membership tiers, clubs (deferred per ADR-10) | Backlog |
 

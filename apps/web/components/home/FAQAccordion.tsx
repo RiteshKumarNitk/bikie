@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 
-const faqs = [
+export interface FAQItem {
+  question: string;
+  answer: string;
+}
+
+const defaultFaqs: FAQItem[] = [
   {
     question: "How does instant booking work?",
     answer:
@@ -23,7 +28,7 @@ const faqs = [
   },
 ];
 
-export function FAQAccordion() {
+export function FAQAccordion({ faqs = defaultFaqs, idPrefix = "" }: { faqs?: FAQItem[]; idPrefix?: string }) {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
@@ -31,7 +36,7 @@ export function FAQAccordion() {
       {faqs.map((faq, index) => {
         const isOpen = openIndex === index;
         return (
-          <div key={faq.question} className="px-6">
+          <div key={`${idPrefix}${faq.question}`} className="px-6">
             <button
               type="button"
               onClick={() => setOpenIndex(isOpen ? null : index)}

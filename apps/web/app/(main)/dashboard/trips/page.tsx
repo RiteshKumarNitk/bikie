@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { RideStatsDTO, TripSummaryDTO } from "@bikie/types";
 import { getJson } from "@/lib/api";
 import { TripCard } from "@/components/trips/TripCard";
@@ -16,7 +17,15 @@ export default async function DashboardTripsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">My Rides</h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <h1 className="text-2xl font-semibold">My Rides</h1>
+        <Link
+          href="/trips/create"
+          className="rounded-full bg-accent px-5 py-2.5 text-sm font-semibold text-white hover:bg-accent/90"
+        >
+          + Create a Ride
+        </Link>
+      </div>
 
       <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div className="rounded-2xl bg-card p-4">
@@ -63,16 +72,25 @@ export default async function DashboardTripsPage() {
         </section>
       )}
 
-      {organized.length > 0 && (
-        <section className="mt-10">
-          <h2 className="font-semibold text-foreground/80">Rides You Organize</h2>
+      <section className="mt-10">
+        <h2 className="font-semibold text-foreground/80">Rides You Organize</h2>
+        {organized.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState
+              title="You haven't published a ride yet"
+              description="Organize a ride and let the community request to join — you approve who rides with you."
+              actionHref="/trips/create"
+              actionLabel="+ Create a Ride"
+            />
+          </div>
+        ) : (
           <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {organized.map((trip) => (
               <TripCard key={trip.id} trip={trip} />
             ))}
           </div>
-        </section>
-      )}
+        )}
+      </section>
     </div>
   );
 }
