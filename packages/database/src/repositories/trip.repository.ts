@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import { Prisma as PrismaRuntime } from "../generated/prisma/client.js";
 import type { Prisma } from "../generated/prisma/client";
 
 function toSummary(trip: {
@@ -41,7 +42,17 @@ const TAB_TO_TYPE: Record<string, "WEEKEND" | "ADVENTURE" | "ROAD_TRIP" | "INTER
   "guided-tour": "GUIDED_TOUR",
 };
 
-export async function findTrips(tab?: string) {
+export interface TripFilters {
+  /** Destination slug */
+  destination?: string;
+  difficulty?: string;
+  /** Inclusive lower bound on startDate */
+  from?: Date;
+  /** Inclusive upper bound on startDate */
+  to?: Date;
+}
+
+export async function findTrips(tab?: string, filters?: TripFilters) {
   const where: Prisma.TripWhereInput =
     tab === "completed"
       ? { status: "COMPLETED" }
@@ -50,6 +61,19 @@ export async function findTrips(tab?: string) {
         : tab === "upcoming" || !tab
           ? { status: "UPCOMING" }
           : {};
+
+  if (filters?.destination) {
+    where.destination = { slug: filters.destination };
+  }
+  if (filters?.difficulty) {
+    where.difficulty = filters.difficulty as never;
+  }
+  if (filters?.from || filters?.to) {
+    where.startDate = {
+      ...(filters.from ? { gte: filters.from } : {}),
+      ...(filters.to ? { lte: filters.to } : {}),
+    };
+  }
 
   const trips = await prisma.trip.findMany({
     where,
@@ -184,33 +208,41 @@ export async function createTrip(data: {
   destinationId?: string;
 }) {
   const base = slugify(data.title);
-  let slug = base;
-  let suffix = 1;
-  while (await prisma.trip.findUnique({ where: { slug }, select: { id: true } })) {
-    slug = `${base}-${suffix}`;
-    suffix += 1;
-  }
 
-  const trip = await prisma.trip.create({
-    data: {
-      slug,
-      title: data.title,
-      description: data.description,
-      imageUrl: data.imageUrl,
-      type: data.type as never,
-      difficulty: data.difficulty as never,
-      price: data.price,
-      seatsTotal: data.seatsTotal,
-      seatsLeft: data.seatsTotal,
-      meetingPoint: data.meetingPoint,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      organizerId: data.organizerId,
-      destinationId: data.destinationId,
-    },
-    include: { destination: true },
-  });
-  return toSummary(trip);
+  // Retry-on-conflict instead of check-then-create: two concurrent creates with the
+  // same title can both pass a "does this slug exist" check before either commits, so
+  // the uniqueness has to be enforced by letting the DB's unique constraint reject the
+  // collision and trying the next suffix.
+  for (let suffix = 0; ; suffix += 1) {
+    const slug = suffix === 0 ? base : `${base}-${suffix}`;
+    try {
+      const trip = await prisma.trip.create({
+        data: {
+          slug,
+          title: data.title,
+          description: data.description,
+          imageUrl: data.imageUrl,
+          type: data.type as never,
+          difficulty: data.difficulty as never,
+          price: data.price,
+          seatsTotal: data.seatsTotal,
+          seatsLeft: data.seatsTotal,
+          meetingPoint: data.meetingPoint,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          organizerId: data.organizerId,
+          destinationId: data.destinationId,
+        },
+        include: { destination: true },
+      });
+      return toSummary(trip);
+    } catch (err) {
+      if (err instanceof PrismaRuntime.PrismaClientKnownRequestError && err.code === "P2002") {
+        continue;
+      }
+      throw err;
+    }
+  }
 }
 
 export async function findTripById(id: string) {

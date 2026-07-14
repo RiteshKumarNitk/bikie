@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { Skeleton } from "@bikie/ui";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface SOSAlert {
   id: string;
@@ -139,7 +141,7 @@ export default function SOSPage() {
     return (
       <div>
         <h1 className="text-2xl font-semibold">SOS Emergency</h1>
-        <div className="mt-6 h-48 animate-pulse rounded-2xl bg-card" />
+        <Skeleton className="mt-6 h-48 rounded-2xl" />
       </div>
     );
   }
@@ -273,11 +275,7 @@ export default function SOSPage() {
       {activeTab === "alerts" && (
         <div className="mt-4 space-y-3">
           {activeAlerts.length === 0 ? (
-            <div className="rounded-2xl border border-foreground/10 bg-card p-8 text-center text-sm text-foreground/50">
-              <p className="text-2xl">✅</p>
-              <p className="mt-2 font-medium">No active alerts</p>
-              <p className="mt-1">All clear right now.</p>
-            </div>
+            <EmptyState icon="✅" title="No active alerts" description="All clear right now." />
           ) : (
             activeAlerts.map((a) => (
               <div

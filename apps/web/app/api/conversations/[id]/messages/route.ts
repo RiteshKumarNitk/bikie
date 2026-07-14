@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { MessageService } from "@bikie/services";
 import { sendMessageSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { logAdminAction } from "@/lib/audit";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -27,6 +28,13 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { session, error } = await requireSession();
   if (error) return error;
+
+  // Generous enough for a real back-and-forth conversation while blocking a spam/flood loop.
+  const rateLimitError = await enforceRateLimit("message-send", session.user.id, {
+    requests: 30,
+    windowSeconds: 60,
+  });
+  if (rateLimitError) return rateLimitError;
 
   const { id } = await params;
   const parsed = sendMessageSchema.safeParse(await request.json());

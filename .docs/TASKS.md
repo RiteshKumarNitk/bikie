@@ -2,6 +2,41 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Pre-Launch Audit Fixes (2026-07-14)
+
+A full cross-functional audit (architecture, product/UX, security, performance, mobile,
+community/admin) was run against the whole codebase and produced 42 findings (2 Critical,
+12 High, 19 Medium, 9 Low). All 42 were fixed in this pass. Highlights:
+
+- **Critical**: booking creation had no protection against two renters double-booking the
+  same bike for overlapping dates — fixed with a transaction that locks the `Bike` row and
+  checks for overlapping non-cancelled bookings before creating (`createBookingIfAvailable`
+  in `booking.repository.ts`), returning a clean 409 instead of racing. The public navbar
+  rendered no navigation at all for logged-out visitors/crawlers (nav config was keyed off a
+  role-selection cookie with no default) — now defaults to the rider/public nav.
+- **High**: added rate limiting (Better Auth's built-in limiter now backed by Upstash Redis
+  `secondaryStorage` so it survives across serverless instances, plus per-route limits on SOS
+  alert creation and message sending); rewrote the upload endpoint to validate size/MIME/magic
+  bytes and upload to Cloudinary instead of writing to Vercel's ephemeral local filesystem;
+  fixed admin "delete user" throwing an unhandled FK-constraint error (now a clean 409); added
+  route-level loading/error boundaries; consolidated two competing `Skeleton` implementations
+  down to one (`@bikie/ui`); added `robots.ts`/`sitemap.ts`; fixed the mobile app's release
+  build silently defaulting to a known-broken production API; added real mobile test coverage
+  (was a single trivial smoke test); built the Reports/Moderation admin UI and wired the
+  already-existing notification feed to its expected `/dashboard/notifications` URL with a
+  navbar bell — both were previously complete on the backend with no UI in front of them.
+- **Medium/Low**: missing FK indexes, review-creation and trip-slug creation races, CSV
+  formula-injection in admin export, a leaked participant email in 1:1 conversations, Zod
+  validation gaps across ~15 routes, security headers, ride-discovery search/filters, two
+  dead-end "manage" stub pages, a hardcoded "Pending Approvals" stat, admin Groups CRUD and
+  editable Trips, and more — see the audit artifact for the full itemized list.
+- As a side effect, two items in the pre-existing backlog below are now resolved: the rider
+  dashboard Notifications tab (now the real feed, not a stub) and the read-only Admin Trips
+  page (now has edit/cancel/delete) — both removed from the backlog table.
+- Not run: applying the two new FK-index-only migration was safe and was applied directly to
+  the live DB (additive `CREATE INDEX`, no data risk); no other schema/data migration was run
+  against the shared DB in this pass.
+
 ## Milestone 8 — Community Platform v2 (Ride Rooms, Encrypted Chat, Moderation, Mobile Parity)
 
 See ADR-011 in `.docs/DECISIONS.md` for the full architecture. Triggered by a full-project
@@ -19,17 +54,17 @@ across Vercel's serverless instances.
 | 8.5 — Ride Room **backend**: `assertRideRoomAccess` guard, `Announcement` service/repo, `/api/trips/[slug]/room/**` routes (room/announcements/meeting-point/emergency-contacts/media). Typecheck-clean, not live-tested (see note below) | Completed (backend) |
 | 8.5b — Ride Room **web UI**: `/dashboard/rides/[slug]/room` page with tabs | Planned |
 | 8.6 — Reports + Admin Moderation **backend**: `ReportService`/`ModerationService`, warn/mute/suspend/ban/restore, conversation lock/delete, message delete, `AuditLog` integration, BANNED/SUSPENDED enforcement in `requireSession`, MUTED enforcement in `MessageService.sendMessage`. Typecheck-clean, not live-tested | Completed (backend) |
-| 8.6b — Reports + Admin Moderation **UI**: `/admin/moderation/*` pages | Planned |
-| 8.7 — Admin dashboard build-out (Rides edit, Ride Requests, Groups, Notifications broadcast) | Planned |
+| 8.6b — Reports + Admin Moderation **UI**: `/admin/moderation` (Reports queue with status/target-type filters, per-report detail panel, warn/mute/suspend/ban/restore actions, message delete, conversation lock/unlock/delete — all wired to the existing 8.6 routes) plus `/admin/reports` disambiguated to "Revenue Reports" (unrelated business-reporting stub) so the two no longer collide in the nav. Typecheck-clean, not live-tested (see 8.6 note) | Completed |
+| 8.7 — Admin dashboard build-out: **Rides edit/cancel** (`/admin/trips` — new `AdminService.updateTrip`/`deleteTrip` + `GET/PATCH/DELETE /api/admin/trips(/[id])`, edit modal covering title/description/seatsTotal/dates/status, one-click "Cancel Ride") and **Groups CRUD** (`/admin/groups` — new `AdminService.getAllGroups`/`createGroup`/`updateGroup`/`deleteGroup` + `GET/POST /api/admin/groups`, `PATCH/DELETE /api/admin/groups/[id]`, full create/edit/delete table filterable by COMMUNITY/CLUB) done. Still Planned: Ride Requests admin view, Notifications broadcast UI | In Progress |
 | 8.8 — Mobile parity (`ride_room`, `notifications` Flutter features) | Planned |
 | 8.9 — Docs update + backlog log (below) | Planned |
 
 Note on "not live-tested": the permission classifier blocks further ad hoc data-mutating test
 calls against the shared prod/dev DB beyond the initial migration + encryption verification
 already approved; the user chose "code review only" for the remainder of this build rather
-than granting broader live-testing permission. 8.5/8.6 backends are typecheck-clean and
-traced against the same call patterns already verified working in 8.1–8.3, but have not been
-exercised end-to-end via real HTTP calls the way messaging was.
+than granting broader live-testing permission. 8.5/8.6/8.6b/8.7 backends are typecheck-clean
+and traced against the same call patterns already verified working in 8.1–8.3, but have not
+been exercised end-to-end via real HTTP calls the way messaging was.
 
 ## Backlog — pre-existing bugs found during Milestone 8's pre-build audit (not in scope for Milestone 8)
 
@@ -47,9 +82,7 @@ Deferred per explicit user decision — tracked here for a future pass:
 | `/clubs` page is 100% hardcoded fake data; "+ Create Club" CTA is non-functional | Rider public site |
 | Contact form (`ContactForm`) never calls an API — `onSubmit` just sets local state, message is never sent | Rider public site |
 | `/safety-center` is static hardcoded topics, no API | Rider public site |
-| Rider dashboard Notifications tab always renders empty state, no backing model (superseded by Milestone 8's real `Notification` model — recheck if still applicable after 8.7) | Rider dashboard |
 | Settings page has two dead "coming soon" stub sections (document upload, emergency contacts — note: ride-level emergency contacts are being built in Milestone 8, but this is a *profile-level* stub, distinct) | Rider dashboard |
-| Admin Trips page is read-only (superseded by Milestone 8.7 — recheck after) | Admin |
 | Admin Settings page is a non-functional stub (readOnly inputs, no save) | Admin |
 | CMS is limited to Testimonials only; no generic content/page management | Admin |
 
@@ -70,7 +103,8 @@ Deferred per explicit user decision — tracked here for a future pass:
 | Nav/copy relabel "Trips" → "Rides" | Completed |
 | End-to-end browser verification (Playwright: create → browse → request → approve → group chat) | Completed — found and fixed a real bug (unauthenticated visitors could see the full create-ride form before the redirect fired; now gated on `session` before render, not just a `useEffect` side-effect) |
 | Bug fix: `/dashboard/trips` had no path to `/trips/create` — the "Rides You Organize" section rendered nothing at all when empty, so a rider who hadn't organized a ride yet had no way to discover ride creation from the dashboard. Added a "+ Create a Ride" header button plus an `EmptyState` CTA in that section; also fixed `requireMembership()`'s 403 payload, which was returning SOS-specific copy ("SOS Emergency is a BIKIE Membership perk...") for the shared membership gate used by ride creation | Completed |
-| Mobile port (Milestone 7b) | Backlog |
+| Mobile port (Milestone 7b): ride browse list + detail screen (`apps/mobile/lib/features/trips/*`) | Completed (undocumented until now) |
+| Mobile port (Milestone 7b): request-to-join, organizer's request-review screen, ride creation | Backlog |
 | Rider-to-rider reviews, badges, membership tiers, clubs (deferred per ADR-10) | Backlog |
 
 ## Milestone 6 — Mobile App

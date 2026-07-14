@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { TripSummaryDTO } from "@bikie/types";
 import Link from "next/link";
+import { Skeleton } from "@bikie/ui";
 
 export default function DashboardCalendarPage() {
   const [rides, setRides] = useState<TripSummaryDTO[]>([]);
@@ -25,7 +26,7 @@ export default function DashboardCalendarPage() {
       <p className="text-foreground/60 text-sm">Your upcoming rides timeline.</p>
 
       {loading ? (
-        <div className="h-64 bg-card animate-pulse rounded-3xl" />
+        <Skeleton className="h-64 rounded-3xl" />
       ) : rides.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-foreground/20 p-12 text-center text-foreground/50">
           No upcoming rides on your calendar.

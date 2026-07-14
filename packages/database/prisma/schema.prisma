@@ -409,6 +409,7 @@ model Review {
   createdAt DateTime @default(now())
 
   @@index([bikeId])
+  @@index([userId])
 }
 
 // --- Trips ---
@@ -442,6 +443,7 @@ model Trip {
   createdAt     DateTime          @default(now())
 
   @@index([status])
+  @@index([organizerId])
 }
 
 model TripParticipant {
@@ -500,6 +502,7 @@ model ConversationParticipant {
   joinedAt       DateTime          @default(now())
 
   @@unique([conversationId, userId])
+  @@index([userId])
   @@map("conversation_participant")
 }
 
@@ -625,6 +628,7 @@ model GroupMember {
   joinedAt DateTime          @default(now())
 
   @@unique([groupId, userId])
+  @@index([userId])
   @@map("group_member")
 }
 
@@ -646,6 +650,7 @@ model Report {
 
   @@index([status])
   @@index([targetType, targetId])
+  @@index([reporterId])
   @@map("report")
 }
 

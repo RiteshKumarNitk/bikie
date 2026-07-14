@@ -3,13 +3,28 @@
 import { useEffect, useState } from "react";
 import { NotificationDTO } from "@bikie/types";
 
+const POLL_INTERVAL_MS = 45_000;
+
 export function NotificationsTab({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
 
   useEffect(() => {
-    fetch("/api/notifications")
-      .then((r) => r.json())
-      .then((data) => setNotifications(data.notifications || []));
+    let cancelled = false;
+
+    function load() {
+      fetch("/api/notifications")
+        .then((r) => r.json())
+        .then((data) => {
+          if (!cancelled) setNotifications(data.notifications || []);
+        });
+    }
+
+    load();
+    const interval = setInterval(load, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
   }, []);
 
   async function markRead(id: string) {

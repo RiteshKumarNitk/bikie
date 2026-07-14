@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { MessageDTO } from "@bikie/types";
+import { ReportModal } from "@/components/shared/ReportModal";
 
 export function MessageItem({ 
   msg, 
@@ -17,6 +19,7 @@ export function MessageItem({
   onReact: (id: string, emoji: string) => void;
 }) {
   const [showActions, setShowActions] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   if (msg.type === "SYSTEM") {
     return (
@@ -41,8 +44,8 @@ export function MessageItem({
       onMouseLeave={() => setShowActions(false)}
     >
       {!isMe && (
-        <div className="w-8 h-8 rounded-full bg-foreground/10 shrink-0 overflow-hidden flex items-center justify-center text-xs font-bold text-foreground/50">
-          {showAvatar ? (msg.senderImage ? <img src={msg.senderImage} alt="" className="w-full h-full object-cover" /> : msg.senderName?.[0] || "?") : ""}
+        <div className="relative w-8 h-8 rounded-full bg-foreground/10 shrink-0 overflow-hidden flex items-center justify-center text-xs font-bold text-foreground/50">
+          {showAvatar ? (msg.senderImage ? <Image src={msg.senderImage} alt={msg.senderName || "Sender"} fill className="object-cover" /> : msg.senderName?.[0] || "?") : ""}
         </div>
       )}
 
@@ -90,18 +93,30 @@ export function MessageItem({
                 {emoji}
               </button>
             ))}
-            {isMe && (
-              <button 
+            {isMe ? (
+              <button
                 onClick={() => { onDelete(msg.id); setShowActions(false); }}
                 className="text-destructive hover:bg-destructive/10 rounded-full p-1 ml-1"
                 title="Delete message"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
               </button>
+            ) : (
+              <button
+                onClick={() => { setReporting(true); setShowActions(false); }}
+                className="text-foreground/50 hover:bg-foreground/10 rounded-full p-1 ml-1"
+                title="Report message"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><path d="M4 22v-7"/></svg>
+              </button>
             )}
           </div>
         )}
       </div>
+
+      {reporting && (
+        <ReportModal targetType="MESSAGE" targetId={msg.id} title="Report message" onClose={() => setReporting(false)} />
+      )}
     </div>
   );
 }

@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Image from "next/image";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-import { blogPosts } from "@/lib/blog-data";
+import { blogPosts, type BlogPost } from "@/lib/blog-data";
+import { getSiteUrl } from "@/lib/site-url";
 
 export async function generateMetadata({
   params,
@@ -15,6 +16,22 @@ export async function generateMetadata({
   return { title: post.title, description: post.excerpt };
 }
 
+function blogPostJsonLd(post: BlogPost) {
+  const siteUrl = getSiteUrl();
+  return {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    description: post.excerpt,
+    image: [post.coverImage],
+    datePublished: post.publishedAt,
+    articleSection: post.category,
+    author: { "@type": "Organization", name: post.author },
+    publisher: { "@type": "Organization", name: "BIKIE" },
+    mainEntityOfPage: `${siteUrl}/blog/${post.slug}`,
+  };
+}
+
 export default async function BlogPostPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const post = blogPosts.find((p) => p.slug === slug);
@@ -22,6 +39,10 @@ export default async function BlogPostPage({ params }: { params: Promise<{ slug:
 
   return (
     <div className="pb-24">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(blogPostJsonLd(post)) }}
+      />
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Blog", href: "/blog" }, { label: post.title }]} />
 
       <div className="mx-auto max-w-3xl px-6 pt-6">

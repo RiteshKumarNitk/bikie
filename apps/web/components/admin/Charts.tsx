@@ -31,7 +31,7 @@ export function MonthlyBookingsChart({ data }: { data: { month: string; count: n
           <BarChart data={data}>
             <XAxis dataKey="month" tick={{ fill: "#9ca3af", fontSize: 10 }} />
             <YAxis tick={{ fill: "#9ca3af", fontSize: 10 }} />
-            <Tooltip contentStyle={{ background: "#111933", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
+            <Tooltip contentStyle={{ background: "var(--color-card)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "var(--color-foreground)" }} />
             <Bar dataKey="count" fill="#e8a838" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
@@ -76,7 +76,7 @@ export function BikesByCityChart({ data }: { data: { city: string; count: number
           <BarChart data={data} layout="vertical">
             <XAxis type="number" tick={{ fill: "#9ca3af", fontSize: 10 }} />
             <YAxis dataKey="city" type="category" tick={{ fill: "#9ca3af", fontSize: 10 }} />
-            <Tooltip contentStyle={{ background: "#111933", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "#fff" }} />
+            <Tooltip contentStyle={{ background: "var(--color-card)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 8, color: "var(--color-foreground)" }} />
             <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} />
           </BarChart>
         </ResponsiveContainer>

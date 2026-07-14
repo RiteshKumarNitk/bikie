@@ -24,7 +24,13 @@ function toDTO(booking: {
   };
 }
 
-export async function createBooking(data: {
+/**
+ * Creates a booking only if the bike has no overlapping non-cancelled booking for the
+ * requested date range. Locks the Bike row for the duration of the transaction so two
+ * concurrent requests for the same bike are serialized instead of racing past the
+ * overlap check together. Returns null (no booking created) if the bike is unavailable.
+ */
+export async function createBookingIfAvailable(data: {
   userId: string;
   bikeId: string;
   startDate: Date;
@@ -33,19 +39,34 @@ export async function createBooking(data: {
   totalPrice: number;
   status: "PENDING" | "CONFIRMED";
 }) {
-  const booking = await prisma.booking.create({
-    data: {
-      userId: data.userId,
-      bikeId: data.bikeId,
-      startDate: data.startDate,
-      endDate: data.endDate,
-      pickupCity: data.pickupCity,
-      totalPrice: data.totalPrice,
-      status: data.status,
-    },
-    include: { bike: true, review: true },
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Bike" WHERE id = ${data.bikeId} FOR UPDATE`;
+
+    const overlapping = await tx.booking.findFirst({
+      where: {
+        bikeId: data.bikeId,
+        status: { not: "CANCELLED" },
+        startDate: { lt: data.endDate },
+        endDate: { gt: data.startDate },
+      },
+      select: { id: true },
+    });
+    if (overlapping) return null;
+
+    const booking = await tx.booking.create({
+      data: {
+        userId: data.userId,
+        bikeId: data.bikeId,
+        startDate: data.startDate,
+        endDate: data.endDate,
+        pickupCity: data.pickupCity,
+        totalPrice: data.totalPrice,
+        status: data.status,
+      },
+      include: { bike: true, review: true },
+    });
+    return toDTO(booking);
   });
-  return toDTO(booking);
 }
 
 export async function findBookingById(id: string) {

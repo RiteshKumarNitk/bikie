@@ -10,7 +10,8 @@ export async function GET(req: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const trips = await TripService.getByTab(parsed.data.tab);
+  const { tab, destination, difficulty, from, to } = parsed.data;
+  const trips = await TripService.getByTab(tab, { destination, difficulty, from, to });
   return NextResponse.json({ trips });
 }
 

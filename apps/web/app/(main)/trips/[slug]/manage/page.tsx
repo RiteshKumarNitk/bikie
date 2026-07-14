@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { getServerSession } from "@/lib/get-session";
 import { getJson } from "@/lib/api";
-import { TripDetailDTO } from "@bikie/types";
+import { RideJoinRequestDTO, TripDetailDTO } from "@bikie/types";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import Link from "next/link";
+import { CopyRideLinkButton } from "@/components/trips/CopyRideLinkButton";
 
 export default async function TripManagePage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
@@ -12,6 +13,11 @@ export default async function TripManagePage({ params }: { params: Promise<{ slu
 
   const { trip } = await getJson<{ trip: TripDetailDTO }>(`/api/trips/${slug}`);
   if (!trip) notFound();
+
+  const { requests: pendingRequests } = await getJson<{ requests: RideJoinRequestDTO[] }>(
+    `/api/trips/${slug}/requests`,
+    { auth: true },
+  );
 
   return (
     <div>
@@ -22,7 +28,7 @@ export default async function TripManagePage({ params }: { params: Promise<{ slu
         </div>
         <div className="rounded-2xl bg-card p-5 border border-foreground/10">
           <p className="text-xs text-foreground/50 font-medium">Pending Approvals</p>
-          <p className="text-2xl font-bold mt-1 text-warning">0</p>
+          <p className="text-2xl font-bold mt-1 text-warning">{pendingRequests.length}</p>
         </div>
         <div className="rounded-2xl bg-card p-5 border border-foreground/10">
           <p className="text-xs text-foreground/50 font-medium">Status</p>
@@ -39,10 +45,15 @@ export default async function TripManagePage({ params }: { params: Promise<{ slu
           <h2 className="text-xl font-semibold">Invite Riders</h2>
         </div>
         <div className="rounded-3xl bg-card border border-foreground/10 p-6">
-          <p className="text-sm text-foreground/60 mb-4">Search for riders by name or username to send them a direct invitation to join this ride.</p>
+          <p className="text-sm text-foreground/60 mb-4">Share this ride&apos;s link so riders can find it and request to join.</p>
           <div className="flex gap-2 max-w-md">
-            <input type="text" placeholder="Search riders..." className="flex-1 bg-background border border-foreground/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-accent" />
-            <button className="bg-foreground text-background px-4 py-2 rounded-xl text-sm font-semibold hover:bg-foreground/90 transition-colors">Search</button>
+            <input
+              type="text"
+              readOnly
+              value={`/trips/${trip.slug}`}
+              className="flex-1 bg-background border border-foreground/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-accent"
+            />
+            <CopyRideLinkButton tripSlug={trip.slug} />
           </div>
         </div>
       </section>

@@ -27,6 +27,17 @@ export const bikeSearchQuerySchema = z.object({
   pageSize: z.coerce.number().int().min(1).max(48).default(12),
 });
 
+// Query params commonly arrive as empty strings from unfilled HTML form fields
+// (e.g. `?from=&to=`) rather than being omitted outright — treat those as absent.
+const emptyToUndefined = (val: unknown) => (val === "" ? undefined : val);
+
 export const tripsQuerySchema = z.object({
-  tab: z.enum(["upcoming", "weekend", "adventure", "road-trip", "international", "guided-tour", "completed"]).optional(),
+  tab: z.preprocess(
+    emptyToUndefined,
+    z.enum(["upcoming", "weekend", "adventure", "road-trip", "international", "guided-tour", "completed"]).optional(),
+  ),
+  destination: z.preprocess(emptyToUndefined, z.string().trim().min(1).optional()),
+  difficulty: z.preprocess(emptyToUndefined, z.enum(["EASY", "MODERATE", "HARD"]).optional()),
+  from: z.preprocess(emptyToUndefined, z.coerce.date().optional()),
+  to: z.preprocess(emptyToUndefined, z.coerce.date().optional()),
 });

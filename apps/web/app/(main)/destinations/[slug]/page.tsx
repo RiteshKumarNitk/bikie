@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Image from "next/image";
 import type { DestinationDetailDTO } from "@bikie/types";
 import { getJson } from "@/lib/api";
+import { getSiteUrl } from "@/lib/site-url";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { BikeCard } from "@/components/shared/BikeCard";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -30,6 +31,23 @@ export async function generateMetadata({
   };
 }
 
+function destinationJsonLd(destination: DestinationDetailDTO) {
+  const siteUrl = getSiteUrl();
+  return {
+    "@context": "https://schema.org",
+    "@type": "TouristDestination",
+    name: destination.name,
+    url: `${siteUrl}/destinations/${destination.slug}`,
+    description: destination.description ?? `Find and rent bikes in ${destination.name}, ${destination.state} on BIKIE.`,
+    image: destination.imageUrl,
+    address: {
+      "@type": "PostalAddress",
+      addressRegion: destination.state,
+      addressCountry: "IN",
+    },
+  };
+}
+
 const infoColumns = (name: string) => [
   { heading: "Popular Routes", items: [`${name} Loop Ride`, "Sunset Viewpoint Trail", "Old Highway Bypass"] },
   { heading: "Top Cafes", items: ["Wanderer's Cafe", "The Ride Stop", "Roadside Chai Point"] },
@@ -44,6 +62,10 @@ export default async function DestinationDetailPage({ params }: { params: Promis
 
   return (
     <div className="pb-24">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(destinationJsonLd(destination)) }}
+      />
       <Breadcrumbs
         items={[{ label: "Home", href: "/" }, { label: "Destinations", href: "/destinations" }, { label: destination.name }]}
       />

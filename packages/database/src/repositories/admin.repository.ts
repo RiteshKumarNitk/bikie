@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import { Prisma } from "../generated/prisma/client.js";
 import { sumCompletedBookingRevenue } from "./booking.repository";
 
 export async function getAdminOverviewStats() {
@@ -62,8 +63,19 @@ export async function updateUserRole(userId: string, role: string) {
   return { ...user, createdAt: user.createdAt.toISOString() };
 }
 
-export async function deleteUser(userId: string) {
-  await prisma.user.delete({ where: { id: userId } });
+export async function deleteUser(userId: string): Promise<{ ok: true } | { ok: false; reason: "HAS_DEPENDENCIES" }> {
+  try {
+    await prisma.user.delete({ where: { id: userId } });
+    return { ok: true };
+  } catch (err) {
+    // Bookings/reviews/organized trips/moderation actions etc. all restrict deletion of
+    // their owning user (see schema.prisma) — surface that as a clean 409 instead of a
+    // raw 500 so the admin UI can explain why the delete didn't go through.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+      return { ok: false, reason: "HAS_DEPENDENCIES" };
+    }
+    throw err;
+  }
 }
 
 export async function findAllPartners() {
@@ -265,7 +277,193 @@ export async function deleteMembershipPlan(id: string) {
   await prisma.membershipPlan.delete({ where: { id } });
 }
 
-// --- Referrals ---
+// --- Trips ---
+
+function mapTripAdmin(t: {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  type: string;
+  difficulty: string;
+  price: { toNumber(): number };
+  seatsTotal: number;
+  seatsLeft: number;
+  startDate: Date;
+  endDate: Date;
+  status: string;
+  organizer: { id: string; name: string; email: string };
+  createdAt: Date;
+}) {
+  return {
+    id: t.id,
+    slug: t.slug,
+    title: t.title,
+    description: t.description,
+    type: t.type,
+    difficulty: t.difficulty,
+    price: t.price.toNumber(),
+    seatsTotal: t.seatsTotal,
+    seatsLeft: t.seatsLeft,
+    startDate: t.startDate.toISOString(),
+    endDate: t.endDate.toISOString(),
+    status: t.status,
+    organizer: t.organizer,
+    createdAt: t.createdAt.toISOString(),
+  };
+}
+
+export async function findAllTripsAdmin() {
+  const trips = await prisma.trip.findMany({
+    orderBy: { createdAt: "desc" },
+    include: { organizer: { select: { id: true, name: true, email: true } } },
+  });
+  return trips.map(mapTripAdmin);
+}
+
+export async function updateTripAdmin(
+  tripId: string,
+  data: Partial<{
+    title: string;
+    description: string;
+    seatsTotal: number;
+    startDate: string;
+    endDate: string;
+    status: string;
+  }>,
+) {
+  const { startDate, endDate, status, ...rest } = data;
+  const trip = await prisma.trip.update({
+    where: { id: tripId },
+    data: {
+      ...rest,
+      ...(startDate ? { startDate: new Date(startDate) } : {}),
+      ...(endDate ? { endDate: new Date(endDate) } : {}),
+      ...(status ? { status: status as never } : {}),
+    },
+    include: { organizer: { select: { id: true, name: true, email: true } } },
+  });
+  return mapTripAdmin(trip);
+}
+
+export async function deleteTripAdmin(tripId: string) {
+  await prisma.trip.delete({ where: { id: tripId } });
+}
+
+// --- Groups ---
+
+function slugifyGroupName(input: string) {
+  return input
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
+
+function mapGroup(g: {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  imageUrl: string;
+  type: string;
+  city: string | null;
+  isPrivate: boolean;
+  owner: { id: string; name: string; email: string };
+  _count: { members: number };
+  createdAt: Date;
+}) {
+  return {
+    id: g.id,
+    slug: g.slug,
+    name: g.name,
+    description: g.description,
+    imageUrl: g.imageUrl,
+    type: g.type,
+    city: g.city,
+    isPrivate: g.isPrivate,
+    owner: g.owner,
+    memberCount: g._count.members,
+    createdAt: g.createdAt.toISOString(),
+  };
+}
+
+const groupAdminInclude = {
+  owner: { select: { id: true, name: true, email: true } },
+  _count: { select: { members: true } },
+} as const;
+
+export async function findAllGroupsAdmin() {
+  const groups = await prisma.group.findMany({
+    orderBy: { createdAt: "desc" },
+    include: groupAdminInclude,
+  });
+  return groups.map(mapGroup);
+}
+
+export async function createGroupAdmin(data: {
+  name: string;
+  description: string;
+  imageUrl: string;
+  type: "COMMUNITY" | "CLUB";
+  city?: string;
+  isPrivate?: boolean;
+  ownerId: string;
+}) {
+  const baseSlug = slugifyGroupName(data.name) || "group";
+  let slug = baseSlug;
+
+  for (let attempt = 0; attempt < 5; attempt++) {
+    try {
+      const group = await prisma.group.create({
+        data: {
+          name: data.name,
+          slug,
+          description: data.description,
+          imageUrl: data.imageUrl,
+          type: data.type,
+          city: data.city,
+          isPrivate: data.isPrivate ?? false,
+          ownerId: data.ownerId,
+          members: { create: { userId: data.ownerId, role: "OWNER", status: "APPROVED" } },
+        },
+        include: groupAdminInclude,
+      });
+      return mapGroup(group);
+    } catch (err) {
+      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002" && attempt < 4) {
+        slug = `${baseSlug}-${Math.random().toString(36).slice(2, 6)}`;
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("Failed to generate a unique slug for this group");
+}
+
+export async function updateGroupAdmin(
+  groupId: string,
+  data: Partial<{
+    name: string;
+    description: string;
+    imageUrl: string;
+    type: "COMMUNITY" | "CLUB";
+    city: string | null;
+    isPrivate: boolean;
+    ownerId: string;
+  }>,
+) {
+  const group = await prisma.group.update({
+    where: { id: groupId },
+    data: data as never,
+    include: groupAdminInclude,
+  });
+  return mapGroup(group);
+}
+
+export async function deleteGroupAdmin(groupId: string) {
+  await prisma.group.delete({ where: { id: groupId } });
+}
 
 export async function findAllReferrals() {
   const referred = await prisma.user.findMany({

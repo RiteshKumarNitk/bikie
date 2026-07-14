@@ -2,7 +2,11 @@ export interface ConversationDTO {
   id: string;
   subject: string | null;
   isLocked: boolean;
-  participants: { id: string; name: string; email: string; role: string }[];
+  // Deliberately no `email` here — this DTO backs ordinary 1:1/group chats
+  // (GET /api/conversations) and shouldn't leak a participant's email to the
+  // other side of the conversation. SOSAlertDTO (packages/types/src/sos.ts) is
+  // the separate, intentional case that carries full reporter contact info.
+  participants: { id: string; name: string; role: string }[];
   lastMessage: { content: string | null; createdAt: string; senderId: string | null } | null;
   unreadCount: number;
   createdAt: string;

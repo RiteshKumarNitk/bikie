@@ -16,5 +16,7 @@ export { SMSService } from "./sms.service";
 export { ReferralService } from "./referral.service";
 export { NotificationService } from "./notification.service";
 export { RealtimeService } from "./lib/realtime";
+export { RateLimitService } from "./lib/rate-limit";
 export { RideRoomService } from "./ride-room.service";
 export { ReportService, ModerationService } from "./moderation.service";
+export { UploadService } from "./upload.service";

@@ -1,18 +1,23 @@
 import type { Metadata } from "next";
-import { EmptyState } from "@/components/shared/EmptyState";
+import { redirect } from "next/navigation";
+import { getServerSession } from "@/lib/get-session";
+import { NotificationsTab } from "@/components/chat/NotificationsTab";
 
 export const metadata: Metadata = { title: "Notifications" };
 
-export default function DashboardNotificationsPage() {
+export default async function DashboardNotificationsPage() {
+  const session = await getServerSession();
+  if (!session) redirect("/login?next=/dashboard/notifications");
+
   return (
     <div>
       <h1 className="text-2xl font-semibold">Notifications</h1>
-      <div className="mt-8">
-        <EmptyState
-          icon="🔔"
-          title="No notifications yet"
-          description="Real-time push notifications are planned for a future release — see the Roadmap."
-        />
+      <p className="mt-1 text-sm text-foreground/60">
+        Ride requests, approvals, and other updates land here.
+      </p>
+
+      <div className="mt-8 overflow-hidden rounded-3xl border border-foreground/10 bg-card/30">
+        <NotificationsTab userId={session.user.id} />
       </div>
     </div>
   );

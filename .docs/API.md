@@ -161,6 +161,10 @@ Notifications routes are being added. This section is updated as each phase land
 | `/api/admin/bikes/[id]` | PATCH/DELETE | |
 | `/api/admin/bookings` | GET | |
 | `/api/admin/bookings/[id]` | PATCH/DELETE | Update status / delete |
+| `/api/admin/trips` | GET | List all trips (any status), with organizer |
+| `/api/admin/trips/[id]` | PATCH/DELETE | Update title/description/seatsTotal/dates/status (e.g. set `CANCELLED` to cancel a ride) / delete |
+| `/api/admin/groups` | GET/POST | List/create Groups (`GroupType: COMMUNITY \| CLUB`); create auto-generates a unique slug and adds the chosen owner as an `OWNER` `GroupMember` |
+| `/api/admin/groups/[id]` | PATCH/DELETE | Update / delete a Group |
 | `/api/admin/testimonials` | GET/POST | |
 | `/api/admin/testimonials/[id]` | PATCH/DELETE | |
 | `/api/admin/membership/plans(/[id])` | see Membership above | |
@@ -170,8 +174,25 @@ Notifications routes are being added. This section is updated as each phase land
 | `/api/admin/email` | POST | `{ to, subject, html }` — send via the email gateway |
 | `/api/admin/sms` | POST | `{ to, message }` — send via the SMS gateway |
 
+### Moderation (role: ADMIN — Milestone 8.6/8.6b, consumed by `/admin/moderation`)
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/admin/moderation/reports` | GET | `?status=&targetType=` filters; `{ reports: ReportDTO[] }` |
+| `/api/admin/moderation/reports/[id]` | PATCH | `{ status, resolutionNote? }` |
+| `/api/admin/moderation/users/[id]/warn` | POST | `{ reason, reportId? }` |
+| `/api/admin/moderation/users/[id]/mute` | POST | `{ reason, durationHours, reportId? }` |
+| `/api/admin/moderation/users/[id]/suspend` | POST | `{ reason, durationHours, reportId? }` |
+| `/api/admin/moderation/users/[id]/ban` | POST | `{ reason, reportId? }` |
+| `/api/admin/moderation/users/[id]/restore` | POST | `{ reason? }` — clears WARNED/MUTED/SUSPENDED/BANNED back to ACTIVE |
+| `/api/admin/moderation/messages/[id]` | DELETE | `{ reason, reportId? }` — true erasure (nulls ciphertext/content) |
+| `/api/admin/moderation/conversations` | GET | `?page=` paginated (25/page); `{ conversations: ModerationConversationSummaryDTO[], total, page, pageSize }` |
+| `/api/admin/moderation/conversations/[id]` | DELETE | `{ reason }` |
+| `/api/admin/moderation/conversations/[id]/lock` | POST | `{ locked, reason }` |
+
 All admin mutation routes (CREATE/UPDATE/DELETE) write an `AuditLog` entry via
-`logAdminAction()`.
+`logAdminAction()`. Moderation routes additionally write a `ModerationAction` row (see
+ADR-011) as the trust-and-safety-specific audit trail.
 
 ## Conventions
 

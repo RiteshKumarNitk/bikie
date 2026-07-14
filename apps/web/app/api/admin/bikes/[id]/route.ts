@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AdminService } from "@bikie/services";
+import { updateBikeSchema } from "@bikie/validation";
 import { requireRole } from "@/lib/require-role";
 import { logAdminAction } from "@/lib/audit";
 
@@ -8,14 +9,18 @@ export async function PATCH(_request: Request, { params }: { params: Promise<{ i
   if (error) return error;
 
   const { id } = await params;
-  const body = await _request.json();
-  const bike = await AdminService.updateBike(id, body);
+  const parsed = updateBikeSchema.safeParse(await _request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const bike = await AdminService.updateBike(id, parsed.data);
   await logAdminAction({
     userId: session.user.id,
     action: "UPDATE_BIKE",
     entity: "Bike",
     entityId: id,
-    metadata: body,
+    metadata: parsed.data,
   });
   return NextResponse.json({ bike });
 }

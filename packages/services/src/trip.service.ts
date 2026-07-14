@@ -30,9 +30,16 @@ export type GetGroupResult =
   | { ok: true; conversationId: string }
   | { ok: false; reason: "TRIP_NOT_FOUND" | "FORBIDDEN" | "NOT_STARTED" };
 
+export interface TripListFilters {
+  destination?: string;
+  difficulty?: string;
+  from?: Date;
+  to?: Date;
+}
+
 export const TripService = {
-  async getByTab(tab?: string): Promise<TripSummaryDTO[]> {
-    return tripRepository.findTrips(tab);
+  async getByTab(tab?: string, filters?: TripListFilters): Promise<TripSummaryDTO[]> {
+    return tripRepository.findTrips(tab, filters);
   },
 
   async getBySlug(slug: string): Promise<TripDetailDTO | null> {

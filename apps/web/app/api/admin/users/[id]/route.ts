@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AdminService } from "@bikie/services";
+import { updateUserRoleSchema } from "@bikie/validation";
 import { requireRole } from "@/lib/require-role";
 import { logAdminAction } from "@/lib/audit";
 
@@ -8,14 +9,18 @@ export async function PATCH(_request: Request, { params }: { params: Promise<{ i
   if (error) return error;
 
   const { id } = await params;
-  const body = await _request.json();
-  const user = await AdminService.updateUserRole(id, body.role);
+  const parsed = updateUserRoleSchema.safeParse(await _request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const user = await AdminService.updateUserRole(id, parsed.data.role);
   await logAdminAction({
     userId: session.user.id,
     action: "UPDATE_USER_ROLE",
     entity: "User",
     entityId: id,
-    metadata: { newRole: body.role },
+    metadata: { newRole: parsed.data.role },
   });
   return NextResponse.json({ user });
 }
@@ -25,7 +30,16 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (error) return error;
 
   const { id } = await params;
-  await AdminService.deleteUser(id);
+  const result = await AdminService.deleteUser(id);
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        error:
+          "This user has existing bookings, reviews, organized rides, or moderation history and can't be deleted. Consider suspending the account instead.",
+      },
+      { status: 409 },
+    );
+  }
   await logAdminAction({
     userId: session.user.id,
     action: "DELETE_USER",

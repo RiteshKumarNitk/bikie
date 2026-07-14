@@ -6,3 +6,8 @@ export * from "./review.schema";
 export * from "./trip.schema";
 export * from "./message.schema";
 export * from "./ride-room.schema";
+export * from "./sos.schema";
+export * from "./membership.schema";
+export * from "./admin.schema";
+export * from "./wishlist.schema";
+export * from "./conversation.schema";

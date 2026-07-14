@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
+import { ReportModal } from "@/components/shared/ReportModal";
 
 interface MyRequestStatus {
   status: string;
@@ -42,7 +43,25 @@ function GroupChatLink({ tripSlug }: { tripSlug: string }) {
   );
 }
 
-function RiderPanel({ tripSlug, seatsLeft }: { tripSlug: string; seatsLeft: number }) {
+function ReportRideLink({ tripId }: { tripId: string }) {
+  const [reporting, setReporting] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setReporting(true)}
+        className="mt-3 w-full text-center text-xs text-foreground/40 hover:text-foreground/70 hover:underline"
+      >
+        Report this ride
+      </button>
+      {reporting && (
+        <ReportModal targetType="TRIP" targetId={tripId} title="Report this ride" onClose={() => setReporting(false)} />
+      )}
+    </>
+  );
+}
+
+function RiderPanel({ tripSlug, tripId, seatsLeft }: { tripSlug: string; tripId: string; seatsLeft: number }) {
   const [request, setRequest] = useState<MyRequestStatus | null | undefined>(undefined);
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,6 +122,7 @@ function RiderPanel({ tripSlug, seatsLeft }: { tripSlug: string; seatsLeft: numb
         >
           Leave this ride
         </button>
+        <ReportRideLink tripId={tripId} />
       </div>
     );
   }
@@ -121,6 +141,7 @@ function RiderPanel({ tripSlug, seatsLeft }: { tripSlug: string; seatsLeft: numb
         >
           Cancel request
         </button>
+        <ReportRideLink tripId={tripId} />
       </div>
     );
   }
@@ -148,6 +169,7 @@ function RiderPanel({ tripSlug, seatsLeft }: { tripSlug: string; seatsLeft: numb
       >
         {seatsLeft > 0 ? "Request to Join" : "Fully Booked"}
       </button>
+      <ReportRideLink tripId={tripId} />
     </div>
   );
 }
@@ -220,10 +242,12 @@ function OrganizerPanel({ tripSlug }: { tripSlug: string }) {
 
 export function RideActionsPanel({
   tripSlug,
+  tripId,
   organizerId,
   seatsLeft,
 }: {
   tripSlug: string;
+  tripId: string;
   organizerId: string;
   seatsLeft: number;
 }) {
@@ -250,5 +274,5 @@ export function RideActionsPanel({
     return <OrganizerPanel tripSlug={tripSlug} />;
   }
 
-  return <RiderPanel tripSlug={tripSlug} seatsLeft={seatsLeft} />;
+  return <RiderPanel tripSlug={tripSlug} tripId={tripId} seatsLeft={seatsLeft} />;
 }

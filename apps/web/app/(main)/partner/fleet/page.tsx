@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { formatCurrency } from "@bikie/utils";
+import { Skeleton } from "@bikie/ui";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface Bike {
   id: string;
@@ -71,7 +73,7 @@ export default function PartnerFleetPage() {
     setBikes((prev) => prev.filter((b) => b.id !== id));
   }
 
-  if (loading) return <div className="h-48 animate-pulse rounded-2xl bg-card" />;
+  if (loading) return <Skeleton className="h-48 rounded-2xl" />;
 
   return (
     <div>
@@ -87,17 +89,21 @@ export default function PartnerFleetPage() {
       </div>
 
       {bikes.length === 0 ? (
-        <div className="mt-8 rounded-2xl border border-foreground/10 bg-card p-12 text-center">
-          <p className="text-3xl">🏍️</p>
-          <p className="mt-3 font-medium">No bikes listed yet</p>
-          <p className="mt-1 text-sm text-foreground/50">Add your first bike to start receiving bookings.</p>
-          <button
-            type="button"
-            onClick={() => setShowAdd(true)}
-            className="mt-4 rounded-xl bg-accent px-6 py-2.5 text-sm font-medium text-white"
-          >
-            Add Your First Bike
-          </button>
+        <div className="mt-8">
+          <EmptyState
+            icon="🏍️"
+            title="No bikes listed yet"
+            description="Add your first bike to start receiving bookings."
+            action={
+              <button
+                type="button"
+                onClick={() => setShowAdd(true)}
+                className="rounded-xl bg-accent px-6 py-2.5 text-sm font-medium text-white"
+              >
+                Add Your First Bike
+              </button>
+            }
+          />
         </div>
       ) : (
         <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">

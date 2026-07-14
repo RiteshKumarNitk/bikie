@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import { EmptyState } from "@/components/shared/EmptyState";
 
-export const metadata: Metadata = { title: "Reports" };
+export const metadata: Metadata = { title: "Revenue Reports" };
 
+// Note: this is the *business* reporting stub (revenue/booking/partner performance
+// exports), unrelated to trust-and-safety user Reports — those live under
+// /admin/moderation now (see ADR-011 / Milestone 8.6b). Named "Revenue Reports" in
+// the nav specifically to avoid the collision.
 export default function AdminReportsPage() {
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Reports</h1>
+      <h1 className="text-2xl font-semibold">Revenue Reports</h1>
       <div className="mt-8">
         <EmptyState
           icon="📊"

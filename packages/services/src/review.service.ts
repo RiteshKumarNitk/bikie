@@ -37,6 +37,7 @@ export const ReviewService = {
       rating: input.rating,
       comment: input.comment,
     });
+    if (!review) return { ok: false, reason: "ALREADY_REVIEWED" };
     return { ok: true, review };
   },
 };

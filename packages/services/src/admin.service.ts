@@ -124,4 +124,65 @@ export const AdminService = {
   async getAllReferrals() {
     return adminRepository.findAllReferrals();
   },
+
+  // --- Trips ---
+
+  async getAllTrips() {
+    return adminRepository.findAllTripsAdmin();
+  },
+
+  async updateTrip(
+    tripId: string,
+    data: Partial<{
+      title: string;
+      description: string;
+      seatsTotal: number;
+      startDate: string;
+      endDate: string;
+      status: string;
+    }>,
+  ) {
+    return adminRepository.updateTripAdmin(tripId, data);
+  },
+
+  async deleteTrip(tripId: string) {
+    return adminRepository.deleteTripAdmin(tripId);
+  },
+
+  // --- Groups ---
+
+  async getAllGroups() {
+    return adminRepository.findAllGroupsAdmin();
+  },
+
+  async createGroup(data: {
+    name: string;
+    description: string;
+    imageUrl: string;
+    type: "COMMUNITY" | "CLUB";
+    city?: string;
+    isPrivate?: boolean;
+    ownerId: string;
+  }) {
+    return adminRepository.createGroupAdmin(data);
+  },
+
+  async updateGroup(
+    groupId: string,
+    data: Partial<{
+      name: string;
+      description: string;
+      imageUrl: string;
+      type: "COMMUNITY" | "CLUB";
+      city: string | null;
+      isPrivate: boolean;
+      ownerId: string;
+    }>,
+  ) {
+    return adminRepository.updateGroupAdmin(groupId, data);
+  },
+
+  async deleteGroup(groupId: string) {
+    return adminRepository.deleteGroupAdmin(groupId);
+  },
 };

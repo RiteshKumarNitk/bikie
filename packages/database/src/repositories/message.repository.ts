@@ -13,7 +13,9 @@ export async function getConversationsForUser(userId: string) {
     include: {
       conversation: {
         include: {
-          participants: { include: { user: { select: { id: true, name: true, email: true, role: true } } } },
+          // No `email` — this backs ConversationDTO for ordinary 1:1/group chats, which
+          // must not leak a participant's email (see packages/types/src/message.ts).
+          participants: { include: { user: { select: { id: true, name: true, role: true } } } },
           messages: { orderBy: { createdAt: "desc" }, take: 1 },
         },
       },

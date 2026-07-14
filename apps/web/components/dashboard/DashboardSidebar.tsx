@@ -39,7 +39,7 @@ export function DashboardSidebar({
       <aside
         className={`${
           open ? "fixed inset-y-0 left-0 z-50 w-64 translate-x-0" : "hidden"
-        } overflow-y-auto bg-[#0a0f1e] p-6 md:static md:block md:w-56 md:bg-transparent md:p-0`}
+        } overflow-y-auto bg-background p-6 md:static md:block md:w-56 md:bg-transparent md:p-0`}
       >
         <div className="flex items-center justify-between md:hidden">
           <p className="text-xs font-semibold uppercase tracking-wide text-foreground/50">Navigation</p>

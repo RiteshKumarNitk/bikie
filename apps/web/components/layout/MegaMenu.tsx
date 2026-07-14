@@ -38,7 +38,7 @@ export function MegaMenu({ label = "Explore", columns = riderMegaMenuColumns }: 
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
             transition={{ duration: 0.15 }}
-            className="glass absolute left-1/2 top-full mt-3 w-[640px] -translate-x-1/2 rounded-3xl p-8 shadow-xl"
+            className="glass absolute right-0 top-full mt-3 w-[min(90vw,640px)] rounded-3xl p-6 shadow-xl sm:p-8 lg:left-1/2 lg:right-auto lg:w-[640px] lg:-translate-x-1/2"
           >
             <div className="grid grid-cols-3 gap-8">
               {columns.map((column) => (

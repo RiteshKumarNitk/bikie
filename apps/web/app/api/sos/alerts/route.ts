@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { SOSService, EmailService, RealtimeService } from "@bikie/services";
+import { sosAlertCreateSchema } from "@bikie/validation";
 import { requireMembership } from "@/lib/require-role";
+import { enforceRateLimit } from "@/lib/rate-limit";
 import { prisma } from "@bikie/database";
 
 export async function GET(request: Request) {
@@ -17,8 +19,21 @@ export async function POST(request: Request) {
   const { session, error } = await requireMembership();
   if (error) return error;
 
-  const body = await request.json();
-  const alert = await SOSService.createAlert(session.user.id, body);
+  // SOS alerts fan out to every connected client + an email send — cap how often one
+  // account can trigger that (real emergencies are rare; 5 per 5 minutes is generous
+  // headroom over a genuine false-alarm-then-correction flow while blocking spam/abuse).
+  const rateLimitError = await enforceRateLimit("sos-alert-create", session.user.id, {
+    requests: 5,
+    windowSeconds: 300,
+  });
+  if (rateLimitError) return rateLimitError;
+
+  const parsed = sosAlertCreateSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const alert = await SOSService.createAlert(session.user.id, parsed.data);
 
   // Check profile completeness for SOS
   const user = await prisma.user.findUnique({

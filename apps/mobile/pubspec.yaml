@@ -69,8 +69,16 @@ dev_dependencies:
   flutter_lints: ^5.0.0
 
   build_runner: ^2.4.13
-  freezed: ^2.5.7
+  # Pinned to what pubspec.lock actually resolves (freezed 2.5.8 against
+  # freezed_annotation 2.4.4 above — freezed_annotation intentionally lags
+  # freezed's version number; that pairing is correct, see freezed's own
+  # pubspec constraint). The ^2.5.7 constraint here previously undersold the
+  # locked version.
+  freezed: ^2.5.8
   json_serializable: ^6.8.0
+
+  # Mocking for unit tests (auth/booking/SOS repository + provider tests).
+  mocktail: ^1.0.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

@@ -20,18 +20,29 @@ export const partnerPrimaryLinks: NavLink[] = [
   { label: "Pricing", href: "/partners/pricing" },
 ];
 
+// Shared between the mega-menu and the footer where both render the exact same set of
+// links, so the two surfaces can't silently drift apart (audit finding L5).
+const exploreLinks: NavLink[] = [
+  { label: "Explore Bikes", href: "/explore-bikes" },
+  { label: "Destinations", href: "/destinations" },
+  { label: "Rides", href: "/trips" },
+  { label: "Community", href: "/community" },
+  { label: "Clubs", href: "/clubs" },
+  { label: "Events", href: "/events" },
+  { label: "Roadside Assistance", href: "/roadside-assistance" },
+];
+
+const growWithBikieLinks: NavLink[] = [
+  { label: "Services", href: "/partners/services" },
+  { label: "Benefits", href: "/partners/benefits" },
+  { label: "Pricing", href: "/partners/pricing" },
+  { label: "Success Stories", href: "/partners/success-stories" },
+];
+
 export const riderMegaMenuColumns: NavColumn[] = [
   {
     heading: "Explore",
-    links: [
-      { label: "Explore Bikes", href: "/explore-bikes" },
-      { label: "Destinations", href: "/destinations" },
-      { label: "Rides", href: "/trips" },
-      { label: "Community", href: "/community" },
-      { label: "Clubs", href: "/clubs" },
-      { label: "Events", href: "/events" },
-      { label: "Roadside Assistance", href: "/roadside-assistance" },
-    ],
+    links: exploreLinks,
   },
   {
     heading: "Company",
@@ -57,12 +68,7 @@ export const riderMegaMenuColumns: NavColumn[] = [
 export const partnerMegaMenuColumns: NavColumn[] = [
   {
     heading: "Grow with BIKIE",
-    links: [
-      { label: "Services", href: "/partners/services" },
-      { label: "Benefits", href: "/partners/benefits" },
-      { label: "Pricing", href: "/partners/pricing" },
-      { label: "Success Stories", href: "/partners/success-stories" },
-    ],
+    links: growWithBikieLinks,
   },
   {
     heading: "Company",
@@ -85,15 +91,7 @@ export const partnerMegaMenuColumns: NavColumn[] = [
 export const riderFooterColumns: NavColumn[] = [
   {
     heading: "Explore",
-    links: [
-      { label: "Explore Bikes", href: "/explore-bikes" },
-      { label: "Destinations", href: "/destinations" },
-      { label: "Rides", href: "/trips" },
-      { label: "Community", href: "/community" },
-      { label: "Clubs", href: "/clubs" },
-      { label: "Events", href: "/events" },
-      { label: "Roadside Assistance", href: "/roadside-assistance" },
-    ],
+    links: exploreLinks,
   },
   {
     heading: "Company",
@@ -119,12 +117,7 @@ export const riderFooterColumns: NavColumn[] = [
 export const partnerFooterColumns: NavColumn[] = [
   {
     heading: "Grow with BIKIE",
-    links: [
-      { label: "Services", href: "/partners/services" },
-      { label: "Benefits", href: "/partners/benefits" },
-      { label: "Pricing", href: "/partners/pricing" },
-      { label: "Success Stories", href: "/partners/success-stories" },
-    ],
+    links: growWithBikieLinks,
   },
   {
     heading: "Company",

@@ -3,7 +3,10 @@ import { TripService } from "@bikie/services";
 import { updateTripSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
 
-export const dynamic = 'force-dynamic';
+// Public, read-only ride detail — matches the revalidate window used by the
+// sibling list route (GET /api/trips). PATCH below is a mutation and is never
+// cached regardless of this setting.
+export const revalidate = 60;
 
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

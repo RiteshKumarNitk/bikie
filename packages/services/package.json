@@ -11,6 +11,7 @@
   "dependencies": {
     "@bikie/database": "workspace:*",
     "@bikie/types": "workspace:*",
+    "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "cloudinary": "^2.10.0"
   },

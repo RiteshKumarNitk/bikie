@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef } from "react";
 import { authClient } from "@/lib/auth-client";
+import { Skeleton } from "@bikie/ui";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface Conversation {
   id: string;
   subject: string | null;
-  participants: { id: string; name: string; email: string; role: string }[];
+  participants: { id: string; name: string; role: string }[];
   lastMessage: { content: string; createdAt: string; senderId: string } | null;
   unreadCount: number;
 }
@@ -66,7 +68,7 @@ export default function PartnerMessagesPage() {
     return (
       <div>
         <h1 className="text-2xl font-semibold">Messages</h1>
-        <div className="mt-4 h-64 animate-pulse rounded-2xl bg-card" />
+        <Skeleton className="mt-4 h-64 rounded-2xl" />
       </div>
     );
   }
@@ -79,10 +81,11 @@ export default function PartnerMessagesPage() {
       <div className="mt-4 flex flex-col gap-4 lg:flex-row">
         <div className="w-full shrink-0 space-y-2 lg:w-72">
           {conversations.length === 0 ? (
-            <div className="rounded-2xl border border-foreground/10 bg-card p-6 text-center text-sm text-foreground/50">
-              <p className="font-medium">No conversations yet</p>
-              <p className="mt-1">When customers message you, conversations will appear here.</p>
-            </div>
+            <EmptyState
+              icon="💬"
+              title="No conversations yet"
+              description="When customers message you, conversations will appear here."
+            />
           ) : (
             conversations.map((conv) => {
               const other = conv.participants.find((p) => p.id !== session?.user.id);
@@ -115,7 +118,7 @@ export default function PartnerMessagesPage() {
                 <p className="text-xs text-foreground/50">
                   {activeConv.participants
                     .filter((p) => p.id !== session?.user.id)
-                    .map((p) => p.email)
+                    .map((p) => p.role)
                     .join(", ")}
                 </p>
               </div>

@@ -68,10 +68,12 @@ Bike Type" and structured "Rules" (helmet/no-rash-riding/follow-leader) from the
 product brief were folded into the free-text description for v1 rather than becoming
 structured fields — revisit if organizers want filtering/enforcement on them.
 
-### Milestone 7b — Rides on Mobile (future)
-Port the Milestone 7 web flow to `apps/mobile`: ride creation form, request-to-join,
-organizer's request-review screen, and a Ride Group entry point into the existing
-polling-based messaging screens (Milestone 6b).
+### Milestone 7b — Rides on Mobile (partially started)
+A read-only ride browse/list + detail port already exists undocumented in
+`apps/mobile/lib/features/trips/*` (mirrors the web browse experience). Still
+backlog: request-to-join, organizer's request-review screen, ride creation
+form, and a Ride Group entry point into the existing polling-based messaging
+screens (Milestone 6b).
 
 ## Milestone 8 — Community Platform v2 (in progress)
 Triggered by a full-project audit (pre-build, per user request) that found Communities,
@@ -94,7 +96,10 @@ serverless function instances. See ADR-011 in `.docs/DECISIONS.md` for the full 
   warn/mute/suspend/ban users, close/delete rooms — every action written to `AuditLog` plus
   a new `ModerationAction` trust-and-safety ledger.
 - **Reports**: users can report spam/abuse/fake accounts/dangerous behaviour/harassment/scam;
-  land in Admin → Community Moderation → Reports (previously a stub `EmptyState`, now real).
+  land in Admin → Safety → Moderation (Reports tab), with a Conversations tab for
+  lock/unlock/delete. The pre-existing `/admin/reports` nav item is a *different*,
+  unrelated business-reporting stub (revenue/booking exports) — relabeled "Revenue
+  Reports" in the nav so it no longer collides in name with this trust-and-safety feature.
 - **Realtime infra**: Upstash Redis (REST client) replaces the broken in-process SSE `Map`.
 - **Groups/Communities/Clubs**: one new `Group` model (`GroupType: COMMUNITY | CLUB`),
   admin-seeded only in this pass — see ADR-011 for why user-facing creation is deferred.

@@ -58,7 +58,18 @@ export async function GET(_request: Request) {
       return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }
 
-  const esc = (v: unknown) => `"${v == null ? "" : String(v).replace(/"/g, '""')}"`;
+  // CSV formula injection: a cell whose text starts with =, +, -, or @ can be interpreted as
+  // a formula by Excel/Sheets/LibreOffice when the file is opened, letting a malicious name/
+  // businessName/etc. run arbitrary formulas (including ones that shell out or exfiltrate
+  // data) against whoever opens the export. Prefixing a neutralizing `'` disarms it while
+  // keeping the value visible as plain text.
+  const DANGEROUS_LEADING_CHARS = new Set(["=", "+", "-", "@"]);
+  const sanitizeCsvValue = (v: unknown): string => {
+    if (v == null) return "";
+    const str = String(v);
+    return str.length > 0 && DANGEROUS_LEADING_CHARS.has(str[0]) ? `'${str}` : str;
+  };
+  const esc = (v: unknown) => `"${sanitizeCsvValue(v).replace(/"/g, '""')}"`;
   const header = Object.keys(rows[0] ?? {}).map(esc).join(",");
   const csvLines = rows.map((r) => Object.values(r).map(esc).join(","));
   const csv = [header, ...csvLines].join("\n");

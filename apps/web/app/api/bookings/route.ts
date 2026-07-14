@@ -27,6 +27,12 @@ export async function POST(req: NextRequest) {
     if (result.reason === "BIKE_NOT_FOUND") {
       return NextResponse.json({ error: "Bike not found" }, { status: 404 });
     }
+    if (result.reason === "BIKE_UNAVAILABLE") {
+      return NextResponse.json(
+        { error: "This bike is already booked for the selected dates" },
+        { status: 409 },
+      );
+    }
     return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
   }
 

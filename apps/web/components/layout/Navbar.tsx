@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import type { SelectedRole } from "@/lib/role";
 import { ThemeToggle } from "./ThemeToggle";
 import { MegaMenu } from "./MegaMenu";
+import { NotificationBell } from "./NotificationBell";
 import { SwitchRoleLink } from "./SwitchRoleLink";
 import {
   otherRole,
@@ -43,8 +44,12 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const { data: session, isPending } = authClient.useSession();
   const userMenuRef = useRef<HTMLDivElement>(null);
+  const userMenuButtonRef = useRef<HTMLButtonElement>(null);
 
-  const primaryLinks = role === "PARTNER" ? partnerPrimaryLinks : role === "RIDER" ? riderPrimaryLinks : [];
+  // A visitor with no explicit role selection yet (every first-time visit, and every
+  // crawler) still needs a working nav — default that state to the rider/public
+  // experience rather than rendering an empty header. See DECISIONS.md.
+  const primaryLinks = role === "PARTNER" ? partnerPrimaryLinks : riderPrimaryLinks;
   const megaMenuColumns = role === "PARTNER" ? partnerMegaMenuColumns : riderMegaMenuColumns;
 
   useEffect(() => {
@@ -64,6 +69,18 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
     document.addEventListener("mousedown", onClick);
     return () => document.removeEventListener("mousedown", onClick);
   }, []);
+
+  useEffect(() => {
+    if (!userMenuOpen) return;
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setUserMenuOpen(false);
+        userMenuButtonRef.current?.focus();
+      }
+    }
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [userMenuOpen]);
 
   const dashboardHref = dashboardHrefForRole(session?.user.role);
 
@@ -89,16 +106,20 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
               {link.label}
             </Link>
           ))}
-          {role && <MegaMenu label="More" columns={megaMenuColumns} />}
+          <MegaMenu label="More" columns={megaMenuColumns} />
         </nav>
 
         <div className="hidden items-center gap-3 md:flex">
+          {!isPending && session && <NotificationBell />}
           <ThemeToggle />
           {!isPending && session ? (
             <div className="relative" ref={userMenuRef}>
               <button
+                ref={userMenuButtonRef}
                 type="button"
                 onClick={() => setUserMenuOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={userMenuOpen}
                 className="flex items-center gap-2 rounded-full border border-foreground/10 p-1 pl-2 pr-3 transition-colors hover:bg-foreground/5"
               >
                 <UserAvatar name={session.user.name} />
@@ -114,6 +135,8 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 8 }}
                     transition={{ duration: 0.15 }}
+                    role="menu"
+                    aria-orientation="vertical"
                     className="absolute right-0 top-full mt-2 w-56 rounded-2xl border border-foreground/10 bg-card p-2 shadow-xl"
                   >
                     <div className="border-b border-foreground/10 px-3 py-2">
@@ -127,6 +150,7 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                       <Link
                         href={dashboardHref}
                         onClick={() => setUserMenuOpen(false)}
+                        role="menuitem"
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-foreground/5"
                       >
                         <svg className="h-4 w-4 text-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -137,6 +161,7 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                       <Link
                         href={session.user.role === "ADMIN" ? "/admin/settings" : session.user.role === "PARTNER" ? "/partner/settings" : "/dashboard/settings"}
                         onClick={() => setUserMenuOpen(false)}
+                        role="menuitem"
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-foreground/5"
                       >
                         <svg className="h-4 w-4 text-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -148,6 +173,7 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                       {role && (
                         <SwitchRoleLink
                           to={otherRole(role)}
+                          role="menuitem"
                           className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-foreground/5"
                         >
                           <svg className="h-4 w-4 text-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -163,6 +189,7 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                           setUserMenuOpen(false);
                           window.location.href = "/";
                         }}
+                        role="menuitem"
                         className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm text-red-400 hover:bg-red-500/10"
                       >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -222,7 +249,7 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex flex-col gap-6">
-                {(role ? megaMenuColumns : []).map((column) => (
+                {megaMenuColumns.map((column) => (
                   <div key={column.heading}>
                     <p className="mb-2 px-4 text-xs font-semibold uppercase tracking-wide text-foreground/50">{column.heading}</p>
                     <nav className="flex flex-col gap-1">
@@ -252,6 +279,7 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
               )}
               <div className="mt-6 flex items-center gap-3 border-t border-foreground/10 pt-6">
                 <ThemeToggle />
+                {!isPending && session && <NotificationBell />}
                 {!isPending && session ? (
                   <Link
                     href={dashboardHref}

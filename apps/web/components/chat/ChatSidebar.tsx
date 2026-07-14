@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import { Conversation } from "./types";
 import { NotificationsTab } from "./NotificationsTab";
 
@@ -58,8 +59,8 @@ export function ChatSidebar({
                       : "hover:bg-foreground/5 border border-transparent"
                   }`}
                 >
-                  <div className="w-10 h-10 rounded-full bg-foreground/10 shrink-0 overflow-hidden flex items-center justify-center text-sm font-bold text-foreground/50">
-                    {other?.image ? <img src={other.image} alt="" className="w-full h-full object-cover" /> : label[0]?.toUpperCase()}
+                  <div className="relative w-10 h-10 rounded-full bg-foreground/10 shrink-0 overflow-hidden flex items-center justify-center text-sm font-bold text-foreground/50">
+                    {other?.image ? <Image src={other.image} alt={label} fill className="object-cover" /> : label[0]?.toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold truncate">{label}</p>

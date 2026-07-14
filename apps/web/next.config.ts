@@ -1,6 +1,32 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV === "development";
+
+// Reasonable-default CSP (no nonces — see Next's CSP guide, "Without Nonces" section): this
+// app has `revalidate`-cached and statically-generated routes throughout (bikes/destinations
+// search, etc., see API.md), and nonce-based CSP forces every page into dynamic rendering,
+// which we don't want. Fonts (Geist Sans via `geist/font/sans`, Inter via `next/font/google`)
+// are self-hosted at build time by next/font — no fonts.gstatic.com/googleapis.com needed.
+// Images come from Cloudinary (uploads, see /api/upload) plus a handful of stock-photo hosts
+// already allow-listed in `images.remotePatterns` below, some of which are referenced via
+// plain <img> tags (not next/image) — https: is kept broad in img-src for that reason.
+const cspHeader = `
+  default-src 'self';
+  script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""};
+  style-src 'self' 'unsafe-inline';
+  img-src 'self' data: blob: https:;
+  font-src 'self' data:;
+  connect-src 'self' https://res.cloudinary.com https://api.cloudinary.com;
+  object-src 'none';
+  base-uri 'self';
+  form-action 'self';
+  frame-ancestors 'none';
+  ${isDev ? "" : "upgrade-insecure-requests;"}
+`
+  .replace(/\s{2,}/g, " ")
+  .trim();
+
 const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname, "..", ".."),
@@ -20,7 +46,25 @@ const nextConfig: NextConfig = {
       { protocol: "https", hostname: "images.unsplash.com", pathname: "/**" },
       { protocol: "https", hostname: "i.pravatar.cc", pathname: "/**" },
       { protocol: "https", hostname: "images.pexels.com", pathname: "/**" },
+      { protocol: "https", hostname: "res.cloudinary.com", pathname: "/**" },
     ],
+  },
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          { key: "Content-Security-Policy", value: cspHeader },
+          { key: "X-Frame-Options", value: "DENY" },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          // Harmless over plain http:// (browsers ignore it there), so safe to send
+          // unconditionally rather than branching on environment (ADR-003: local dev is
+          // http://localhost:4000).
+          { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+        ],
+      },
+    ];
   },
   async redirects() {
     return [

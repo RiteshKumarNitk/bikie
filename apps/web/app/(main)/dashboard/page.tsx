@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { DashboardOverviewDTO, RideJoinRequestDTO } from "@bikie/types";
 import { authClient } from "@/lib/auth-client";
+import { Skeleton } from "@bikie/ui";
 
 export default function DashboardHomePage() {
   const { data: session } = authClient.useSession();
@@ -49,8 +50,8 @@ export default function DashboardHomePage() {
   if (loading) {
     return (
       <div className="space-y-6">
-        <div className="h-32 bg-card animate-pulse rounded-3xl" />
-        <div className="h-64 bg-card animate-pulse rounded-3xl" />
+        <Skeleton className="h-32 rounded-3xl" />
+        <Skeleton className="h-64 rounded-3xl" />
       </div>
     );
   }

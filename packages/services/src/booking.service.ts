@@ -4,7 +4,7 @@ import type { CreateBookingInput } from "@bikie/validation";
 
 export type CreateBookingResult =
   | { ok: true; booking: BookingDTO }
-  | { ok: false; reason: "BIKE_NOT_FOUND" | "INVALID_DATES" };
+  | { ok: false; reason: "BIKE_NOT_FOUND" | "INVALID_DATES" | "BIKE_UNAVAILABLE" };
 
 function daysBetween(start: Date, end: Date) {
   const ms = end.getTime() - start.getTime();
@@ -33,7 +33,7 @@ export const BookingService = {
     const totalPrice = bike.pricePerDay * daysBetween(startDate, endDate);
     const status = bike.instantBooking ? "CONFIRMED" : "PENDING";
 
-    const booking = await bookingRepository.createBooking({
+    const booking = await bookingRepository.createBookingIfAvailable({
       userId,
       bikeId: input.bikeId,
       startDate,
@@ -42,6 +42,7 @@ export const BookingService = {
       totalPrice,
       status,
     });
+    if (!booking) return { ok: false, reason: "BIKE_UNAVAILABLE" };
     return { ok: true, booking };
   },
 };

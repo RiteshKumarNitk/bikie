@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { RideJoinRequestDTO } from "@bikie/types";
+import { Skeleton } from "@bikie/ui";
 
 export default function DashboardRequestsPage() {
   const [requests, setRequests] = useState<RideJoinRequestDTO[]>([]);
@@ -44,7 +45,7 @@ export default function DashboardRequestsPage() {
       <p className="text-foreground/60 text-sm">Manage who joins your rides.</p>
 
       {loading ? (
-        <div className="h-64 bg-card animate-pulse rounded-3xl" />
+        <Skeleton className="h-64 rounded-3xl" />
       ) : requests.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-foreground/20 p-12 text-center text-foreground/50">
           No pending requests.

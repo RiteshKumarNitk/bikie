@@ -86,7 +86,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ slu
             <div className="sticky top-24 rounded-3xl bg-card p-6 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_8px_24px_rgba(0,0,0,0.06)]">
               <p className="text-2xl font-semibold">{trip.price > 0 ? formatCurrency(trip.price) : "Free"}</p>
               <p className="text-sm text-foreground/60">{trip.price > 0 ? "per rider" : "community ride"}</p>
-              <RideActionsPanel tripSlug={trip.slug} organizerId={trip.organizer.id} seatsLeft={trip.seatsLeft} />
+              <RideActionsPanel tripSlug={trip.slug} tripId={trip.id} organizerId={trip.organizer.id} seatsLeft={trip.seatsLeft} />
             </div>
           </div>
         </div>

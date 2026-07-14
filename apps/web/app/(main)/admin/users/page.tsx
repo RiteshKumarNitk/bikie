@@ -21,6 +21,7 @@ export default function AdminUsersPage() {
   const [editingUser, setEditingUser] = useState<AdminUser | null>(null);
   const [newRole, setNewRole] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/users")
@@ -40,7 +41,14 @@ export default function AdminUsersPage() {
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const data = await res.json().catch(() => null);
+      setDeleteError(data?.error ?? "Failed to delete this user.");
+      setDeletingId(null);
+      return;
+    }
+    setDeleteError(null);
     setDeletingId(null);
     setUsers((prev) => prev.filter((u) => u.id !== id));
   }
@@ -56,6 +64,15 @@ export default function AdminUsersPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Users ({users.length})</h1>
       </div>
+
+      {deleteError && (
+        <div className="mt-4 flex items-start justify-between gap-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <span>{deleteError}</span>
+          <button type="button" onClick={() => setDeleteError(null)} className="shrink-0 font-medium hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       <div className="mt-4">
         <input

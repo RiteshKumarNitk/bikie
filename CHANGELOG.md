@@ -1,5 +1,37 @@
 # Changelog
 
+## Pre-Launch Audit Fixes
+- Ran a full cross-functional audit (architecture, product/UX, security, performance,
+  mobile, community/admin) across the whole codebase: 42 findings (2 Critical, 12 High,
+  19 Medium, 9 Low), all fixed in this pass. See `.docs/TASKS.md` for the itemized list.
+- Fixed a booking double-booking race (no transaction/overlap check previously existed) via
+  a row-locked transaction in `createBookingIfAvailable`, returning 409 on conflict instead
+  of allowing two confirmed bookings on the same bike for overlapping dates.
+- Fixed the public navbar rendering no navigation at all for logged-out visitors/crawlers —
+  the nav config now has a real default instead of an empty array.
+- Added rate limiting (Upstash-backed, durable across serverless instances) on auth, SOS
+  alert creation, and messaging; rewrote the upload endpoint to validate size/MIME/magic
+  bytes and upload to Cloudinary instead of a local filesystem that never persisted in
+  production; added security headers, closed ~15 routes' Zod validation gaps, fixed a CSV
+  formula-injection risk in admin export, and stopped leaking a chat participant's email in
+  ordinary 1:1 conversations.
+- Fixed admin "delete user" crashing with an unhandled FK-constraint error; added missing
+  indexes on `Trip.organizerId`/`Review.userId`/`Report.reporterId`/`ConversationParticipant.userId`/`GroupMember.userId`;
+  closed a review-creation race and a trip-slug-generation race.
+- Consolidated two competing `Skeleton` components into one; added route-level loading/error
+  boundaries; fixed several accessibility and design-token issues; added `robots.ts`/
+  `sitemap.ts` and structured data (JSON-LD) to bike/destination/blog pages.
+- Wired the already-built (but unreachable) notification feed to `/dashboard/notifications`
+  and added a navbar bell; added a rider-facing report action (message/ride) on top of the
+  already-built Reports backend; added search/filters to ride discovery; removed two dead-end
+  "manage" stub pages and fixed a hardcoded "Pending Approvals" stat.
+- Built the admin Reports/Moderation UI and admin Groups CRUD on top of already-complete,
+  previously UI-less backends; made the Admin Trips page editable (edit/cancel/delete).
+- Mobile: fixed the release build silently defaulting to a known-broken production API;
+  added real unit test coverage (booking, SOS, auth) where only one trivial smoke test
+  existed before; corrected the roadmap to reflect a partial, previously-undocumented Rides
+  browse port that already existed in the Flutter app.
+
 ## Milestone 8 — Community Platform v2 (in progress)
 - Ran a full-project audit before starting (per explicit request): confirmed Communities,
   Groups, Clubs, Events, Reports, Moderation, and Notifications have no Prisma models at

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../bikes/data/bike_models.dart';
+import '../domain/booking_calculator.dart';
 import '../domain/booking_providers.dart';
 
 Future<void> showCreateBookingSheet(BuildContext context, BikeDetail bike) {
@@ -42,8 +43,11 @@ class _CreateBookingSheetState extends ConsumerState<CreateBookingSheet> {
 
   num get _totalPrice {
     if (_range == null) return 0;
-    final days = _range!.duration.inDays.clamp(1, 1000);
-    return widget.bike.pricePerDay * days;
+    return calculateBookingTotal(
+      start: _range!.start,
+      end: _range!.end,
+      pricePerDay: widget.bike.pricePerDay,
+    );
   }
 
   Future<void> _pickDateRange() async {

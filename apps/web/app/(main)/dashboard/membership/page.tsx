@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { Skeleton } from "@bikie/ui";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface Membership {
   id: string;
@@ -22,26 +23,20 @@ export default function DashboardMembershipPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="h-48 animate-pulse rounded-2xl bg-card" />;
+  if (loading) return <Skeleton className="h-48 rounded-2xl" />;
 
   if (!membership) {
     return (
       <div>
         <h1 className="text-2xl font-semibold">Membership</h1>
-        <div className="mt-6 rounded-2xl border border-foreground/10 bg-card p-8 text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-accent/10 text-2xl">
-            💎
-          </div>
-          <h2 className="mt-4 text-lg font-semibold">You&apos;re not a member yet</h2>
-          <p className="mt-2 text-sm text-foreground/50 max-w-md mx-auto">
-            Join BIKIE Premium for discounts on every booking, free cancellation, priority support, and exclusive trips.
-          </p>
-          <Link
-            href="/membership"
-            className="mt-6 inline-flex rounded-xl bg-accent px-8 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
-          >
-            View Membership Plans
-          </Link>
+        <div className="mt-6">
+          <EmptyState
+            icon="💎"
+            title="You're not a member yet"
+            description="Join BIKIE Premium for discounts on every booking, free cancellation, priority support, and exclusive trips."
+            actionHref="/membership"
+            actionLabel="View Membership Plans"
+          />
         </div>
       </div>
     );

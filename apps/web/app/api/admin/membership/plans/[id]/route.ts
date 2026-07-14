@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AdminService } from "@bikie/services";
+import { updateMembershipPlanSchema } from "@bikie/validation";
 import { requireRole } from "@/lib/require-role";
 import { logAdminAction } from "@/lib/audit";
 
@@ -8,8 +9,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   if (error) return error;
 
   const { id } = await params;
-  const body = await request.json();
-  const plan = await AdminService.updateMembershipPlan(id, body);
+  const parsed = updateMembershipPlanSchema.safeParse(await request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const plan = await AdminService.updateMembershipPlan(id, parsed.data);
   await logAdminAction({
     userId: session.user.id,
     action: "UPDATE_MEMBERSHIP_PLAN",

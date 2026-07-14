@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AdminService } from "@bikie/services";
+import { updateBookingStatusSchema } from "@bikie/validation";
 import { requireRole } from "@/lib/require-role";
 import { logAdminAction } from "@/lib/audit";
 
@@ -8,14 +9,18 @@ export async function PATCH(_request: Request, { params }: { params: Promise<{ i
   if (error) return error;
 
   const { id } = await params;
-  const body = await _request.json();
-  await AdminService.updateBookingStatus(id, body.status);
+  const parsed = updateBookingStatusSchema.safeParse(await _request.json());
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  await AdminService.updateBookingStatus(id, parsed.data.status);
   await logAdminAction({
     userId: session.user.id,
     action: "UPDATE_BOOKING_STATUS",
     entity: "Booking",
     entityId: id,
-    metadata: { newStatus: body.status },
+    metadata: { newStatus: parsed.data.status },
   });
   return NextResponse.json({ success: true });
 }

@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Skeleton } from "@bikie/ui";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 interface Referral {
   id: string;
@@ -38,7 +40,7 @@ export default function ReferralsPage() {
     return (
       <div>
         <h1 className="text-2xl font-semibold">Referrals</h1>
-        <div className="mt-6 h-40 animate-pulse rounded-2xl bg-card" />
+        <Skeleton className="mt-6 h-40 rounded-2xl" />
       </div>
     );
   }
@@ -71,9 +73,9 @@ export default function ReferralsPage() {
           <span className="text-foreground/40">({referrals.length})</span>
         </p>
         {referrals.length === 0 ? (
-          <p className="mt-3 text-sm text-foreground/50">
-            No referrals yet. Share your link above to invite friends.
-          </p>
+          <div className="mt-3">
+            <EmptyState icon="🔗" title="No referrals yet" description="Share your link above to invite friends." />
+          </div>
         ) : (
           <ul className="mt-4 divide-y divide-foreground/10">
             {referrals.map((r) => (

@@ -11,14 +11,16 @@ import type { SelectedRole } from "@/lib/role";
 export function SwitchRoleLink({
   to,
   className,
+  role,
   children,
 }: {
   to: SelectedRole;
   className?: string;
+  role?: string;
   children: ReactNode;
 }) {
   return (
-    <button type="button" className={className} onClick={() => selectRole(to)}>
+    <button type="button" role={role} className={className} onClick={() => selectRole(to)}>
       {children}
     </button>
   );

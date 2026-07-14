@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import type { BikeDetailDTO, BikeSearchResultDTO, ReviewDTO } from "@bikie/types";
 import { getJson } from "@/lib/api";
+import { getSiteUrl } from "@/lib/site-url";
 import { formatCurrency } from "@bikie/utils";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { BikeCard } from "@/components/shared/BikeCard";
@@ -28,6 +29,35 @@ export async function generateMetadata({
   return {
     title: `${bike.name} — Rent in ${bike.city}`,
     description: bike.description ?? `Rent the ${bike.brand} ${bike.name} in ${bike.city}, from ${formatCurrency(bike.pricePerDay)}/day on BIKIE.`,
+  };
+}
+
+function bikeJsonLd(bike: BikeDetailDTO) {
+  const siteUrl = getSiteUrl();
+  return {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: bike.name,
+    brand: { "@type": "Brand", name: bike.brand },
+    image: bike.gallery.length > 0 ? bike.gallery : [bike.imageUrl],
+    description:
+      bike.description ?? `Rent the ${bike.brand} ${bike.name} in ${bike.city}, from ${formatCurrency(bike.pricePerDay)}/day on BIKIE.`,
+    ...(bike.ratingCount > 0
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: bike.ratingAvg,
+            reviewCount: bike.ratingCount,
+          },
+        }
+      : {}),
+    offers: {
+      "@type": "Offer",
+      url: `${siteUrl}/bikes/${bike.slug}`,
+      priceCurrency: "INR",
+      price: bike.pricePerDay,
+      availability: bike.instantBooking ? "https://schema.org/InStock" : "https://schema.org/LimitedAvailability",
+    },
   };
 }
 
@@ -58,6 +88,10 @@ export default async function BikeDetailPage({ params }: { params: Promise<{ slu
 
   return (
     <div className="pb-24">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(bikeJsonLd(bike)) }}
+      />
       <Breadcrumbs
         items={[
           { label: "Home", href: "/" },

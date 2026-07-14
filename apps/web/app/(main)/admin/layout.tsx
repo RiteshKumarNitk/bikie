@@ -20,6 +20,13 @@ const navGroups = [
     label: "Safety",
     items: [
       { label: "SOS", href: "/admin/sos" },
+      { label: "Moderation", href: "/admin/moderation" },
+    ],
+  },
+  {
+    label: "Community",
+    items: [
+      { label: "Groups", href: "/admin/groups" },
     ],
   },
   {
@@ -46,7 +53,7 @@ const navGroups = [
     label: "System",
     items: [
       { label: "Audit Logs", href: "/admin/audit-logs" },
-      { label: "Reports", href: "/admin/reports" },
+      { label: "Revenue Reports", href: "/admin/reports" },
       { label: "Settings", href: "/admin/settings" },
     ],
   },
