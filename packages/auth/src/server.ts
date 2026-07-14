@@ -32,5 +32,8 @@ export const auth = betterAuth({
   // `Authorization: Bearer <token>` using the same session/getSession machinery.
   plugins: [bearer()],
   secret: process.env.BETTER_AUTH_SECRET,
-  baseURL: process.env.BETTER_AUTH_URL || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined),
+  baseURL: process.env.VERCEL_URL
+    ? (process.env.BETTER_AUTH_URL === "http://localhost:4000" ? `https://${process.env.VERCEL_URL}` : process.env.BETTER_AUTH_URL)
+    : process.env.BETTER_AUTH_URL,
+  trustedOrigins: process.env.VERCEL_URL ? [`https://${process.env.VERCEL_URL}`] : [],
 });
