@@ -62,7 +62,14 @@ export async function findTrips(tab?: string) {
 export async function findTripBySlug(slug: string) {
   const trip = await prisma.trip.findUnique({
     where: { slug },
-    include: { destination: true, organizer: true },
+    include: { 
+      destination: true, 
+      organizer: true,
+      participants: {
+        where: { status: "APPROVED" },
+        include: { user: true }
+      }
+    },
   });
   if (!trip) return null;
 
@@ -72,6 +79,11 @@ export async function findTripBySlug(slug: string) {
     gallery: trip.gallery,
     meetingPoint: trip.meetingPoint,
     organizer: { id: trip.organizer.id, name: trip.organizer.name, image: trip.organizer.image },
+    members: trip.participants.map(p => ({
+      id: p.user.id,
+      name: p.user.name,
+      image: p.user.image,
+    }))
   };
 }
 

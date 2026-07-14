@@ -22,6 +22,7 @@ export interface TripDetailDTO extends TripSummaryDTO {
   gallery: string[];
   meetingPoint: string | null;
   organizer: { id: string; name: string; image: string | null };
+  members?: { id: string; name: string; image: string | null }[];
 }
 
 export interface RideJoinRequestDTO {

@@ -9,7 +9,7 @@ export default function ManageTabs({ trip }: { trip: TripDetailDTO }) {
 
   const tabs = [
     { name: "Overview", href: `/trips/${trip.slug}/manage` },
-    { name: `Members (${trip.seatsTotal - trip.seatsLeft})`, href: `/trips/${trip.slug}/manage/members` },
+    { name: `Members (${trip.seatsTotal - trip.seatsLeft + 1})`, href: `/trips/${trip.slug}/manage/members` },
     { name: "Requests", href: `/trips/${trip.slug}/manage/requests` },
     { name: "Chat", href: `/trips/${trip.slug}/manage/chat` },
     { name: "Timeline", href: `/trips/${trip.slug}/manage/timeline` },

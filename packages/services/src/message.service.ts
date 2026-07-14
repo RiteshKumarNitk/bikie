@@ -36,7 +36,10 @@ function toReactionDTO(r: RawMessage["reactions"][number]) {
 function decryptRow(row: RawMessage): string | null {
   if (row.type === "SYSTEM") return row.content;
   if (row.deletedAt) return null;
-  if (!row.ciphertext || !row.iv || !row.authTag || row.encryptionVersion === null) return null;
+  if (!row.ciphertext || !row.iv || !row.authTag || row.encryptionVersion === null) {
+    // Fallback for older unencrypted messages
+    return row.content || null;
+  }
   try {
     return decryptMessageContent({
       ciphertext: row.ciphertext,
@@ -44,8 +47,9 @@ function decryptRow(row: RawMessage): string | null {
       authTag: row.authTag,
       encryptionVersion: row.encryptionVersion,
     });
-  } catch {
-    return null;
+  } catch (err) {
+    console.error("Failed to decrypt message:", row.id, err);
+    return row.content || null;
   }
 }
 

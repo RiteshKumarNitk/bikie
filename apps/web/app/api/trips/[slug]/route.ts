@@ -3,7 +3,7 @@ import { TripService } from "@bikie/services";
 import { updateTripSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
 
-export const revalidate = 60;
+export const dynamic = 'force-dynamic';
 
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;

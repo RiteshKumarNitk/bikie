@@ -14,7 +14,7 @@ export default async function MembersPage({ params }: { params: Promise<{ slug: 
 
   // In a real implementation, you would fetch actual members
   // For now we just show a placeholder based on seatsTotal and seatsLeft
-  const memberCount = trip.seatsTotal - trip.seatsLeft;
+  const memberCount = trip.seatsTotal - trip.seatsLeft + 1; // +1 for the Organizer
 
   return (
     <div>
@@ -24,10 +24,15 @@ export default async function MembersPage({ params }: { params: Promise<{ slug: 
         
         {memberCount > 0 ? (
           <div className="space-y-4">
+            {/* Organizer */}
             <div className="flex items-center justify-between p-4 bg-foreground/5 rounded-2xl border border-foreground/10">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-foreground/10 flex items-center justify-center font-bold">
-                  {trip.organizer.name[0]}
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-foreground/10 flex items-center justify-center font-bold">
+                  {trip.organizer.image ? (
+                    <img src={trip.organizer.image} alt={trip.organizer.name} className="w-full h-full object-cover" />
+                  ) : (
+                    trip.organizer.name[0]
+                  )}
                 </div>
                 <div>
                   <p className="font-semibold">{trip.organizer.name} <span className="text-xs bg-accent text-background px-2 py-0.5 rounded-full ml-2">Organizer</span></p>
@@ -35,7 +40,26 @@ export default async function MembersPage({ params }: { params: Promise<{ slug: 
                 </div>
               </div>
             </div>
-            {/* Placeholder for other members */}
+            
+            {/* Approved Participants */}
+            {trip.members?.map((member) => (
+              <div key={member.id} className="flex items-center justify-between p-4 bg-transparent rounded-2xl border border-foreground/10">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full overflow-hidden bg-foreground/10 flex items-center justify-center font-bold">
+                    {member.image ? (
+                      <img src={member.image} alt={member.name} className="w-full h-full object-cover" />
+                    ) : (
+                      member.name[0]
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-semibold">{member.name}</p>
+                    <p className="text-xs text-foreground/60">No vehicle info</p>
+                  </div>
+                </div>
+                <button className="text-xs text-red-500 hover:underline">Remove</button>
+              </div>
+            ))}
           </div>
         ) : (
           <div className="text-center py-10">
