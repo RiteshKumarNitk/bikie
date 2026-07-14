@@ -63,9 +63,9 @@ export default async function TripDetailPage({ params }: { params: Promise<{ slu
                 <p className="mt-1 font-medium">{trip.type.replace("_", " ")}</p>
               </div>
               <div className="rounded-2xl bg-card p-4">
-                <p className="text-xs text-foreground/50">Seats Left</p>
+                <p className="text-xs text-foreground/50">Seats Available</p>
                 <p className="mt-1 font-medium">
-                  {trip.seatsLeft} / {trip.seatsTotal}
+                  {trip.seatsLeft} of {trip.seatsTotal}
                 </p>
               </div>
               <div className="rounded-2xl bg-card p-4">

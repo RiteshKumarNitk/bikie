@@ -22,9 +22,15 @@ export default function AdminBikesPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/bikes?pageSize=100")
+    fetch("/api/bikes?pageSize=48")
       .then((r) => r.json())
-      .then((data) => { setBikes(data.bikes); setTotal(data.total); setLoading(false); });
+      .then((data) => { 
+        if (data.bikes) {
+          setBikes(data.bikes); 
+          setTotal(data.total); 
+        }
+        setLoading(false); 
+      });
   }, []);
 
   async function handleDelete(id: string) {

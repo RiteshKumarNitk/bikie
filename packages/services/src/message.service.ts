@@ -25,6 +25,14 @@ function toReceiptDTO(r: RawMessage["receipts"][number]): MessageReceiptDTO {
   };
 }
 
+function toReactionDTO(r: RawMessage["reactions"][number]) {
+  return {
+    emoji: r.emoji,
+    userId: r.userId,
+    createdAt: r.createdAt.toISOString(),
+  };
+}
+
 function decryptRow(row: RawMessage): string | null {
   if (row.type === "SYSTEM") return row.content;
   if (row.deletedAt) return null;
@@ -47,13 +55,16 @@ function toDTO(row: RawMessage): MessageDTO {
     conversationId: row.conversationId,
     senderId: row.senderId,
     senderName: row.sender?.name ?? null,
+    senderImage: row.sender?.image ?? null,
     type: row.type,
     content: decryptRow(row),
+    metadata: row.metadata ?? null,
     replyToId: row.replyToId,
     editedAt: row.editedAt?.toISOString() ?? null,
     deletedAt: row.deletedAt?.toISOString() ?? null,
     attachments: row.attachments.map(toAttachmentDTO),
     receipts: row.receipts.map(toReceiptDTO),
+    reactions: row.reactions.map(toReactionDTO),
     createdAt: row.createdAt.toISOString(),
   };
 }
@@ -125,8 +136,8 @@ export const MessageService = {
     return { ok: true, message: dto };
   },
 
-  async createSystemMessage(conversationId: string, content: string): Promise<MessageDTO> {
-    const row = await messageRepository.sendMessage({ conversationId, senderId: null, type: "SYSTEM", content });
+  async createSystemMessage(conversationId: string, content: string, metadata?: any): Promise<MessageDTO> {
+    const row = await messageRepository.sendMessage({ conversationId, senderId: null, type: "SYSTEM", content, metadata });
     const dto = toDTO(row);
     const allIds = await messageRepository.getParticipantIds(conversationId);
     await RealtimeService.publishToUsers(allIds, "new_message", dto);
@@ -179,5 +190,25 @@ export const MessageService = {
     if (existing) return existing;
 
     return messageRepository.createConversation([userId, otherUserId], subject);
+  },
+
+  async reactToMessage(messageId: string, userId: string, emoji: string) {
+    const message = await messageRepository.findMessageById(messageId);
+    if (!message) return { ok: false, reason: "NOT_FOUND" };
+    
+    await messageRepository.addReaction(messageId, userId, emoji);
+    const otherIds = await messageRepository.getOtherParticipantIds(message.conversationId, userId);
+    await RealtimeService.publishToUsers(otherIds, "reaction_added", { messageId, userId, emoji });
+    return { ok: true };
+  },
+
+  async removeReaction(messageId: string, userId: string, emoji: string) {
+    const message = await messageRepository.findMessageById(messageId);
+    if (!message) return { ok: false, reason: "NOT_FOUND" };
+    
+    await messageRepository.removeReaction(messageId, userId, emoji);
+    const otherIds = await messageRepository.getOtherParticipantIds(message.conversationId, userId);
+    await RealtimeService.publishToUsers(otherIds, "reaction_removed", { messageId, userId, emoji });
+    return { ok: true };
   },
 };

@@ -62,7 +62,7 @@ export default async function WelcomePage({
       <form action={choosePartner} className="group relative flex-1">
         <button type="submit" className="relative block h-full min-h-[50vh] w-full text-left md:min-h-screen">
           <Image
-            src="https://images.unsplash.com/photo-1632823469850-1b7b1e8b7692?q=80&w=1600&auto=format&fit=crop"
+            src="https://images.unsplash.com/photo-1777499697680-b5072cf11247?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
             alt=""
             fill
             priority

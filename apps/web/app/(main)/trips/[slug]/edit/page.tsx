@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
@@ -26,10 +26,12 @@ const DIFFICULTIES = [
   { value: "HARD", label: "Advanced" },
 ];
 
-export default function CreateRidePage() {
+export default function EditRidePage({ params }: { params: Promise<{ slug: string }> }) {
+  const resolvedParams = use(params);
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
   const [destinations, setDestinations] = useState<DestinationOption[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -42,7 +44,6 @@ export default function CreateRidePage() {
   const [endDate, setEndDate] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [price, setPrice] = useState("0");
-  const [termsAccepted, setTermsAccepted] = useState(false);
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -54,10 +55,38 @@ export default function CreateRidePage() {
   }, []);
 
   useEffect(() => {
-    if (!isPending && !session) {
-      router.push("/login?next=/trips/create");
+    if (isPending) return;
+    if (!session) {
+      router.push(`/login?next=/trips/${resolvedParams.slug}/edit`);
+      return;
     }
-  }, [isPending, session, router]);
+
+    fetch(`/api/trips/${resolvedParams.slug}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.trip) {
+          if (data.trip.organizer?.id !== session.user.id) {
+            router.push(`/trips/${resolvedParams.slug}`);
+            return;
+          }
+          const t = data.trip;
+          setTitle(t.title);
+          setDescription(t.description || "");
+          setType(t.type);
+          setDifficulty(t.difficulty);
+          setSeatsTotal(t.seatsTotal.toString());
+          setMeetingPoint(t.meetingPoint || "");
+          if (t.destination) setDestinationId(t.destination.id || ""); // Need id if possible, wait, getBySlug only has summary fields?
+          // Fallback if destination id isn't populated exactly:
+          setStartDate(new Date(t.startDate).toISOString().slice(0, 16));
+          setEndDate(new Date(t.endDate).toISOString().slice(0, 16));
+          setImageUrl(t.imageUrl || "");
+          setPrice(t.price?.toString() || "0");
+        }
+        setInitialLoading(false);
+      })
+      .catch(() => setInitialLoading(false));
+  }, [resolvedParams.slug, session, isPending, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,15 +96,11 @@ export default function CreateRidePage() {
       setError("Pick both a start and return date/time.");
       return;
     }
-    if (!termsAccepted) {
-      setError("You must accept the Organizer Terms and Conditions.");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
-      const res = await fetch("/api/trips", {
-        method: "POST",
+      const res = await fetch(`/api/trips/${resolvedParams.slug}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title,
@@ -93,7 +118,7 @@ export default function CreateRidePage() {
       });
 
       if (res.status === 403) {
-        router.push("/membership?next=/trips/create");
+        setError("You do not have permission to edit this ride.");
         return;
       }
       if (!res.ok) {
@@ -101,22 +126,22 @@ export default function CreateRidePage() {
         setError(
           typeof data.error === "string"
             ? data.error
-            : "Couldn't create the ride — check the form and try again.",
+            : "Couldn't update the ride — check the form and try again.",
         );
         return;
       }
 
-      const data = await res.json();
-      router.push(`/trips/${data.trip.slug}`);
+      router.push(`/trips/${resolvedParams.slug}`);
+      router.refresh();
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  if (isPending || !session) {
+  if (isPending || !session || initialLoading) {
     return (
       <div className="pb-24">
-        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Rides", href: "/trips" }, { label: "Create a Ride" }]} />
+        <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Rides", href: "/trips" }, { label: "Edit Ride" }]} />
         <div className="mx-auto max-w-2xl px-6 pt-6">
           <div className="h-64 animate-pulse rounded-3xl bg-card" />
         </div>
@@ -126,12 +151,12 @@ export default function CreateRidePage() {
 
   return (
     <div className="pb-24">
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Rides", href: "/trips" }, { label: "Create a Ride" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Rides", href: "/trips" }, { label: "Edit Ride" }]} />
 
       <div className="mx-auto max-w-2xl px-6 pt-6">
-        <h1 className="text-3xl font-semibold">Create a Ride</h1>
+        <h1 className="text-3xl font-semibold">Edit Ride</h1>
         <p className="mt-2 text-foreground/60">
-          Organize a ride and let the community request to join. You approve who rides with you.
+          Update the details of your ride.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
@@ -141,7 +166,6 @@ export default function CreateRidePage() {
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Jaipur to Mount Abu Weekend Ride"
               className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent"
             />
           </div>
@@ -198,7 +222,6 @@ export default function CreateRidePage() {
             <input
               value={meetingPoint}
               onChange={(e) => setMeetingPoint(e.target.value)}
-              placeholder="Vaishali Nagar Petrol Pump"
               className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent"
             />
           </div>
@@ -259,7 +282,6 @@ export default function CreateRidePage() {
               rows={5}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Weekend ride to Mount Abu. Breakfast at Behror. Stay one night. Return Sunday. Helmet mandatory, no rash riding, follow the leader."
               className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent"
             />
           </div>
@@ -275,18 +297,6 @@ export default function CreateRidePage() {
             <p className="mt-1 text-xs text-foreground/50">Provide a public image URL (e.g. from Unsplash or a hosting site).</p>
           </div>
 
-          <label className="flex items-start gap-3">
-            <input
-              type="checkbox"
-              checked={termsAccepted}
-              onChange={(e) => setTermsAccepted(e.target.checked)}
-              className="mt-1 border-foreground/20 bg-transparent text-accent focus:ring-accent"
-            />
-            <span className="text-sm text-foreground/80">
-              I agree to the <Link href="/terms-and-conditions" className="text-accent hover:underline" target="_blank">Organizer Terms &amp; Conditions</Link>, and acknowledge that I am responsible for organizing and conducting this trip safely.
-            </span>
-          </label>
-
           {error && <p className="text-sm text-red-400">{error}</p>}
 
           <button
@@ -294,11 +304,8 @@ export default function CreateRidePage() {
             disabled={isSubmitting}
             className="w-full rounded-xl bg-accent px-6 py-3 text-sm font-semibold text-white hover:bg-accent/90 disabled:opacity-50"
           >
-            {isSubmitting ? "Creating…" : "Publish Ride"}
+            {isSubmitting ? "Saving…" : "Save Changes"}
           </button>
-          <p className="text-center text-xs text-foreground/50">
-            Requires an active <Link href="/membership" className="text-accent-text hover:underline">BIKIE membership</Link>.
-          </p>
         </form>
       </div>
     </div>

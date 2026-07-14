@@ -1,9 +1,10 @@
 import { prisma } from "../client";
 
 const MESSAGE_INCLUDE = {
-  sender: { select: { id: true, name: true } },
+  sender: { select: { id: true, name: true, image: true } },
   attachments: true,
   receipts: true,
+  reactions: true,
 } as const;
 
 export async function getConversationsForUser(userId: string) {
@@ -71,6 +72,7 @@ export async function sendMessage(params: {
   senderId: string | null;
   type: "TEXT" | "SYSTEM";
   content?: string;
+  metadata?: any;
   ciphertext?: string;
   iv?: string;
   authTag?: string;
@@ -93,6 +95,7 @@ export async function sendMessage(params: {
       senderId: params.senderId,
       type: params.type,
       content: params.content,
+      metadata: params.metadata ? (params.metadata as any) : undefined,
       ciphertext: params.ciphertext,
       iv: params.iv,
       authTag: params.authTag,
@@ -155,6 +158,20 @@ export async function markDelivered(conversationId: string, userId: string) {
   await prisma.messageReceipt.updateMany({
     where: { userId, deliveredAt: null, message: { conversationId } },
     data: { deliveredAt: new Date() },
+  });
+}
+
+export async function addReaction(messageId: string, userId: string, emoji: string) {
+  return prisma.messageReaction.upsert({
+    where: { messageId_userId_emoji: { messageId, userId, emoji } },
+    create: { messageId, userId, emoji },
+    update: {},
+  });
+}
+
+export async function removeReaction(messageId: string, userId: string, emoji: string) {
+  return prisma.messageReaction.deleteMany({
+    where: { messageId, userId, emoji },
   });
 }
 

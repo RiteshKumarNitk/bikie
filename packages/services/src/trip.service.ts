@@ -6,7 +6,7 @@ import type {
   TripDetailDTO,
   TripSummaryDTO,
 } from "@bikie/types";
-import type { CreateTripInput } from "@bikie/validation";
+import type { CreateTripInput, UpdateTripInput } from "@bikie/validation";
 import { MessageService } from "./message.service";
 import { NotificationService } from "./notification.service";
 
@@ -66,6 +66,35 @@ export const TripService = {
       organizerId,
       destinationId: input.destinationId,
     });
+  },
+
+  async update(slug: string, userId: string, input: UpdateTripInput): Promise<{ ok: boolean; reason?: string; trip?: TripSummaryDTO }> {
+    const trip = await tripRepository.findTripBySlug(slug);
+    if (!trip) return { ok: false, reason: "NOT_FOUND" };
+    if (trip.organizer.id !== userId) return { ok: false, reason: "FORBIDDEN" };
+
+    const updated = await tripRepository.updateTrip(slug, {
+      title: input.title,
+      description: input.description,
+      imageUrl: input.imageUrl !== undefined ? input.imageUrl : undefined,
+      type: input.type as never,
+      difficulty: input.difficulty as never,
+      price: input.price,
+      seatsTotal: input.seatsTotal,
+      meetingPoint: input.meetingPoint,
+      startDate: input.startDate ? new Date(input.startDate) : undefined,
+      endDate: input.endDate ? new Date(input.endDate) : undefined,
+      destinationId: input.destinationId,
+    });
+
+    const conversationId = await tripRepository.findConversationIdForTrip(trip.id);
+    if (conversationId) {
+      await MessageService.createSystemMessage(conversationId, `The ride details were updated by the organizer.`, {
+        event: "TRIP_UPDATED",
+      });
+    }
+
+    return { ok: true, trip: updated };
   },
 
   async requestToJoin(slug: string, userId: string, message?: string): Promise<RequestToJoinResult> {
@@ -151,6 +180,7 @@ export const TripService = {
     await MessageService.createSystemMessage(
       conversationId,
       `${participant.trip.organizer.name} approved ${participant.user.name}.`,
+      { event: "USER_JOINED", userId: participant.userId, userName: participant.user.name }
     );
     await NotificationService.notify(
       participant.userId,
@@ -179,7 +209,11 @@ export const TripService = {
       await tripRepository.incrementSeatsLeft(trip.id);
       const conversationId = await tripRepository.findConversationIdForTrip(trip.id);
       if (conversationId) {
-        await MessageService.createSystemMessage(conversationId, `${userName} left the ride.`);
+        await MessageService.createSystemMessage(conversationId, `${userName} left the ride.`, {
+          event: "USER_LEFT",
+          userId,
+          userName,
+        });
       }
     }
 

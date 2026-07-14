@@ -174,6 +174,12 @@ function OrganizerPanel({ tripSlug }: { tripSlug: string }) {
 
   return (
     <div className="mt-5">
+      <Link
+        href={`/trips/${tripSlug}/edit`}
+        className="block w-full mb-3 rounded-xl border border-foreground/10 bg-transparent px-6 py-3 text-center text-sm font-semibold hover:bg-foreground/5"
+      >
+        Edit Ride
+      </Link>
       <GroupChatLink tripSlug={tripSlug} />
       <p className="mt-4 text-sm font-medium">Join Requests</p>
       {requests === undefined ? (

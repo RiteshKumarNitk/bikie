@@ -25,17 +25,26 @@ export interface MessageReceiptDTO {
   readAt: string | null;
 }
 
+export interface MessageReactionDTO {
+  emoji: string;
+  userId: string;
+  createdAt: string;
+}
+
 export interface MessageDTO {
   id: string;
   conversationId: string;
   senderId: string | null;
   senderName: string | null;
+  senderImage: string | null;
   type: "TEXT" | "SYSTEM";
   content: string | null;
+  metadata: any | null;
   replyToId: string | null;
   editedAt: string | null;
   deletedAt: string | null;
   attachments: MessageAttachmentDTO[];
   receipts: MessageReceiptDTO[];
+  reactions: MessageReactionDTO[];
   createdAt: string;
 }

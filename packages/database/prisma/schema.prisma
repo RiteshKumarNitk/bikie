@@ -196,6 +196,7 @@ model User {
   role          UserRole  @default(RENTER)
   accountStatus          UserAccountStatus @default(ACTIVE)
   accountStatusExpiresAt DateTime?
+  lastActiveAt  DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   sessions      Session[]
@@ -225,6 +226,7 @@ model User {
   moderationIssued    ModerationAction[] @relation("ModerationActor")
   notifications       Notification[]
   messageReceipts     MessageReceipt[]
+  messageReactions    MessageReaction[]
 
   @@map("user")
 }
@@ -506,6 +508,7 @@ model Message {
   sender            User?        @relation(fields: [senderId], references: [id])
   type              MessageType  @default(TEXT)
   content           String?
+  metadata          Json?
   ciphertext        String?
   iv                String?
   authTag           String?
@@ -518,6 +521,7 @@ model Message {
   deletedBy         String?
   attachments       MessageAttachment[]
   receipts          MessageReceipt[]
+  reactions         MessageReaction[]
   createdAt         DateTime     @default(now())
 
   @@index([conversationId])
@@ -538,6 +542,20 @@ model MessageReceipt {
   @@unique([messageId, userId])
   @@index([userId])
   @@map("message_receipt")
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emoji     String
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+  @@map("message_reaction")
 }
 
 model MessageAttachment {

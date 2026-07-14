@@ -158,6 +158,15 @@ export async function findTripById(id: string) {
   return prisma.trip.findUnique({ where: { id } });
 }
 
+export async function updateTrip(slug: string, data: Partial<Omit<Prisma.TripUpdateInput, "slug">>) {
+  const trip = await prisma.trip.update({
+    where: { slug },
+    data,
+    include: { destination: true },
+  });
+  return toSummary(trip);
+}
+
 export async function getRoomInfo(tripId: string) {
   return prisma.trip.findUnique({
     where: { id: tripId },
