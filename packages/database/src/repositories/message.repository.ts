@@ -250,3 +250,12 @@ export async function getConversationById(conversationId: string) {
     include: { participants: true },
   });
 }
+
+export async function countUnread(userId: string) {
+  return prisma.messageReceipt.count({
+    where: {
+      userId,
+      readAt: null
+    }
+  });
+}

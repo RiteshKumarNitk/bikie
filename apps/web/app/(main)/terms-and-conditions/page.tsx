@@ -51,6 +51,29 @@ export default function TermsPage() {
               bookings at the agreed price.
             </p>
           </section>
+          
+          <div className="my-8 border-t border-foreground/10" />
+
+          <h2 className="text-xl font-semibold md:text-2xl text-foreground">Community & Group Rides</h2>
+          
+          <section>
+            <h2 className="text-lg font-semibold text-foreground">6. Organizer Responsibilities</h2>
+            <p className="mt-2">
+              By creating and organizing a group ride, you agree that you are solely responsible for managing the itinerary, ensuring safety protocols, and communicating effectively with participants. BIKIE acts strictly as a platform to facilitate community connections and does not organize or sponsor these rides.
+            </p>
+          </section>
+          <section>
+            <h2 className="text-lg font-semibold text-foreground">7. Rider Conduct</h2>
+            <p className="mt-2">
+              All participants in community rides must adhere to local traffic laws, wear appropriate safety gear (including helmets), and ride responsibly. Organizers reserve the right to remove any rider from a trip for unsafe behavior.
+            </p>
+          </section>
+          <section>
+            <h2 className="text-lg font-semibold text-foreground">8. Financial Contributions</h2>
+            <p className="mt-2">
+              Any estimated costs or prices listed for community rides are handled directly between the organizer and the participants. BIKIE does not currently process payments for community group rides, and any financial disputes must be resolved among the involved parties.
+            </p>
+          </section>
         </div>
       </div>
     </div>

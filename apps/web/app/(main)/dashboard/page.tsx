@@ -1,87 +1,155 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { BookingDTO, WishlistItemDTO } from "@bikie/types";
-import { getJson } from "@/lib/api";
-import { getServerSession } from "@/lib/get-session";
-import { StatCard } from "@/components/dashboard/StatCard";
-import { formatCurrency } from "@bikie/utils";
+import { DashboardOverviewDTO, RideJoinRequestDTO } from "@bikie/types";
+import { authClient } from "@/lib/auth-client";
 
-export const metadata: Metadata = { title: "Dashboard" };
+export default function DashboardHomePage() {
+  const { data: session } = authClient.useSession();
+  const [overview, setOverview] = useState<DashboardOverviewDTO | null>(null);
+  const [requests, setRequests] = useState<RideJoinRequestDTO[]>([]);
+  const [loading, setLoading] = useState(true);
 
-export default async function DashboardHomePage() {
-  const session = await getServerSession();
-  const [{ bookings }, { items: wishlist }] = await Promise.all([
-    getJson<{ bookings: BookingDTO[] }>("/api/bookings", { auth: true }),
-    getJson<{ items: WishlistItemDTO[] }>("/api/wishlist", { auth: true }),
-  ]);
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/dashboard/overview").then(res => res.json()),
+      fetch("/api/requests/pending").then(res => res.json())
+    ]).then(([overviewData, requestsData]) => {
+      setOverview(overviewData);
+      setRequests(requestsData.requests || []);
+      setLoading(false);
+    });
+  }, []);
 
-  const upcoming = bookings.find((b) => b.status === "CONFIRMED" || b.status === "PENDING");
-  const active = bookings.find((b) => b.status === "ACTIVE");
+  async function handleApprove(requestId: string, tripSlug: string) {
+    const res = await fetch(`/api/trips/${tripSlug}/requests`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId, action: "APPROVE" })
+    });
+    if (res.ok) {
+      setRequests(prev => prev.filter(r => r.id !== requestId));
+      setOverview(prev => prev ? { ...prev, stats: { ...prev.stats, pendingRequests: prev.stats.pendingRequests - 1 } } : null);
+    }
+  }
+
+  async function handleReject(requestId: string, tripSlug: string) {
+    const res = await fetch(`/api/trips/${tripSlug}/requests`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId, action: "REJECT" })
+    });
+    if (res.ok) {
+      setRequests(prev => prev.filter(r => r.id !== requestId));
+      setOverview(prev => prev ? { ...prev, stats: { ...prev.stats, pendingRequests: prev.stats.pendingRequests - 1 } } : null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="h-32 bg-card animate-pulse rounded-3xl" />
+        <div className="h-64 bg-card animate-pulse rounded-3xl" />
+      </div>
+    );
+  }
 
   return (
-    <div>
-      <h1 className="text-2xl font-semibold">Welcome back, {session?.user.name.split(" ")[0]}</h1>
-      <p className="mt-1 text-foreground/60">Here&apos;s what&apos;s happening with your account.</p>
-
-      <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <StatCard label="Upcoming Bookings" value={bookings.filter((b) => b.status !== "COMPLETED" && b.status !== "CANCELLED").length} />
-        <StatCard label="Completed Trips" value={bookings.filter((b) => b.status === "COMPLETED").length} />
-        <StatCard label="Wishlist" value={wishlist.length} />
-        <StatCard label="Total Spent" value={formatCurrency(bookings.reduce((sum, b) => sum + b.totalPrice, 0))} />
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-red-500/20 bg-red-500/5 p-5">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/15 text-lg">🆘</span>
-            <div>
-              <p className="font-semibold text-red-400">SOS Emergency</p>
-              <p className="text-xs text-foreground/50">Need help? Send an alert to nearby users and admins.</p>
-            </div>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-3xl font-semibold">👋 Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}, {session?.user.name.split(" ")[0]}</h1>
+        
+        <div className="mt-6 flex flex-wrap gap-4">
+          <div className="rounded-2xl bg-card border border-foreground/10 p-5 min-w[140px] flex-1">
+            <p className="text-2xl font-bold">{overview?.stats.upcomingRides}</p>
+            <p className="text-sm text-foreground/60 mt-1">Upcoming Rides</p>
           </div>
-          <Link
-            href="/dashboard/sos"
-            className="rounded-xl bg-red-500 px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-red-600"
-          >
-            Alert
-          </Link>
+          <div className="rounded-2xl bg-card border border-foreground/10 p-5 min-w[140px] flex-1">
+            <p className="text-2xl font-bold">{overview?.stats.pendingRequests}</p>
+            <p className="text-sm text-foreground/60 mt-1">Pending Requests</p>
+          </div>
+          <div className="rounded-2xl bg-card border border-foreground/10 p-5 min-w[140px] flex-1">
+            <p className="text-2xl font-bold">{overview?.stats.unreadMessages}</p>
+            <p className="text-sm text-foreground/60 mt-1">Unread Messages</p>
+          </div>
         </div>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-3xl bg-card p-6">
-          <p className="font-semibold">Current / Upcoming Booking</p>
-          {active || upcoming ? (
-            <div className="mt-4">
-              <p className="font-medium">{(active ?? upcoming)!.bike.name}</p>
-              <p className="text-sm text-foreground/60">
-                {new Date((active ?? upcoming)!.startDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} –{" "}
-                {new Date((active ?? upcoming)!.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
-              </p>
-              <Link href="/dashboard/bookings" className="mt-3 inline-flex text-sm font-medium text-accent-text">
-                View booking →
-              </Link>
-            </div>
-          ) : (
-            <div className="mt-4">
-              <p className="text-sm text-foreground/60">No active or upcoming bookings.</p>
-              <Link href="/explore-bikes" className="mt-3 inline-flex text-sm font-medium text-accent-text">
-                Explore bikes →
-              </Link>
-            </div>
-          )}
-        </div>
+      {overview?.actionableItems && overview.actionableItems.length > 0 && (
+        <section>
+          <h2 className="text-xl font-semibold mb-4 text-red-400">Needs Your Attention</h2>
+          <div className="grid gap-3">
+            {overview.actionableItems.map(item => (
+              <div key={item.id} className="flex items-center justify-between p-4 rounded-2xl bg-red-500/10 border border-red-500/20">
+                <div>
+                  <p className="font-semibold">{item.title}</p>
+                  {item.description && <p className="text-sm opacity-70 mt-0.5">{item.description}</p>}
+                </div>
+                <Link href={item.actionHref} className="bg-red-500/20 text-red-400 px-4 py-2 rounded-xl text-sm font-medium hover:bg-red-500/30 transition-colors">
+                  {item.actionLabel}
+                </Link>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
-        <div className="rounded-3xl bg-card p-6">
-          <p className="font-semibold">Emergency Contacts</p>
-          <p className="mt-2 text-sm text-foreground/60">
-            Roadside assistance is available 24/7 for every active booking.
-          </p>
-          <Link href="/roadside-assistance" className="mt-3 inline-flex text-sm font-medium text-accent-text">
-            Get Roadside Assistance →
+      {requests.length > 0 && (
+        <section>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold">Pending Join Requests</h2>
+            <Link href="/dashboard/requests" className="text-sm text-accent-text hover:underline">View all</Link>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            {requests.slice(0, 4).map(req => (
+              <div key={req.id} className="rounded-2xl bg-card border border-foreground/10 p-5 shadow-sm flex flex-col justify-between">
+                <div>
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-foreground/10 shrink-0">
+                      {req.rider.image ? <img src={req.rider.image} alt="" className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center font-bold">{req.rider.name[0]}</div>}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-lg">{req.rider.name}</p>
+                      <p className="text-xs text-foreground/60">{req.rider.bike || "Unknown bike"}</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 bg-foreground/5 p-3 rounded-xl border border-foreground/10">
+                    <p className="text-xs font-semibold mb-1 text-accent-text">Requested to join {req.tripTitle}</p>
+                    {req.message && <p className="text-sm text-foreground/80 italic">&quot;{req.message}&quot;</p>}
+                  </div>
+                </div>
+                <div className="mt-5 flex gap-2">
+                  <button onClick={() => handleApprove(req.id, req.tripSlug)} className="flex-1 bg-accent text-white py-2 rounded-xl text-sm font-semibold hover:bg-accent/90 transition-colors">
+                    Approve
+                  </button>
+                  <button onClick={() => handleReject(req.id, req.tripSlug)} className="flex-1 bg-foreground/10 py-2 rounded-xl text-sm font-semibold hover:bg-foreground/20 transition-colors">
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-semibold">Quick Actions</h2>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Link href="/trips/create" className="px-5 py-3 rounded-2xl bg-card border border-foreground/10 text-sm font-medium hover:border-accent transition-colors flex items-center gap-2">
+            <span className="text-lg">+</span> Create Ride
+          </Link>
+          <Link href="/dashboard/requests" className="px-5 py-3 rounded-2xl bg-card border border-foreground/10 text-sm font-medium hover:border-accent transition-colors">
+            Manage Requests
+          </Link>
+          <Link href="/dashboard/messages" className="px-5 py-3 rounded-2xl bg-card border border-foreground/10 text-sm font-medium hover:border-accent transition-colors">
+            Ride Rooms
           </Link>
         </div>
-      </div>
+      </section>
+
     </div>
   );
 }

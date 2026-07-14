@@ -16,6 +16,7 @@ export default async function DashboardSettingsPage() {
         <ProfileSettings
           name={session?.user.name ?? ""}
           email={session?.user.email ?? ""}
+          image={session?.user.image ?? null}
           phone={(session?.user as any).phone ?? null}
         />
       </section>

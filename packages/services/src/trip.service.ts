@@ -39,6 +39,63 @@ export const TripService = {
     return tripRepository.findTripBySlug(slug);
   },
 
+  async getRequestedBy(userId: string): Promise<TripSummaryDTO[]> {
+    return tripRepository.findTripsRequestedBy(userId);
+  },
+
+  async getAllPendingRequests(userId: string): Promise<RideJoinRequestDTO[]> {
+    return tripRepository.findPendingRequestsForOrganizer(userId);
+  },
+
+  async getOverview(userId: string): Promise<any> {
+    const metrics = await tripRepository.getOrganizerDashboardMetrics(userId);
+    const unreadMessages = await messageRepository.countUnread(userId);
+    
+    // Calculate rides starting tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    
+    // Construct actionable items
+    const actionableItems = [];
+    if (metrics.pendingRequests > 0) {
+      actionableItems.push({
+        id: "pending-requests",
+        type: "PENDING_APPROVALS",
+        title: `${metrics.pendingRequests} Riders waiting approval`,
+        actionLabel: "Manage Requests",
+        actionHref: "/dashboard/requests"
+      });
+    }
+    
+    if (unreadMessages > 0) {
+      actionableItems.push({
+        id: "unread-messages",
+        type: "UNREAD_MESSAGES",
+        title: `${unreadMessages} unread messages`,
+        actionLabel: "Open Chat",
+        actionHref: "/dashboard/messages"
+      });
+    }
+
+    return {
+      stats: {
+        upcomingRides: metrics.upcomingRides,
+        pendingRequests: metrics.pendingRequests,
+        unreadMessages,
+        ridesTomorrow: 0
+      },
+      actionableItems
+    };
+  },
+
+
+  async getStats(userId: string): Promise<RideStatsDTO> {
+    const stats = await tripRepository.getRideStatsForUser(userId);
+    const approvalRate =
+      stats.requestsSent > 0 ? Math.round((stats.requestsApproved / stats.requestsSent) * 100) : null;
+    return { ...stats, approvalRate };
+  },
+
   async getOrganizedBy(userId: string): Promise<TripSummaryDTO[]> {
     return tripRepository.findTripsOrganizedBy(userId);
   },
@@ -47,9 +104,6 @@ export const TripService = {
     return tripRepository.findTripsJoinedBy(userId);
   },
 
-  async getRequestedBy(userId: string): Promise<TripSummaryDTO[]> {
-    return tripRepository.findTripsRequestedBy(userId);
-  },
 
   async create(organizerId: string, input: CreateTripInput): Promise<TripSummaryDTO> {
     return tripRepository.createTrip({
@@ -76,7 +130,7 @@ export const TripService = {
     const updated = await tripRepository.updateTrip(slug, {
       title: input.title,
       description: input.description,
-      imageUrl: input.imageUrl !== undefined ? input.imageUrl : undefined,
+      imageUrl: input.imageUrl === null ? "" : input.imageUrl !== undefined ? input.imageUrl : undefined,
       type: input.type as never,
       difficulty: input.difficulty as never,
       price: input.price,
@@ -133,7 +187,15 @@ export const TripService = {
     if (!trip) return { ok: false, reason: "TRIP_NOT_FOUND" };
     if (trip.organizer.id !== organizerId) return { ok: false, reason: "FORBIDDEN" };
     const requests = await tripRepository.findPendingRequestsForTrip(trip.id);
-    return { ok: true, requests };
+    return { 
+      ok: true, 
+      requests: requests.map(r => ({
+        ...r,
+        tripId: trip.id,
+        tripSlug: trip.slug,
+        tripTitle: trip.title
+      }))
+    };
   },
 
   async decideRequest(

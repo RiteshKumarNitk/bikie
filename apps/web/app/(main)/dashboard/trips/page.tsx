@@ -7,13 +7,48 @@ import { EmptyState } from "@/components/shared/EmptyState";
 
 export const metadata: Metadata = { title: "My Rides" };
 
-export default async function DashboardTripsPage() {
+type TabType = "UPCOMING" | "ORGANIZING" | "JOINED" | "PENDING_APPROVAL" | "COMPLETED" | "CANCELLED";
+
+export default async function DashboardTripsPage({ searchParams }: { searchParams: { tab?: string } }) {
   const { organized, joined, requested, stats } = await getJson<{
     organized: TripSummaryDTO[];
     joined: TripSummaryDTO[];
     requested: TripSummaryDTO[];
     stats: RideStatsDTO;
   }>("/api/trips/mine", { auth: true });
+
+  const activeTab: TabType = (searchParams.tab?.toUpperCase() as TabType) || "UPCOMING";
+
+  const tabs = [
+    { id: "UPCOMING", label: "Upcoming" },
+    { id: "ORGANIZING", label: "Organizing" },
+    { id: "JOINED", label: "Joined" },
+    { id: "PENDING_APPROVAL", label: "Pending Approval" },
+    { id: "COMPLETED", label: "Completed" },
+    { id: "CANCELLED", label: "Cancelled" },
+  ];
+
+  let displayTrips: TripSummaryDTO[] = [];
+  
+  if (activeTab === "UPCOMING") {
+    displayTrips = [...organized, ...joined].filter(t => t.status === "UPCOMING" || t.status === "PUBLISHED" || t.status === "IN_PROGRESS");
+    // Remove duplicates if any
+    displayTrips = Array.from(new Map(displayTrips.map(item => [item.id, item])).values());
+  } else if (activeTab === "ORGANIZING") {
+    displayTrips = organized;
+  } else if (activeTab === "JOINED") {
+    displayTrips = joined;
+  } else if (activeTab === "PENDING_APPROVAL") {
+    displayTrips = requested;
+  } else if (activeTab === "COMPLETED") {
+    displayTrips = [...organized, ...joined].filter(t => t.status === "COMPLETED");
+  } else if (activeTab === "CANCELLED") {
+    displayTrips = [...organized, ...joined].filter(t => t.status === "CANCELLED");
+  }
+
+  // Deduplicate and sort by date
+  displayTrips = Array.from(new Map(displayTrips.map(item => [item.id, item])).values());
+  displayTrips.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
 
   return (
     <div>
@@ -27,65 +62,34 @@ export default async function DashboardTripsPage() {
         </Link>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-4">
-        <div className="rounded-2xl bg-card p-4">
-          <p className="text-xs text-foreground/50">Organized</p>
-          <p className="mt-1 text-xl font-semibold">{stats.ridesOrganized}</p>
-        </div>
-        <div className="rounded-2xl bg-card p-4">
-          <p className="text-xs text-foreground/50">Requests Sent</p>
-          <p className="mt-1 text-xl font-semibold">{stats.requestsSent}</p>
-        </div>
-        <div className="rounded-2xl bg-card p-4">
-          <p className="text-xs text-foreground/50">Approval Rate</p>
-          <p className="mt-1 text-xl font-semibold">{stats.approvalRate !== null ? `${stats.approvalRate}%` : "—"}</p>
-        </div>
-        <div className="rounded-2xl bg-card p-4">
-          <p className="text-xs text-foreground/50">Cancelled</p>
-          <p className="mt-1 text-xl font-semibold">{stats.ridesCancelled}</p>
-        </div>
+      <div className="mt-8 border-b border-foreground/10 pb-0 flex overflow-x-auto gap-6 hide-scrollbar">
+        {tabs.map((tab) => (
+          <Link
+            key={tab.id}
+            href={`/dashboard/trips?tab=${tab.id.toLowerCase()}`}
+            className={`pb-3 whitespace-nowrap text-sm font-medium border-b-2 transition-colors ${
+              activeTab === tab.id
+                ? "border-accent text-accent-text"
+                : "border-transparent text-foreground/60 hover:text-foreground hover:border-foreground/30"
+            }`}
+          >
+            {tab.label}
+          </Link>
+        ))}
       </div>
 
       <section className="mt-8">
-        <h2 className="font-semibold text-foreground/80">Rides Joined</h2>
-        {joined.length === 0 ? (
+        {displayTrips.length === 0 ? (
           <div className="mt-4">
-            <EmptyState title="No joined rides yet" actionHref="/trips" actionLabel="Browse rides" />
-          </div>
-        ) : (
-          <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {joined.map((trip) => (
-              <TripCard key={trip.id} trip={trip} />
-            ))}
-          </div>
-        )}
-      </section>
-
-      {requested.length > 0 && (
-        <section className="mt-10">
-          <h2 className="font-semibold text-foreground/80">Requested — Awaiting Approval</h2>
-          <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {requested.map((trip) => (
-              <TripCard key={trip.id} trip={trip} />
-            ))}
-          </div>
-        </section>
-      )}
-
-      <section className="mt-10">
-        <h2 className="font-semibold text-foreground/80">Rides You Organize</h2>
-        {organized.length === 0 ? (
-          <div className="mt-4">
-            <EmptyState
-              title="You haven't published a ride yet"
-              description="Organize a ride and let the community request to join — you approve who rides with you."
-              actionHref="/trips/create"
-              actionLabel="+ Create a Ride"
+            <EmptyState 
+              title={`No ${tabs.find(t => t.id === activeTab)?.label.toLowerCase()} rides`} 
+              actionHref={activeTab === "ORGANIZING" ? "/trips/create" : "/trips"} 
+              actionLabel={activeTab === "ORGANIZING" ? "+ Create a Ride" : "Browse rides"} 
             />
           </div>
         ) : (
           <div className="mt-4 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {organized.map((trip) => (
+            {displayTrips.map((trip) => (
               <TripCard key={trip.id} trip={trip} />
             ))}
           </div>

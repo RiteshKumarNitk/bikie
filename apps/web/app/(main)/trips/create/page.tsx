@@ -265,14 +265,38 @@ export default function CreateRidePage() {
           </div>
 
           <div>
-            <label className="text-sm font-medium">Cover Image URL (optional)</label>
-            <input
-              value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
-              placeholder="https://images.unsplash.com/..."
-              className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent"
-            />
-            <p className="mt-1 text-xs text-foreground/50">Provide a public image URL (e.g. from Unsplash or a hosting site).</p>
+            <label className="text-sm font-medium">Cover Image</label>
+            <div className="mt-1 flex items-center gap-4">
+              {imageUrl && (
+                <div className="relative h-20 w-32 overflow-hidden rounded-xl border border-foreground/10">
+                  <img src={imageUrl} alt="Cover" className="h-full w-full object-cover" />
+                </div>
+              )}
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    
+                    try {
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      const res = await fetch("/api/upload", { method: "POST", body: formData });
+                      if (res.ok) {
+                        const { url } = await res.json();
+                        setImageUrl(url);
+                      }
+                    } catch (err) {
+                      console.error("Failed to upload image", err);
+                    }
+                  }}
+                  className="mt-1 block w-full text-sm text-foreground/60 file:mr-4 file:rounded-xl file:border-0 file:bg-foreground/5 file:px-4 file:py-2.5 file:text-sm file:font-semibold hover:file:bg-foreground/10 focus:outline-none"
+                />
+                <p className="mt-1 text-xs text-foreground/50">Upload a cover image (JPG, PNG). Max size 5MB.</p>
+              </div>
+            </div>
           </div>
 
           <label className="flex items-start gap-3">

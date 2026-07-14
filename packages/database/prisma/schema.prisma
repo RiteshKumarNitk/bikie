@@ -60,7 +60,10 @@ enum TripDifficulty {
 }
 
 enum TripStatus {
+  DRAFT
+  PUBLISHED
   UPCOMING
+  IN_PROGRESS
   COMPLETED
   CANCELLED
 }

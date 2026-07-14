@@ -12,6 +12,9 @@ export interface TripSummaryDTO {
   endDate: string;
   status: string;
   destination: { name: string; slug: string } | null;
+  unreadMessages?: number;
+  pendingRequests?: number;
+  membersCount?: number;
 }
 
 export interface TripDetailDTO extends TripSummaryDTO {
@@ -23,9 +26,19 @@ export interface TripDetailDTO extends TripSummaryDTO {
 
 export interface RideJoinRequestDTO {
   id: string;
+  tripId: string;
+  tripSlug: string;
+  tripTitle: string;
   message: string | null;
   createdAt: string;
-  rider: { id: string; name: string; image: string | null };
+  rider: { 
+    id: string; 
+    name: string; 
+    image: string | null;
+    completedRides?: number;
+    rating?: number;
+    bike?: string;
+  };
 }
 
 export interface MyRideRequestStatusDTO {
@@ -39,4 +52,23 @@ export interface RideStatsDTO {
   requestsApproved: number;
   ridesCancelled: number;
   approvalRate: number | null;
+}
+
+export interface ActionableItemDTO {
+  id: string;
+  type: 'PENDING_APPROVALS' | 'RIDE_STARTING_SOON' | 'MISSING_MEETING_POINT' | 'UNREAD_MESSAGES';
+  title: string;
+  description?: string;
+  actionLabel: string;
+  actionHref: string;
+}
+
+export interface DashboardOverviewDTO {
+  stats: {
+    upcomingRides: number;
+    pendingRequests: number;
+    unreadMessages: number;
+    ridesTomorrow: number;
+  };
+  actionableItems: ActionableItemDTO[];
 }

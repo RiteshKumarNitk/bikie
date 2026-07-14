@@ -102,6 +102,53 @@ export async function findTripsRequestedBy(userId: string) {
   return participants.map((p) => toSummary(p.trip));
 }
 
+export async function findPendingRequestsForOrganizer(organizerId: string) {
+  const requests = await prisma.tripParticipant.findMany({
+    where: {
+      trip: { organizerId },
+      status: "PENDING"
+    },
+    include: {
+      trip: { select: { id: true, slug: true, title: true } },
+      user: { select: { id: true, name: true, image: true, bikes: { take: 1, select: { name: true } } } }
+    },
+    orderBy: { joinedAt: "desc" }
+  });
+  
+  return requests.map((r) => ({
+    id: r.id,
+    message: r.message,
+    createdAt: r.joinedAt.toISOString(),
+    rider: { 
+      id: r.user.id, 
+      name: r.user.name, 
+      image: r.user.image,
+      bike: r.user.bikes?.[0]?.name 
+    },
+    tripId: r.trip.id,
+    tripSlug: r.trip.slug,
+    tripTitle: r.trip.title,
+  }));
+}
+
+export async function getOrganizerDashboardMetrics(organizerId: string) {
+  const [pendingRequests, upcomingRides] = await Promise.all([
+    prisma.tripParticipant.count({
+      where: { trip: { organizerId }, status: "PENDING" }
+    }),
+    prisma.trip.count({
+      where: {
+        OR: [
+          { organizerId, status: "UPCOMING" },
+          { participants: { some: { userId: organizerId, status: "APPROVED" } }, status: "UPCOMING" }
+        ]
+      }
+    })
+  ]);
+
+  return { pendingRequests, upcomingRides };
+}
+
 function slugify(title: string) {
   return title
     .toLowerCase()
@@ -158,7 +205,7 @@ export async function findTripById(id: string) {
   return prisma.trip.findUnique({ where: { id } });
 }
 
-export async function updateTrip(slug: string, data: Partial<Omit<Prisma.TripUpdateInput, "slug">>) {
+export async function updateTrip(slug: string, data: Partial<Omit<Prisma.TripUncheckedUpdateInput, "slug">>) {
   const trip = await prisma.trip.update({
     where: { slug },
     data,

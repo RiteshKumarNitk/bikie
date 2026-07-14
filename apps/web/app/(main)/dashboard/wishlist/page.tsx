@@ -3,6 +3,7 @@ import type { WishlistItemDTO } from "@bikie/types";
 import { getJson } from "@/lib/api";
 import { BikeCard } from "@/components/shared/BikeCard";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { RemoveWishlistButton } from "@/components/dashboard/RemoveWishlistButton";
 
 export const metadata: Metadata = { title: "Wishlist" };
 
@@ -25,7 +26,10 @@ export default async function WishlistPage() {
       ) : (
         <div className="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {items.map((item) => (
-            <BikeCard key={item.id} bike={item.bike} />
+            <div key={item.id} className="relative">
+              <RemoveWishlistButton bikeId={item.bike.id} />
+              <BikeCard bike={item.bike} />
+            </div>
           ))}
         </div>
       )}

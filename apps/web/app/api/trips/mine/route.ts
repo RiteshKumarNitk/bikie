@@ -10,7 +10,7 @@ export async function GET() {
     TripService.getOrganizedBy(session.user.id),
     TripService.getJoinedBy(session.user.id),
     TripService.getRequestedBy(session.user.id),
-    TripService.getRideStats(session.user.id),
+    TripService.getStats(session.user.id),
   ]);
 
   return NextResponse.json({ organized, joined, requested, stats });
