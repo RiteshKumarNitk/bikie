@@ -196,6 +196,13 @@ model User {
   emailVerified Boolean   @default(false)
   image         String?
   phone         String?
+  /** Better Auth's `phone-number` plugin fields (ADR-013) — distinct from `phone` above,
+   * which predates this and is still used for SOS profile completeness. Kept as two fields
+   * rather than merged: `phoneNumber` is plugin-managed (unique, drives login/signup),
+   * `phone` stays a plain profile field other features already read. Synced to match on
+   * first phone verification (see packages/auth/src/server.ts). */
+  phoneNumber         String?   @unique
+  phoneNumberVerified Boolean?  @default(false)
   role          UserRole  @default(RENTER)
   accountStatus          UserAccountStatus @default(ACTIVE)
   accountStatusExpiresAt DateTime?
@@ -230,8 +237,77 @@ model User {
   notifications       Notification[]
   messageReceipts     MessageReceipt[]
   messageReactions    MessageReaction[]
+  riderProfile        RiderProfile?
 
   @@map("user")
+}
+
+// --- Rider profile (post-signup onboarding, skippable — see .docs/DECISIONS.md ADR-012/ADR-014) ---
+
+enum GovernmentIdType {
+  AADHAAR
+  PASSPORT
+}
+
+enum RiderFrequency {
+  OCCASIONAL
+  WEEKLY
+  DAILY
+}
+
+enum RidingClubType {
+  SOLO
+  CLUB_MEMBER
+}
+
+model RiderProfile {
+  id                    String             @id @default(cuid())
+  userId                String             @unique
+  user                  User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  drivingLicenceNumber  String?
+  drivingLicenceExpiry  DateTime?
+  addressLine           String?
+  area                  String?
+  district              String?
+  pincode               String?
+  country               String?            @default("India")
+  // --- Added in ADR-014 (client-provided onboarding field list) ---
+  fatherName            String?
+  motherName            String?
+  dateOfBirth           DateTime?
+  gender                String?
+  bloodGroup            String?
+  medicalHistory        String?
+  allergies             String?
+  vehicleType           String?
+  vehicleBrand          String?
+  vehicleModel          String?
+  governmentIdType      GovernmentIdType?
+  governmentIdNumber    String?
+  riderFrequency        RiderFrequency?
+  ridingClubType        RidingClubType?    @default(SOLO)
+  clubName              String?
+  /** True once the user has been through the onboarding gate — either filled it in or
+   * explicitly skipped — so we don't show the gate again on their next login. */
+  onboardingSkipped     Boolean            @default(false)
+  emergencyContacts     RiderEmergencyContact[]
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@map("rider_profile")
+}
+
+model RiderEmergencyContact {
+  id             String       @id @default(cuid())
+  riderProfileId String
+  riderProfile   RiderProfile @relation(fields: [riderProfileId], references: [id], onDelete: Cascade)
+  name           String
+  phone          String
+  relation       String?
+  createdAt      DateTime     @default(now())
+
+  @@index([riderProfileId])
+  @@map("rider_emergency_contact")
 }
 
 model Session {
@@ -372,6 +448,12 @@ model Partner {
   isVerified   Boolean     @default(false)
   ratingAvg    Decimal     @default(0) @db.Decimal(2, 1)
   ratingCount  Int         @default(0)
+  // --- Added in ADR-014 (client-provided onboarding field list) ---
+  aadhaarNumber        String?
+  contactPerson1Name   String?
+  contactPerson1Mobile String?
+  contactPerson2Name   String?
+  contactPerson2Mobile String?
   createdAt    DateTime    @default(now())
 }
 

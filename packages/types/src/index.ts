@@ -15,3 +15,4 @@ export * from "./referral";
 export * from "./notification";
 export * from "./ride-room";
 export * from "./moderation";
+export * from "./rider-profile";

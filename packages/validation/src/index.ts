@@ -11,3 +11,5 @@ export * from "./membership.schema";
 export * from "./admin.schema";
 export * from "./wishlist.schema";
 export * from "./conversation.schema";
+export * from "./rider-profile.schema";
+export * from "./partner.schema";

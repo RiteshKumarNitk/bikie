@@ -1,11 +1,19 @@
 import type { Metadata } from "next";
+import type { RiderProfileDTO } from "@bikie/types";
 import { getServerSession } from "@/lib/get-session";
+import { getJson } from "@/lib/api";
 import { ProfileSettings } from "@/components/dashboard/ProfileSettings";
+import { RiderDetailsSettings } from "@/components/dashboard/RiderDetailsSettings";
+import { BecomeServiceProviderAction } from "@/components/dashboard/BecomeServiceProviderAction";
 
 export const metadata: Metadata = { title: "Settings" };
 
 export default async function DashboardSettingsPage() {
   const session = await getServerSession();
+  const { profile } = await getJson<{ profile: RiderProfileDTO | null; needsOnboarding: boolean }>(
+    "/api/rider-profile",
+    { auth: true },
+  );
 
   return (
     <div>
@@ -28,10 +36,28 @@ export default async function DashboardSettingsPage() {
       </section>
 
       <section className="mt-6 rounded-3xl bg-card p-6">
-        <p className="font-semibold">Emergency Contacts</p>
-        <p className="mt-2 text-sm text-foreground/60">Add a contact we can reach in case of an emergency during a ride.</p>
-        <p className="mt-3 text-xs text-foreground/50">Emergency contacts are coming soon.</p>
+        <p className="font-semibold">Rider Details</p>
+        <p className="mt-2 text-sm text-foreground/60">
+          Your driving licence, address, and emergency contacts — shown to partners and used if we
+          ever need to reach someone on your behalf during a ride.
+        </p>
+        <div className="mt-4">
+          <RiderDetailsSettings profile={profile} />
+        </div>
       </section>
+
+      {session?.user.role === "RENTER" && (
+        <section className="mt-6 rounded-3xl bg-card p-6">
+          <p className="font-semibold">Become a Service Provider</p>
+          <p className="mt-2 text-sm text-foreground/60">
+            List your bikes, offer services, or organize rides as a partner. You&apos;ll need to
+            re-verify your phone number and add a few business details.
+          </p>
+          <div className="mt-4">
+            <BecomeServiceProviderAction />
+          </div>
+        </section>
+      )}
     </div>
   );
 }

@@ -1,5 +1,62 @@
 # Changelog
 
+## Onboarding Field Expansion + Welcome/Login Fixes (ADR-014)
+- Fixed a `/login` regression from the phone-OTP rewrite: email/password sign-in had no UI
+  path left at all, which would have locked out the seeded admin account. Added a "Log in
+  with email instead" fallback.
+- Phone input on `/login` and `/signup` is now a country-code dropdown (India +91 default,
+  USA +1) + 10-digit number field, instead of a free-form text box.
+- `/welcome`: choosing a role now routes to `/login` for both Rider and Partner (previously
+  went straight to the homepage/marketing page with no login required); visuals updated to
+  match a client-provided reference more closely (circular logo badge, tagline, background
+  image) while keeping the existing dark theme.
+- Added a second reference doc's onboarding field list to the existing `RiderProfile`
+  (father/mother name, DOB, gender, blood group, medical history, allergies, vehicle
+  type/brand/model, government ID type+number, rider frequency, riding club) and `Partner`
+  (Aadhaar number, 2 contact persons) models — not the doc's separate parallel schema, which
+  would have duplicated/replaced working systems (see ADR-014).
+
+## Phone Number + OTP Login (ADR-013)
+- Replaced email+password with phone+OTP as the login/signup mechanism for both Rider and
+  Partner accounts, using Better Auth's built-in `phoneNumber` plugin — OTP delivery reuses
+  the existing `SMSService`, which console-logs the code when no Twilio credentials are
+  configured (true today) instead of failing, so the whole flow works end-to-end right now
+  with zero SMS vendor signup.
+- New `User.phoneNumber`/`phoneNumberVerified` columns; the pre-existing `phone` field (SOS,
+  mobile app) is kept in sync automatically rather than replaced.
+- New self-service Rider → Partner upgrade: sign out, re-verify the same phone number via the
+  Partner path on `/welcome`, supply business details, done — no admin approval step.
+- Fixed a real bug found while wiring this up: the signup page's hardcoded partner-type list
+  was missing `FUEL_DELIVERY`, out of sync with the schema's actual 8-value enum.
+- Not built: Aadhaar/government-ID verification (needs a licensed third-party vendor, a
+  cost/compliance decision not a code change).
+
+## Product Requests — Homepage, Welcome Page, Rider Onboarding
+- Fixed a real bug: `/dashboard/requests` approve/reject called a non-existent `PATCH`
+  endpoint and silently no-op'd on every click (405). Now calls the real approve/reject
+  routes with error feedback on failure.
+- Homepage: added a real "Upcoming Rides" section (there was none) and a prominent SOS CTA
+  in the Hero linking to the existing SOS feature.
+- `/welcome` redesigned from full-bleed photo panels to a compact centered-logo + two-card
+  layout, keeping the existing dark-navy/indigo theme.
+- New skippable rider onboarding (`/onboarding`, gated only on new rider signups) collecting
+  driving licence, address, and up to 3 emergency contacts (`RiderProfile`/
+  `RiderEmergencyContact`); the dashboard Settings page's dead "Emergency Contacts" stub is
+  now wired to the same data.
+
+## Milestone 8.4 — Chat UI: reply/edit/delete/reactions/typing/read receipts
+- Built the missing web chat UI on top of the already-complete 8.3 backend
+  (`apps/web/components/chat/ChatArea.tsx`, `MessageItem.tsx`): inline reply with a
+  quoted preview, inline edit (Enter to save / Escape to cancel) with an "(edited)"
+  indicator, a 6-emoji reaction picker (👍❤️😂😮😢🙏) with add/remove toggle, a
+  debounced typing indicator, and WhatsApp-style single/double read-receipt
+  checkmarks. Delete-own-message already existed from a prior pass and was left as-is.
+- No server-side changes were needed — `MessageService` already fanned out
+  `message_edited`/`message_deleted`/`reaction_added`/`reaction_removed`/`message_read`/`typing`
+  over the existing SSE stream; only the client had never subscribed to those event types.
+- Not built in this pass: the Cloudinary image/file attachment composer UI (backend
+  attachment support already exists via `MessageAttachmentDTO`, no picker wired in yet).
+
 ## Pre-Launch Audit Fixes
 - Ran a full cross-functional audit (architecture, product/UX, security, performance,
   mobile, community/admin) across the whole codebase: 42 findings (2 Critical, 12 High,

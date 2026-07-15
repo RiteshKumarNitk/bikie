@@ -4,9 +4,16 @@ import { useEffect, useState } from "react";
 import { RideJoinRequestDTO } from "@bikie/types";
 import { Skeleton } from "@bikie/ui";
 
+const REASON_MESSAGES: Record<string, string> = {
+  NOT_FOUND: "This request no longer exists.",
+  FORBIDDEN: "You're not the organizer of this ride.",
+  NO_SEATS: "No seats left on this ride.",
+};
+
 export default function DashboardRequestsPage() {
   const [requests, setRequests] = useState<RideJoinRequestDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/requests/pending")
@@ -17,32 +24,35 @@ export default function DashboardRequestsPage() {
       });
   }, []);
 
-  async function handleApprove(requestId: string, tripSlug: string) {
-    const res = await fetch(`/api/trips/${tripSlug}/requests`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestId, action: "APPROVE" })
+  async function decide(requestId: string, tripSlug: string, action: "approve" | "reject") {
+    setActionError(null);
+    const res = await fetch(`/api/trips/${tripSlug}/requests/${requestId}/${action}`, {
+      method: "POST",
     });
     if (res.ok) {
-      setRequests(prev => prev.filter(r => r.id !== requestId));
+      setRequests((prev) => prev.filter((r) => r.id !== requestId));
+      return;
     }
+    const data = await res.json().catch(() => null);
+    setActionError(REASON_MESSAGES[data?.error] ?? "Something went wrong — please try again.");
   }
 
-  async function handleReject(requestId: string, tripSlug: string) {
-    const res = await fetch(`/api/trips/${tripSlug}/requests`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestId, action: "REJECT" })
-    });
-    if (res.ok) {
-      setRequests(prev => prev.filter(r => r.id !== requestId));
-    }
-  }
+  const handleApprove = (requestId: string, tripSlug: string) => decide(requestId, tripSlug, "approve");
+  const handleReject = (requestId: string, tripSlug: string) => decide(requestId, tripSlug, "reject");
 
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">Join Requests</h1>
       <p className="text-foreground/60 text-sm">Manage who joins your rides.</p>
+
+      {actionError && (
+        <div className="flex items-center justify-between gap-4 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <span>{actionError}</span>
+          <button type="button" onClick={() => setActionError(null)} className="shrink-0 font-medium hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <Skeleton className="h-64 rounded-3xl" />

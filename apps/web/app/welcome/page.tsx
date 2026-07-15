@@ -28,69 +28,93 @@ export default async function WelcomePage({
   }
 
   return (
-    <div className="relative flex min-h-screen flex-col md:flex-row">
-      <form action={chooseRider} className="group relative flex-1">
-        <button type="submit" className="relative block h-full min-h-[50vh] w-full text-left md:min-h-screen">
-          <Image
-            src="https://images.unsplash.com/photo-1558981806-ec527fa84c39?q=80&w=1600&auto=format&fit=crop"
-            alt=""
-            fill
-            priority
-            sizes="(max-width: 767px) 100vw, 50vw"
-            className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/20 transition-colors duration-500 group-hover:from-black/90" />
-          <div className="relative flex h-full min-h-[50vh] flex-col justify-end p-8 md:min-h-screen md:p-16">
-            <div className="glass w-fit rounded-2xl px-4 py-2 text-3xl">🏍️</div>
-            <h2 className="mt-6 font-display text-3xl font-bold text-white md:text-5xl">Continue as Rider</h2>
-            <p className="mt-4 max-w-md text-base leading-relaxed text-white/70 md:text-lg">
-              Join India&apos;s motorcycle riding community. Discover rides, connect with fellow
-              riders, create adventures, and explore destinations.
-            </p>
-            <span className="mt-8 inline-flex w-fit items-center gap-2 rounded-full bg-accent px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition-transform duration-300 group-hover:translate-x-1">
-              Continue as Rider
-              <span aria-hidden="true">→</span>
-            </span>
+    <div className="relative flex min-h-screen items-center justify-center overflow-hidden px-6 py-16">
+      <Image
+        src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?q=80&w=2000&auto=format&fit=crop"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="object-cover"
+      />
+      <div className="absolute inset-0 bg-background/80" aria-hidden="true" />
+      <div
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(60% 50% at 50% 0%, color-mix(in srgb, var(--color-accent) 30%, transparent), transparent 70%)",
+        }}
+        aria-hidden="true"
+      />
+
+      <div className="relative w-full max-w-3xl">
+        <div className="flex flex-col items-center text-center">
+          <div
+            className="flex h-24 w-24 items-center justify-center rounded-full bg-accent"
+            style={{ boxShadow: "0 0 60px color-mix(in srgb, var(--color-accent) 55%, transparent)" }}
+          >
+            <span className="font-display text-5xl font-bold leading-none text-white">B</span>
           </div>
-        </button>
-      </form>
+          <h1 className="mt-5 font-display text-3xl font-bold tracking-tight text-foreground md:text-4xl">
+            BIKIE
+          </h1>
+          <p className="mt-1 text-xs font-medium uppercase tracking-[0.2em] text-foreground/50">
+            Anytime anywhere — your only companion
+          </p>
+          <p className="mt-6 text-base text-foreground/70">
+            Welcome! How would you like to join BIKIE?
+          </p>
+        </div>
 
-      <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 hidden h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/40 text-xs font-semibold uppercase tracking-wide text-white/70 backdrop-blur-md md:flex">
-        or
-      </div>
+        <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <form action={chooseRider} className="h-full">
+            <button
+              type="submit"
+              className="glass group flex h-full w-full flex-col items-start rounded-3xl p-6 text-left transition-transform duration-300 hover:-translate-y-1 md:p-8"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/15 text-2xl">
+                🏍️
+              </div>
+              <h2 className="mt-5 font-display text-xl font-semibold text-foreground md:text-2xl">
+                I&apos;m a Biker
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-foreground/70">
+                Rent a motorbike, create group trips, connect with riders, and access the
+                BIKIE safety panic network.
+              </p>
+              <span className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition-transform duration-300 group-hover:translate-x-1">
+                Join as Rider
+                <span aria-hidden="true">→</span>
+              </span>
+            </button>
+          </form>
 
-      <form action={choosePartner} className="group relative flex-1">
-        <button type="submit" className="relative block h-full min-h-[50vh] w-full text-left md:min-h-screen">
-          <Image
-            src="https://images.unsplash.com/photo-1777499697680-b5072cf11247?q=80&w=1172&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-            alt=""
-            fill
-            priority
-            sizes="(max-width: 767px) 100vw, 50vw"
-            className="object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-black/20 transition-colors duration-500 group-hover:from-black/90" />
-          <div className="relative flex h-full min-h-[50vh] flex-col justify-end p-8 md:min-h-screen md:p-16">
-            <div className="glass w-fit rounded-2xl px-4 py-2 text-3xl">🛠️</div>
-            <h2 className="mt-6 font-display text-3xl font-bold text-white md:text-5xl">
-              Continue as Service Provider
-            </h2>
-            <p className="mt-4 max-w-md text-base leading-relaxed text-white/70 md:text-lg">
-              Manage your motorcycle business, organize rides, connect with riders, and grow
-              your community.
-            </p>
-            <span className="mt-8 inline-flex w-fit items-center gap-2 rounded-full bg-accent px-8 py-3.5 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition-transform duration-300 group-hover:translate-x-1">
-              Continue as Service Provider
-              <span aria-hidden="true">→</span>
-            </span>
-          </div>
-        </button>
-      </form>
+          <form action={choosePartner} className="h-full">
+            <button
+              type="submit"
+              className="glass group flex h-full w-full flex-col items-start rounded-3xl p-6 text-left transition-transform duration-300 hover:-translate-y-1 md:p-8"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-accent/15 text-2xl">
+                🔧
+              </div>
+              <h2 className="mt-5 font-display text-xl font-semibold text-foreground md:text-2xl">
+                Service Provider
+              </h2>
+              <p className="mt-2 text-sm leading-relaxed text-foreground/70">
+                List bikes for rent, offer roadside assistance, create curated trips, and
+                grow your business with BIKIE.
+              </p>
+              <span className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white shadow-lg shadow-accent/30 transition-transform duration-300 group-hover:translate-x-1">
+                Join as Provider
+                <span aria-hidden="true">→</span>
+              </span>
+            </button>
+          </form>
+        </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-6 z-10 flex justify-center">
-        <p className="pointer-events-auto rounded-full bg-black/40 px-5 py-2 text-sm text-white/70 backdrop-blur-md">
+        <p className="mt-10 text-center text-sm text-foreground/60">
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-white hover:underline">
+          <Link href="/login" className="font-medium text-accent-text hover:underline">
             Log in
           </Link>
         </p>

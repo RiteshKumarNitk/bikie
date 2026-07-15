@@ -8,7 +8,17 @@ export const PartnerService = {
 
   async upsertProfile(
     userId: string,
-    data: { businessName: string; type: string; city: string; description?: string },
+    data: {
+      businessName: string;
+      type: string;
+      city: string;
+      description?: string;
+      aadhaarNumber?: string;
+      contactPerson1Name?: string;
+      contactPerson1Mobile?: string;
+      contactPerson2Name?: string;
+      contactPerson2Mobile?: string;
+    },
   ): Promise<PartnerProfileDTO> {
     return partnerRepository.upsertPartnerProfile(userId, data);
   },

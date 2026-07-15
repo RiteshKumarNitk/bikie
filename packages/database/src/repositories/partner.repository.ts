@@ -1,10 +1,22 @@
 import { prisma } from "../client";
 import { countBookingsByStatus, sumCompletedBookingRevenue } from "./booking.repository";
 
-export async function findPartnerByUserId(userId: string) {
-  const partner = await prisma.partner.findUnique({ where: { userId } });
-  if (!partner) return null;
-
+function toDTO(partner: {
+  id: string;
+  businessName: string;
+  type: string;
+  city: string;
+  description: string | null;
+  logoUrl: string | null;
+  isVerified: boolean;
+  ratingAvg: { toNumber(): number };
+  ratingCount: number;
+  aadhaarNumber: string | null;
+  contactPerson1Name: string | null;
+  contactPerson1Mobile: string | null;
+  contactPerson2Name: string | null;
+  contactPerson2Mobile: string | null;
+}) {
   return {
     id: partner.id,
     businessName: partner.businessName,
@@ -15,40 +27,50 @@ export async function findPartnerByUserId(userId: string) {
     isVerified: partner.isVerified,
     ratingAvg: partner.ratingAvg.toNumber(),
     ratingCount: partner.ratingCount,
+    aadhaarNumber: partner.aadhaarNumber,
+    contactPerson1Name: partner.contactPerson1Name,
+    contactPerson1Mobile: partner.contactPerson1Mobile,
+    contactPerson2Name: partner.contactPerson2Name,
+    contactPerson2Mobile: partner.contactPerson2Mobile,
   };
+}
+
+export async function findPartnerByUserId(userId: string) {
+  const partner = await prisma.partner.findUnique({ where: { userId } });
+  return partner ? toDTO(partner) : null;
 }
 
 export async function upsertPartnerProfile(
   userId: string,
-  data: { businessName: string; type: string; city: string; description?: string },
+  data: {
+    businessName: string;
+    type: string;
+    city: string;
+    description?: string;
+    aadhaarNumber?: string;
+    contactPerson1Name?: string;
+    contactPerson1Mobile?: string;
+    contactPerson2Name?: string;
+    contactPerson2Mobile?: string;
+  },
 ) {
+  const shared = {
+    businessName: data.businessName,
+    type: data.type as any,
+    city: data.city,
+    description: data.description,
+    aadhaarNumber: data.aadhaarNumber,
+    contactPerson1Name: data.contactPerson1Name,
+    contactPerson1Mobile: data.contactPerson1Mobile,
+    contactPerson2Name: data.contactPerson2Name,
+    contactPerson2Mobile: data.contactPerson2Mobile,
+  };
   const partner = await prisma.partner.upsert({
     where: { userId },
-    create: {
-      userId,
-      businessName: data.businessName,
-      type: data.type as any,
-      city: data.city,
-      description: data.description,
-    },
-    update: {
-      businessName: data.businessName,
-      type: data.type as any,
-      city: data.city,
-      description: data.description,
-    },
+    create: { userId, ...shared },
+    update: shared,
   });
-  return {
-    id: partner.id,
-    businessName: partner.businessName,
-    type: partner.type,
-    city: partner.city,
-    description: partner.description,
-    logoUrl: partner.logoUrl,
-    isVerified: partner.isVerified,
-    ratingAvg: partner.ratingAvg.toNumber(),
-    ratingCount: partner.ratingCount,
-  };
+  return toDTO(partner);
 }
 
 export async function getPartnerDashboardStats(userId: string) {

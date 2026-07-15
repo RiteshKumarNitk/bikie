@@ -13,10 +13,6 @@ export function selectedRoleToDbRole(role: SelectedRole): "RENTER" | "PARTNER" {
   return role === "PARTNER" ? "PARTNER" : "RENTER";
 }
 
-export function homeHrefForRole(role: SelectedRole): string {
-  return role === "PARTNER" ? "/partners" : "/";
-}
-
 export function isSelectedRole(value: string | undefined | null): value is SelectedRole {
   return value === "RIDER" || value === "PARTNER";
 }

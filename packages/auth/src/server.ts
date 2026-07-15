@@ -1,8 +1,9 @@
 import { betterAuth } from "better-auth";
-import { bearer } from "better-auth/plugins";
+import { bearer, phoneNumber } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { Redis } from "@upstash/redis";
 import { prisma } from "@bikie/database";
+import { SMSService, DevOtpStore } from "@bikie/services";
 
 // Rate limiting needs shared state across serverless function instances (Vercel), so
 // Better Auth's default "memory" storage (per-instance, in-process) can't actually enforce
@@ -56,6 +57,14 @@ const additionalTrustedOrigins = (process.env.ADDITIONAL_TRUSTED_ORIGINS ?? "")
   .map((origin) => origin.trim())
   .filter(Boolean);
 
+/** Turns a raw phone number into a syntactically-valid, RFC-safe local-part for a
+ * placeholder email — real uniqueness is guaranteed by the phone number itself being
+ * `@unique` on `User.phoneNumber`, this is just a value `emailAndPassword`'s schema needs
+ * populated at signup time. Never shown to the user, never used to actually contact them. */
+function tempEmailForPhone(phoneNumber: string) {
+  return `phone-${phoneNumber.replace(/[^a-zA-Z0-9]/g, "")}@bikie.local`;
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
   emailAndPassword: {
@@ -83,7 +92,37 @@ export const auth = betterAuth({
   // Cookie sessions remain the primary mechanism for the web app; bearer()
   // additionally lets non-browser clients (the Flutter app) authenticate via
   // `Authorization: Bearer <token>` using the same session/getSession machinery.
-  plugins: [bearer()],
+  // phoneNumber() adds mobile-number + OTP sign-up/sign-in (ADR-013) — OTP delivery goes
+  // through the existing SMSService, which already has a dev-safe console-log fallback
+  // when no Twilio credentials are configured, so this works end-to-end in dev with zero
+  // SMS vendor signup; production just needs TWILIO_* env vars added, no code change.
+  plugins: [
+    bearer(),
+    phoneNumber({
+      otpLength: 6,
+      expiresIn: 300,
+      allowedAttempts: 3,
+      sendOTP: async ({ phoneNumber, code }) => {
+        // Dev-only convenience so the code can be shown on-screen instead of requiring a
+        // terminal check — no-ops in production (see DevOtpStore). Real delivery is
+        // unaffected either way.
+        DevOtpStore.set(phoneNumber, code, 300);
+        await SMSService.send(phoneNumber, `Your BIKIE verification code is ${code}. It expires in 5 minutes.`);
+      },
+      signUpOnVerification: {
+        getTempEmail: tempEmailForPhone,
+        getTempName: (phoneNumber) => phoneNumber,
+      },
+      // Keep the plain `User.phone` field (used elsewhere — SOS profile completeness,
+      // mobile app) in sync with the verified login phone number, rather than making
+      // every existing caller of `user.phone` learn about a second field. `phone` isn't
+      // part of Better Auth's own `UserWithPhoneNumber` type (it's not one of the plugin's
+      // declared fields), so this write is unconditional/idempotent rather than compared.
+      callbackOnVerification: async ({ phoneNumber, user }) => {
+        await prisma.user.update({ where: { id: user.id }, data: { phone: phoneNumber } });
+      },
+    }),
+  ],
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.VERCEL_PROJECT_PRODUCTION_URL
     ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`

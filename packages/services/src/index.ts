@@ -20,3 +20,6 @@ export { RateLimitService } from "./lib/rate-limit";
 export { RideRoomService } from "./ride-room.service";
 export { ReportService, ModerationService } from "./moderation.service";
 export { UploadService } from "./upload.service";
+export { RiderProfileService } from "./rider-profile.service";
+export { UserService } from "./user.service";
+export { DevOtpStore } from "./lib/dev-otp-store";

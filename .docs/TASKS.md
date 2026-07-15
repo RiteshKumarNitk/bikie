@@ -2,6 +2,54 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Onboarding Field Expansion + Welcome/Login Fixes (2026-07-16, ADR-014)
+
+Follow-up round: a crash fix, an admin-login gap fix, and a second reference doc's onboarding
+field list adopted onto the existing models (not its parallel schema — see ADR-014).
+
+| Task | Status |
+|---|---|
+| Bug fix: stale Turbopack cache crash (`phoneInput is not defined`) on `/login` — confirmed source was already clean, no code change needed beyond a dev-server/browser refresh | Completed |
+| Bug fix: `/login`'s full rewrite to phone/OTP had silently dropped the only UI path to email/password sign-in, which would have locked out the seeded admin account (email/password, no phone number). Added an "Log in with email instead" fallback toggle | Completed |
+| `PhoneNumberInput` shared component: country-code dropdown (India +91 default, USA +1) + 10-digit number field, replacing the old free-form phone text input on both `/login` and `/signup` | Completed |
+| `/welcome`: role selection now routes to `/login` for both roles (was: straight to homepage/marketing, no login required) — matches the client's described flow; visuals updated to a circular glowing logo badge + tagline + background image, closer to a provided reference mockup, still on the existing dark-navy/indigo theme | Completed |
+| `RiderProfile` extended with father/mother name, DOB, gender, blood group, medical history, allergies, vehicle type/brand/model, government ID type+number (raw text, no verification), rider frequency, riding club type+name — migration applied live. New fields added to both `/onboarding` and the Settings "Rider Details" section | Completed |
+| `Partner` extended with Aadhaar number + 2 contact persons (name+mobile) — migration applied live. New fields added to the shared partner-signup component, wired through both the signup and login-upgrade flows | Completed |
+| Not built (explicit user decision): the reference doc's parallel `Biker`/`Provider`/`PanicAlert`/`Trip`/`Booking` schema — the existing `User`/`Partner`/`SOSAlert`/`Trip`/`Booking` models already cover this, adopting the doc's models too would duplicate/replace working systems for no gain | Deferred |
+
+## Product Requests (2026-07-15)
+
+Real bug report plus a batch of product asks from a client meeting, scoped down per explicit
+user decisions (see ADR-012 in `.docs/DECISIONS.md` for what was descoped and why — no
+Aadhaar/KYC verification, no mobile+OTP login, dark theme kept as-is).
+
+| Task | Status |
+|---|---|
+| Bug fix: `/dashboard/requests` approve/reject called a `PATCH` method that doesn't exist on `/api/trips/[slug]/requests` (405, silently no-op) — now calls the real `POST .../requests/[id]/approve\|reject` routes, with error feedback surfaced on failure (e.g. `NO_SEATS`) | Completed |
+| Homepage: new "Upcoming Rides" section (`components/home/UpcomingRides.tsx`, backed by `GET /api/trips?tab=upcoming`) — previously the homepage had zero ride content | Completed |
+| Homepage: SOS CTA added to the Hero, linking to the existing `/dashboard/sos` feature (no new "nearby riders" live-location system built — explicitly descoped) | Completed |
+| `/welcome` role-select page redesigned from full-bleed photo panels to a compact centered-logo + two-card layout, dark theme kept (no orange/purple) | Completed |
+| New `RiderProfile`/`RiderEmergencyContact` schema + migration (applied live) + full API (`GET/PUT /api/rider-profile`, `POST /api/rider-profile/skip`) — driving licence, address, up to 3 emergency contacts | Completed |
+| New skippable onboarding form (`/onboarding`), gated only on new rider signups (partner signups unaffected) | Completed |
+| Dashboard Settings: dead "Emergency Contacts... coming soon" stub replaced with a real editable "Rider Details" section wired to the RiderProfile API. "Documents" upload stub intentionally left as-is (separate, larger feature) | Completed |
+| Chat UI (Milestone 8.4): reply/edit/delete/reactions/typing/read-receipts — see that milestone's row below for detail | In Progress |
+| Not built (explicit user decision): Aadhaar/government-ID verification (needs a licensed third-party vendor) | Deferred |
+| **Follow-up (2026-07-15): mobile number + OTP login built after all** — see ADR-013 below | Completed |
+
+## Phone Number + OTP Login (2026-07-15, ADR-013)
+
+Reversed the "hold off on OTP" call from the row above once asked to build it anyway, for
+both Rider and Partner. See ADR-013 in `.docs/DECISIONS.md` for the full design.
+
+| Task | Status |
+|---|---|
+| Schema: `User.phoneNumber` (unique) / `phoneNumberVerified`, migration applied live (user-approved after an auto-mode safety check on the direct-DB-write step) | Completed |
+| Better Auth `phoneNumber` plugin wired (`packages/auth/src/server.ts`): send/verify OTP, auto-register on first verification with a placeholder name/email, `callbackOnVerification` keeps the pre-existing `User.phone` field in sync | Completed |
+| OTP delivery via the existing `SMSService` — console-logs the code when Twilio isn't configured (true today), sends real SMS the moment `TWILIO_*` env vars are added, zero code change needed either way | Completed |
+| `GET /api/auth-helpers/phone-exists`, `PATCH /api/user/complete-phone-signup` (sets real name + role once, right after a brand-new phone's first verification), `POST /api/user/become-partner` (self-service Rider → Partner upgrade) | Completed |
+| `/signup` and `/login` rewritten from email+password to phone+OTP for both roles; Settings gained a "Become a Service Provider" action (sign out → `/welcome` → re-verify same phone → business details → upgraded) | Completed |
+| Fixed in passing: the partner-type list on signup was missing `FUEL_DELIVERY` (out of sync with the schema's 8-value enum) — now sourced from the same validated enum everywhere | Completed |
+
 ## Pre-Launch Audit Fixes (2026-07-14)
 
 A full cross-functional audit (architecture, product/UX, security, performance, mobile,
@@ -50,7 +98,7 @@ across Vercel's serverless instances.
 | 8.1 — Schema/migration (Group, GroupMember, Announcement, MessageAttachment, MessageReceipt, Report, ModerationAction, Notification, field additions, `TripType.EVENT`); migration applied to the live DB (user-approved). `encrypt-existing-messages.ts` backfill script written, **not run** (needs separate explicit sign-off — no plaintext-message backfill has occurred) | Completed |
 | 8.2 — Upstash Redis realtime swap (`RealtimeService`: per-user inbox + non-destructive cursor-based broadcast channels for global/admin), `sse-manager.ts` deleted, SSE route + SOS route migrated | Completed |
 | 8.3 — Encryption (AES-256-GCM, `message-crypto.ts`) + Message model overhaul (reply/edit/delete/per-participant receipts/system messages). Verified live: message send/edit/delete/typing/read-receipt all confirmed working via the API; direct DB inspection confirmed `content` is null and `ciphertext` populated for new messages | Completed |
-| 8.4 — Chat UI (web): reply/edit/delete/emoji/typing/receipts UI, Cloudinary upload flow | Planned |
+| 8.4 — Chat UI (web): reply/edit/delete/emoji reactions/typing indicator/read receipts UI (`apps/web/components/chat/ChatArea.tsx`, `MessageItem.tsx`) — all wired to the already-complete 8.3 backend, no server-side changes needed (typing/edit/delete/reaction/read-receipt SSE fan-out was already implemented in `MessageService`, just not yet consumed client-side). Cloudinary upload/attachment composer UI still not built (`MessageAttachmentDTO`/backend attachment support exists, no image/file picker wired in) | In Progress |
 | 8.5 — Ride Room **backend**: `assertRideRoomAccess` guard, `Announcement` service/repo, `/api/trips/[slug]/room/**` routes (room/announcements/meeting-point/emergency-contacts/media). Typecheck-clean, not live-tested (see note below) | Completed (backend) |
 | 8.5b — Ride Room **web UI**: `/dashboard/rides/[slug]/room` page with tabs | Planned |
 | 8.6 — Reports + Admin Moderation **backend**: `ReportService`/`ModerationService`, warn/mute/suspend/ban/restore, conversation lock/delete, message delete, `AuditLog` integration, BANNED/SUSPENDED enforcement in `requireSession`, MUTED enforcement in `MessageService.sendMessage`. Typecheck-clean, not live-tested | Completed (backend) |

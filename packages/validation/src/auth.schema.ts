@@ -11,5 +11,11 @@ export const signInSchema = z.object({
   password: z.string().min(1, "Password is required"),
 });
 
+export const completePhoneSignupSchema = z.object({
+  name: z.string().min(2, "Name is too short").max(100),
+  role: z.enum(["RENTER", "PARTNER"]).default("RENTER"),
+});
+
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
+export type CompletePhoneSignupInput = z.infer<typeof completePhoneSignupSchema>;

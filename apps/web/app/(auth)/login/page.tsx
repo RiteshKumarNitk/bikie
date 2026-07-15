@@ -1,32 +1,195 @@
 "use client";
 
 import { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { signInSchema, type SignInInput } from "@bikie/validation";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
+import { SELECTED_ROLE_COOKIE } from "@/lib/role";
+import {
+  PartnerBusinessFields,
+  emptyPartnerBusinessDetails,
+  type PartnerBusinessDetails,
+} from "@/components/auth/PartnerBusinessFields";
+import { PhoneNumberInput, DEFAULT_COUNTRY_CODE, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
 import Link from "next/link";
 
-export default function LoginPage() {
-  const [serverError, setServerError] = useState<string | null>(null);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<SignInInput>({ resolver: zodResolver(signInSchema) });
+const inputClassName =
+  "mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30";
 
-  async function onSubmit(values: SignInInput) {
+const NO_ACCOUNT = "NO_ACCOUNT";
+
+function readSelectedRoleCookie(): "RIDER" | "PARTNER" {
+  const match = document.cookie.match(new RegExp(`(?:^|; )${SELECTED_ROLE_COOKIE}=([^;]*)`));
+  return match?.[1] === "PARTNER" ? "PARTNER" : "RIDER";
+}
+
+export default function LoginPage() {
+  // "phone" covers riders/partners created via OTP (the normal path). "email" is a fallback
+  // for accounts that predate phone login or were never given a phone number — the seeded
+  // admin account in particular has no phoneNumber at all, so without this there'd be no way
+  // to sign in as admin. Better Auth's emailAndPassword sign-in was never disabled server-side
+  // (packages/auth/src/server.ts), this just restores a UI path to it.
+  const [mode, setMode] = useState<"phone" | "email">("phone");
+  const [step, setStep] = useState<"phone" | "otp" | "upgrade">("phone");
+  const [serverError, setServerError] = useState<string | null>(null);
+
+  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
+  const [localNumber, setLocalNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [otpCode, setOtpCode] = useState("");
+  const [partnerDetails, setPartnerDetails] = useState<PartnerBusinessDetails>(
+    emptyPartnerBusinessDetails,
+  );
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+
+  const [sendingOtp, setSendingOtp] = useState(false);
+  const [verifying, setVerifying] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
+
+  // Dev-only convenience: no SMS vendor is configured yet (ADR-013), so the OTP normally only
+  // shows up in the server console. /api/dev/otp is a 404 in production, so this silently
+  // stays empty there — nothing to gate here beyond that.
+  const [devOtpCode, setDevOtpCode] = useState<string | null>(null);
+  async function fetchDevOtp(phone: string) {
+    try {
+      const res = await fetch(`/api/dev/otp?phone=${encodeURIComponent(phone)}`);
+      const data: { code?: string | null } = await res.json();
+      setDevOtpCode(data.code ?? null);
+    } catch {
+      setDevOtpCode(null);
+    }
+  }
+
+  async function handleSendCode() {
     setServerError(null);
-    const { error } = await authClient.signIn.email({
-      email: values.email,
-      password: values.password,
-    });
-    if (error) {
-      setServerError(error.message ?? "Invalid email or password.");
+    const normalized = composePhoneNumber(countryCode, localNumber);
+    if (!normalized) {
+      setServerError("Enter a 10-digit phone number.");
       return;
     }
-    window.location.href = "/";
+    setSendingOtp(true);
+    try {
+      const { error } = await authClient.phoneNumber.sendOtp({ phoneNumber: normalized });
+      if (error) {
+        setServerError(error.message ?? "Could not send the verification code. Please try again.");
+        return;
+      }
+      // Check existence up front rather than waiting for verify() to fail — since the
+      // backend auto-creates an account on any successful OTP verification (ADR-013),
+      // a login page shouldn't silently sign someone up. Catch it here instead.
+      const existsRes = await fetch(`/api/auth-helpers/phone-exists?phone=${encodeURIComponent(normalized)}`);
+      const existsData: { exists: boolean; hasRealName: boolean } = await existsRes.json();
+      if (!existsData.exists) {
+        setServerError(NO_ACCOUNT);
+        return;
+      }
+      setPhoneNumber(normalized);
+      setStep("otp");
+      fetchDevOtp(normalized);
+    } catch {
+      setServerError("Could not send the verification code. Please try again.");
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
+  async function handleResend() {
+    setServerError(null);
+    setSendingOtp(true);
+    try {
+      const { error } = await authClient.phoneNumber.sendOtp({ phoneNumber });
+      if (error) {
+        setServerError(error.message ?? "Could not resend the verification code. Please try again.");
+        return;
+      }
+      fetchDevOtp(phoneNumber);
+    } finally {
+      setSendingOtp(false);
+    }
+  }
+
+  async function onVerify(e: React.FormEvent) {
+    e.preventDefault();
+    setServerError(null);
+    setVerifying(true);
+    try {
+      const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: otpCode });
+      if (error) {
+        setServerError(error.message ?? "Invalid or expired code. Please try again.");
+        return;
+      }
+
+      const { data: sessionData } = await authClient.getSession();
+      const role = sessionData?.user.role;
+
+      // Existing Rider signing back in through the Partner path on /welcome (ADR-013's
+      // self-service upgrade) — the selectedRole cookie says PARTNER but the account is
+      // still RENTER. Show the upgrade mini-form instead of redirecting immediately.
+      if (role === "RENTER" && readSelectedRoleCookie() === "PARTNER") {
+        setStep("upgrade");
+        return;
+      }
+
+      // Every other case: preserve the pre-existing behavior of this page (always "/").
+      window.location.href = "/";
+    } catch {
+      setServerError("Something went wrong. Please try again.");
+    } finally {
+      setVerifying(false);
+    }
+  }
+
+  async function onUpgrade(e: React.FormEvent) {
+    e.preventDefault();
+    setServerError(null);
+    setUpgrading(true);
+    try {
+      const res = await fetch("/api/user/become-partner", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessName: partnerDetails.businessName,
+          type: partnerDetails.type,
+          city: partnerDetails.city,
+          description: partnerDetails.description.trim() || undefined,
+          aadhaarNumber: partnerDetails.aadhaarNumber.trim() || undefined,
+          contactPerson1Name: partnerDetails.contactPerson1Name.trim() || undefined,
+          contactPerson1Mobile: partnerDetails.contactPerson1Mobile.trim() || undefined,
+          contactPerson2Name: partnerDetails.contactPerson2Name.trim() || undefined,
+          contactPerson2Mobile: partnerDetails.contactPerson2Mobile.trim() || undefined,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}) as { error?: string });
+        setServerError(data.error ?? "Could not complete your application. Please try again.");
+        return;
+      }
+      window.location.href = "/partner";
+    } catch {
+      setServerError("Something went wrong. Please try again.");
+    } finally {
+      setUpgrading(false);
+    }
+  }
+
+  async function onEmailSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    setServerError(null);
+    setSigningIn(true);
+    try {
+      const { error } = await authClient.signIn.email({ email, password });
+      if (error) {
+        setServerError(error.message ?? "Invalid email or password.");
+        return;
+      }
+      window.location.href = "/";
+    } catch {
+      setServerError("Something went wrong. Please try again.");
+    } finally {
+      setSigningIn(false);
+    }
   }
 
   return (
@@ -68,63 +231,217 @@ export default function LoginPage() {
           </div>
 
           <div className="mt-8 lg:mt-0">
-            <h2 className="font-display text-2xl font-semibold">Sign in</h2>
-            <p className="mt-1 text-sm text-foreground/50">Log in to your account</p>
+            <h2 className="font-display text-2xl font-semibold">
+              {step === "upgrade" ? "Complete your Service Provider application" : "Sign in"}
+            </h2>
+            <p className="mt-1 text-sm text-foreground/50">
+              {step === "upgrade"
+                ? "A few business details and you're a partner."
+                : "Log in to your account"}
+            </p>
           </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-4">
-            <div>
-              <label className="text-sm font-medium" htmlFor="email">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="email"
-                className="mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30"
-                {...register("email")}
-              />
-              {errors.email && <p className="mt-1 text-xs text-red-500">{errors.email.message}</p>}
-            </div>
+          {mode === "phone" && step === "phone" && (
+            <p className="mt-4">
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("email");
+                  setServerError(null);
+                }}
+                className="text-xs font-medium text-accent-text hover:text-accent-hover"
+              >
+                Admin or existing email account? Log in with email instead
+              </button>
+            </p>
+          )}
 
-            <div>
-              <div className="flex items-center justify-between">
+          {mode === "email" && (
+            <form onSubmit={onEmailSignIn} className="mt-6 space-y-4">
+              <div>
+                <label className="text-sm font-medium" htmlFor="email">
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+              <div>
                 <label className="text-sm font-medium" htmlFor="password">
                   Password
                 </label>
-                <button type="button" className="text-xs text-accent-text hover:text-accent-hover">
-                  Forgot?
+                <input
+                  id="password"
+                  type="password"
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className={inputClassName}
+                />
+              </div>
+
+              {serverError && (
+                <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                  {serverError}
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={signingIn} size="lg">
+                {signingIn ? "Signing in..." : "Sign in"}
+              </Button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setMode("phone");
+                  setServerError(null);
+                }}
+                className="w-full text-center text-xs font-medium text-accent-text hover:text-accent-hover"
+              >
+                Log in with phone instead
+              </button>
+            </form>
+          )}
+
+          {mode === "phone" && step === "phone" && (
+            <div className="mt-6 space-y-4">
+              <div>
+                <label className="text-sm font-medium" htmlFor="phoneNumber">
+                  Phone number
+                </label>
+                <div className="mt-1.5">
+                  <PhoneNumberInput
+                    countryCode={countryCode}
+                    onCountryCodeChange={setCountryCode}
+                    localNumber={localNumber}
+                    onLocalNumberChange={setLocalNumber}
+                  />
+                </div>
+              </div>
+
+              {serverError === NO_ACCOUNT ? (
+                <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                  No account found for this number.{" "}
+                  <Link href="/signup" className="font-medium underline hover:text-red-300">
+                    Sign up instead
+                  </Link>
+                  .
+                </div>
+              ) : (
+                serverError && (
+                  <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                    {serverError}
+                  </div>
+                )
+              )}
+
+              <Button
+                type="button"
+                onClick={handleSendCode}
+                className="w-full"
+                disabled={sendingOtp}
+                size="lg"
+              >
+                {sendingOtp ? "Sending code..." : "Send code"}
+              </Button>
+            </div>
+          )}
+
+          {step === "otp" && (
+            <form onSubmit={onVerify} className="mt-6 space-y-4">
+              <div className="flex items-center justify-between rounded-xl border border-foreground/10 bg-foreground/[0.02] px-4 py-2.5 text-sm">
+                <span className="text-foreground/70">{phoneNumber}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("phone");
+                    setOtpCode("");
+                    setServerError(null);
+                    setDevOtpCode(null);
+                  }}
+                  className="text-xs font-medium text-accent-text hover:text-accent-hover"
+                >
+                  Change
                 </button>
               </div>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                className="mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30"
-                {...register("password")}
-              />
-              {errors.password && (
-                <p className="mt-1 text-xs text-red-500">{errors.password.message}</p>
+
+              {devOtpCode && (
+                <div className="rounded-xl border border-dashed border-accent/30 bg-accent/5 px-4 py-2.5 text-sm text-accent-text">
+                  Dev mode (no SMS provider configured): code is <span className="font-mono font-semibold">{devOtpCode}</span>
+                </div>
               )}
-            </div>
 
-            {serverError && (
-              <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                {serverError}
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium" htmlFor="otpCode">
+                    Verification code
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={sendingOtp}
+                    className="text-xs text-accent-text hover:text-accent-hover disabled:opacity-50"
+                  >
+                    Resend
+                  </button>
+                </div>
+                <input
+                  id="otpCode"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={otpCode}
+                  onChange={(e) => setOtpCode(e.target.value)}
+                  placeholder="6-digit code"
+                  className={inputClassName}
+                />
               </div>
-            )}
 
-            <Button type="submit" className="w-full" disabled={isSubmitting} size="lg">
-              {isSubmitting ? "Signing in..." : "Sign in"}
-            </Button>
-          </form>
+              {serverError && (
+                <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                  {serverError}
+                </div>
+              )}
 
-          <p className="mt-6 text-center text-sm text-foreground/50">
-            Don&apos;t have an account?{" "}
-            <Link href="/signup" className="font-medium text-accent-text hover:text-accent-hover">
-              Create one
-            </Link>
-          </p>
+              <Button type="submit" className="w-full" disabled={verifying} size="lg">
+                {verifying ? "Signing in..." : "Sign in"}
+              </Button>
+            </form>
+          )}
+
+          {step === "upgrade" && (
+            <form onSubmit={onUpgrade} className="mt-6 space-y-4">
+              <PartnerBusinessFields
+                value={partnerDetails}
+                onChange={setPartnerDetails}
+                idPrefix="upgrade-partner"
+                showDescription
+              />
+
+              {serverError && (
+                <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
+                  {serverError}
+                </div>
+              )}
+
+              <Button type="submit" className="w-full" disabled={upgrading} size="lg">
+                {upgrading ? "Submitting..." : "Become a partner"}
+              </Button>
+            </form>
+          )}
+
+          {mode === "phone" && step !== "upgrade" && (
+            <p className="mt-6 text-center text-sm text-foreground/50">
+              Don&apos;t have an account?{" "}
+              <Link href="/signup" className="font-medium text-accent-text hover:text-accent-hover">
+                Create one
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </main>

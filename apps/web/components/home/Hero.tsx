@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { gsap } from "gsap";
 import { SearchBar } from "./SearchBar";
 import { LandingAccordionItem } from "@/components/ui/interactive-image-accordion";
@@ -18,7 +19,8 @@ export function Hero() {
           { opacity: 0, y: 20, duration: 0.6, ease: "power3.out" },
           "-=0.5",
         )
-        .from("[data-hero-accordion]", { opacity: 0, x: 32, duration: 0.8, ease: "power3.out" }, "-=0.6");
+        .from("[data-hero-accordion]", { opacity: 0, x: 32, duration: 0.8, ease: "power3.out" }, "-=0.6")
+        .from("[data-hero-sos]", { opacity: 0, y: 16, duration: 0.6, ease: "power3.out" }, "-=0.4");
     }, rootRef);
 
     return () => ctx.revert();
@@ -39,6 +41,21 @@ export function Hero() {
             <p data-hero-subtitle className="mx-auto mt-6 max-w-xl text-lg text-foreground/70 md:mx-0">
               Connect with fellow riders, form a group, and explore India's most beautiful destinations together. Ride safe with our community and SOS support.
             </p>
+
+            <div data-hero-sos className="mx-auto mt-8 flex max-w-xl justify-center md:mx-0 md:justify-start">
+              <Link
+                href="/dashboard/sos"
+                className="group flex items-center gap-3 rounded-2xl border border-warning/30 bg-warning/10 px-5 py-3 transition-colors hover:bg-warning/15"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-warning/20 text-xl">
+                  🆘
+                </span>
+                <span className="text-left">
+                  <span className="block text-sm font-semibold text-warning">Ride Safe — Emergency SOS network</span>
+                  <span className="block text-xs text-foreground/60">Alert nearby riders instantly if you need help on the road</span>
+                </span>
+              </Link>
+            </div>
           </div>
 
           {/* Right Side: Image Accordion */}

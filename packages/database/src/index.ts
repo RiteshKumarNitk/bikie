@@ -18,3 +18,5 @@ export * as notificationRepository from "./repositories/notification.repository"
 export * as announcementRepository from "./repositories/announcement.repository";
 export * as reportRepository from "./repositories/report.repository";
 export * as moderationRepository from "./repositories/moderation.repository";
+export * as riderProfileRepository from "./repositories/rider-profile.repository";
+export * as userRepository from "./repositories/user.repository";

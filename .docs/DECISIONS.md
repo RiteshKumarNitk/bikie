@@ -151,3 +151,94 @@ continuing ADR-010's "reuse over new surface area" precedent:
   feeds CSV export and the Audit Logs page); `ModerationAction` is the trust-and-safety-specific
   state machine with `expiresAt` semantics (mute/suspend durations) that hot paths
   (`requireSession`, `sendMessage`) query directly, without joining history on every request.
+
+## ADR-012: Rider profile onboarding — new `RiderProfile`/`RiderEmergencyContact` models, skippable gate, no Aadhaar/KYC verification
+A client meeting requested an extensive KYC-style post-signup form (vehicle details, Aadhaar
+number + OTP verification, driving licence, address, medical history, emergency contacts).
+Scoped down, per explicit user decision, to what the app can actually back today:
+- **New `RiderProfile` (1:1 with `User`) + `RiderEmergencyContact` (many, cascade-deleted with
+  the profile)** — driving licence number/expiry, address (line/area/district/pincode/country),
+  and 0-3 emergency contacts. Named distinctly from the existing ride-level
+  `Trip.emergencyContacts`/`EmergencyContactDTO` (Ride Room, ADR-011) — this is a *profile*-level
+  concept, a different thing that happens to share a name; kept as separate models rather than
+  reusing the Ride Room shape, since a rider's own contacts aren't scoped to any one ride.
+- **No Aadhaar/government-ID verification.** UIDAI doesn't allow direct third-party Aadhaar
+  integration — real verification needs a licensed vendor, a cost/compliance decision, not a
+  code change. Not built; the form only collects driving-licence-style fields the app already
+  has a reason to show back to the user (e.g. on the Settings page).
+- **Skippable, not mandatory.** `RiderProfile.onboardingSkipped` (boolean) plus the mere
+  existence of a `RiderProfile` row is how `RiderProfileService.needsOnboarding()` decides
+  whether to show the gate again — a user who explicitly skips gets an (mostly empty) row
+  written so they aren't re-prompted every login, distinct from a user who was never asked yet
+  (no row at all).
+- **No mobile+OTP login** in this pass either (a separate, larger ask from the same meeting) —
+  real OTP delivery needs an SMS provider (Twilio/MSG91/etc.), and none is configured
+  (`apps/web/.env.local` has no SMS vendor, only email via Resend). Deferred until a provider
+  is chosen; email/password (plus the existing bearer-token mobile auth) is unchanged.
+
+## ADR-013: Mobile number + OTP login, for both Rider and Partner — Better Auth's `phoneNumber` plugin, console-logged OTP until a real SMS vendor is chosen
+Follow-up to ADR-012, once the SMS-provider question came back "build it now anyway." Three
+decisions:
+- **Better Auth's built-in `phoneNumber` plugin** (already present in the installed
+  `better-auth` version, no new dependency) rather than hand-rolling OTP storage/expiry/retry
+  logic — it owns OTP generation, expiry (5 min), and attempt-limiting (3 tries), and exposes
+  `POST /phone-number/send-otp` / `POST /phone-number/verify`. `signUpOnVerification` auto-
+  creates the `User` row on a brand-new phone number's first successful verification (with a
+  placeholder email/name — see `tempEmailForPhone`/`getTempName` in `packages/auth/src/server.ts`),
+  auto-logging them in with a session in the same call. New `User.phoneNumber` (unique) /
+  `phoneNumberVerified` columns are the plugin's own required schema, added alongside — not
+  merged into — the pre-existing plain `User.phone` field (used by SOS profile-completeness
+  and the mobile app before this ADR), which a `callbackOnVerification` hook keeps in sync so
+  none of those existing call sites needed to change.
+- **OTP delivery reuses the existing `SMSService`** (`packages/services/src/sms.service.ts`)
+  rather than a new one — it already has the exact dev-safe posture needed: if
+  `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_FROM_NUMBER` aren't set, it logs
+  `[SMS][DEV] To: ... | Message: ...` to the server console instead of failing. Per explicit
+  user decision, that's the shipped behavior for now — real SMS delivery is a one-time env-var
+  addition away, no code change, whenever a Twilio (or compatible) account is set up.
+  Email/password sign-in is unchanged server-side and still works side by side — **but the
+  first pass of `/login` replaced the UI wholesale with phone/OTP fields and lost the only UI
+  path to it**, which would have locked out the seeded admin account (`admin@bikie.app`,
+  created via email/password, no `phoneNumber` set — admins aren't created through the public
+  phone-based signup at all). Fixed by adding an "Admin or existing email account? Log in with
+  email instead" toggle on `/login` (not `/signup`, which stays phone-only by design — new
+  account creation is the part that moved to OTP, not every login path).
+- **Role upgrade (Rider → Partner) is self-service, not admin-approved**: an existing user can
+  sign back in via the same phone number through the Partner path on `/welcome`, then supply
+  business details, which calls the new `POST /api/user/become-partner` — sets `User.role` to
+  `PARTNER` and upserts a `Partner` profile in one step (`UserService.becomePartner`, guarded
+  to refuse if already `PARTNER`/`ADMIN`). This is a narrower, explicitly-scoped version of the
+  "one account, multiple modes" principle from ADR-005 — a real admin-reviewed partner
+  application queue (the existing signup flow's "will be reviewed by our team" copy) is a
+  separate, larger feature not built here.
+
+## ADR-014: Onboarding field list from a second reference doc — fields only, not the doc's parallel schema
+A second reference document arrived with its own full technical spec (`Biker`/`Provider`/
+`Trip`/`Booking`/`PanicAlert` Prisma models, NextAuth-based auth, a different API surface) —
+a complete, different design for the same product, not a diff against what's actually built.
+Per explicit user confirmation ("I just want onboarding from this"), only the onboarding field
+*list* was adopted, layered onto the existing models — the doc's architecture was not adopted:
+- **`RiderProfile` gains**: `fatherName`/`motherName`, `dateOfBirth`, `gender`, `bloodGroup`,
+  `medicalHistory`, `allergies`, `vehicleType`/`vehicleBrand`/`vehicleModel`, a
+  `GovernmentIdType` (`AADHAAR | PASSPORT`) + `governmentIdNumber` (raw text, no verification —
+  same reasoning as ADR-012: real Aadhaar verification needs a licensed vendor, not a code
+  change), `RiderFrequency` (`OCCASIONAL | WEEKLY | DAILY`, named to avoid colliding with any
+  future "rider type" concept), and `RidingClubType` (`SOLO | CLUB_MEMBER`) + `clubName`. All
+  optional, all part of the existing skippable onboarding gate (ADR-012) — not a new gate.
+- **`Partner` gains**: `aadhaarNumber` and two optional contact-person name/mobile pairs. The
+  reference doc's `ServiceType` enum (Rental/Mechanic/Fuel/Puncture/Medical/Towing/Multi-service)
+  was deliberately **not** adopted in place of the existing `PartnerType` enum (Rental/Mechanic/
+  Fuel Delivery/Tour Guide/Hotel/Camping/Accessories/Photography) — swapping it would silently
+  drop categories the current `/partners/services` marketing page already advertises; that's a
+  business-scope decision, not something to infer from a reference doc.
+- **What was explicitly not built**: a parallel `Biker`/`Provider` model set, a separate
+  `PanicAlert` system (the existing `SOSAlert` Red/Amber-equivalent flow already exists),
+  `RentalRequest`/`RentalResponse` marketplace matching, or a `Trip`/`TripOption`/`TripMember`
+  redesign (the existing `Trip`/`TripParticipant` — Rides — already covers this per ADR-010).
+  These would replace working systems for no stated gain; revisit only if a real gap in the
+  *existing* systems is identified, not because a reference doc modeled the same idea twice.
+- **`/welcome` flow**: role selection no longer drops the visitor straight onto the
+  homepage/marketing page — both paths now route to `/login` (which already offers a
+  "no account yet? sign up" fallback), so a role is chosen *and then* the visitor authenticates
+  before seeing any dashboard content. Anonymous marketing-site browsing without picking a role
+  is unaffected (the role cookie is separate from being logged in).
