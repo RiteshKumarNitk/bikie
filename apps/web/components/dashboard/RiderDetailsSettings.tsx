@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import type { RiderProfileDTO } from "@bikie/types";
+import { riderProfileSchema } from "@bikie/validation";
+import { formatZodError } from "@/lib/format-zod-error";
 import {
   EmergencyContactsEditor,
   type EmergencyContactValue,
@@ -106,11 +108,18 @@ export function RiderDetailsSettings({ profile }: { profile: RiderProfileDTO | n
         })),
     };
 
+    const parsed = riderProfileSchema.safeParse(body);
+    if (!parsed.success) {
+      setError(formatZodError(parsed.error).join(" "));
+      setSaving(false);
+      return;
+    }
+
     try {
       const res = await fetch("/api/rider-profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(parsed.data),
       });
       if (!res.ok) throw new Error("Failed to save rider profile");
       setSaved(true);

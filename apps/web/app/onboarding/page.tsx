@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { riderProfileSchema } from "@bikie/validation";
+import { formatZodError } from "@/lib/format-zod-error";
 import {
   EmergencyContactsEditor,
   type EmergencyContactValue,
@@ -49,7 +51,6 @@ export default function OnboardingPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSaving(true);
     setError(null);
 
     const body = {
@@ -90,16 +91,24 @@ export default function OnboardingPage() {
         })),
     };
 
+    const parsed = riderProfileSchema.safeParse(body);
+    if (!parsed.success) {
+      setError(formatZodError(parsed.error).join(" "));
+      return;
+    }
+
+    setSaving(true);
     try {
       const res = await fetch("/api/rider-profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
+        body: JSON.stringify(parsed.data),
       });
       if (!res.ok) throw new Error("Failed to save rider profile");
       router.push("/");
     } catch {
       setError("Something went wrong saving your details. Please try again.");
+    } finally {
       setSaving(false);
     }
   }
@@ -107,7 +116,7 @@ export default function OnboardingPage() {
   const busy = saving || skipping;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-background px-6 py-16">
+    <div className="relative min-h-screen overflow-hidden bg-background px-6 py-16 lg:px-10">
       <div
         className="pointer-events-none absolute inset-0"
         style={{
@@ -117,7 +126,7 @@ export default function OnboardingPage() {
         aria-hidden="true"
       />
 
-      <div className="relative mx-auto w-full max-w-2xl">
+      <div className="relative mx-auto w-full max-w-2xl lg:max-w-4xl xl:max-w-5xl">
         <div className="flex flex-col items-center text-center">
           <div className="flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-base font-bold text-white">
@@ -136,7 +145,7 @@ export default function OnboardingPage() {
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="glass mt-10 space-y-8 rounded-3xl p-6 md:p-8">
+        <form onSubmit={handleSubmit} className="glass mt-10 space-y-8 rounded-3xl p-6 md:p-8 lg:p-10">
           <section className="space-y-4">
             <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">
               Driving licence
@@ -187,7 +196,7 @@ export default function OnboardingPage() {
                 className={inputClassName}
               />
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <div>
                 <label className={labelClassName} htmlFor="area">
                   Area

@@ -1,5 +1,21 @@
 # Changelog
 
+## Rider Profile Validation
+- Added real validation to `riderProfileSchema` (`packages/validation/src/rider-profile.schema.ts`),
+  used both server-side (`PUT /api/rider-profile`) and client-side (`/onboarding`, the
+  Settings "Rider Details" section) so the two can't drift apart: date of birth must put the
+  rider between 18-100 years old, pincode must be 6 digits, driving licence expiry can't be
+  in the past, Aadhaar must be exactly 12 digits / passport a plausible format (cross-checked
+  against whichever ID type is selected), and emergency-contact phone numbers must be 10-15
+  digits (spaces/hyphens stripped before checking, matching the form's placeholder format).
+  Found via a real test submission with a 2020 date-of-birth (making the "rider" 5 years old)
+  and an 8-digit "Aadhaar" number — both now caught client-side before ever reaching the API,
+  with the actual validation messages shown instead of a generic "Something went wrong."
+- The onboarding/settings forms now build a `body` object, run it through
+  `riderProfileSchema.safeParse()`, and send `parsed.data` (not the raw body) — new shared
+  `apps/web/lib/format-zod-error.ts` turns a validation failure into a plain-language message
+  list.
+
 ## Onboarding Field Expansion + Welcome/Login Fixes (ADR-014)
 - Fixed a `/login` regression from the phone-OTP rewrite: email/password sign-in had no UI
   path left at all, which would have locked out the seeded admin account. Added a "Log in

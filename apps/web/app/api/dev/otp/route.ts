@@ -14,6 +14,6 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing phone query param" }, { status: 400 });
   }
 
-  const code = DevOtpStore.get(phone);
+  const code = await DevOtpStore.get(phone);
   return NextResponse.json({ code });
 }

@@ -83,7 +83,7 @@ export function RiderProfileExtraFields({
     <>
       <div className="space-y-4 border-t border-foreground/10 pt-6">
         <p className={sectionHeadingClassName}>Personal details</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={labelClassName} htmlFor={id("fatherName")}>
               Father&apos;s name
@@ -188,7 +188,7 @@ export function RiderProfileExtraFields({
 
       <div className="space-y-4 border-t border-foreground/10 pt-6">
         <p className={sectionHeadingClassName}>Vehicle details</p>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <div>
             <label className={labelClassName} htmlFor={id("vehicleType")}>
               Vehicle type

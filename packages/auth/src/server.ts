@@ -106,7 +106,7 @@ export const auth = betterAuth({
         // Dev-only convenience so the code can be shown on-screen instead of requiring a
         // terminal check — no-ops in production (see DevOtpStore). Real delivery is
         // unaffected either way.
-        DevOtpStore.set(phoneNumber, code, 300);
+        await DevOtpStore.set(phoneNumber, code, 300);
         await SMSService.send(phoneNumber, `Your BIKIE verification code is ${code}. It expires in 5 minutes.`);
       },
       signUpOnVerification: {

@@ -57,7 +57,7 @@ export function EmergencyContactsEditor({
           <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">
             Contact {index + 1}
           </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div>
               <label className={labelClassName} htmlFor={`contact-name-${index}`}>
                 Name
@@ -83,7 +83,7 @@ export function EmergencyContactsEditor({
                 className={inputClassName}
               />
             </div>
-            <div className="sm:col-span-2">
+            <div className="sm:col-span-2 lg:col-span-1">
               <label className={labelClassName} htmlFor={`contact-relation-${index}`}>
                 Relation <span className="font-normal text-foreground/40">(optional)</span>
               </label>
