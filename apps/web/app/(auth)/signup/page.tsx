@@ -4,11 +4,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
 import { SELECTED_ROLE_COOKIE, selectedRoleToDbRole } from "@/lib/role";
-import {
-  PartnerBusinessFields,
-  emptyPartnerBusinessDetails,
-  type PartnerBusinessDetails,
-} from "@/components/auth/PartnerBusinessFields";
 import { PhoneNumberInput, DEFAULT_COUNTRY_CODE, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
 import Link from "next/link";
 
@@ -39,9 +34,6 @@ export default function SignUpPage() {
   const [otpCode, setOtpCode] = useState("");
   const [exists, setExists] = useState<boolean | null>(null);
   const [fullName, setFullName] = useState("");
-  const [partnerDetails, setPartnerDetails] = useState<PartnerBusinessDetails>(
-    emptyPartnerBusinessDetails,
-  );
   const [referralCode, setReferralCode] = useState("");
 
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -145,23 +137,6 @@ export default function SignUpPage() {
         });
         const completeData: { success: boolean; becamePartner: boolean } = await completeRes.json();
 
-        if (completeData.becamePartner) {
-          await fetch("/api/partner/profile", {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              businessName: partnerDetails.businessName,
-              type: partnerDetails.type,
-              city: partnerDetails.city,
-              aadhaarNumber: partnerDetails.aadhaarNumber.trim() || undefined,
-              contactPerson1Name: partnerDetails.contactPerson1Name.trim() || undefined,
-              contactPerson1Mobile: partnerDetails.contactPerson1Mobile.trim() || undefined,
-              contactPerson2Name: partnerDetails.contactPerson2Name.trim() || undefined,
-              contactPerson2Mobile: partnerDetails.contactPerson2Mobile.trim() || undefined,
-            }),
-          });
-        }
-
         if (referralCode.trim()) {
           await fetch("/api/referrals/link", {
             method: "POST",
@@ -170,7 +145,7 @@ export default function SignUpPage() {
           }).catch(() => {});
         }
 
-        window.location.href = selectedRole === "PARTNER" ? "/partner" : "/onboarding";
+        window.location.href = selectedRole === "PARTNER" ? "/partner-onboarding" : "/onboarding";
         return;
       }
 
@@ -195,13 +170,15 @@ export default function SignUpPage() {
         </Link>
         <div className="max-w-md">
           <h1 className="font-display text-4xl font-bold leading-tight text-white">
-            Start your journey.
+            {selectedRole === "PARTNER" ? "Grow your business." : "Start your journey."}
           </h1>
           <p className="mt-4 text-lg text-white/60 leading-relaxed">
-            Whether you&apos;re a rider looking for adventure or a partner ready to grow your business — BIKIE is your platform.
+            {selectedRole === "PARTNER"
+              ? "List your bikes, connect with riders, and build your business with BIKIE."
+              : "Join the community, discover new places, and rent the perfect ride."}
           </p>
           <div className="mt-8 flex gap-3">
-            {["🏍️", "🔧", "🤝"].map((emoji, i) => (
+            {(selectedRole === "PARTNER" ? ["🔧", "📈", "🤝"] : ["🏍️", "🌄", "🌍"]).map((emoji, i) => (
               <span key={i} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-xl backdrop-blur-sm">
                 {emoji}
               </span>
@@ -211,7 +188,13 @@ export default function SignUpPage() {
         <p className="text-sm text-white/30">© {new Date().getFullYear()} BIKIE</p>
       </div>
 
-      <div className="flex w-full items-center justify-center px-6 py-12 lg:w-1/2">
+      <div className="relative flex w-full items-center justify-center px-6 py-12 lg:w-1/2">
+        <Link
+          href="/welcome"
+          className="absolute right-8 top-8 rounded-full border border-foreground/10 bg-foreground/[0.02] px-4 py-2 text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+        >
+          Change Role
+        </Link>
         <div className="w-full max-w-sm">
           <div className="lg:hidden">
             <Link href="/" className="flex items-center gap-2">
@@ -343,21 +326,6 @@ export default function SignUpPage() {
                       className={`${inputClassName} uppercase`}
                     />
                   </div>
-
-                  {selectedRole === "PARTNER" && (
-                    <div className="space-y-4 rounded-xl border border-accent/20 bg-accent/[0.02] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">Partner details</p>
-                      <PartnerBusinessFields
-                        value={partnerDetails}
-                        onChange={setPartnerDetails}
-                        idPrefix="signup-partner"
-                        showDescription={false}
-                      />
-                      <p className="text-xs text-foreground/40">
-                        Your application will be reviewed by our team after signup.
-                      </p>
-                    </div>
-                  )}
                 </>
               )}
 

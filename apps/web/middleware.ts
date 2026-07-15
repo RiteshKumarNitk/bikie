@@ -35,47 +35,37 @@ export default async function middleware(request: NextRequest) {
   const url = new URL(request.url);
   const { pathname } = url;
 
+  const session = await getSession(request);
+
+  if (!session) {
+    const selectedRole = request.cookies.get(SELECTED_ROLE_COOKIE)?.value;
+    
+    if (!isSelectedRole(selectedRole)) {
+      const welcomeUrl = new URL("/welcome", url);
+      welcomeUrl.searchParams.set("next", pathname + url.search);
+      return NextResponse.redirect(welcomeUrl);
+    }
+
+    const loginUrl = new URL("/login", url);
+    loginUrl.searchParams.set("next", pathname + url.search);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const role = session.user.role as string | undefined;
+
   const isPartnerRoute = isPathOrSubpath(pathname, "/partner");
   const isAdminRoute = isPathOrSubpath(pathname, "/admin");
-  const isDashboardRoute = isPathOrSubpath(pathname, "/dashboard");
 
-  if (isPartnerRoute || isAdminRoute || isDashboardRoute) {
-    const session = await getSession(request);
-
-    if (!session) {
-      const loginUrl = new URL("/login", url);
-      loginUrl.searchParams.set("next", pathname);
-      return NextResponse.redirect(loginUrl);
-    }
-
-    const role = session.user.role as string | undefined;
-
-    if (isPartnerRoute && role !== "PARTNER") {
-      return NextResponse.redirect(new URL(dashboardHomeForRole(role), url));
-    }
-    if (isAdminRoute && role !== "ADMIN") {
-      return NextResponse.redirect(new URL(dashboardHomeForRole(role), url));
-    }
-
-    return NextResponse.next();
+  if (isPartnerRoute && role !== "PARTNER") {
+    return NextResponse.redirect(new URL(dashboardHomeForRole(role), url));
+  }
+  if (isAdminRoute && role !== "ADMIN") {
+    return NextResponse.redirect(new URL(dashboardHomeForRole(role), url));
   }
 
-  // Public/marketing routes: gate on the pre-auth `selectedRole` cookie so
-  // first-time visitors land on /welcome instead of the homepage. See
-  // .docs/DECISIONS.md ADR-012.
   const selectedRole = request.cookies.get(SELECTED_ROLE_COOKIE)?.value;
-  if (isSelectedRole(selectedRole)) {
-    return NextResponse.next();
-  }
-
-  const session = await getSession(request);
-  if (session) {
-    // Already-authenticated user with no selectedRole cookie (e.g. an
-    // account predating this feature, or cleared cookies) — silently
-    // backfill from their DB role rather than detouring through /welcome.
-    // A Set-Cookie on a pass-through response isn't visible to this same
-    // request's later `cookies()` reads, so we redirect to re-run with it.
-    const derived = dbRoleToSelectedRole(session.user.role as string | undefined);
+  if (!isSelectedRole(selectedRole)) {
+    const derived = dbRoleToSelectedRole(role);
     const response = NextResponse.redirect(url);
     response.cookies.set(SELECTED_ROLE_COOKIE, derived, {
       path: "/",
@@ -85,9 +75,7 @@ export default async function middleware(request: NextRequest) {
     return response;
   }
 
-  const welcomeUrl = new URL("/welcome", url);
-  welcomeUrl.searchParams.set("next", pathname + url.search);
-  return NextResponse.redirect(welcomeUrl);
+  return NextResponse.next();
 }
 
 export const config = {

@@ -26,11 +26,36 @@ export default async function PartnerSettingsPage() {
             <input readOnly value={profile?.city ?? ""} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm" />
           </div>
           <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Aadhaar Number</label>
+            <input readOnly value={profile?.aadhaarNumber ?? "Not provided"} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm" />
+          </div>
+          <div>
             <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Verification Status</label>
             <input readOnly value={profile?.isVerified ? "Verified" : "Pending"} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm" />
           </div>
         </div>
-        <p className="mt-3 text-xs text-foreground/50">Profile editing is coming soon.</p>
+
+        <p className="mt-8 font-semibold">Contact Persons</p>
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Primary Contact Name</label>
+            <input readOnly value={profile?.contactPerson1Name ?? "Not provided"} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Primary Contact Mobile</label>
+            <input readOnly value={profile?.contactPerson1Mobile ?? "Not provided"} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Secondary Contact Name</label>
+            <input readOnly value={profile?.contactPerson2Name ?? "Not provided"} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm" />
+          </div>
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Secondary Contact Mobile</label>
+            <input readOnly value={profile?.contactPerson2Mobile ?? "Not provided"} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm" />
+          </div>
+        </div>
+
+        <p className="mt-6 text-xs text-foreground/50">Profile editing is coming soon.</p>
       </section>
     </div>
   );

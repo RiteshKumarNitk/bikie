@@ -8,14 +8,11 @@ import type { SelectedRole } from "@/lib/role";
 import { ThemeToggle } from "./ThemeToggle";
 import { MegaMenu } from "./MegaMenu";
 import { NotificationBell } from "./NotificationBell";
-import { SwitchRoleLink } from "./SwitchRoleLink";
 import {
-  otherRole,
   partnerMegaMenuColumns,
   partnerPrimaryLinks,
   riderMegaMenuColumns,
   riderPrimaryLinks,
-  switchRoleLabel,
 } from "./nav-config";
 
 function dashboardHrefForRole(role: string | undefined) {
@@ -170,18 +167,6 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                         </svg>
                         Settings
                       </Link>
-                      {role && (
-                        <SwitchRoleLink
-                          to={otherRole(role)}
-                          role="menuitem"
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm hover:bg-foreground/5"
-                        >
-                          <svg className="h-4 w-4 text-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4" />
-                          </svg>
-                          {switchRoleLabel(role)}
-                        </SwitchRoleLink>
-                      )}
                       <button
                         type="button"
                         onClick={async () => {
@@ -267,16 +252,6 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                   </div>
                 ))}
               </div>
-              {role && (
-                <div className="mt-2">
-                  <SwitchRoleLink
-                    to={otherRole(role)}
-                    className="w-full rounded-xl px-4 py-2.5 text-left text-sm font-medium text-accent-text hover:bg-foreground/5"
-                  >
-                    {switchRoleLabel(role)}
-                  </SwitchRoleLink>
-                </div>
-              )}
               <div className="mt-6 flex items-center gap-3 border-t border-foreground/10 pt-6">
                 <ThemeToggle />
                 {!isPending && session && <NotificationBell />}

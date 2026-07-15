@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
 import { SELECTED_ROLE_COOKIE } from "@/lib/role";
@@ -31,6 +31,11 @@ export default function LoginPage() {
   const [mode, setMode] = useState<"phone" | "email">("phone");
   const [step, setStep] = useState<"phone" | "otp" | "upgrade">("phone");
   const [serverError, setServerError] = useState<string | null>(null);
+  const [selectedRole, setSelectedRole] = useState<"RIDER" | "PARTNER">("RIDER");
+  
+  useEffect(() => {
+    setSelectedRole(readSelectedRoleCookie());
+  }, []);
 
   const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [localNumber, setLocalNumber] = useState("");
@@ -206,13 +211,15 @@ export default function LoginPage() {
         </Link>
         <div className="max-w-md">
           <h1 className="font-display text-4xl font-bold leading-tight text-white">
-            Welcome back to the ride.
+            {selectedRole === "PARTNER" ? "Manage your business." : "Welcome back to the ride."}
           </h1>
           <p className="mt-4 text-lg text-white/60 leading-relaxed">
-            Access your dashboard, manage bookings, or oversee your fleet — all from one account.
+            {selectedRole === "PARTNER" 
+              ? "Access your dashboard, manage your fleet, and oversee bookings — all from your partner account." 
+              : "Access your dashboard, manage bookings, or plan your next trip — all from one account."}
           </p>
           <div className="mt-8 flex gap-3">
-            {["🏍️", "🌄", "🛣️"].map((emoji, i) => (
+            {(selectedRole === "PARTNER" ? ["🔧", "📊", "🤝"] : ["🏍️", "🌄", "🛣️"]).map((emoji, i) => (
               <span key={i} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-xl backdrop-blur-sm">
                 {emoji}
               </span>
@@ -222,7 +229,13 @@ export default function LoginPage() {
         <p className="text-sm text-white/30">© {new Date().getFullYear()} BIKIE</p>
       </div>
 
-      <div className="flex w-full items-center justify-center px-6 lg:w-1/2">
+      <div className="relative flex w-full items-center justify-center px-6 lg:w-1/2">
+        <Link
+          href="/welcome"
+          className="absolute right-8 top-8 rounded-full border border-foreground/10 bg-foreground/[0.02] px-4 py-2 text-xs font-medium text-foreground/70 transition-colors hover:bg-foreground/[0.05] hover:text-foreground"
+        >
+          Change Role
+        </Link>
         <div className="w-full max-w-sm">
           <div className="lg:hidden">
             <Link href="/" className="flex items-center gap-2">
@@ -235,7 +248,7 @@ export default function LoginPage() {
 
           <div className="mt-8 lg:mt-0">
             <h2 className="font-display text-2xl font-semibold">
-              {step === "upgrade" ? "Complete your Service Provider application" : "Sign in"}
+              {step === "upgrade" ? "Complete your Service Provider application" : selectedRole === "PARTNER" ? "Sign in to Service Provider" : "Sign in to Rider"}
             </h2>
             <p className="mt-1 text-sm text-foreground/50">
               {step === "upgrade"
