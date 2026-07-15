@@ -233,18 +233,12 @@ export const TripService = {
 
     await tripRepository.decideParticipant(participantId, "APPROVED");
 
-    let conversationId = await tripRepository.findConversationIdForTrip(participant.tripId);
-    if (!conversationId) {
-      const conversation = await messageRepository.createConversation(
-        [organizerId, participant.userId],
-        `Ride: ${participant.trip.title}`,
-        organizerId,
-      );
-      conversationId = conversation.id;
-      await tripRepository.linkConversationToTrip(participant.tripId, conversationId);
-    } else {
-      await messageRepository.addParticipant(conversationId, participant.userId, "MEMBER");
-    }
+    const { conversationId } = await tripRepository.getOrCreateRideConversation(
+      participant.tripId,
+      organizerId,
+      participant.userId,
+      participant.trip.title,
+    );
 
     await MessageService.createSystemMessage(
       conversationId,

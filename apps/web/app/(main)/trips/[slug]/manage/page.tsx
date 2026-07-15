@@ -24,7 +24,7 @@ export default async function TripManagePage({ params }: { params: Promise<{ slu
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="rounded-2xl bg-card p-5 border border-foreground/10">
           <p className="text-xs text-foreground/50 font-medium">Members</p>
-          <p className="text-2xl font-bold mt-1">{trip.seatsTotal - trip.seatsLeft}</p>
+          <p className="text-2xl font-bold mt-1">{trip.seatsTotal - trip.seatsLeft + 1}</p>
         </div>
         <div className="rounded-2xl bg-card p-5 border border-foreground/10">
           <p className="text-xs text-foreground/50 font-medium">Pending Approvals</p>

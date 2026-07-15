@@ -354,6 +354,52 @@ export async function findConversationIdForTrip(tripId: string) {
   return conversation?.id ?? null;
 }
 
+/**
+ * Race-safe "find the ride's group Conversation, or create it" — locks the Trip row for the
+ * duration of the transaction so two approvals landing close together (or a double-submitted
+ * approve click) can't both see "no conversation yet" and each create one. `Conversation.tripId`
+ * being `@unique` meant the loser of that race used to hit an unhandled constraint violation,
+ * leaving an orphaned, unlinked "New chat" conversation behind (still visible to the organizer
+ * via their regular conversation list, just never wired to the trip) — reproduced live when
+ * approvals happened close together. Returns `{ conversationId, created }` so the caller knows
+ * whether to also add the newly-approved participant (already included at creation time if
+ * `created` is true) or just insert them into the pre-existing conversation.
+ */
+export async function getOrCreateRideConversation(
+  tripId: string,
+  organizerId: string,
+  participantUserId: string,
+  tripTitle: string,
+) {
+  return prisma.$transaction(async (tx) => {
+    await tx.$queryRaw`SELECT id FROM "Trip" WHERE id = ${tripId} FOR UPDATE`;
+
+    const existing = await tx.conversation.findUnique({ where: { tripId }, select: { id: true } });
+    if (existing) {
+      await tx.conversationParticipant.upsert({
+        where: { conversationId_userId: { conversationId: existing.id, userId: participantUserId } },
+        create: { conversationId: existing.id, userId: participantUserId, role: "MEMBER" },
+        update: {},
+      });
+      return { conversationId: existing.id, created: false };
+    }
+
+    const conversation = await tx.conversation.create({
+      data: {
+        subject: `Ride: ${tripTitle}`,
+        tripId,
+        participants: {
+          create: [
+            { userId: organizerId, role: "ORGANIZER" },
+            { userId: participantUserId, role: "MEMBER" },
+          ],
+        },
+      },
+    });
+    return { conversationId: conversation.id, created: true };
+  });
+}
+
 export async function getRideStatsForUser(userId: string) {
   const [ridesOrganized, requestsSent, requestsApproved, ridesCancelled] = await Promise.all([
     prisma.trip.count({ where: { organizerId: userId } }),

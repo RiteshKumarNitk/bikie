@@ -11,6 +11,18 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const city = url.searchParams.get("city") || undefined;
+
+  // Admins monitor the whole network and are allowed to see every city (the admin SOS page
+  // says so explicitly); everyone else only sees alerts — including reporter name/phone/email
+  // and exact GPS — from riders in the same city. Enforced server-side rather than left to the
+  // client to opt into, since a member could otherwise just omit the filter to see every city.
+  if (session.user.role !== "ADMIN" && !city) {
+    return NextResponse.json(
+      { error: "CITY_REQUIRED", message: "Share your city to see nearby SOS alerts." },
+      { status: 400 },
+    );
+  }
+
   const alerts = await SOSService.getActiveAlerts(city);
   return NextResponse.json({ alerts });
 }

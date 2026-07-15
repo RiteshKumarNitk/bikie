@@ -82,11 +82,15 @@ export default function SOSPage() {
   }, [session]);
 
   useEffect(() => {
+    // Regular members only see alerts from riders in the same city (the API 400s without one,
+    // admins are exempt) — so there's nothing to fetch here until a city is provided, same
+    // field used by the "New Alert" form above.
     if (!isMember) return;
-    fetch("/api/sos/alerts")
+    if (session?.user.role !== "ADMIN" && !city.trim()) return;
+    fetch(`/api/sos/alerts${city.trim() ? `?city=${encodeURIComponent(city.trim())}` : ""}`)
       .then((r) => r.json())
       .then((data) => setActiveAlerts(data.alerts ?? []));
-  }, [isMember]);
+  }, [isMember, city, session?.user.role]);
 
   function getLocation() {
     if (!navigator.geolocation) {
@@ -274,7 +278,24 @@ export default function SOSPage() {
 
       {activeTab === "alerts" && (
         <div className="mt-4 space-y-3">
-          {activeAlerts.length === 0 ? (
+          {session?.user.role !== "ADMIN" && !city.trim() ? (
+            <div className="rounded-2xl border border-foreground/10 bg-card p-8 text-center">
+              <p className="font-semibold">Share your city to see nearby alerts</p>
+              <p className="mx-auto mt-1 max-w-sm text-sm text-foreground/50">
+                For everyone&apos;s privacy, SOS alerts (including reporter contact info and
+                exact location) are only shown to riders in the same city.
+              </p>
+              <div className="mx-auto mt-4 max-w-sm">
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="e.g. Goa, Manali"
+                  className="w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30"
+                />
+              </div>
+            </div>
+          ) : activeAlerts.length === 0 ? (
             <EmptyState icon="✅" title="No active alerts" description="All clear right now." />
           ) : (
             activeAlerts.map((a) => (
