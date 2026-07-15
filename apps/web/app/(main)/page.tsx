@@ -1,6 +1,7 @@
 import type { BikeSummaryDTO, CategoryDTO, DestinationSummaryDTO, TestimonialDTO, TripSummaryDTO } from "@bikie/types";
 import { getJson } from "@/lib/api";
 import { Hero } from "@/components/home/Hero";
+import { PanicButtonSection } from "@/components/home/PanicButtonSection";
 import { PopularDestinations } from "@/components/home/PopularDestinations";
 import { Categories } from "@/components/home/Categories";
 import { FeaturedBikes } from "@/components/home/FeaturedBikes";
@@ -23,6 +24,7 @@ export default async function HomePage() {
   return (
     <>
       <Hero />
+      <PanicButtonSection />
       <PopularDestinations destinations={destinationsRes.destinations} />
       <Categories categories={categoriesRes.categories} />
       <FeaturedBikes bikes={bikesRes.bikes} />

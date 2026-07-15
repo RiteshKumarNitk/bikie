@@ -1,5 +1,22 @@
 # Changelog
 
+## Homepage Panic Button
+- Replaced the small "Ride Safe" link in the Hero with a full Red Alert / Amber Alert section
+  (`apps/web/components/home/PanicButtonSection.tsx`) right below the Hero, matching a
+  provided reference design — category chips per alert kind, GPS/city capture, and a real
+  submit flow through the existing `POST /api/sos/alerts` (same membership gate, rate limit,
+  and profile-completeness warning as the dashboard SOS page).
+- Category mapping: the backend's `SOSAlertType` enum has no dedicated Puncture or Fire/Hazard
+  value, so Puncture maps to `BIKE_BREAKDOWN` and Fire/Hazard to `OTHER` — the specific label
+  is preserved in the alert's description text so responders still see it.
+- Not real: the WhatsApp and "Emergency Services"/"Service Provider" pill labels match the
+  reference design's copy but aren't wired to any integration — only SMS (via the existing
+  dev-console-log-fallback `SMSService`) and in-app "Fellow Riders" alerting are functional.
+- Noted, not changed: `apps/web/middleware.ts` (pre-existing, unmodified this session) already
+  redirects every route except `/welcome`/`/login`/`/signup` to `/login` when there's no
+  session — so this new section, like the rest of the homepage, isn't actually reachable by a
+  logged-out visitor today.
+
 ## Rider Profile Validation
 - Added real validation to `riderProfileSchema` (`packages/validation/src/rider-profile.schema.ts`),
   used both server-side (`PUT /api/rider-profile`) and client-side (`/onboarding`, the
