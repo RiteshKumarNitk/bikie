@@ -55,6 +55,9 @@ export default function SignUpPage() {
     try {
       const res = await fetch(`/api/dev/otp?phone=${encodeURIComponent(phone)}`);
       const data: { code?: string | null } = await res.json();
+      if (data.code) {
+        console.log("Dev OTP Code:", data.code);
+      }
       setDevOtpCode(data.code ?? null);
     } catch {
       setDevOtpCode(null);
