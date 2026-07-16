@@ -1,5 +1,12 @@
 # Changelog
 
+## OTP Toast for Testing Builds
+- Removed `NODE_ENV === "production"` guards from `DevOtpStore` and `/api/dev/otp` route —
+  now gated by `SHOW_OTP_TOAST` env var (defaults to enabled in `.env.example`).
+- Added `ToastProvider` to root layout so auth pages can display toasts.
+- Replaced the dashed-border "Dev mode" OTP box on `/login` and `/signup` with a toast
+  notification that shows the verification code automatically after "Send code" is clicked.
+
 ## Homepage Panic Button
 - Replaced the small "Ride Safe" link in the Hero with a full Red Alert / Amber Alert section
   (`apps/web/components/home/PanicButtonSection.tsx`) right below the Hero, matching a

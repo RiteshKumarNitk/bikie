@@ -26,7 +26,7 @@ These are the source of truth. Don't contradict them without updating them.
 ## Conventions
 
 - Package manager: pnpm (`corepack pnpm ...`). Dev server: `pnpm dev`, fixed to
-  port 4000 (see ADR-003 in `DECISIONS.md`).
+  port 3000 (see ADR-003 in `DECISIONS.md`).
 - No `@prisma/client` import outside `packages/database`.
 - Relative imports between TS source files inside `packages/*` must NOT use a
   `.js` extension (Turbopack doesn't rewrite it like `tsc` does) — the one

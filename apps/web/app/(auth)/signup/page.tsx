@@ -5,6 +5,7 @@ import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
 import { SELECTED_ROLE_COOKIE, selectedRoleToDbRole } from "@/lib/role";
 import { PhoneNumberInput, DEFAULT_COUNTRY_CODE, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
+import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
 
 const inputClassName =
@@ -24,6 +25,7 @@ function dashboardHrefForRole(role: string | undefined) {
 }
 
 export default function SignUpPage() {
+  const { addToast } = useToast();
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<"RIDER" | "PARTNER">("RIDER");
@@ -39,20 +41,15 @@ export default function SignUpPage() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
-  // Dev-only convenience: no SMS vendor is configured yet (ADR-013), so the OTP normally only
-  // shows up in the server console. /api/dev/otp is a 404 in production, so this silently
-  // stays empty there — nothing to gate here beyond that.
-  const [devOtpCode, setDevOtpCode] = useState<string | null>(null);
   async function fetchDevOtp(phone: string) {
     try {
       const res = await fetch(`/api/dev/otp?phone=${encodeURIComponent(phone)}`);
       const data: { code?: string | null } = await res.json();
       if (data.code) {
-        console.log("Dev OTP Code:", data.code);
+        addToast(`Your verification code: ${data.code}`, "info");
       }
-      setDevOtpCode(data.code ?? null);
     } catch {
-      setDevOtpCode(null);
+      // silently ignore
     }
   }
 
@@ -263,19 +260,12 @@ export default function SignUpPage() {
                     setStep("phone");
                     setOtpCode("");
                     setServerError(null);
-                    setDevOtpCode(null);
                   }}
                   className="text-xs font-medium text-accent-text hover:text-accent-hover"
                 >
                   Change
                 </button>
               </div>
-
-              {devOtpCode && (
-                <div className="rounded-xl border border-dashed border-accent/30 bg-accent/5 px-4 py-2.5 text-sm text-accent-text">
-                  Dev mode (no SMS provider configured): code is <span className="font-mono font-semibold">{devOtpCode}</span>
-                </div>
-              )}
 
               <div>
                 <label className="text-sm font-medium" htmlFor="otpCode">

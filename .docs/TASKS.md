@@ -2,6 +2,17 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## OTP Toast for Testing Builds (2026-07-16)
+
+Made the OTP visible as a toast notification on production builds during testing, so the
+team doesn't need to check the server console for the code.
+
+| Task | Status |
+|---|---|
+| Removed `NODE_ENV === "production"` guards from `DevOtpStore` and `/api/dev/otp` route — replaced with `SHOW_OTP_TOAST` env var (defaults to enabled) | Completed |
+| Added `ToastProvider` to root layout so auth pages can use toasts | Completed |
+| Replaced dashed-border "Dev mode" OTP box with a toast notification on both `/login` and `/signup` | Completed |
+
 ## Onboarding Field Expansion + Welcome/Login Fixes (2026-07-16, ADR-014)
 
 Follow-up round: a crash fix, an admin-login gap fix, and a second reference doc's onboarding

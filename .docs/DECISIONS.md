@@ -10,11 +10,12 @@ The product brief calls for a premium dark aesthetic (Dark Navy / Midnight Blue 
 Deep Slate) as the primary identity, matching Linear/Notion/Tesla-style dark-first
 products. Light mode is kept as an accessibility toggle, not removed.
 
-## ADR-003: Dev server pinned to port 4000
-Port 3000 is occupied by an unrelated project on this machine. Rather than fight
-for the default port, `apps/web` always runs on 4000. SSR internal fetches derive
-their origin from request headers (not the env var) so this doesn't create a
-fragile dependency on the exact port number.
+## ADR-003: Dev server pinned to port 3000 (was 4000)
+Originally pinned to 4000 because port 3000 was occupied by an unrelated project on the
+original dev machine. Changed back to 3000 because port 4000 falls into a Windows Hyper-V
+reserved range (`3909–4008`) on a subsequent machine, making it unusable without admin
+privileges. SSR internal fetches derive from request headers (not the env var), so the port
+remains a local-only convention with no production impact.
 
 ## ADR-004: Prisma 7 config split (`prisma.config.ts` + driver adapter)
 Prisma 7 removed `datasource.url`; migrations run via `prisma.config.ts` against

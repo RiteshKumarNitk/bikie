@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { DevOtpStore } from "@bikie/services";
 
-/** Local-dev-only convenience — lets the login/signup UI show the OTP on screen instead of
- * requiring a terminal check, since no SMS vendor is configured yet (see ADR-013). Disabled
- * entirely in production; DevOtpStore itself is also a no-op there as a second guard. */
+/**
+ * Returns the OTP code for a given phone number so the login/signup UI can display it as a toast.
+ * Gated by SHOW_OTP_TOAST env var (defaults to enabled when not set to "false").
+ */
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV === "production") {
+  if (process.env.SHOW_OTP_TOAST === "false") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
