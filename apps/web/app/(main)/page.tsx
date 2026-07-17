@@ -23,8 +23,8 @@ export default async function HomePage() {
 
   return (
     <>
-      <Hero />
       <PanicButtonSection />
+      <Hero />
       <PopularDestinations destinations={destinationsRes.destinations} />
       <Categories categories={categoriesRes.categories} />
       <FeaturedBikes bikes={bikesRes.bikes} />

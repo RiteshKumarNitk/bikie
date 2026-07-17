@@ -12,7 +12,9 @@ export const signInSchema = z.object({
 });
 
 export const completePhoneSignupSchema = z.object({
-  name: z.string().min(2, "Name is too short").max(100),
+  // Optional: name is now collected on the onboarding/partner-onboarding form
+  // that follows this call, not during OTP verification itself.
+  name: z.string().min(2, "Name is too short").max(100).optional(),
   role: z.enum(["RENTER", "PARTNER"]).default("RENTER"),
 });
 

@@ -1,16 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import Link from "next/link";
 import { riderProfileSchema } from "@bikie/validation";
 import { formatZodError } from "@/lib/format-zod-error";
+import { authClient } from "@/lib/auth-client";
 import {
   EmergencyContactsEditor,
   type EmergencyContactValue,
 } from "@/components/shared/EmergencyContactsEditor";
 import {
-  RiderProfileExtraFields,
+  VehicleDetailsFields,
+  RiderPersonalFields,
+  GovernmentIdFields,
+  RidingDetailsFields,
   emptyRiderProfileExtraValue,
   type RiderProfileExtraValue,
 } from "@/components/shared/RiderProfileExtraFields";
@@ -18,9 +23,16 @@ import {
 const inputClassName =
   "mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30";
 const labelClassName = "text-sm font-medium";
+const sectionHeadingClassName = "text-xs font-semibold uppercase tracking-wider text-accent-text";
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { data: session } = authClient.useSession();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [fullName, setFullName] = useState("");
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [drivingLicenceNumber, setDrivingLicenceNumber] = useState("");
   const [drivingLicenceExpiry, setDrivingLicenceExpiry] = useState("");
@@ -36,10 +48,40 @@ export default function OnboardingPage() {
   const [skipping, setSkipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingPhoto(true);
+    setError(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) throw new Error("Upload failed");
+      const { url } = await res.json();
+      setPhotoUrl(url);
+    } catch {
+      setError("Couldn't upload that photo. Please try again.");
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  }
+
+  async function saveNameAndPhoto() {
+    const updates: { name?: string; image?: string } = {};
+    if (fullName.trim()) updates.name = fullName.trim();
+    if (photoUrl) updates.image = photoUrl;
+    if (Object.keys(updates).length === 0) return;
+    await authClient.updateUser(updates);
+  }
+
   async function handleSkip() {
     setSkipping(true);
     setError(null);
     try {
+      await saveNameAndPhoto();
       const res = await fetch("/api/rider-profile/skip", { method: "POST" });
       if (!res.ok) throw new Error("Failed to skip onboarding");
       router.push("/");
@@ -99,6 +141,7 @@ export default function OnboardingPage() {
 
     setSaving(true);
     try {
+      await saveNameAndPhoto();
       const res = await fetch("/api/rider-profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -114,6 +157,7 @@ export default function OnboardingPage() {
   }
 
   const busy = saving || skipping;
+  const phoneNumber = session?.user?.phoneNumber ?? null;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-background px-6 py-16 lg:px-10">
@@ -146,10 +190,81 @@ export default function OnboardingPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="glass mt-10 space-y-8 rounded-3xl p-6 md:p-8 lg:p-10">
-          <section className="space-y-4">
-            <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">
-              Driving licence
-            </p>
+          <section>
+            <VehicleDetailsFields
+              value={extra}
+              onChange={setExtra}
+              sectionHeadingClassName={sectionHeadingClassName}
+            />
+          </section>
+
+          <section className="space-y-4 border-t border-foreground/10 pt-6">
+            <p className={sectionHeadingClassName}>Rider profile</p>
+
+            <div className="flex items-center gap-5">
+              <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-full bg-foreground/10 flex items-center justify-center">
+                {photoUrl ? (
+                  <Image src={photoUrl} alt="Rider photo" fill className="object-cover" />
+                ) : (
+                  <span className="text-xl">📷</span>
+                )}
+                {uploadingPhoto && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-background/50">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+                  </div>
+                )}
+              </div>
+              <div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  ref={fileInputRef}
+                  onChange={handlePhotoUpload}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingPhoto}
+                  className="rounded-xl border border-foreground/10 bg-background px-4 py-2 text-sm font-medium transition-colors hover:bg-foreground/5 disabled:opacity-50"
+                >
+                  Upload rider photo
+                </button>
+                <p className="mt-1.5 text-xs text-foreground/50">JPG or PNG, max 5 MB.</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className={labelClassName} htmlFor="fullName">
+                  Full name
+                </label>
+                <input
+                  id="fullName"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="As per government ID"
+                  className={inputClassName}
+                />
+              </div>
+              <div>
+                <label className={labelClassName} htmlFor="mobileNumber">
+                  Mobile number
+                </label>
+                <input
+                  id="mobileNumber"
+                  readOnly
+                  value={phoneNumber ?? ""}
+                  className={`${inputClassName} opacity-60`}
+                />
+              </div>
+            </div>
+
+            <RiderPersonalFields value={extra} onChange={setExtra} sectionHeadingClassName="sr-only" />
+          </section>
+
+          <section className="space-y-4 border-t border-foreground/10 pt-6">
+            <p className={sectionHeadingClassName}>Driving licence</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelClassName} htmlFor="drivingLicenceNumber">
@@ -178,12 +293,8 @@ export default function OnboardingPage() {
             </div>
           </section>
 
-          <RiderProfileExtraFields value={extra} onChange={setExtra} />
-
           <section className="space-y-4 border-t border-foreground/10 pt-6">
-            <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">
-              Address
-            </p>
+            <p className={sectionHeadingClassName}>Address</p>
             <div>
               <label className={labelClassName} htmlFor="addressLine">
                 Address line
@@ -246,14 +357,28 @@ export default function OnboardingPage() {
 
           <section className="space-y-4 border-t border-foreground/10 pt-6">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">
-                Emergency contacts
-              </p>
+              <p className={sectionHeadingClassName}>Emergency contacts</p>
               <p className="mt-1 text-sm text-foreground/60">
                 Add up to 3 people we can reach in case of an emergency during a ride.
               </p>
             </div>
             <EmergencyContactsEditor contacts={contacts} onChange={setContacts} max={3} />
+          </section>
+
+          <section className="border-t border-foreground/10 pt-6">
+            <GovernmentIdFields
+              value={extra}
+              onChange={setExtra}
+              sectionHeadingClassName={sectionHeadingClassName}
+            />
+          </section>
+
+          <section className="border-t border-foreground/10 pt-6">
+            <RidingDetailsFields
+              value={extra}
+              onChange={setExtra}
+              sectionHeadingClassName={sectionHeadingClassName}
+            />
           </section>
 
           {error && (

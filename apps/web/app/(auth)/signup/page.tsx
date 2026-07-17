@@ -35,7 +35,6 @@ export default function SignUpPage() {
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpCode, setOtpCode] = useState("");
   const [exists, setExists] = useState<boolean | null>(null);
-  const [fullName, setFullName] = useState("");
   const [referralCode, setReferralCode] = useState("");
 
   const [sendingOtp, setSendingOtp] = useState(false);
@@ -113,11 +112,6 @@ export default function SignUpPage() {
     e.preventDefault();
     setServerError(null);
 
-    if (exists === false && !fullName.trim()) {
-      setServerError("Enter your full name.");
-      return;
-    }
-
     setVerifying(true);
     try {
       const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: otpCode });
@@ -127,10 +121,12 @@ export default function SignUpPage() {
       }
 
       if (exists === false) {
+        // Name isn't collected here — it's asked for on the onboarding/partner-onboarding
+        // form right after this, so this call only needs to apply the role picked on /welcome.
         const completeRes = await fetch("/api/user/complete-phone-signup", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: fullName.trim(), role: dbRole }),
+          body: JSON.stringify({ role: dbRole }),
         });
         const completeData: { success: boolean; becamePartner: boolean } = await completeRes.json();
 
@@ -291,32 +287,21 @@ export default function SignUpPage() {
               </div>
 
               {exists === false && (
-                <>
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="fullName">
-                      Full name
-                    </label>
-                    <input
-                      id="fullName"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className={inputClassName}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-medium" htmlFor="referralCode">
-                      Referral code <span className="font-normal text-foreground/40">(optional)</span>
-                    </label>
-                    <input
-                      id="referralCode"
-                      value={referralCode}
-                      onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                      placeholder="e.g. RID4F2A9"
-                      className={`${inputClassName} uppercase`}
-                    />
-                  </div>
-                </>
+                <div>
+                  <label className="text-sm font-medium" htmlFor="referralCode">
+                    Referral code <span className="font-normal text-foreground/40">(optional)</span>
+                  </label>
+                  <input
+                    id="referralCode"
+                    value={referralCode}
+                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. RID4F2A9"
+                    className={`${inputClassName} uppercase`}
+                  />
+                  <p className="mt-1 text-xs text-foreground/40">
+                    We&apos;ll ask for your name on the next screen.
+                  </p>
+                </div>
               )}
 
               {serverError && (

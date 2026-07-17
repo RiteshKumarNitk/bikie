@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Rider Registration Restructure + Modal Panic UI (2026-07-17, ADR-015)
+
+Name collection moved out of the OTP signup step into onboarding; onboarding form
+reordered/expanded per a reference rider-registration mockup; Panic Button rebuilt as a
+modal confirm flow and moved above the Hero.
+
+| Task | Status |
+|---|---|
+| `/signup`: removed the inline "Full name" field from the OTP-entry step (both Rider and Partner share this step); `completePhoneSignupSchema`/`UserService.completePhoneSignup` now treat `name` as optional, so the post-verify call only applies the chosen role | Completed |
+| `/onboarding`: added Full Name field + rider photo upload (reusing the existing `/api/upload` → Cloudinary pipeline and `authClient.updateUser` — same pattern as `ProfileSettings.tsx`), reordered sections to Vehicle → Rider profile → Driving licence → Address → Emergency contacts → Government ID → Riding details | Completed |
+| `RiderProfileExtraFields` split into 4 exported sub-components (`VehicleDetailsFields`, `RiderPersonalFields`, `GovernmentIdFields`, `RidingDetailsFields`) so onboarding can reorder them; combined export unchanged for Settings | Completed |
+| `/partner-onboarding`: added a "Your details" → Full Name field, since Partner accounts also no longer get a name from the OTP step | Completed |
+| `PanicButtonSection`: rebuilt as a modal-based confirm flow (Red = one-tap "Are you sure?", Amber = category picker) instead of an inline expanding panel; GPS captured silently in the background on modal open, city input only shown as a fallback if geolocation fails; moved above the Hero on the homepage | Completed |
+| Added missing `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_FROM_NUMBER` to `.env.example` — `SMSService` (Twilio) already sends OTP/SOS SMS when these are set, they just weren't documented | Completed |
+
 ## OTP Toast for Testing Builds (2026-07-16)
 
 Made the OTP visible as a toast notification on production builds during testing, so the

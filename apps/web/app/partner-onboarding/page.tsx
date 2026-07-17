@@ -2,15 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { authClient } from "@/lib/auth-client";
 import {
   PartnerBusinessFields,
   emptyPartnerBusinessDetails,
   type PartnerBusinessDetails,
 } from "@/components/auth/PartnerBusinessFields";
 
+const inputClassName =
+  "mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30";
+const labelClassName = "text-sm font-medium";
+
 export default function PartnerOnboardingPage() {
   const router = useRouter();
 
+  const [fullName, setFullName] = useState("");
   const [partnerDetails, setPartnerDetails] = useState<PartnerBusinessDetails>(
     emptyPartnerBusinessDetails,
   );
@@ -24,6 +30,9 @@ export default function PartnerOnboardingPage() {
 
     setSaving(true);
     try {
+      if (fullName.trim()) {
+        await authClient.updateUser({ name: fullName.trim() });
+      }
       const res = await fetch("/api/partner/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -85,6 +94,24 @@ export default function PartnerOnboardingPage() {
 
         <form onSubmit={handleSubmit} className="glass mt-10 space-y-8 rounded-3xl p-6 md:p-8 lg:p-10">
           <section className="space-y-4">
+            <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">
+              Your details
+            </p>
+            <div>
+              <label className={labelClassName} htmlFor="fullName">
+                Full name
+              </label>
+              <input
+                id="fullName"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="As per government ID"
+                className={inputClassName}
+              />
+            </div>
+          </section>
+
+          <section className="space-y-4 border-t border-foreground/10 pt-6">
             <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">
               Business details
             </p>

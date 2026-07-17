@@ -1,5 +1,27 @@
 # Changelog
 
+## Rider Registration Restructure + Modal Panic UI
+- Removed the "Full name" field from `/signup`'s OTP step — name is no longer collected during
+  phone+OTP verification for either Rider or Partner. `PATCH /api/user/complete-phone-signup`
+  now only applies the role picked on `/welcome`; `name` is optional in its schema/service.
+- `/onboarding`: added a Full Name field and a rider photo upload (via the existing
+  `/api/upload` Cloudinary route + `authClient.updateUser`), and reordered the form to Vehicle
+  details → Rider profile → Driving licence → Address → Emergency contacts → Government ID →
+  Riding details, matching a provided rider-registration reference mockup. The form stays fully
+  skippable, name included, per explicit user decision.
+- Split `RiderProfileExtraFields` into 4 exported sub-components (`VehicleDetailsFields`,
+  `RiderPersonalFields`, `GovernmentIdFields`, `RidingDetailsFields`) so onboarding can reorder
+  them independently; the combined `RiderProfileExtraFields` export (used by Settings) is
+  unchanged.
+- `/partner-onboarding`: added a Full Name field, since Partner signups also stopped getting a
+  name from the OTP step.
+- `PanicButtonSection`: replaced the inline expanding panel with a modal confirm flow — Red is a
+  single "Are you sure?" tap, Amber picks a category inside the modal — and moved the section
+  above the Hero on the homepage. GPS is captured silently when the modal opens; a city field
+  only appears if geolocation fails.
+- Documented `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_FROM_NUMBER` in `.env.example` —
+  `SMSService` already used them, they just weren't listed; no code change to SMS delivery.
+
 ## OTP Toast for Testing Builds
 - Removed `NODE_ENV === "production"` guards from `DevOtpStore` and `/api/dev/otp` route —
   now gated by `SHOW_OTP_TOAST` env var (defaults to enabled in `.env.example`).

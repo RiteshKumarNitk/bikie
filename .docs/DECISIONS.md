@@ -243,3 +243,51 @@ Per explicit user confirmation ("I just want onboarding from this"), only the on
   "no account yet? sign up" fallback), so a role is chosen *and then* the visitor authenticates
   before seeing any dashboard content. Anonymous marketing-site browsing without picking a role
   is unaffected (the role cookie is separate from being logged in).
+
+## ADR-015: Name moves from the OTP signup step to the onboarding/partner-onboarding form; Panic UI becomes modal-based and moves above the Hero
+Per a third reference doc (a full rider-registration mockup) plus explicit user instructions:
+- **Full name is no longer collected on `/signup`'s OTP step.** It previously appeared inline
+  in the OTP-entry form for brand-new phone numbers and was sent to
+  `PATCH /api/user/complete-phone-signup` alongside the chosen role. That endpoint's `name`
+  field is now optional (`completePhoneSignupSchema`, `UserService.completePhoneSignup`) — the
+  call is still made immediately after OTP verify, but now only to apply the Rider/Partner role
+  picked on `/welcome`; the account keeps Better Auth's placeholder name (the raw phone number,
+  `getTempName`) until the user reaches onboarding. Name is instead collected as a plain field
+  in the "Rider profile" section of `/onboarding` (and a new "Your details" section on
+  `/partner-onboarding`, since both roles share the same OTP step), saved via
+  `authClient.updateUser({ name, image })` directly from the client — no new backend route,
+  reusing the same Better Auth `updateUser` call `ProfileSettings.tsx` already uses for the
+  profile picture. Per explicit user decision, the whole onboarding form — including the name
+  field — stays skippable exactly as it was before (ADR-012); an account can still end up keeping
+  its phone-number placeholder name if the user skips.
+- **Rider photo upload added to onboarding**, reusing the existing `/api/upload` → Cloudinary
+  pipeline (`UploadService`) and the same `authClient.updateUser({ image })` pattern as
+  `ProfileSettings.tsx` — no new upload route or DB column; the photo is stored on `User.image`,
+  the same field the dashboard Settings page already reads/writes.
+- **Onboarding form reordered** to match the reference mockup's section order (Vehicle details →
+  Rider profile → Driving licence → Address → Emergency contacts → Government ID → Riding
+  details). `RiderProfileExtraFields` (`components/shared/RiderProfileExtraFields.tsx`) was
+  split into four exported sub-components (`VehicleDetailsFields`, `RiderPersonalFields`,
+  `GovernmentIdFields`, `RidingDetailsFields`) so `/onboarding` can interleave them with its own
+  Full Name/DL/Address/Emergency-contacts sections in that order; the original combined
+  `RiderProfileExtraFields` export is unchanged (same fields, same original order) so the
+  Settings "Rider Details" section needed no changes.
+- **Panic Button restructured to a modal-based confirm flow**, matching the reference mockup:
+  the two cards (`PanicButtonSection.tsx`) are now purely presentational (icon/tagline/category
+  badges/channels), and tapping either opens a centered modal overlay instead of expanding an
+  inline panel — Red shows a single "Are you sure?" confirm (category defaults to `ACCIDENT`,
+  since the mockup's Red flow is one-tap with no picker); Amber shows the same category buttons
+  moved into the modal; both fall through to the existing login-required / membership-required /
+  sending / success states, now rendered as modal content instead of inline. GPS location is
+  captured silently in the background the moment the modal opens (falls back to a small city
+  input only if geolocation fails or is denied) rather than requiring the user to tap "share
+  location" — same `POST /api/sos/alerts` call, membership gate, and rate limit as before.
+- **Panic section moved above the Hero** on the homepage (`apps/web/app/(main)/page.tsx`) —
+  per explicit user decision, it's now the first thing a visitor sees, ahead of the marketing
+  hero banner.
+- **Twilio**: no code change — `SMSService` (ADR-013) already sends real SMS through Twilio's
+  REST API whenever `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_FROM_NUMBER` are set, for
+  both OTP delivery and SOS alerts. The only actual gap found was that `.env.example` never
+  documented those three variables even though the code already reads them — added under the
+  "ACTIVE" section. Real delivery still requires a real Twilio account's credentials in
+  `apps/web/.env.local`, which is out of scope for a code change.

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "@bikie/ui";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { PanicAlertCards } from "@/components/shared/PanicAlertCards";
 
 interface SOSAlert {
   id: string;
@@ -56,17 +57,10 @@ export default function SOSPage() {
   const [checkingMembership, setCheckingMembership] = useState(true);
   const [isMember, setIsMember] = useState(false);
   const [activeTab, setActiveTab] = useState<"new" | "alerts">("new");
-  const [alertType, setAlertType] = useState("ACCIDENT");
-  const [description, setDescription] = useState("");
   const [city, setCity] = useState("");
-  const [location, setLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [locError, setLocError] = useState<string | null>(null);
-  const [sending, setSending] = useState(false);
-  const [sent, setSent] = useState(false);
   const [activeAlerts, setActiveAlerts] = useState<SOSAlert[]>([]);
   const [alertSent, setAlertSent] = useState(false);
   const [profileWarning, setProfileWarning] = useState<string | null>(null);
-  const [sendError, setSendError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!session) return;
@@ -92,51 +86,10 @@ export default function SOSPage() {
       .then((data) => setActiveAlerts(data.alerts ?? []));
   }, [isMember, city, session?.user.role]);
 
-  function getLocation() {
-    if (!navigator.geolocation) {
-      setLocError("Geolocation is not supported");
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setLocError(null);
-      },
-      () => {
-        setLocError("Could not get location. Please enter your city manually.");
-      },
-    );
-  }
-
-  async function handleSendAlert() {
-    if (!location && !city) {
-      setLocError("Please allow location access or enter your city");
-      return;
-    }
-    setSending(true);
-    setSendError(null);
-    const res = await fetch("/api/sos/alerts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        type: alertType,
-        description,
-        latitude: location?.lat ?? 0,
-        longitude: location?.lng ?? 0,
-        city: city || "Unknown",
-      }),
-    });
-    setSending(false);
-    if (res.ok) {
-      const data = await res.json();
-      setSent(true);
-      setAlertSent(true);
-      if (data.profileWarning) setProfileWarning(data.profileWarning);
-      setTimeout(() => { setActiveTab("alerts"); setSent(false); }, 2000);
-    } else {
-      const data = await res.json().catch(() => null);
-      setSendError(data?.message ?? "Could not send alert. Please try again.");
-    }
+  function handleAlertSent(warning: string | null) {
+    setAlertSent(true);
+    setProfileWarning(warning);
+    setTimeout(() => setActiveTab("alerts"), 2000);
   }
 
   const isMyAlert = (item: SOSAlert) => item.userId === session?.user.id;
@@ -197,82 +150,9 @@ export default function SOSPage() {
         </div>
       )}
 
-      {sendError && (
-        <div className="mt-4 rounded-2xl bg-red-500/15 px-6 py-4 text-sm text-red-400">
-          {sendError}
-        </div>
-      )}
-
       {activeTab === "new" && (
-        <div className="mt-4 rounded-2xl border border-foreground/10 bg-card p-6">
-          <p className="text-lg font-semibold">What&apos;s happening?</p>
-          <p className="mt-1 text-sm text-foreground/50">Your location and alert will be shared with other members and admins.</p>
-
-          <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {alertTypes.map((type) => (
-              <button
-                key={type.value}
-                type="button"
-                onClick={() => { setAlertType(type.value); setSent(false); }}
-                className={`rounded-xl border p-4 text-left transition-all ${
-                  alertType === type.value
-                    ? "border-red-500 bg-red-500/10 ring-1 ring-red-500"
-                    : "border-foreground/10 hover:border-foreground/20"
-                }`}
-              >
-                <p className="text-lg">{type.label.split(" ")[0]}</p>
-                <p className="mt-1 text-sm font-medium">{type.label.split(" ").slice(1).join(" ")}</p>
-                <p className="mt-0.5 text-xs text-foreground/50">{type.desc}</p>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-6">
-            <label className="text-sm font-medium">Additional details (optional)</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Describe your situation..."
-              rows={3}
-              className="mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-red-500 focus:ring-1 focus:ring-red-500/30"
-            />
-          </div>
-
-          <div className="mt-4">
-            <label className="text-sm font-medium">Your City</label>
-            <input
-              type="text"
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
-              placeholder="e.g. Goa, Manali"
-              className="mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30"
-            />
-          </div>
-
-          <div className="mt-4 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={getLocation}
-              className="rounded-xl border border-foreground/10 px-4 py-2 text-xs font-medium transition-colors hover:bg-foreground/5"
-            >
-              {location ? "📍 Location captured" : "Share my location"}
-            </button>
-            {location && (
-              <span className="text-xs text-foreground/50">
-                {location.lat.toFixed(4)}, {location.lng.toFixed(4)}
-              </span>
-            )}
-          </div>
-          {locError && <p className="mt-2 text-xs text-red-400">{locError}</p>}
-
-          <button
-            type="button"
-            onClick={handleSendAlert}
-            disabled={sending || sent}
-            className="mt-6 w-full rounded-xl bg-red-500 py-3.5 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50"
-          >
-            {sending ? "Sending..." : sent ? "✓ Alert Sent!" : `Send SOS Alert — ${alertTypes.find((t) => t.value === alertType)?.label}`}
-          </button>
+        <div className="mt-4">
+          <PanicAlertCards gateState="ready" onSent={handleAlertSent} />
         </div>
       )}
 

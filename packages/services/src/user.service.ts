@@ -39,21 +39,23 @@ export const UserService = {
    * Better Auth's `signUpOnVerification` creates the row with a placeholder name (the raw
    * phone number, see `getTempName` in packages/auth/src/server.ts) and always defaults
    * `role` to RENTER, since passing extra fields through the OTP `verify` call isn't a
-   * type-safe path worth relying on. This sets the real name, and — only on that same
-   * first call, detected by the name still being the untouched placeholder — applies the
-   * role the user actually picked on /welcome. Calling this again later just renames the
-   * account; it can never be used to change role after the fact (use /api/user/become-partner
-   * for that, which has its own explicit guard).
+   * type-safe path worth relying on. This applies — only on that same first call, detected
+   * by the name still being the untouched placeholder — the role the user actually picked
+   * on /welcome. The real name is set later, on the onboarding/partner-onboarding form
+   * (via `authClient.updateUser`), not here — `name` is only accepted for backward
+   * compatibility with any other caller that still wants to set it in the same step.
    */
   async completePhoneSignup(
     userId: string,
-    input: { name: string; role: "RENTER" | "PARTNER" },
+    input: { name?: string; role: "RENTER" | "PARTNER" },
   ): Promise<{ ok: true; becamePartner: boolean } | { ok: false; reason: "NOT_FOUND" }> {
     const user = await userRepository.findById(userId);
     if (!user) return { ok: false, reason: "NOT_FOUND" };
 
     const isFirstCompletion = user.phoneNumber !== null && user.name === user.phoneNumber;
-    await userRepository.updateName(userId, input.name);
+    if (input.name) {
+      await userRepository.updateName(userId, input.name);
+    }
 
     const becamePartner = isFirstCompletion && input.role === "PARTNER" && user.role !== "PARTNER";
     if (becamePartner) {
