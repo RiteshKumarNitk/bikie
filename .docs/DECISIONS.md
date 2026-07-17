@@ -353,3 +353,43 @@ migration file — likely from an earlier `prisma db push`). Per explicit user c
 no real users yet), this was resolved via `prisma migrate reset`, which reseeded the three
 standard test accounts but **did not** restore any ad hoc account created outside the seed
 script (e.g. a real phone-OTP signup) — those are gone and would need to be recreated.
+
+## ADR-017: "Continue with Google" via Better Auth's `socialProviders`, not Firebase Authentication
+
+The user asked for Google login and initially pasted a Firebase Web SDK config snippet
+(`apiKey`/`authDomain`/`projectId`/etc.), believing it was the credential needed. It isn't —
+that snippet is Firebase's general app config (used for Cloud Messaging push per ADR-016, and
+optionally Analytics), not an OAuth credential. It was used to fill in the previously-blank
+`NEXT_PUBLIC_FIREBASE_*` client vars in `apps/web/.env.local` (`apiKey` → `NEXT_PUBLIC_FIREBASE_API_KEY`,
+`projectId` → both `FIREBASE_PROJECT_ID` and `NEXT_PUBLIC_FIREBASE_PROJECT_ID`,
+`messagingSenderId` → `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`, `appId` →
+`NEXT_PUBLIC_FIREBASE_APP_ID`) — push *sending* still needs a separate service account key
+(`FIREBASE_CLIENT_EMAIL`/`FIREBASE_PRIVATE_KEY`) the user hasn't generated yet, so it still uses
+the `[Push][DEV]` console fallback until that's added.
+
+Actual Google login is a standard OAuth2 **Better Auth social provider** — added as a
+`socialProviders.google` block in `packages/auth/src/server.ts`, using a Google OAuth **Client
+ID + Client Secret** from Google Cloud Console (a different credential than the Firebase config
+above, obtained from APIs & Services → Credentials → OAuth client ID, redirect URI
+`/api/auth/callback/google`). This does **not** involve Firebase Authentication at all — the
+existing constraint against using Firebase for auth (Firebase is FCM/Analytics-only, per
+ADR-016) is unaffected. No schema migration was needed: `Account` (`schema.prisma:330-348`)
+already has `providerId`/`accountId`/`accessToken`/`refreshToken`/`idToken`/`scope` — the
+standard Better Auth Prisma-adapter shape for any OAuth provider — and `User.email`/`image`/
+`emailVerified` already cover the profile fields Google returns.
+
+Per explicit user decisions:
+- **Account linking**: Better Auth's default behavior is used as-is (no `accountLinking`
+  override) — a Google sign-in whose email matches an existing account's **verified** email
+  signs into that same account rather than creating a duplicate.
+- **Placement**: "Continue with Google" appears on both `/login` and `/signup`, above the
+  existing phone/OTP and admin-email flows, hidden only during the OTP-entry/partner-upgrade
+  sub-steps.
+- **Role**: a brand-new Google sign-up always lands as `RENTER` (`user.additionalFields.role`'s
+  existing default, `server.ts:75-79`) — the Rider/Partner choice from `/welcome` isn't threaded
+  through the OAuth redirect; anyone who wants Partner uses the existing self-service
+  `POST /api/user/become-partner` upgrade afterward, same as any phone-signup Rider today.
+- **No dev-safe fallback**: unlike SMS/Places/Push, there's no graceful no-op mode for Google
+  sign-in — if `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are unset, Better Auth logs a warning
+  and simply never registers the `google` provider/callback route; the login/signup UI shows a
+  normal error message if the button is clicked in that state rather than assuming a stub exists.

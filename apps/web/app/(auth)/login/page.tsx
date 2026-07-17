@@ -54,6 +54,7 @@ export default function LoginPage() {
   const [verifying, setVerifying] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
 
   async function fetchDevOtp(phone: string) {
     try {
@@ -179,6 +180,22 @@ export default function LoginPage() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    setServerError(null);
+    setSigningInWithGoogle(true);
+    try {
+      const { error } = await authClient.signIn.social({ provider: "google", callbackURL: "/" });
+      if (error) {
+        setServerError(error.message ?? "Could not sign in with Google. Please try again.");
+        setSigningInWithGoogle(false);
+      }
+      // On success Better Auth redirects to Google, so no further action here.
+    } catch {
+      setServerError("Could not sign in with Google. Please try again.");
+      setSigningInWithGoogle(false);
+    }
+  }
+
   async function onEmailSignIn(e: React.FormEvent) {
     e.preventDefault();
     setServerError(null);
@@ -253,6 +270,26 @@ export default function LoginPage() {
                 : "Log in to your account"}
             </p>
           </div>
+
+          {step !== "otp" && step !== "upgrade" && (
+            <div className="mt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGoogleSignIn}
+                disabled={signingInWithGoogle}
+                className="w-full"
+                size="lg"
+              >
+                {signingInWithGoogle ? "Redirecting…" : "Continue with Google"}
+              </Button>
+              <div className="mt-4 flex items-center gap-3 text-xs text-foreground/40">
+                <div className="h-px flex-1 bg-foreground/10" />
+                or
+                <div className="h-px flex-1 bg-foreground/10" />
+              </div>
+            </div>
+          )}
 
           {mode === "phone" && step === "phone" && (
             <p className="mt-4">

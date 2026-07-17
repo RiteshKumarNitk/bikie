@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## "Continue with Google" Sign-In (2026-07-17, ADR-017)
+
+Google OAuth via Better Auth's `socialProviders` — not Firebase Authentication. Also finished
+wiring the client-side Firebase config left blank in ADR-016.
+
+| Task | Status |
+|---|---|
+| `packages/auth/src/server.ts`: added `socialProviders.google` (`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`); no schema migration needed — `Account`/`User` already support OAuth providers | Completed |
+| "Continue with Google" button on both `/login` and `/signup`, calling `authClient.signIn.social({ provider: "google" })`, hidden during OTP-entry/partner-upgrade sub-steps | Completed |
+| `.env.example`: added `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` (no dev-safe fallback for this one — unset means the provider just doesn't register) | Completed |
+| Filled in `apps/web/.env.local`'s previously-blank `NEXT_PUBLIC_FIREBASE_*` client vars from the user's Firebase web app config (`apiKey`/`projectId`/`messagingSenderId`/`appId`) — push *sending* still needs a separate service account key the user hasn't generated, so `[Push][DEV]` fallback is still active | Completed |
+| New Google sign-ups always land as `RENTER`; Partner is available afterward via the existing self-service upgrade — the `/welcome` Rider/Partner choice isn't threaded through the OAuth redirect | Completed |
+
 ## Nearby Riders, Nearby Help, Push Notifications (2026-07-17, ADR-016)
 
 Un-defers ADR-011's Live Location extension point; adds Google Places-backed nearby help on the

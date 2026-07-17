@@ -89,6 +89,19 @@ export const auth = betterAuth({
       },
     },
   },
+  // Google sign-in (ADR-017) — a standard OAuth2 social provider through Better Auth itself,
+  // NOT Firebase Authentication (Firebase is used only for Cloud Messaging push, ADR-016).
+  // Unset GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET simply means the `google` provider/callback
+  // route never registers — there's no dev-safe stub here the way SMS/Places/Push have one,
+  // so the login/signup UI must handle a failed `signIn.social` call with a normal error.
+  // Account linking uses Better Auth's default: a Google email matching an existing *verified*
+  // email signs into that same account rather than creating a duplicate.
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    },
+  },
   // Cookie sessions remain the primary mechanism for the web app; bearer()
   // additionally lets non-browser clients (the Flutter app) authenticate via
   // `Authorization: Bearer <token>` using the same session/getSession machinery.

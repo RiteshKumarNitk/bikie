@@ -1,5 +1,18 @@
 # Changelog
 
+## "Continue with Google" Sign-In
+- Added Google as a Better Auth social provider (`socialProviders.google` in
+  `packages/auth/src/server.ts`) — a standard OAuth2 flow, not Firebase Authentication. No
+  migration needed; `Account`/`User` already support arbitrary OAuth providers.
+- "Continue with Google" button added to both `/login` and `/signup`.
+- New Google sign-ups default to `RENTER`; Partner is available afterward via the existing
+  self-service upgrade path.
+- Filled in the previously-blank client-side Firebase config vars (`NEXT_PUBLIC_FIREBASE_*`) in
+  `apps/web/.env.local` from the user's Firebase web app snippet — completes the client half of
+  ADR-016's push notifications; sending still needs a separate service account key.
+- See `.docs/DECISIONS.md` ADR-017 for why the pasted Firebase config wasn't the credential
+  Google login actually needed, and what account-linking/role behavior was chosen.
+
 ## Nearby Riders, Nearby Help, Push Notifications
 - New `RiderLocation` model (PostGIS `geography(Point,4326)`, opt-in `sharingEnabled` flag,
   default off) powers "Nearby Riders" — `GET /api/riders/nearby?radiusKm=` self-joins on the

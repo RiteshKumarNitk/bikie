@@ -39,6 +39,7 @@ export default function SignUpPage() {
 
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
 
   async function fetchDevOtp(phone: string) {
     try {
@@ -65,6 +66,25 @@ export default function SignUpPage() {
   }, []);
 
   const dbRole = selectedRoleToDbRole(selectedRole);
+
+  async function handleGoogleSignIn() {
+    setServerError(null);
+    setSigningInWithGoogle(true);
+    try {
+      // Google sign-up always lands as RENTER (Better Auth's default role) — the Rider/Partner
+      // choice on /welcome only threads through the phone-OTP flow; Partner is available
+      // afterward via the existing self-service "Become a Partner" upgrade, same as any
+      // phone-signup Rider.
+      const { error } = await authClient.signIn.social({ provider: "google", callbackURL: "/" });
+      if (error) {
+        setServerError(error.message ?? "Could not continue with Google. Please try again.");
+        setSigningInWithGoogle(false);
+      }
+    } catch {
+      setServerError("Could not continue with Google. Please try again.");
+      setSigningInWithGoogle(false);
+    }
+  }
 
   async function handleSendCode() {
     setServerError(null);
@@ -210,7 +230,27 @@ export default function SignUpPage() {
           </div>
 
           {step === "phone" && (
-            <div className="mt-6 space-y-4">
+            <div className="mt-6">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleGoogleSignIn}
+                disabled={signingInWithGoogle}
+                className="w-full"
+                size="lg"
+              >
+                {signingInWithGoogle ? "Redirecting…" : "Continue with Google"}
+              </Button>
+              <div className="mt-4 flex items-center gap-3 text-xs text-foreground/40">
+                <div className="h-px flex-1 bg-foreground/10" />
+                or
+                <div className="h-px flex-1 bg-foreground/10" />
+              </div>
+            </div>
+          )}
+
+          {step === "phone" && (
+            <div className="mt-4 space-y-4">
               <div>
                 <label className="text-sm font-medium" htmlFor="phoneNumber">
                   Phone number
