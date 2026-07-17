@@ -106,6 +106,28 @@ reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md
 | `/api/sos/alerts/[id]/resolve` | POST | Mark an alert resolved. |
 | `/api/cron/sos-resolve` | GET | Cron-only. Requires `Authorization: Bearer <CRON_SECRET>`. Auto-resolves alerts inactive for 120+ minutes. |
 
+## Nearby Riders (membership required, ADR-016)
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/rider-location/consent` | GET/PUT | `{ enabled: boolean }`. Opt in/out of live location sharing. |
+| `/api/rider-location` | PUT | `{ latitude, longitude }`. Rejected with `409 { error: "SHARING_DISABLED" }` if consent isn't on. Rate-limited (~30/5min). |
+| `/api/riders/nearby` | GET | `?radiusKm=` (default 5, max 50). Self-joins on the caller's own fix as the search center — `409 { error: "SHARING_DISABLED" }` if the caller has no fix on file. |
+| `/api/cron/rider-location-cleanup` | GET | Cron-only. Requires `Authorization: Bearer <CRON_SECRET>`. Disables sharing for anyone with no fix in 30+ minutes. |
+
+## Nearby Help / Places (membership required, ADR-016)
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/places/nearby` | GET | `?lat=&lng=&type=gas_station\|car_repair\|hospital`. Server-side Google Places (New) call, Redis-cached (~1.1km grid, 10min TTL), rate-limited (10/min). |
+
+## Push Notifications (ADR-016)
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/notifications/push-token` | PUT/DELETE | `{ token }`. Registers/removes an FCM web push token for the current session. |
+| `/api/firebase-config` | GET | Public Firebase Web SDK config, fetched by `public/firebase-messaging-sw.js` at load time (static files can't read `NEXT_PUBLIC_*` env vars). |
+
 ## Membership (auth required)
 
 | Route | Method | Notes |

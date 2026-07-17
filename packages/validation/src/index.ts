@@ -13,3 +13,6 @@ export * from "./wishlist.schema";
 export * from "./conversation.schema";
 export * from "./rider-profile.schema";
 export * from "./partner.schema";
+export * from "./rider-location.schema";
+export * from "./places.schema";
+export * from "./push-subscription.schema";

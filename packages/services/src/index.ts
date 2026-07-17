@@ -23,3 +23,6 @@ export { UploadService } from "./upload.service";
 export { RiderProfileService } from "./rider-profile.service";
 export { UserService } from "./user.service";
 export { DevOtpStore } from "./lib/dev-otp-store";
+export { RiderLocationService } from "./rider-location.service";
+export { PushService } from "./push.service";
+export { PlacesService } from "./places.service";

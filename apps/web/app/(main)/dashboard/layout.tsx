@@ -31,6 +31,7 @@ const navGroups = [
       { label: "Notifications", href: "/dashboard/notifications" },
       { label: "Wallet", href: "/dashboard/wallet" },
       { label: "SOS Emergency", href: "/dashboard/sos" },
+      { label: "Nearby Riders", href: "/dashboard/nearby" },
       { label: "Membership", href: "/dashboard/membership" },
       { label: "Settings", href: "/dashboard/settings" },
     ]

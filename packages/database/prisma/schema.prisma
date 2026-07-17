@@ -238,6 +238,8 @@ model User {
   messageReceipts     MessageReceipt[]
   messageReactions    MessageReaction[]
   riderProfile        RiderProfile?
+  riderLocation       RiderLocation?
+  pushSubscriptions   PushSubscription[]
 
   @@map("user")
 }
@@ -858,4 +860,35 @@ model AuditLog {
   @@index([entity, entityId])
   @@index([createdAt])
   @@map("audit_log")
+}
+
+// --- Nearby riders (ADR-016) — un-defers ADR-011's "Live Location" extension point ---
+
+// `location` is only ever read/written via $queryRaw/$executeRaw in
+// rider-location.repository.ts — Unsupported types are invisible to the generated Client's
+// normal CRUD methods. The PostGIS extension and this model's GiST index are BOTH hand-written
+// into this model's migration.sql and are invisible to `prisma migrate dev`'s diff engine —
+// see that migration's comments before touching this table's migrations again.
+model RiderLocation {
+  userId         String    @id
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location       Unsupported("geography(Point, 4326)")?
+  sharingEnabled Boolean   @default(false)
+  updatedAt      DateTime  @updatedAt
+
+  @@map("rider_location")
+}
+
+// --- Push notifications (ADR-016) — Firebase Cloud Messaging, web only for now ---
+
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  createdAt  DateTime @default(now())
+  lastSeenAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("push_subscription")
 }

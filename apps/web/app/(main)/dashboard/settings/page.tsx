@@ -5,6 +5,8 @@ import { getJson } from "@/lib/api";
 import { ProfileSettings } from "@/components/dashboard/ProfileSettings";
 import { RiderDetailsSettings } from "@/components/dashboard/RiderDetailsSettings";
 import { BecomeServiceProviderAction } from "@/components/dashboard/BecomeServiceProviderAction";
+import { PushNotificationToggle } from "@/components/dashboard/PushNotificationToggle";
+import { RiderLocationToggle } from "@/components/dashboard/RiderLocationToggle";
 
 export const metadata: Metadata = { title: "Settings" };
 
@@ -27,6 +29,20 @@ export default async function DashboardSettingsPage() {
           image={session?.user.image ?? null}
           phone={(session?.user as any).phone ?? null}
         />
+      </section>
+
+      <section className="mt-6 rounded-3xl bg-card p-6">
+        <p className="font-semibold">Notifications</p>
+        <div className="mt-4">
+          <PushNotificationToggle />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-3xl bg-card p-6">
+        <p className="font-semibold">Nearby riders</p>
+        <div className="mt-4">
+          <RiderLocationToggle />
+        </div>
       </section>
 
       <section className="mt-6 rounded-3xl bg-card p-6">

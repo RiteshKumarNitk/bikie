@@ -2,6 +2,25 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Nearby Riders, Nearby Help, Push Notifications (2026-07-17, ADR-016)
+
+Un-defers ADR-011's Live Location extension point; adds Google Places-backed nearby help on the
+SOS page; wires Firebase push into every existing notification type.
+
+| Task | Status |
+|---|---|
+| New `RiderLocation` model (PostGIS `geography(Point,4326)`, hand-edited migration enabling the `postgis` extension + a GiST index — both invisible to `schema.prisma`'s diff engine) + `sharingEnabled` opt-in flag, default off | Completed |
+| `rider-location.repository.ts`/`rider-location.service.ts` — consent toggle, GPS-fix upsert (rejects if sharing is off), and a self-joining nearby-radius query (uses the caller's own fix as the search center, so "must be sharing to search" falls out of the query itself) | Completed |
+| Routes: `PUT/GET /api/rider-location/consent`, `PUT /api/rider-location`, `GET /api/riders/nearby?radiusKm=` — all `requireMembership()`-gated | Completed |
+| New `/dashboard/nearby` page + a "Share my live location" toggle in Settings (`RiderLocationToggle.tsx`, pushes a fix every ~45s via `getCurrentPosition` while enabled) | Completed |
+| New cron `GET /api/cron/rider-location-cleanup` — flips `sharingEnabled` off after 30 minutes of no fix, same `Bearer CRON_SECRET` pattern as the existing `cron/sos-resolve` | Completed |
+| `PlacesService` (Google Places API (New) `searchNearby`, server-only key, Redis-cached ~1.1km grid cell/10min, rate-limited) + `GET /api/places/nearby` + a "Nearby Help" third tab on `/dashboard/sos` (`NearbyHelpPanel.tsx`) listing petrol pumps/mechanics/hospitals with a no-API-key-needed Google Maps directions link | Completed |
+| `PushSubscription` model + `PushService` (`firebase-admin`, `sendEachForMulticast`, dead-token cleanup on `messaging/registration-token-not-registered`) wired into `NotificationService.notify()` — covers every existing notification type (bookings, trip requests, chat, moderation, SOS) through that one choke point | Completed |
+| Client push wiring: `public/firebase-messaging-sw.js` (fetches its config from a new `GET /api/firebase-config` since static files can't read `NEXT_PUBLIC_*` vars), `lib/push-notifications.ts`, `PUT/DELETE /api/notifications/push-token`, and a Settings toggle (`PushNotificationToggle.tsx`) | Completed |
+| `.env.example`: added `GOOGLE_PLACES_API_KEY`, moved Firebase from "FUTURE" to "ACTIVE" and added the three vars its config was missing (`NEXT_PUBLIC_FIREBASE_PROJECT_ID`/`_MESSAGING_SENDER_ID`/`_VAPID_KEY`), added `CRON_SECRET` (pre-existing gap — already consumed by `cron/sos-resolve` but never documented) | Completed |
+| Web push only — native Flutter push (would need `firebase_messaging` + native FCM tokens) and a rendered Google Map (Maps JS SDK) are explicitly out of scope, see ADR-016 | Deferred |
+| Resolved pre-existing migration drift on the dev database (`message_reaction`, `TripStatus` enum values, `message.metadata`, `user.lastActiveAt` existed live with no migration file) via `prisma migrate reset`, per explicit user consent (dev phase, no real users) — reseeded the 3 standard test accounts; any account created outside the seed script (e.g. a real phone-OTP signup) did not survive and needs to be recreated | Completed |
+
 ## Rider Registration Restructure + Modal Panic UI (2026-07-17, ADR-015)
 
 Name collection moved out of the OTP signup step into onboarding; onboarding form

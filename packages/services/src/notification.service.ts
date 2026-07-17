@@ -1,6 +1,7 @@
 import { notificationRepository } from "@bikie/database";
 import type { NotificationDTO, NotificationType } from "@bikie/types";
 import { RealtimeService } from "./lib/realtime";
+import { PushService } from "./push.service";
 
 function toDTO(row: {
   id: string;
@@ -35,6 +36,12 @@ export const NotificationService = {
   ): Promise<void> {
     const row = await notificationRepository.create({ userId, type, title, body, entity, entityId });
     await RealtimeService.publishToUser(userId, "notification", toDTO(row));
+    // Fire-and-forget: push delivery must never block or fail the in-app notification write
+    // above, which is the source of truth. Covers every notification type (bookings, trip
+    // requests, chat, moderation, SOS) since they all funnel through this one function.
+    PushService.sendToUser(userId, { title, body, data: { type, entity: entity ?? "", entityId: entityId ?? "" } }).catch(
+      console.error,
+    );
   },
 
   async notifyMany(

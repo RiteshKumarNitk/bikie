@@ -13,7 +13,8 @@
     "@bikie/types": "workspace:*",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
-    "cloudinary": "^2.10.0"
+    "cloudinary": "^2.10.0",
+    "firebase-admin": "^13.0.0"
   },
   "devDependencies": {
     "typescript": "^5.7.0"

@@ -291,3 +291,65 @@ Per a third reference doc (a full rider-registration mockup) plus explicit user 
   documented those three variables even though the code already reads them — added under the
   "ACTIVE" section. Real delivery still requires a real Twilio account's credentials in
   `apps/web/.env.local`, which is out of scope for a code change.
+
+## ADR-016: Nearby Riders (PostGIS), Google Places "Nearby Help", Firebase push notifications
+
+Per explicit user decision, three previously future-roadmapped features were pulled into scope
+on top of the existing Next.js/Vercel/Prisma/Neon stack (no ASP.NET Core/VPS split — ADR-001's
+reasoning still holds and was re-confirmed against a competing stack proposal):
+
+- **"Nearby riders within Xkm" un-defers ADR-011's Live Location extension point** (which was
+  explicitly descoped — see `.docs/TASKS.md`). New `RiderLocation` model: one row per user,
+  `location Unsupported("geography(Point, 4326)")?` (nullable — Prisma has no native geometry
+  type, so this column is only ever read/written via `$queryRaw`/`$executeRaw` in
+  `rider-location.repository.ts`, never the normal Client API) plus an explicit
+  `sharingEnabled` opt-in boolean, default off. The `postgis` extension and this table's GiST
+  index (required for `ST_DWithin` to be fast) are **both hand-written into this migration's
+  SQL and are permanently invisible to `schema.prisma`/`prisma migrate dev`'s diff engine** —
+  do not "clean up" `packages/database/prisma/migrations/20260717094251_add_missing_columns_rider_location_push/migration.sql`
+  expecting Prisma to regenerate it correctly; it can't. Consent design: the "nearby riders"
+  query (`GET /api/riders/nearby`) self-joins on the *caller's own* location row as the search
+  center rather than accepting an external lat/lng — this makes "you must have your own
+  location on file (i.e. sharing must be on) to search" a natural side effect of the query
+  (`ST_DWithin`/`ST_Distance` against a null geography evaluate to null, filtering out every
+  row) rather than a bolted-on rule, and gives reciprocity for free. A `staleMinutes` filter (15
+  min) hides abandoned-but-still-"on" rows from query results, and a new cron
+  (`GET /api/cron/rider-location-cleanup`, same `Bearer CRON_SECRET` pattern as
+  `cron/sos-resolve`) flips `sharingEnabled` off after 30 minutes of no fix, so opting in doesn't
+  silently assert consent at the DB level forever after the client stops reporting. Gated behind
+  `requireMembership()`, matching the existing SOS "membership perk" precedent.
+- **Google Places "Nearby Help"** (petrol pump/mechanic/hospital), a new tab on the existing SOS
+  dashboard page (`/dashboard/sos`) rather than a new page — reuses the same
+  `navigator.geolocation` capture pattern already in `PanicAlertCards.tsx`. Calls the newer
+  Places API (New) v1 `searchNearby` (not the legacy `nearbysearch/json`), server-side only via
+  a new `PlacesService` (`GOOGLE_PLACES_API_KEY` never reaches the browser — it's a billable
+  key). Cached in the existing Upstash Redis instance on a ~1.1km grid cell (10 min TTL) and
+  rate-limited (`enforceRateLimit`), both specifically to bound billing risk from an
+  unauthenticated-cost-abuse angle even though the route also sits behind `requireMembership()`.
+  No visual map/Maps JS SDK — results are a list with a `google.com/maps/dir` deep link (needs
+  no API key), a deliberately smaller scope than a rendered map widget.
+- **Firebase Cloud Messaging**, wired into every existing notification type at once by hooking
+  the one existing choke point every notification already passes through —
+  `NotificationService.notify()` (`packages/services/src/notification.service.ts`) — with a
+  fire-and-forget `PushService.sendToUser(...).catch(console.error)` call, rather than adding
+  push calls at each of the many call sites (bookings, trip requests, chat, moderation, SOS).
+  New `PushSubscription` model (plain, ordinary migration — a user can have multiple
+  tokens/devices). Dead tokens (FCM's `messaging/registration-token-not-registered` error code)
+  are deleted automatically after a failed send. **Web only for now** — a native Flutter app
+  would need `firebase_messaging` and native FCM tokens, a different mechanism than the Web
+  SDK/VAPID/service-worker path built here; scoped out as a separate later effort. The static
+  `public/firebase-messaging-sw.js` service worker can't read `NEXT_PUBLIC_*` env vars at all
+  (only code Next actually builds gets them inlined), so it fetches its config from a new
+  `GET /api/firebase-config` route at load time instead of hardcoding values.
+- **Not built**: a rendered Google Map anywhere in the app (the `NEXT_PUBLIC_MAPBOX_TOKEN`
+  placeholder remains unwired — a visual map, e.g. for the existing unused
+  `Trip.meetingLat`/`meetingLng` fields, is a separate future feature), and any push notification
+  path for the mobile app.
+
+**Operational note**: applying this migration required resolving pre-existing, unrelated schema
+drift on the dev database (a `message_reaction` table, extra `TripStatus` enum values, `message
+.metadata`, and `user.lastActiveAt` existed in the live Neon database with no corresponding
+migration file — likely from an earlier `prisma db push`). Per explicit user consent (dev-phase,
+no real users yet), this was resolved via `prisma migrate reset`, which reseeded the three
+standard test accounts but **did not** restore any ad hoc account created outside the seed
+script (e.g. a real phone-OTP signup) — those are gone and would need to be recreated.

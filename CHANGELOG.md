@@ -1,5 +1,26 @@
 # Changelog
 
+## Nearby Riders, Nearby Help, Push Notifications
+- New `RiderLocation` model (PostGIS `geography(Point,4326)`, opt-in `sharingEnabled` flag,
+  default off) powers "Nearby Riders" — `GET /api/riders/nearby?radiusKm=` self-joins on the
+  caller's own fix as the search center, `PUT /api/rider-location(/consent)` for updating it,
+  all `requireMembership()`-gated. New `/dashboard/nearby` page + a Settings toggle. A new cron
+  (`/api/cron/rider-location-cleanup`) auto-disables sharing after 30 minutes of inactivity.
+- New "Nearby Help" tab on `/dashboard/sos` — `PlacesService` calls Google's Places API (New)
+  `searchNearby` server-side (key never reaches the browser), cached in Upstash Redis and
+  rate-limited, listing petrol pumps/mechanics/hospitals with map-key-free directions links.
+- Firebase Cloud Messaging wired into every existing notification type at once via a single
+  hook in `NotificationService.notify()` — no per-call-site changes needed. New
+  `PushSubscription` model, `PushService` (dead-token cleanup included), service worker,
+  `push-notifications.ts`, and a Settings toggle.
+- `.env.example`: added `GOOGLE_PLACES_API_KEY` and `CRON_SECRET`; moved Firebase config to
+  "ACTIVE" and filled in the three vars its client config was missing.
+- Resolved pre-existing migration drift on the dev database (undocumented `message_reaction`
+  table, `TripStatus` enum values, `message.metadata`, `user.lastActiveAt`) via `prisma migrate
+  reset`, per explicit user consent — see ADR-016 for what that did and didn't restore.
+- See `.docs/DECISIONS.md` ADR-016 for the full design, including why native mobile push and a
+  rendered Google Map are explicitly out of scope for now.
+
 ## Rider Registration Restructure + Modal Panic UI
 - Removed the "Full name" field from `/signup`'s OTP step — name is no longer collected during
   phone+OTP verification for either Rider or Partner. `PATCH /api/user/complete-phone-signup`

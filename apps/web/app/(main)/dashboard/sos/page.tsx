@@ -6,6 +6,7 @@ import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "@bikie/ui";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { PanicAlertCards } from "@/components/shared/PanicAlertCards";
+import { NearbyHelpPanel } from "@/components/shared/NearbyHelpPanel";
 
 interface SOSAlert {
   id: string;
@@ -56,7 +57,7 @@ export default function SOSPage() {
   const { data: session } = authClient.useSession();
   const [checkingMembership, setCheckingMembership] = useState(true);
   const [isMember, setIsMember] = useState(false);
-  const [activeTab, setActiveTab] = useState<"new" | "alerts">("new");
+  const [activeTab, setActiveTab] = useState<"new" | "alerts" | "help">("new");
   const [city, setCity] = useState("");
   const [activeAlerts, setActiveAlerts] = useState<SOSAlert[]>([]);
   const [alertSent, setAlertSent] = useState(false);
@@ -137,6 +138,15 @@ export default function SOSPage() {
         >
           Active Alerts ({activeAlerts.length})
         </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("help")}
+          className={`rounded-xl px-5 py-2 text-sm font-medium transition-all ${
+            activeTab === "help" ? "bg-accent text-white" : "border border-foreground/10 hover:bg-foreground/5"
+          }`}
+        >
+          🗺️ Nearby Help
+        </button>
       </div>
 
       {alertSent && (
@@ -153,6 +163,12 @@ export default function SOSPage() {
       {activeTab === "new" && (
         <div className="mt-4">
           <PanicAlertCards gateState="ready" onSent={handleAlertSent} />
+        </div>
+      )}
+
+      {activeTab === "help" && (
+        <div className="mt-4">
+          <NearbyHelpPanel />
         </div>
       )}
 
