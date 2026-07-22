@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,10 +43,25 @@ export default function OnboardingPage() {
   const [country, setCountry] = useState("India");
   const [contacts, setContacts] = useState<EmergencyContactValue[]>([]);
   const [extra, setExtra] = useState<RiderProfileExtraValue>(emptyRiderProfileExtraValue);
+  const [referralCode, setReferralCode] = useState("");
 
   const [saving, setSaving] = useState(false);
   const [skipping, setSkipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) setReferralCode(ref);
+  }, []);
+
+  async function linkReferral() {
+    if (!referralCode.trim()) return;
+    await fetch("/api/referrals/link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ code: referralCode.trim() }),
+    }).catch(() => {});
+  }
 
   async function handlePhotoUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -82,6 +97,7 @@ export default function OnboardingPage() {
     setError(null);
     try {
       await saveNameAndPhoto();
+      await linkReferral();
       const res = await fetch("/api/rider-profile/skip", { method: "POST" });
       if (!res.ok) throw new Error("Failed to skip onboarding");
       router.push("/");
@@ -142,6 +158,7 @@ export default function OnboardingPage() {
     setSaving(true);
     try {
       await saveNameAndPhoto();
+      await linkReferral();
       const res = await fetch("/api/rider-profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
@@ -256,6 +273,18 @@ export default function OnboardingPage() {
                   readOnly
                   value={phoneNumber ?? ""}
                   className={`${inputClassName} opacity-60`}
+                />
+              </div>
+              <div>
+                <label className={labelClassName} htmlFor="referralCode">
+                  Referral code <span className="font-normal text-foreground/50">(optional)</span>
+                </label>
+                <input
+                  id="referralCode"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder="e.g. RID4F2A9"
+                  className={`${inputClassName} uppercase`}
                 />
               </div>
             </div>

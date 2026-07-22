@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -21,8 +21,14 @@ export default function PartnerOnboardingPage() {
     emptyPartnerBusinessDetails,
   );
 
+  const [referralCode, setReferralCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const ref = new URLSearchParams(window.location.search).get("ref");
+    if (ref) setReferralCode(ref);
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -32,6 +38,13 @@ export default function PartnerOnboardingPage() {
     try {
       if (fullName.trim()) {
         await authClient.updateUser({ name: fullName.trim() });
+      }
+      if (referralCode.trim()) {
+        await fetch("/api/referrals/link", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ code: referralCode.trim() }),
+        }).catch(() => {});
       }
       const res = await fetch("/api/partner/profile", {
         method: "PUT",
@@ -107,6 +120,18 @@ export default function PartnerOnboardingPage() {
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="As per government ID"
                 className={inputClassName}
+              />
+            </div>
+            <div>
+              <label className={labelClassName} htmlFor="referralCode">
+                Referral code <span className="font-normal text-foreground/50">(optional)</span>
+              </label>
+              <input
+                id="referralCode"
+                value={referralCode}
+                onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                placeholder="e.g. RID4F2A9"
+                className={`${inputClassName} uppercase`}
               />
             </div>
           </section>

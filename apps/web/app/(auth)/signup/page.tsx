@@ -39,7 +39,6 @@ export default function SignUpPage() {
 
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [signingInWithGoogle, setSigningInWithGoogle] = useState(false);
 
   async function fetchDevOtp(phone: string) {
     try {
@@ -66,25 +65,6 @@ export default function SignUpPage() {
   }, []);
 
   const dbRole = selectedRoleToDbRole(selectedRole);
-
-  async function handleGoogleSignIn() {
-    setServerError(null);
-    setSigningInWithGoogle(true);
-    try {
-      // Google sign-up always lands as RENTER (Better Auth's default role) — the Rider/Partner
-      // choice on /welcome only threads through the phone-OTP flow; Partner is available
-      // afterward via the existing self-service "Become a Partner" upgrade, same as any
-      // phone-signup Rider.
-      const { error } = await authClient.signIn.social({ provider: "google", callbackURL: "/" });
-      if (error) {
-        setServerError(error.message ?? "Could not continue with Google. Please try again.");
-        setSigningInWithGoogle(false);
-      }
-    } catch {
-      setServerError("Could not continue with Google. Please try again.");
-      setSigningInWithGoogle(false);
-    }
-  }
 
   async function handleSendCode() {
     setServerError(null);
@@ -150,15 +130,12 @@ export default function SignUpPage() {
         });
         const completeData: { success: boolean; becamePartner: boolean } = await completeRes.json();
 
-        if (referralCode.trim()) {
-          await fetch("/api/referrals/link", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ code: referralCode.trim() }),
-          }).catch(() => {});
-        }
-
-        window.location.href = selectedRole === "PARTNER" ? "/partner-onboarding" : "/onboarding";
+        // Referral code is collected on the onboarding form itself now, not here —
+        // forward it along as a query param so that step can prefill it.
+        const nextPath = selectedRole === "PARTNER" ? "/partner-onboarding" : "/onboarding";
+        window.location.href = referralCode.trim()
+          ? `${nextPath}?ref=${encodeURIComponent(referralCode.trim())}`
+          : nextPath;
         return;
       }
 
@@ -230,27 +207,7 @@ export default function SignUpPage() {
           </div>
 
           {step === "phone" && (
-            <div className="mt-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleGoogleSignIn}
-                disabled={signingInWithGoogle}
-                className="w-full"
-                size="lg"
-              >
-                {signingInWithGoogle ? "Redirecting…" : "Continue with Google"}
-              </Button>
-              <div className="mt-4 flex items-center gap-3 text-xs text-foreground/40">
-                <div className="h-px flex-1 bg-foreground/10" />
-                or
-                <div className="h-px flex-1 bg-foreground/10" />
-              </div>
-            </div>
-          )}
-
-          {step === "phone" && (
-            <div className="mt-4 space-y-4">
+            <div className="mt-6 space-y-4">
               <div>
                 <label className="text-sm font-medium" htmlFor="phoneNumber">
                   Phone number
@@ -325,24 +282,6 @@ export default function SignUpPage() {
                   Resend code
                 </button>
               </div>
-
-              {exists === false && (
-                <div>
-                  <label className="text-sm font-medium" htmlFor="referralCode">
-                    Referral code <span className="font-normal text-foreground/40">(optional)</span>
-                  </label>
-                  <input
-                    id="referralCode"
-                    value={referralCode}
-                    onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                    placeholder="e.g. RID4F2A9"
-                    className={`${inputClassName} uppercase`}
-                  />
-                  <p className="mt-1 text-xs text-foreground/40">
-                    We&apos;ll ask for your name on the next screen.
-                  </p>
-                </div>
-              )}
 
               {serverError && (
                 <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
