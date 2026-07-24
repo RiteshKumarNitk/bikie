@@ -28,6 +28,11 @@ const AMBER_CATEGORIES: Category[] = [
   { label: "Medical Assistance", type: "MEDICAL", icon: "🏥" },
 ];
 
+// Exact brand hexes for the two alert kinds (RED #e8000d, AMBER #ffaa00) — intentionally
+// more saturated than the shared --color-warning token, since these need to read as urgent
+// at a glance and are only ever used here and in the SOS confirm modal, not as a
+// general-purpose UI color. Class names below are written out in full (not built from a
+// shared variable) because Tailwind's static scanner can't see through string interpolation.
 const THEME = {
   RED: {
     label: "Red Alert — Emergency",
@@ -36,12 +41,13 @@ const THEME = {
     categories: RED_CATEGORIES,
     channels: ["SMS", "WhatsApp", "Fellow Riders", "Emergency Services"],
     footer: "Live GPS shared instantly",
-    cta: "🆘 Send Red Alert",
-    border: "border-red-500/30",
-    iconBg: "bg-red-500/15 text-red-400",
-    button: "bg-red-500 hover:bg-red-600",
-    titleColor: "text-red-400",
-    dot: "bg-red-500",
+    border: "border-[#e8000d]/30",
+    cardBg: "linear-gradient(135deg, rgba(232, 0, 13, .12), rgba(232, 0, 13, .05))",
+    cardBorder: "1px solid rgba(232, 0, 13, .35)",
+    iconBg: "bg-[#e8000d] shadow-[0_0_30px_rgba(232,0,13,0.45)]",
+    chip: "border-[#e8000d]/40 bg-[#e8000d]/20 text-white",
+    button: "bg-[#e8000d] hover:bg-[#c40010]",
+    titleColor: "text-[#e8000d]",
     confirmTitle: "RED ALERT — Are you sure?",
     confirmBody:
       "This immediately alerts your emergency contacts and nearby BIKIE riders, sharing your live GPS via SMS and WhatsApp.",
@@ -53,12 +59,13 @@ const THEME = {
     categories: AMBER_CATEGORIES,
     channels: ["SMS", "WhatsApp", "Service Provider", "Fellow Riders"],
     footer: "GPS shared so help finds you faster",
-    cta: "⚠️ Report an Issue",
-    border: "border-warning/30",
-    iconBg: "bg-warning/15 text-warning",
-    button: "bg-warning hover:bg-warning/90",
-    titleColor: "text-warning",
-    dot: "bg-warning",
+    border: "border-[#ffaa00]/30",
+    cardBg: "linear-gradient(135deg, rgba(255, 170, 0, .12), rgba(255, 170, 0, .05))",
+    cardBorder: "1px solid rgba(255, 170, 0, .35)",
+    iconBg: "bg-[#ffaa00] shadow-[0_0_30px_rgba(255,170,0,0.45)]",
+    chip: "border-[#ffaa00]/40 bg-[#ffaa00]/20 text-white",
+    button: "bg-[#ffaa00] hover:bg-[#e69500]",
+    titleColor: "text-[#ffaa00]",
     confirmTitle: "AMBER ALERT — What do you need?",
     confirmBody:
       "Select your situation. BIKIE alerts nearby service providers and riders with your GPS via SMS and WhatsApp.",
@@ -73,19 +80,34 @@ function ChannelPill({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AlertIcon({ kind }: { kind: AlertKind }) {
+  if (kind === "RED") {
+    return <span className="text-xs font-bold tracking-wide text-white">SOS</span>;
+  }
+  return (
+    <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3 2 20h20L12 3Z" />
+      <path d="M12 10v4" />
+      <path d="M12 17h.01" />
+    </svg>
+  );
+}
+
 function AlertCard({ kind, onOpen }: { kind: AlertKind; onOpen: (kind: AlertKind) => void }) {
   const theme = THEME[kind];
   return (
-    <div className={`glass rounded-3xl border p-6 transition-all md:p-8 ${theme.border}`}>
+    <button
+      type="button"
+      onClick={() => onOpen(kind)}
+      className="group w-full rounded-3xl p-6 text-left transition-all hover:-translate-y-1 md:p-8"
+      style={{ background: theme.cardBg, border: theme.cardBorder }}
+    >
       <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={() => onOpen(kind)}
-          className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-2xl transition-transform hover:scale-105 ${theme.iconBg}`}
-          aria-label={theme.cta}
+        <span
+          className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-full transition-transform group-hover:scale-105 ${theme.iconBg}`}
         >
-          {theme.icon}
-        </button>
+          <AlertIcon kind={kind} />
+        </span>
         <div>
           <h3 className={`font-display text-xl font-bold ${theme.titleColor}`}>{theme.label}</h3>
           <p className="mt-1 text-sm leading-relaxed text-foreground/70">{theme.tagline}</p>
@@ -96,7 +118,7 @@ function AlertCard({ kind, onOpen }: { kind: AlertKind; onOpen: (kind: AlertKind
         {theme.categories.map((category) => (
           <span
             key={category.label}
-            className="rounded-full border border-foreground/15 px-3 py-1.5 text-xs font-medium text-foreground/60"
+            className={`rounded-full border px-3 py-1.5 text-xs font-medium ${theme.chip}`}
           >
             {category.icon} {category.label}
           </span>
@@ -109,20 +131,14 @@ function AlertCard({ kind, onOpen }: { kind: AlertKind; onOpen: (kind: AlertKind
         ))}
       </div>
 
-      <div className="mt-5 flex items-center justify-between gap-4">
-        <span className="flex items-center gap-1.5 text-xs text-foreground/50">
-          <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} />
-          {theme.footer}
+      <div className="mt-5 flex items-center gap-1.5 text-xs text-foreground/50">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-success opacity-75" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
         </span>
-        <button
-          type="button"
-          onClick={() => onOpen(kind)}
-          className={`rounded-full px-5 py-2.5 text-sm font-semibold text-white transition-colors ${theme.button}`}
-        >
-          {theme.cta}
-        </button>
+        {theme.footer}
       </div>
-    </div>
+    </button>
   );
 }
 
@@ -344,7 +360,7 @@ export function PanicAlertCards({
                         onClick={() => setCategory(c)}
                         className={`rounded-xl border px-3 py-2.5 text-sm font-medium transition-colors ${
                           category?.label === c.label
-                            ? "border-warning bg-warning/10 text-warning"
+                            ? "border-[#ffaa00] bg-[#ffaa00]/10 text-[#ffaa00]"
                             : "border-foreground/15 text-foreground/70 hover:border-foreground/30"
                         }`}
                       >
