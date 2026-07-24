@@ -1,0 +1,83 @@
+/* Splash-screen palette for the role-picker welcome page only — not part of the
+   shared design tokens in globals.css, per product decision to keep this look
+   scoped to this one page rather than changing the site-wide accent. */
+
+.splash {
+  background: linear-gradient(
+    135deg,
+    rgba(38, 37, 143, 0.88) 0%,
+    rgba(26, 25, 96, 0.92) 100%
+  );
+}
+
+.logoWrap::before,
+.logoWrap::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  border: 3px solid #ff4d1a;
+  animation: ringPulse 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.logoWrap::after {
+  animation-delay: 1.2s;
+}
+
+@keyframes ringPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+.logoCircle {
+  position: relative;
+  z-index: 1;
+  background: #ff4d1a;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 0 35px rgba(255, 77, 26, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logoWrap::before,
+  .logoWrap::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.iconBiker {
+  background: rgba(255, 77, 26, 0.15);
+}
+
+.iconProvider {
+  background: rgba(255, 170, 0, 0.15);
+}
+
+.tagBiker {
+  background: #ff4d1a;
+  box-shadow: 0 10px 30px -10px rgba(255, 77, 26, 0.6);
+}
+
+.tagProvider {
+  background: #ffaa00;
+  box-shadow: 0 10px 30px -10px rgba(255, 170, 0, 0.6);
+}
+
+.loginLink {
+  color: #ff4d1a;
+}
+
+.loginLink:hover {
+  color: #ffaa00;
+}
