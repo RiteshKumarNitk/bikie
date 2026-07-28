@@ -6,7 +6,7 @@ class AppShell extends StatelessWidget {
 
   final Widget child;
 
-  static const _tabs = ['/', '/bikes', '/bookings', '/profile'];
+  static const _tabs = ['/', '/trips', '/bikes', '/bookings', '/profile'];
 
   int _indexForLocation(String location) {
     final index = _tabs.indexWhere((t) => location == t || (t != '/' && location.startsWith(t)));
@@ -25,6 +25,7 @@ class AppShell extends StatelessWidget {
         onDestinationSelected: (index) => context.go(_tabs[index]),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'Home'),
+          NavigationDestination(icon: Icon(Icons.route_outlined), selectedIcon: Icon(Icons.route), label: 'Rides'),
           NavigationDestination(
             icon: Icon(Icons.two_wheeler_outlined),
             selectedIcon: Icon(Icons.two_wheeler),

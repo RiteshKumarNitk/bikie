@@ -34,7 +34,7 @@ class ConversationsListScreen extends ConsumerWidget {
                   leading: CircleAvatar(child: Text((c.subject ?? 'C').substring(0, 1).toUpperCase())),
                   title: Text(c.subject ?? c.participants.map((p) => p.name).join(', ')),
                   subtitle: c.lastMessage != null
-                      ? Text(c.lastMessage!.content, maxLines: 1, overflow: TextOverflow.ellipsis)
+                      ? Text(c.lastMessage!.content ?? '📎 Attachment', maxLines: 1, overflow: TextOverflow.ellipsis)
                       : null,
                   trailing: c.unreadCount > 0
                       ? CircleAvatar(

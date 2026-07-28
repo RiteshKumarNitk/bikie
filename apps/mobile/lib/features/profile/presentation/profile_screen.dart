@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../auth/domain/auth_controller.dart';
+import '../../notifications/domain/notification_providers.dart';
 import '../data/profile_repository.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -12,6 +13,7 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authControllerProvider).user;
+    final unreadNotifications = ref.watch(unreadNotificationCountProvider);
 
     if (user == null) return const SizedBox.shrink();
 
@@ -30,6 +32,12 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           _PhoneField(initialPhone: user.phone),
           const SizedBox(height: 24),
+          _ProfileTile(
+            icon: Icons.notifications_none,
+            label: 'Notifications',
+            badgeCount: unreadNotifications,
+            onTap: () => context.push('/notifications'),
+          ),
           _ProfileTile(icon: Icons.favorite_border, label: 'Wishlist', onTap: () => context.push('/wishlist')),
           _ProfileTile(icon: Icons.sos, label: 'SOS Emergency', onTap: () => context.push('/sos')),
           _ProfileTile(
@@ -52,18 +60,34 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 class _ProfileTile extends StatelessWidget {
-  const _ProfileTile({required this.icon, required this.label, required this.onTap});
+  const _ProfileTile({required this.icon, required this.label, required this.onTap, this.badgeCount = 0});
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(icon),
       title: Text(label),
-      trailing: const Icon(Icons.chevron_right),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (badgeCount > 0)
+            Container(
+              margin: const EdgeInsets.only(right: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text('$badgeCount', style: const TextStyle(fontSize: 11, color: Colors.white)),
+            ),
+          const Icon(Icons.chevron_right),
+        ],
+      ),
       onTap: onTap,
     );
   }

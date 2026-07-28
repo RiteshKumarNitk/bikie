@@ -393,3 +393,20 @@ Per explicit user decisions:
   sign-in — if `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are unset, Better Auth logs a warning
   and simply never registers the `google` provider/callback route; the login/signup UI shows a
   normal error message if the button is clicked in that state rather than assuming a stub exists.
+
+## ADR-018: Mobile color tokens corrected to the live `globals.css`, not `.docs/UI_GUIDELINES.md`
+
+A Phase 1 audit (ahead of bringing `apps/mobile` to feature parity with the current site,
+Milestone 8.8) found `apps/mobile/lib/core/theme/app_colors.dart` and
+`.docs/UI_GUIDELINES.md` both describe a near-black dark theme (`#0A0E1A` background,
+`#111827` card) that predates ADR-009's indigo rebrand — the site itself has moved on and
+`apps/web/app/globals.css`'s `.dark` block is the actual shipped palette: background/card/
+surface `#26258F`/`#1E1D72`/`#1E1D72`, foreground `#EDF0F7`, accent `#3B3A91` (`--color-accent`,
+distinct from `:root`'s light-mode `#26258F`), accent-hover `#2E2D74`. Corrected
+`AppColors` to these live values (light-mode tokens also corrected: background `#F0F2F5`,
+surface `#E2E6ED`, foreground `#0A1628`, secondary `#182244` — previously generic
+slate placeholders, not the site's actual light palette) and added the previously-missing
+`darkAccentHover`/`lightAccentHover` pair, wired into `ElevatedButtonThemeData`'s pressed
+state. `.docs/UI_GUIDELINES.md` is left as a known-stale doc to be reconciled in a
+follow-up docs pass (Milestone 8.9) rather than rewritten mid-mobile-milestone — the runtime
+CSS is the source of truth in the meantime, not the doc describing it.

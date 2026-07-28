@@ -20,7 +20,7 @@ class SosScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('SOS Emergency')),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => showSendSosSheet(context),
-        backgroundColor: Colors.redAccent,
+        backgroundColor: Theme.of(context).colorScheme.error,
         icon: const Icon(Icons.sos),
         label: const Text('Send SOS'),
       ),
@@ -82,7 +82,7 @@ class _AlertCard extends ConsumerWidget {
           children: [
             Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: Colors.redAccent),
+                Icon(Icons.warning_amber_rounded, color: Theme.of(context).colorScheme.error),
                 const SizedBox(width: 8),
                 Text(alert.type.replaceAll('_', ' '), style: Theme.of(context).textTheme.titleMedium),
                 const Spacer(),

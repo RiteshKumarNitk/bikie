@@ -14,9 +14,14 @@ import '../../features/home/presentation/home_screen.dart';
 import '../../features/membership/presentation/membership_screen.dart';
 import '../../features/messaging/presentation/conversation_thread_screen.dart';
 import '../../features/messaging/presentation/conversations_list_screen.dart';
+import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/referrals/presentation/referrals_screen.dart';
+import '../../features/ride_room/presentation/ride_room_screen.dart';
 import '../../features/sos/presentation/sos_screen.dart';
+import '../../features/trips/presentation/create_ride_screen.dart';
+import '../../features/trips/presentation/my_rides_screen.dart';
+import '../../features/trips/presentation/ride_requests_screen.dart';
 import '../../features/trips/presentation/trip_detail_screen.dart';
 import '../../features/trips/presentation/trips_list_screen.dart';
 import '../../features/wishlist/presentation/wishlist_screen.dart';
@@ -30,6 +35,10 @@ const _authRequiredPrefixes = [
   '/membership',
   '/referrals',
   '/messages',
+  '/trips/create',
+  '/rides',
+  '/requests',
+  '/notifications',
 ];
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -41,7 +50,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (authStatus == AuthStatus.unknown) return null;
 
       final path = state.matchedLocation;
-      final requiresAuth = _authRequiredPrefixes.any((p) => path.startsWith(p));
+      // `/trips/:slug/room` needs auth too, but the bare `/trips` (browse)
+      // and `/trips/:slug` (public ride detail) must stay public — checked
+      // by suffix rather than adding a blanket `/trips` prefix.
+      final requiresAuth = _authRequiredPrefixes.any((p) => path.startsWith(p)) || path.endsWith('/room');
       final isAuthenticated = authStatus == AuthStatus.authenticated;
       final isAuthScreen = path == '/login' || path == '/signup';
 
@@ -60,6 +72,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state, child) => AppShell(child: child),
         routes: [
           GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+          GoRoute(path: '/trips', builder: (context, state) => const TripsListScreen()),
           GoRoute(path: '/bikes', builder: (context, state) => const BikesListScreen()),
           GoRoute(path: '/bookings', builder: (context, state) => const BookingsScreen()),
           GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
@@ -74,11 +87,18 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/destinations/:slug',
         builder: (context, state) => DestinationDetailScreen(slug: state.pathParameters['slug']!),
       ),
-      GoRoute(path: '/trips', builder: (context, state) => const TripsListScreen()),
+      GoRoute(path: '/trips/create', builder: (context, state) => const CreateRideScreen()),
       GoRoute(
         path: '/trips/:slug',
         builder: (context, state) => TripDetailScreen(slug: state.pathParameters['slug']!),
       ),
+      GoRoute(
+        path: '/trips/:slug/room',
+        builder: (context, state) => RideRoomScreen(slug: state.pathParameters['slug']!),
+      ),
+      GoRoute(path: '/rides/mine', builder: (context, state) => const MyRidesScreen()),
+      GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
+      GoRoute(path: '/requests', builder: (context, state) => const RideRequestsScreen()),
       GoRoute(path: '/wishlist', builder: (context, state) => const WishlistScreen()),
       GoRoute(path: '/sos', builder: (context, state) => const SosScreen()),
       GoRoute(path: '/membership', builder: (context, state) => const MembershipScreen()),

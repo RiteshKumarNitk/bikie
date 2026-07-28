@@ -121,6 +121,17 @@ reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md
 |---|---|---|
 | `/api/places/nearby` | GET | `?lat=&lng=&type=gas_station\|car_repair\|hospital`. Server-side Google Places (New) call, Redis-cached (~1.1km grid, 10min TTL), rate-limited (10/min). |
 
+## Notifications (auth required)
+
+The in-app feed behind `components/chat/NotificationsTab.tsx` — found live but undocumented
+here during the Milestone 8.8 mobile-parity pass (the route was added alongside the
+`Notification` model in Milestone 8.1 and never listed afterward).
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/notifications` | GET | `{ notifications: NotificationDTO[] }` for the current user, newest first. |
+| `/api/notifications` | POST | `{ id }` marks one notification read, or `{ action: "MARK_ALL_READ" }` marks all read. `{ ok: true }`. |
+
 ## Push Notifications (ADR-016)
 
 | Route | Method | Notes |
@@ -147,22 +158,49 @@ reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md
 
 ## Messaging (auth required)
 
-Real-time delivery uses Server-Sent Events (see below); the REST surface underneath is
-plain polling-friendly JSON.
+Real-time delivery is Upstash Redis-backed SSE for web (see below); the REST surface
+underneath is plain polling-friendly JSON, which is what the Flutter app consumes (polling
+every 6s, tightened to 3s for an open Ride Room thread — no SSE client, see ROADMAP.md
+Milestone 6b and ADR-011). `Message` content is encrypted at rest (AES-256-GCM,
+`lib/message-crypto.ts`) and decrypted transparently by every route below.
 
 | Route | Method | Notes |
 |---|---|---|
 | `/api/conversations` | GET | Caller's conversations, `{ conversations: ConversationDTO[] }` |
 | `/api/conversations` | POST | `{ otherUserId, subject? }` — get-or-create a conversation. Returns `{ conversation }`. |
 | `/api/conversations/[id]/messages` | GET | `{ messages: MessageDTO[] }`. 404 if the caller isn't a participant. |
-| `/api/conversations/[id]/messages` | POST | `{ content }` — send a message; pushes a `new_message` SSE event to other participants. Returns `{ message }`. |
-| `/api/sse` | GET | Cookie-session-based (uses `getServerSession()` directly, not the shared `requireSession()` helper — bearer-token compatibility not yet verified for this route). Opens a `text/event-stream` connection; emits `connected`/`heartbeat`/`new_message`/SOS events. Not used by the Flutter app in v1 — see ROADMAP.md Milestone 6b. |
+| `/api/conversations/[id]/messages` | POST | `{ content?, replyToId?, attachments? }` (needs at least one of `content`/`attachments`). Rate-limited (30/min). Returns `{ message }`, 403 `{ error: "MUTED" }` if the sender is muted. |
+| `/api/conversations/[id]/typing` | POST | `{ isTyping }` — broadcast-only (SSE `typing` event to other participants); no polling-friendly way to *read back* others' typing state, so the Flutter app can send but not display incoming typing indicators. |
+| `/api/conversations/[id]/read` | POST | `{ upToMessageId }` — marks the caller's read receipt up to that message. |
+| `/api/messages/[id]` | PATCH | `{ content }` — edit the caller's own message. 403 if not the sender. Returns `{ message }`. |
+| `/api/messages/[id]` | DELETE | True erasure (nulls ciphertext/content), not soft-delete. 403 if not the sender. Returns `{ message }`. |
+| `/api/messages/[id]/react` | POST | `{ emoji }` — add a reaction. `{ ok: true }`. |
+| `/api/messages/[id]/react` | DELETE | `?emoji=` — remove the caller's own reaction. `{ ok: true }`. |
+| `/api/sse` | GET | Cookie-session-based (uses `getServerSession()` directly, not the shared `requireSession()` helper — bearer-token compatibility not yet verified for this route). Opens a `text/event-stream` connection; emits `connected`/`heartbeat`/`new_message`/`message_edited`/`message_deleted`/`reaction_added`/`reaction_removed`/`message_read`/`typing`/SOS events. Not used by the Flutter app. |
 
-**Milestone 8 (in progress, see ADR-011)**: `/api/sse` is being rewritten to drain a
-per-user Upstash Redis inbox instead of the in-process manager above; `Message` gains
-encryption, reply/edit/delete/receipts; new Ride Room, Reports, Moderation, Groups, and
-Notifications routes are being added. This section is updated as each phase lands — see
-`.docs/TASKS.md` Milestone 8 for current status.
+## Ride Room (Organizer + Approved Riders + Admin only, ADR-011)
+
+The collaboration hub for an approved ride, gated by one shared guard
+(`assertRideRoomAccess`) on every route below. `role` in the room response (`ORGANIZER` /
+`MEMBER` / `ADMIN`) tells the client whether to show manage affordances — only
+`ORGANIZER`/`ADMIN` can post announcements or edit the meeting point/emergency contacts;
+`MEMBER` is read-only on those. Backend is typecheck-clean but not live-tested (see
+`.docs/TASKS.md` Milestone 8 note); web has no shipped UI for this yet (8.5b: Planned) —
+the Flutter Ride Room screen (Milestone 8.8) is the first UI consuming it.
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/trips/[slug]/room` | GET | `{ room: RideRoomDTO }` — conversationId, role, isLocked, meeting point/lat/lng, emergency contacts. 404 `NOT_STARTED` if no one's been approved yet. |
+| `/api/trips/[slug]/room/announcements` | GET/POST | `{ announcements: AnnouncementDTO[] }` / `{ content }` → `{ announcement }`. POST is manage-only. |
+| `/api/trips/[slug]/room/announcements/[id]` | DELETE | Manage-only. `{ success: true }`. |
+| `/api/trips/[slug]/room/meeting-point` | PATCH | `{ meetingPoint?, meetingLat?, meetingLng? }` — manage-only; posts a system message to the room's chat on change. |
+| `/api/trips/[slug]/room/emergency-contacts` | GET/PATCH | `{ contacts: EmergencyContactDTO[] }` / `{ contacts }` (max 10, `{name, phone, relation}` each). PATCH is manage-only. |
+| `/api/trips/[slug]/room/media` | GET | `?type=IMAGE\|DOCUMENT`. `{ media: MediaItemDTO[] }` — a filtered view over message attachments already shared in the room's chat, not a separate upload surface. |
+
+There is no dedicated "members" route — the room's real member list is the same
+`ConversationDTO.participants` returned by `GET /api/conversations` (filter to the room's
+`conversationId`); `TripDetailDTO.members` exists in the type but is never populated by
+`TripService.getBySlug`, so don't rely on it.
 
 ## User
 

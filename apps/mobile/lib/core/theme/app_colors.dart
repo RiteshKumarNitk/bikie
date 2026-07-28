@@ -1,30 +1,34 @@
 import 'package:flutter/material.dart';
 
-/// Color tokens ported verbatim from `.docs/UI_GUIDELINES.md`
-/// (source of truth: `apps/web/app/globals.css`).
+/// Color tokens ported verbatim from the live `apps/web/app/globals.css`
+/// `@theme`/`:root`/`.dark` blocks (NOT from `.docs/UI_GUIDELINES.md`, which
+/// documents an earlier near-black dark palette that the site no longer
+/// uses — see the Phase 1 mobile-parity audit).
 class AppColors {
   AppColors._();
 
-  // Dark (default)
-  static const darkBackground = Color(0xFF0A0E1A);
-  static const darkSurface = Color(0xFF0F172A);
-  static const darkCard = Color(0xFF111827);
-  static const darkForeground = Color(0xFFF8FAFC);
-  static const darkSecondary = Color(0xFF1E293B);
-  static const darkAccent = Color(0xFF26258F);
-  // #26258F as an icon/text foreground against this near-black background is
-  // ~1.6:1 contrast (fails WCAG AA). Lighter tint of the same hue for
-  // text/icon usages; darkAccent stays literal for button/badge fills. See
-  // ADR-011 in .docs/DECISIONS.md and apps/web/app/globals.css --color-accent-text.
+  // Dark (default) — `.dark` block in globals.css
+  static const darkBackground = Color(0xFF26258F);
+  static const darkSurface = Color(0xFF1E1D72);
+  static const darkCard = Color(0xFF1E1D72);
+  static const darkForeground = Color(0xFFEDF0F7);
+  static const darkSecondary = Color(0xFF1E1D72);
+  static const darkAccent = Color(0xFF3B3A91);
+  static const darkAccentHover = Color(0xFF2E2D74);
+  // #26258F as an icon/text foreground against this background is under
+  // WCAG AA contrast. Lighter tint of the same hue for text/icon usages;
+  // darkAccent stays literal for button/badge fills. See ADR-009 in
+  // .docs/DECISIONS.md and apps/web/app/globals.css --color-accent-text.
   static const darkAccentText = Color(0xFF8585D6);
 
-  // Light
-  static const lightBackground = Color(0xFFFAFAFA);
-  static const lightSurface = Color(0xFFFFFFFF);
+  // Light — `:root` block in globals.css
+  static const lightBackground = Color(0xFFF0F2F5);
+  static const lightSurface = Color(0xFFE2E6ED);
   static const lightCard = Color(0xFFFFFFFF);
-  static const lightForeground = Color(0xFF0F172A);
-  static const lightSecondary = Color(0xFF1E293B);
+  static const lightForeground = Color(0xFF0A1628);
+  static const lightSecondary = Color(0xFF182244);
   static const lightAccent = Color(0xFF26258F);
+  static const lightAccentHover = Color(0xFF1E1D70);
   // #26258F already contrasts well (~10.7:1) against the light background.
   static const lightAccentText = Color(0xFF26258F);
 

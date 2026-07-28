@@ -140,7 +140,7 @@ class _SendSosSheetState extends ConsumerState<SendSosSheet> {
           const SizedBox(height: 20),
           ElevatedButton(
             onPressed: _isSubmitting ? null : _submit,
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+            style: ElevatedButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             child: _isSubmitting
                 ? const SizedBox(
                     height: 20,

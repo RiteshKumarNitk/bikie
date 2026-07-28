@@ -3,8 +3,18 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 /// Shared corner radius, matching Tailwind's `rounded-3xl` (24px) used
-/// across the web app's cards, buttons, and glass panels.
+/// across the web app's cards and glass panels (`packages/ui/src/card.tsx`).
 const double kCardRadius = 24;
+
+/// Matches Tailwind's `rounded-xl` (12px), the dominant radius for text
+/// inputs across the web app's forms (e.g. `ReportModal.tsx`,
+/// `RideActionsPanel.tsx`'s request textarea) — distinct from card radius.
+const double kInputRadius = 12;
+
+/// Web buttons (`packages/ui/src/button.tsx`) are `rounded-full` (a true
+/// stadium shape), not `rounded-3xl` — buttons and cards use different
+/// radii on the web and should not share `kCardRadius`.
+const double kButtonHeight = 44; // Tailwind `h-11`, the Button component's default "md" size.
 
 /// Bundled locally (`assets/fonts/Inter-Variable.ttf`) rather than fetched at
 /// runtime via the `google_fonts` package — a runtime fetch from
@@ -33,6 +43,7 @@ class AppTheme {
         foreground: AppColors.darkForeground,
         secondary: AppColors.darkSecondary,
         accent: AppColors.darkAccent,
+        accentHover: AppColors.darkAccentHover,
       );
 
   static ThemeData get light => _build(
@@ -43,6 +54,7 @@ class AppTheme {
         foreground: AppColors.lightForeground,
         secondary: AppColors.lightSecondary,
         accent: AppColors.lightAccent,
+        accentHover: AppColors.lightAccentHover,
       );
 
   static ThemeData _build({
@@ -53,6 +65,7 @@ class AppTheme {
     required Color foreground,
     required Color secondary,
     required Color accent,
+    required Color accentHover,
   }) {
     final baseTextTheme =
         brightness == Brightness.dark ? ThemeData.dark().textTheme : ThemeData.light().textTheme;
@@ -91,11 +104,14 @@ class AppTheme {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kCardRadius)),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: accent,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kCardRadius)),
+        style: ButtonStyle(
+          backgroundColor: WidgetStateProperty.resolveWith(
+            (states) => states.contains(WidgetState.pressed) ? accentHover : accent,
+          ),
+          foregroundColor: const WidgetStatePropertyAll(Colors.white),
+          padding: const WidgetStatePropertyAll(EdgeInsets.symmetric(horizontal: 24, vertical: 14)),
+          minimumSize: const WidgetStatePropertyAll(Size(64, kButtonHeight)),
+          shape: const WidgetStatePropertyAll(StadiumBorder()),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
@@ -103,14 +119,21 @@ class AppTheme {
           foregroundColor: foreground,
           side: BorderSide(color: secondary),
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kCardRadius)),
+          minimumSize: const Size(64, kButtonHeight),
+          shape: const StadiumBorder(),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: accent,
+          shape: const StadiumBorder(),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: card,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(kCardRadius),
+          borderRadius: BorderRadius.circular(kInputRadius),
           borderSide: BorderSide.none,
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -119,7 +142,7 @@ class AppTheme {
         backgroundColor: card,
         selectedColor: accent,
         labelStyle: textTheme.bodyMedium!,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(kCardRadius)),
+        shape: const StadiumBorder(),
       ),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: card,
