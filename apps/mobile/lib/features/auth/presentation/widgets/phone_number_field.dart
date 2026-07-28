@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Mirrors `apps/web/components/auth/PhoneNumberInput.tsx`: a country-code
 /// dropdown (India default) + a 10-digit local number field.
@@ -47,11 +48,13 @@ class _PhoneNumberFieldState extends State<PhoneNumberField> {
   @override
   Widget build(BuildContext context) {
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         SizedBox(
-          width: 96,
+          width: 100,
           child: DropdownButtonFormField<String>(
             initialValue: widget.countryCode,
+            isExpanded: true,
             items: _countryCodes.map((c) => DropdownMenuItem(value: c.$1, child: Text(c.$2))).toList(),
             onChanged: widget.enabled ? (v) => widget.onCountryCodeChanged(v!) : null,
           ),
@@ -61,20 +64,19 @@ class _PhoneNumberFieldState extends State<PhoneNumberField> {
           child: TextField(
             controller: _controller,
             enabled: widget.enabled,
-            keyboardType: TextInputType.phone,
-            autofillHints: const [AutofillHints.telephoneNumberNational],
+            keyboardType: TextInputType.number,
+            // Digit-filtering/length-limiting done via TextInputFormatter,
+            // not by hand-mutating `_controller.value` inside `onChanged` —
+            // that pattern (an earlier version of this widget) fights the
+            // web text-input plugin's own state sync and can make the field
+            // appear to swallow keystrokes. Formatters are the supported way
+            // to constrain input and don't have that problem.
+            inputFormatters: [
+              FilteringTextInputFormatter.digitsOnly,
+              LengthLimitingTextInputFormatter(10),
+            ],
             decoration: const InputDecoration(hintText: '98765 43210'),
-            onChanged: (value) {
-              final digits = value.replaceAll(RegExp(r'\D'), '');
-              final trimmed = digits.length > 10 ? digits.substring(0, 10) : digits;
-              if (trimmed != value) {
-                _controller.value = TextEditingValue(
-                  text: trimmed,
-                  selection: TextSelection.collapsed(offset: trimmed.length),
-                );
-              }
-              widget.onLocalNumberChanged(trimmed);
-            },
+            onChanged: widget.onLocalNumberChanged,
           ),
         ),
       ],

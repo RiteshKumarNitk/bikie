@@ -6,6 +6,7 @@ import '../../../core/network/api_exception.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_controller.dart';
 import '../domain/role_provider.dart';
+import 'widgets/dev_otp_banner.dart';
 import 'widgets/phone_number_field.dart';
 
 const _noAccountError = 'NO_ACCOUNT';
@@ -35,6 +36,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
 
   String? _error;
+  String? _devOtp;
   bool _sendingOtp = false;
   bool _verifying = false;
   bool _signingIn = false;
@@ -49,9 +51,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _fetchDevOtp(String phone) async {
     final code = await ref.read(authRepositoryProvider).fetchDevOtp(phone);
-    if (code != null && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Your verification code: $code')));
-    }
+    if (mounted) setState(() => _devOtp = code);
   }
 
   Future<void> _sendCode() async {
@@ -139,6 +139,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           TextButton(onPressed: () => context.go('/welcome'), child: const Text('Change Role')),
         ],
       ),
+      bottomNavigationBar: _devOtp != null ? DevOtpBanner(code: _devOtp!) : null,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -250,6 +251,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             _step = 'phone';
                             _otpController.clear();
                             _error = null;
+                            _devOtp = null;
                           }),
                           child: const Text('Change'),
                         ),
