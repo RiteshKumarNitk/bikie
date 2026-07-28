@@ -410,3 +410,49 @@ slate placeholders, not the site's actual light palette) and added the previousl
 state. `.docs/UI_GUIDELINES.md` is left as a known-stale doc to be reconciled in a
 follow-up docs pass (Milestone 8.9) rather than rewritten mid-mobile-milestone — the runtime
 CSS is the source of truth in the meantime, not the doc describing it.
+
+## ADR-019: Mobile auth rebuilt as a mandatory Splash → Intro → Welcome → Phone-OTP-Login gate; default API target moved to the live `https://bikie.app`
+
+Per explicit user direction, treated as the most urgent outstanding mobile gap. Three
+changes:
+
+- **Full pre-auth gate, not free browsing.** `apps/mobile` previously let an unauthenticated
+  visitor land straight on Home/Bikes with no onboarding at all, and its `/login`/`/signup`
+  were still email/password-only — never updated after the web moved to phone+OTP as the
+  primary flow (ADR-013). The web itself still allows anonymous marketing browsing (ADR-014);
+  mobile now deliberately does **not** — every route except `/intro`, `/welcome`, `/login`,
+  `/signup` requires a session (`app_router.dart`'s `redirect`), by explicit product decision
+  for this platform, not an oversight or a divergence to be reconciled later. New
+  `apps/mobile/lib/features/onboarding/` (mobile-only, no web equivalent): `SplashScreen`
+  (shown in `main.dart` while `AuthController.bootstrap()` resolves, replacing a bare spinner),
+  `IntroScreen` (first-launch-only 3-slide carousel, gated on a new `AppPreferences`
+  (`SharedPreferences`) flag distinct from `SecureStorage`, which stays reserved for the
+  bearer token), `WelcomeScreen` (ports the web's `/welcome` role cards — "I'm a Biker" /
+  "Service Provider" — both leading to `/login`, matching ADR-014's redirect-to-login-not-signup
+  behavior exactly, via a new `selectedRoleProvider`).
+- **Phone + OTP via Better Auth's `phoneNumber` plugin, called directly** — no Dart client
+  exists for this plugin, so `AuthRepository` calls the raw REST endpoints found in
+  `node_modules/better-auth`'s `plugins/phone-number/routes.mjs`: `POST
+  /api/auth/phone-number/send-otp` `{phoneNumber}` and `POST /api/auth/phone-number/verify`
+  `{phoneNumber, code}`. The verify response carries the session token in its **JSON body's
+  `token` field** (Better Auth's own documented shape for this endpoint) rather than the
+  `set-auth-token` header the email routes use — `AuthRepository.verifyOtp` reads it from
+  there instead. `GET /api/auth-helpers/phone-exists` (pre-OTP existence check, login flow
+  only) and `PATCH /api/user/complete-phone-signup` (role application, brand-new numbers only)
+  are wired the same as web. Email/password sign-in is kept as a same-screen fallback toggle
+  ("Admin or existing email account? Log in with email instead") for the identical reason web
+  keeps it — the seeded `admin@bikie.app` account has no `phoneNumber` at all.
+  **Deliberately not ported**: the mid-login "existing Rider signs in via the Partner path
+  → show a Become-a-Partner mini-form" upgrade step (ADR-013's self-service upgrade edge
+  case), and the post-signup rider-profile `/onboarding` form (ADR-012/014/015's large field
+  set) — a brand-new mobile signup goes straight to Home with just the chosen role applied,
+  keeping Better Auth's phone-number placeholder name until a future Settings/onboarding
+  milestone. Both are separate, larger features, not silently dropped scope.
+- **Default API target changed to the live production site.** `app_config.dart` previously
+  had no production fallback at all — release builds threw unless `--dart-define=API_BASE_URL`
+  was passed, because the production Vercel deploy genuinely lagged `origin/master` on several
+  routes at the time (Milestone 6). Per explicit user confirmation that `https://bikie.app` is
+  now live, and independent verification in this pass (`GET /api/bikes/featured` → 200 with
+  real bike data), both debug and release builds now default to `https://bikie.app` with no
+  `--dart-define` needed. `--dart-define=API_BASE_URL=http://10.0.2.2:4000` (or the LAN-IP/
+  localhost equivalents) still overrides it for local `pnpm dev` iteration.

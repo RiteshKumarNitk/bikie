@@ -15,6 +15,8 @@ import '../../features/membership/presentation/membership_screen.dart';
 import '../../features/messaging/presentation/conversation_thread_screen.dart';
 import '../../features/messaging/presentation/conversations_list_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/onboarding/presentation/intro_screen.dart';
+import '../../features/onboarding/presentation/welcome_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/referrals/presentation/referrals_screen.dart';
 import '../../features/ride_room/presentation/ride_room_screen.dart';
@@ -25,47 +27,47 @@ import '../../features/trips/presentation/ride_requests_screen.dart';
 import '../../features/trips/presentation/trip_detail_screen.dart';
 import '../../features/trips/presentation/trips_list_screen.dart';
 import '../../features/wishlist/presentation/wishlist_screen.dart';
+import '../providers.dart';
 import '../widgets/app_shell.dart';
 
-const _authRequiredPrefixes = [
-  '/bookings',
-  '/profile',
-  '/wishlist',
-  '/sos',
-  '/membership',
-  '/referrals',
-  '/messages',
-  '/trips/create',
-  '/rides',
-  '/requests',
-  '/notifications',
-];
+/// The only screens a logged-out visitor can reach — every other route
+/// requires a session. This is a deliberate mobile-only posture (the web
+/// allows anonymous marketing browsing) per explicit product direction: the
+/// app should walk a logged-out visitor through Intro → Welcome → Login/OTP
+/// before anything else, not offer a free-browse path around it.
+const _preAuthPaths = {'/intro', '/welcome', '/login', '/signup'};
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authStatus = ref.watch(authControllerProvider.select((s) => s.status));
+  final hasSeenIntro = ref.watch(hasSeenIntroProvider);
+
+  final String initialLocation;
+  if (authStatus == AuthStatus.authenticated) {
+    initialLocation = '/';
+  } else {
+    initialLocation = hasSeenIntro ? '/welcome' : '/intro';
+  }
 
   return GoRouter(
-    initialLocation: '/',
+    initialLocation: initialLocation,
     redirect: (context, state) {
       if (authStatus == AuthStatus.unknown) return null;
 
       final path = state.matchedLocation;
-      // `/trips/:slug/room` needs auth too, but the bare `/trips` (browse)
-      // and `/trips/:slug` (public ride detail) must stay public — checked
-      // by suffix rather than adding a blanket `/trips` prefix.
-      final requiresAuth = _authRequiredPrefixes.any((p) => path.startsWith(p)) || path.endsWith('/room');
       final isAuthenticated = authStatus == AuthStatus.authenticated;
-      final isAuthScreen = path == '/login' || path == '/signup';
+      final isPreAuthPath = _preAuthPaths.contains(path);
 
-      if (!isAuthenticated && requiresAuth) {
-        return '/login?next=${Uri.encodeComponent(path)}';
+      if (!isAuthenticated && !isPreAuthPath) {
+        return hasSeenIntro ? '/welcome' : '/intro';
       }
-      if (isAuthenticated && isAuthScreen) {
+      if (isAuthenticated && isPreAuthPath) {
         return '/';
       }
       return null;
     },
     routes: [
+      GoRoute(path: '/intro', builder: (context, state) => const IntroScreen()),
+      GoRoute(path: '/welcome', builder: (context, state) => const WelcomeScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(path: '/signup', builder: (context, state) => const SignupScreen()),
       ShellRoute(

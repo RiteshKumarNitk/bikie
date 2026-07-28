@@ -201,4 +201,135 @@ void main() {
       verify(() => flutterStorage.delete(key: 'bikie_auth_token')).called(1);
     });
   });
+
+  group('AuthRepository.sendOtp', () {
+    test('posts phoneNumber to the phone-number/send-otp endpoint', () async {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/auth/phone-number/send-otp'),
+          statusCode: 200,
+          data: {'message': 'code sent'},
+        ),
+      );
+
+      await repository.sendOtp('+919876543210');
+
+      verify(
+        () => dio.post('/api/auth/phone-number/send-otp', data: {'phoneNumber': '+919876543210'}),
+      ).called(1);
+    });
+  });
+
+  group('AuthRepository.verifyOtp', () {
+    test('persists the token from the JSON body (not a header) and parses the user', () async {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/auth/phone-number/verify'),
+          statusCode: 200,
+          data: {'status': true, 'token': 'otp-session-token', 'user': buildUserJson()},
+        ),
+      );
+
+      final user = await repository.verifyOtp(phoneNumber: '+919876543210', code: '123456');
+
+      expect(user.id, 'user-1');
+      verify(
+        () => dio.post(
+          '/api/auth/phone-number/verify',
+          data: {'phoneNumber': '+919876543210', 'code': '123456'},
+        ),
+      ).called(1);
+      verify(() => flutterStorage.write(key: 'bikie_auth_token', value: 'otp-session-token')).called(1);
+    });
+
+    test('wraps an invalid/expired code into a typed ApiException and does not store a token', () async {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/auth/phone-number/verify'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/api/auth/phone-number/verify'),
+            statusCode: 400,
+            data: {'error': 'INVALID_OTP'},
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      expect(
+        () => repository.verifyOtp(phoneNumber: '+919876543210', code: '000000'),
+        throwsA(isA<ApiException>().having((e) => e.isValidation, 'isValidation', true)),
+      );
+      verifyNever(() => flutterStorage.write(key: any(named: 'key'), value: any(named: 'value')));
+    });
+  });
+
+  group('AuthRepository.phoneExists', () {
+    test('parses exists/hasRealName from the query response', () async {
+      when(() => dio.get(any(), queryParameters: any(named: 'queryParameters'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/auth-helpers/phone-exists'),
+          statusCode: 200,
+          data: {'exists': true, 'hasRealName': false},
+        ),
+      );
+
+      final result = await repository.phoneExists('+919876543210');
+
+      expect(result.exists, isTrue);
+      expect(result.hasRealName, isFalse);
+      verify(
+        () => dio.get('/api/auth-helpers/phone-exists', queryParameters: {'phone': '+919876543210'}),
+      ).called(1);
+    });
+  });
+
+  group('AuthRepository.completePhoneSignup', () {
+    test('PATCHes the chosen role and returns becamePartner', () async {
+      when(() => dio.patch(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/user/complete-phone-signup'),
+          statusCode: 200,
+          data: {'success': true, 'becamePartner': true},
+        ),
+      );
+
+      final becamePartner = await repository.completePhoneSignup(role: 'PARTNER');
+
+      expect(becamePartner, isTrue);
+      verify(() => dio.patch('/api/user/complete-phone-signup', data: {'role': 'PARTNER'})).called(1);
+    });
+  });
+
+  group('AuthRepository.fetchDevOtp', () {
+    test('returns the code on success', () async {
+      when(() => dio.get(any(), queryParameters: any(named: 'queryParameters'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/dev/otp'),
+          statusCode: 200,
+          data: {'code': '654321'},
+        ),
+      );
+
+      final code = await repository.fetchDevOtp('+919876543210');
+
+      expect(code, '654321');
+    });
+
+    test('silently returns null when the dev endpoint is unavailable (e.g. SHOW_OTP_TOAST=false)', () async {
+      when(() => dio.get(any(), queryParameters: any(named: 'queryParameters'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/dev/otp'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/api/dev/otp'),
+            statusCode: 404,
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      final code = await repository.fetchDevOtp('+919876543210');
+
+      expect(code, isNull);
+    });
+  });
 }
