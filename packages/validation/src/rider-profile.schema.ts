@@ -17,6 +17,8 @@ const emergencyContactSchema = z.object({
     (val) => (typeof val === "string" ? val.replace(/[\s-]/g, "") : val),
     z.string().regex(PHONE_REGEX, "Enter a valid phone number (10-15 digits)"),
   ),
+  // Optional: SOS fan-out emails contacts who have one, in addition to SMS/WhatsApp.
+  email: z.preprocess(emptyToUndefined, z.string().email("Enter a valid email address").max(200).optional()),
   relation: z.string().max(50).optional(),
 });
 

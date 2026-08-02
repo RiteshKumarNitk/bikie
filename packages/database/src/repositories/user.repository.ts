@@ -46,3 +46,13 @@ export async function findSosContactFields(userId: string) {
     select: { phone: true, name: true },
   });
 }
+
+/** Escalation targets for an SOS that resolved to zero recipients (ADR-030). */
+export async function findAdminContacts(take = 5) {
+  return prisma.user.findMany({
+    where: { role: "ADMIN" },
+    select: { id: true, name: true, email: true, phone: true },
+    orderBy: { createdAt: "asc" },
+    take,
+  });
+}

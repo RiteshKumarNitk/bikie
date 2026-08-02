@@ -146,6 +146,7 @@ export default function OnboardingPage() {
         .map((contact) => ({
           name: contact.name.trim(),
           phone: contact.phone.trim(),
+          email: contact.email.trim() || undefined,
           relation: contact.relation.trim() || undefined,
         })),
     };

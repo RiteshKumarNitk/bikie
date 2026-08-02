@@ -78,6 +78,7 @@ export interface PartnerDispatchPort {
 export interface EmergencyContactRow {
   name: string;
   phone: string;
+  email: string | null;
   relation: string | null;
 }
 
@@ -87,6 +88,18 @@ export interface EmergencyContactsPort {
 
 export interface UserContactPort {
   findSosContactFields(userId: string): Promise<{ phone: string | null; name: string } | null>;
+}
+
+export interface EscalationContactRow {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+}
+
+/** Last-resort recipients when an alert resolves to nobody — an SOS must never go nowhere. */
+export interface EscalationPort {
+  findAdminContacts(take?: number): Promise<EscalationContactRow[]>;
 }
 
 export interface InAppNotificationPort {
@@ -121,6 +134,7 @@ export interface SafetyLocationPorts {
   partnerDispatch: PartnerDispatchPort;
   emergencyContacts: EmergencyContactsPort;
   userContact: UserContactPort;
+  escalation: EscalationPort;
   places: PlacesPort;
   notifications: InAppNotificationPort;
   communications: CommunicationsPorts;

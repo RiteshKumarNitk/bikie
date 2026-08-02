@@ -61,6 +61,20 @@ function fail(provider: string, error = "boom"): ChannelResult {
   return { ok: false, provider, error };
 }
 
+/** Typed so `.mock.calls[n][i]` stays indexable — a bare `vi.fn(async () => …)` infers `[]`. */
+function notifyMock() {
+  return vi.fn(
+    async (
+      _userId: string,
+      _type: "SOS_ALERT",
+      _title: string,
+      _body: string,
+      _entity?: string,
+      _entityId?: string,
+    ) => undefined,
+  );
+}
+
 function fakeCommunications(overrides: Partial<CommunicationsPorts> = {}): CommunicationsPorts {
   return {
     email: { send: vi.fn(async () => ok("smtp")) },
@@ -87,6 +101,7 @@ function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partial<Safet
     partnerDispatch: { findByCity: vi.fn(async () => []) },
     emergencyContacts: { findByUserId: vi.fn(async () => []) },
     userContact: { findSosContactFields: vi.fn(async () => null) },
+    escalation: { findAdminContacts: vi.fn(async () => []) },
     sosAlerts: {
       createAlert: vi.fn(),
       getActiveAlerts: vi.fn(async () => []),
@@ -187,12 +202,19 @@ describe("rider-location application", () => {
 });
 
 describe("sos profile warning", () => {
+  const oneContact = {
+    findByUserId: vi.fn(async () => [
+      { name: "Mom", phone: "9111111111", email: null, relation: "Mother" },
+    ]),
+  };
+
   it("warns when phone is missing", async () => {
     const module = createSafetyLocationModule({
       ...emptyRepos({
         userContact: {
           findSosContactFields: vi.fn(async () => ({ phone: null, name: "Rider" })),
         },
+        emergencyContacts: oneContact,
       }),
       communications: fakeCommunications(),
     });
@@ -201,12 +223,27 @@ describe("sos profile warning", () => {
     );
   });
 
-  it("returns null when phone is present", async () => {
+  it("warns when no emergency contacts are saved", async () => {
     const module = createSafetyLocationModule({
       ...emptyRepos({
         userContact: {
           findSosContactFields: vi.fn(async () => ({ phone: "9876543210", name: "Rider" })),
         },
+      }),
+      communications: fakeCommunications(),
+    });
+    expect(await module.sos.getProfileWarning("u1")).toBe(
+      "Your profile is missing: emergency contacts. Update your profile so responders can reach you.",
+    );
+  });
+
+  it("returns null once a phone and at least one contact exist", async () => {
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        userContact: {
+          findSosContactFields: vi.fn(async () => ({ phone: "9876543210", name: "Rider" })),
+        },
+        emergencyContacts: oneContact,
       }),
       communications: fakeCommunications(),
     });
@@ -260,7 +297,9 @@ describe("fan-out dispatch", () => {
           ]),
         },
         emergencyContacts: {
-          findByUserId: vi.fn(async () => [{ name: "Mom", phone: "9111111111", relation: "Mother" }]),
+          findByUserId: vi.fn(async () => [
+            { name: "Mom", phone: "9111111111", email: "mom@example.com", relation: "Mother" },
+          ]),
         },
         notifications: { notify: vi.fn(async () => undefined) },
       }),
@@ -368,7 +407,9 @@ describe("fan-out dispatch", () => {
     const module = createSafetyLocationModule({
       ...emptyRepos({
         emergencyContacts: {
-          findByUserId: vi.fn(async () => [{ name: "Mom", phone: "9111111111", relation: "Mother" }]),
+          findByUserId: vi.fn(async () => [
+            { name: "Mom", phone: "9111111111", email: null, relation: "Mother" },
+          ]),
         },
       }),
       communications: fakeCommunications({
@@ -400,7 +441,95 @@ describe("fan-out dispatch", () => {
     // Unconfigured WhatsApp still yields a manual click-to-send link.
     expect(summary.whatsappClickToSend).toHaveLength(1);
   });
+
+  it("emails emergency contacts who have an email address", async () => {
+    const emailSend = vi.fn(async (_message: { to: string; subject: string; html: string }) =>
+      ok("smtp"),
+    );
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        emergencyContacts: {
+          findByUserId: vi.fn(async () => [
+            { name: "Mom", phone: "9111111111", email: "mom@example.com", relation: "Mother" },
+            { name: "Dad", phone: "9222222222", email: null, relation: "Father" },
+          ]),
+        },
+      }),
+      communications: fakeCommunications({ email: { send: emailSend } }),
+    });
+
+    const summary = await module.dispatch.fanOut(sampleAlert(), {
+      idempotency: {
+        claim: async () => true,
+        remember: async () => undefined,
+        recall: async () => null,
+      },
+    });
+
+    const recipients = emailSend.mock.calls.map((c) => c[0].to);
+    expect(recipients).toContain("mom@example.com");
+    // Reporter receipt + the one contact with an email; the phone-only contact is not attempted.
+    expect(summary.emailAttempted).toBe(2);
+  });
+
+  it("escalates to admins and warns the reporter when nobody was reached", async () => {
+    const findAdminContacts = vi.fn(async () => [
+      { id: "admin-1", name: "Admin One", email: "admin@bikie.app", phone: "9333333333" },
+    ]);
+    const notify = notifyMock();
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        escalation: { findAdminContacts },
+        notifications: { notify },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const summary = await module.dispatch.fanOut(sampleAlert(), {
+      idempotency: {
+        claim: async () => true,
+        remember: async () => undefined,
+        recall: async () => null,
+      },
+    });
+
+    expect(findAdminContacts).toHaveBeenCalled();
+    expect(summary.escalatedToAdmins).toBe(1);
+    expect(summary.smsAttempted).toBe(1);
+
+    const reporterNotice = notify.mock.calls.find((c) => c[0] === "user-1");
+    expect(reporterNotice?.[3]).toContain("No responders could be reached");
+  });
+
+  it("notifies the reporter that the alert is live when responders were found", async () => {
+    const notify = notifyMock();
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        emergencyContacts: {
+          findByUserId: vi.fn(async () => [
+            { name: "Mom", phone: "9111111111", email: null, relation: "Mother" },
+          ]),
+        },
+        escalation: { findAdminContacts: vi.fn(async () => []) },
+        notifications: { notify },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const summary = await module.dispatch.fanOut(sampleAlert(), {
+      idempotency: {
+        claim: async () => true,
+        remember: async () => undefined,
+        recall: async () => null,
+      },
+    });
+
+    expect(summary.escalatedToAdmins).toBe(0);
+    const reporterNotice = notify.mock.calls.find((c) => c[0] === "user-1");
+    expect(reporterNotice?.[3]).toContain("Alerting 1 responder(s)");
+  });
 });
+
 
 describe("channel selection", () => {
   it("treats ports without isConfigured as usable", () => {

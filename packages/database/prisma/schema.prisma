@@ -305,6 +305,8 @@ model RiderEmergencyContact {
   riderProfile   RiderProfile @relation(fields: [riderProfileId], references: [id], onDelete: Cascade)
   name           String
   phone          String
+  /** Optional — SOS fan-out emails contacts who have one, on top of SMS/WhatsApp to `phone`. */
+  email          String?
   relation       String?
   createdAt      DateTime     @default(now())
 

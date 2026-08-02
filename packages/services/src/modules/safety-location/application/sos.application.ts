@@ -27,11 +27,20 @@ export function createSosApplication(ports: SafetyLocationPorts) {
       return ports.sosAlerts.autoResolveStaleAlerts(minutes);
     },
 
-    /** Warn the reporter when SOS responders cannot reach them by phone. */
+    /**
+     * Warn the reporter about gaps that make an SOS less effective: responders can't call them
+     * back without a phone number, and with no emergency contacts saved the fan-out has nobody
+     * guaranteed to reach (nearby riders depend on who happens to be sharing location).
+     */
     async getProfileWarning(userId: string): Promise<string | null> {
-      const user = await ports.userContact.findSosContactFields(userId);
+      const [user, contacts] = await Promise.all([
+        ports.userContact.findSosContactFields(userId),
+        ports.emergencyContacts.findByUserId(userId).catch(() => []),
+      ]);
+
       const missingFields: string[] = [];
       if (!user?.phone) missingFields.push("phone number");
+      if (contacts.length === 0) missingFields.push("emergency contacts");
       if (missingFields.length === 0) return null;
       return `Your profile is missing: ${missingFields.join(", ")}. Update your profile so responders can reach you.`;
     },

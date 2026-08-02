@@ -7,6 +7,7 @@ import {
 } from "@bikie/database";
 import type {
   EmergencyContactsPort,
+  EscalationPort,
   PartnerDispatchPort,
   RiderLocationRepositoryPort,
   SosAlertRepositoryPort,
@@ -73,11 +74,14 @@ export function createEmergencyContactsAdapter(): EmergencyContactsPort {
     async findByUserId(userId) {
       const profile = await riderProfileRepository.findByUserId(userId);
       if (!profile?.emergencyContacts?.length) return [];
-      return profile.emergencyContacts.map((c: { name: string; phone: string; relation: string | null }) => ({
-        name: c.name,
-        phone: c.phone,
-        relation: c.relation,
-      }));
+      return profile.emergencyContacts.map(
+        (c: { name: string; phone: string; email: string | null; relation: string | null }) => ({
+          name: c.name,
+          phone: c.phone,
+          email: c.email,
+          relation: c.relation,
+        }),
+      );
     },
   };
 }
@@ -85,5 +89,11 @@ export function createEmergencyContactsAdapter(): EmergencyContactsPort {
 export function createUserContactAdapter(): UserContactPort {
   return {
     findSosContactFields: (userId) => userRepository.findSosContactFields(userId),
+  };
+}
+
+export function createEscalationAdapter(): EscalationPort {
+  return {
+    findAdminContacts: (take) => userRepository.findAdminContacts(take),
   };
 }

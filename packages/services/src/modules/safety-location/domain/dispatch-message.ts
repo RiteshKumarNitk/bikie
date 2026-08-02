@@ -6,7 +6,9 @@ export type SOSRecipientRole =
   | "NEARBY_RIDER"
   | "SERVICE_PROVIDER"
   | "EMERGENCY_CONTACT"
-  | "EMERGENCY_SERVICES";
+  | "EMERGENCY_SERVICES"
+  /** Escalation-only fallback used when an alert would otherwise reach nobody (ADR-030). */
+  | "PLATFORM_ADMIN";
 
 export interface SOSRecipient {
   role: SOSRecipientRole;
@@ -29,7 +31,9 @@ export function buildTextBody(alert: SOSAlertDTO, recipient: SOSRecipient): stri
         ? "A rider near your service area needs help."
         : recipient.role === "EMERGENCY_SERVICES"
           ? "Automated BIKIE emergency dispatch."
-          : "A fellow BIKIE rider nearby needs help.";
+          : recipient.role === "PLATFORM_ADMIN"
+            ? "Escalation: this alert reached no nearby riders, providers, or emergency contacts."
+            : "A fellow BIKIE rider nearby needs help.";
 
   const pin = mapsPinUrl(alert.latitude, alert.longitude);
   const navigate = mapsNavigateUrl(alert.latitude, alert.longitude);
@@ -69,7 +73,9 @@ export function buildEmailHtml(alert: SOSAlertDTO, recipient: SOSRecipient): str
             ? "A rider near your service area needs help."
             : recipient.role === "EMERGENCY_CONTACT"
               ? "You are listed as an emergency contact for this rider."
-              : "BIKIE emergency dispatch."
+              : recipient.role === "PLATFORM_ADMIN"
+                ? "Escalation: this alert reached no nearby riders, providers, or emergency contacts."
+                : "BIKIE emergency dispatch."
       }</p>
       ${distance ? `<p style="margin:0 0 12px"><strong>Approx. distance from you:</strong> ${distance}</p>` : ""}
       <p style="margin:0 0 4px"><strong>Rider:</strong> ${alert.userName}${alert.userPhone ? ` (${alert.userPhone})` : ""}</p>

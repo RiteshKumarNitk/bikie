@@ -10,6 +10,8 @@
 export interface EmergencyContactValue {
   name: string;
   phone: string;
+  /** Optional — SOS fan-out emails contacts who have one, on top of SMS/WhatsApp. */
+  email: string;
   relation: string;
 }
 
@@ -36,7 +38,7 @@ export function EmergencyContactsEditor({
 
   function addContact() {
     if (contacts.length >= max) return;
-    onChange([...contacts, { name: "", phone: "", relation: "" }]);
+    onChange([...contacts, { name: "", phone: "", email: "", relation: "" }]);
   }
 
   return (
@@ -57,7 +59,7 @@ export function EmergencyContactsEditor({
           <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">
             Contact {index + 1}
           </p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className={labelClassName} htmlFor={`contact-name-${index}`}>
                 Name
@@ -83,7 +85,20 @@ export function EmergencyContactsEditor({
                 className={inputClassName}
               />
             </div>
-            <div className="sm:col-span-2 lg:col-span-1">
+            <div>
+              <label className={labelClassName} htmlFor={`contact-email-${index}`}>
+                Email <span className="font-normal text-foreground/40">(optional)</span>
+              </label>
+              <input
+                id={`contact-email-${index}`}
+                type="email"
+                value={contact.email}
+                onChange={(e) => updateContact(index, "email", e.target.value)}
+                placeholder="priya@example.com"
+                className={inputClassName}
+              />
+            </div>
+            <div>
               <label className={labelClassName} htmlFor={`contact-relation-${index}`}>
                 Relation <span className="font-normal text-foreground/40">(optional)</span>
               </label>

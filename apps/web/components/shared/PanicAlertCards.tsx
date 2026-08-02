@@ -28,6 +28,103 @@ const AMBER_CATEGORIES: Category[] = [
   { label: "Medical Assistance", type: "MEDICAL", icon: "🏥" },
 ];
 
+/** Mirror of the server's `SOSDispatchSummary` fields this screen reports on (ADR-030). */
+interface DispatchSummary {
+  nearbyRiders: number;
+  serviceProviders: number;
+  emergencyContacts: number;
+  emergencyServices: number;
+  smsAttempted: number;
+  smsSent: number;
+  whatsappAttempted: number;
+  whatsappSent: number;
+  emailAttempted: number;
+  emailSent: number;
+  escalatedToAdmins: number;
+  channels?: { sms: boolean; whatsapp: boolean; email: boolean };
+}
+
+function recipientCount(d: DispatchSummary) {
+  return d.nearbyRiders + d.serviceProviders + d.emergencyContacts + d.emergencyServices;
+}
+
+/**
+ * The old success screen always claimed "GPS shared via SMS, WhatsApp, and email" even when the
+ * fan-out reached nobody and those providers had no credentials — the single most misleading part
+ * of the SOS flow. Report what actually happened instead.
+ */
+function DispatchReport({ dispatch }: { dispatch: DispatchSummary | null }) {
+  if (!dispatch) {
+    return (
+      <p className="mx-auto mt-3 max-w-sm rounded-lg bg-red-500/10 p-3 text-sm text-red-400">
+        Your alert is recorded and visible to responders in the app, but the notification dispatch
+        failed. Call local emergency services now.
+      </p>
+    );
+  }
+
+  const reached = recipientCount(dispatch);
+  const channels = dispatch.channels;
+  const offChannels = channels
+    ? [
+        !channels.sms ? "SMS" : null,
+        !channels.whatsapp ? "WhatsApp" : null,
+        !channels.email ? "email" : null,
+      ].filter(Boolean)
+    : [];
+
+  if (reached === 0) {
+    return (
+      <div className="mx-auto mt-3 max-w-sm space-y-3 text-left">
+        <p className="rounded-lg bg-warning/10 p-3 text-sm text-warning">
+          ⚠️ Your alert is live in the app, but <strong>no one could be notified</strong> — no
+          emergency contacts are saved on your profile, no nearby riders are sharing their
+          location, and no service provider matched your city.
+          {dispatch.escalatedToAdmins > 0 &&
+            ` It was escalated to ${dispatch.escalatedToAdmins} BIKIE admin${dispatch.escalatedToAdmins > 1 ? "s" : ""}.`}
+        </p>
+        <p className="text-sm font-semibold text-red-400">
+          Call local emergency services now — don't wait on the app.
+        </p>
+        <Link
+          href="/dashboard/settings"
+          className="block rounded-full bg-accent px-5 py-2 text-center text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+        >
+          Add emergency contacts
+        </Link>
+      </div>
+    );
+  }
+
+  const delivered = [
+    dispatch.smsAttempted > 0 ? `SMS ${dispatch.smsSent}/${dispatch.smsAttempted}` : null,
+    dispatch.whatsappAttempted > 0
+      ? `WhatsApp ${dispatch.whatsappSent}/${dispatch.whatsappAttempted}`
+      : null,
+    dispatch.emailAttempted > 0 ? `Email ${dispatch.emailSent}/${dispatch.emailAttempted}` : null,
+  ].filter(Boolean);
+
+  return (
+    <div className="mx-auto mt-3 max-w-sm space-y-2 text-sm">
+      <p className="text-foreground/60">
+        Your live GPS went out to {reached} responder{reached > 1 ? "s" : ""}
+        {dispatch.nearbyRiders > 0 && ` · ${dispatch.nearbyRiders} nearby rider(s)`}
+        {dispatch.serviceProviders > 0 && ` · ${dispatch.serviceProviders} provider(s)`}
+        {dispatch.emergencyContacts > 0 && ` · ${dispatch.emergencyContacts} emergency contact(s)`}.
+      </p>
+      {delivered.length > 0 && (
+        <p className="text-xs text-foreground/40">Delivered: {delivered.join(" · ")}</p>
+      )}
+      {offChannels.length > 0 && (
+        <p className="rounded-lg bg-warning/10 p-2.5 text-xs text-warning">
+          {offChannels.join(" and ")} {offChannels.length > 1 ? "are" : "is"} not configured on this
+          deployment, so those messages were not sent.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // Exact brand hexes for the two alert kinds (RED #e8000d, AMBER #ffaa00) — intentionally
 // more saturated than the shared --color-warning token, since these need to read as urgent
 // at a glance and are only ever used here and in the SOS confirm modal, not as a
@@ -168,6 +265,7 @@ export function PanicAlertCards({
   const [sent, setSent] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [profileWarning, setProfileWarning] = useState<string | null>(null);
+  const [dispatch, setDispatch] = useState<DispatchSummary | null>(null);
 
   function getLocation() {
     if (!navigator.geolocation) {
@@ -191,6 +289,7 @@ export function PanicAlertCards({
     setLocError(null);
     setSendError(null);
     setSent(false);
+    setDispatch(null);
     // Captured silently in the background so the modal itself can stay a single tap for Red.
     getLocation();
   }
@@ -222,6 +321,7 @@ export function PanicAlertCards({
       if (res.ok) {
         const data = await res.json();
         setSent(true);
+        setDispatch(data.dispatch ?? null);
         const warning = data.profileWarning ?? null;
         setProfileWarning(warning);
         onSent?.(warning);
@@ -317,12 +417,22 @@ export function PanicAlertCards({
               </div>
             ) : sent ? (
               <div className="text-center">
-                <div className="text-4xl">✅</div>
-                <h3 className="mt-3 font-display text-xl font-bold text-success">Alert Sent!</h3>
-                <p className="mt-2 text-sm text-foreground/60">
-                  GPS shared via SMS, WhatsApp, and email to nearby riders, service providers,
-                  and your emergency contacts. Help is on the way. Stay safe.
-                </p>
+                {(() => {
+                  const reachedNobody = !dispatch || recipientCount(dispatch) === 0;
+                  return (
+                    <>
+                      <div className="text-4xl">{reachedNobody ? "⚠️" : "✅"}</div>
+                      <h3
+                        className={`mt-3 font-display text-xl font-bold ${
+                          reachedNobody ? "text-warning" : "text-success"
+                        }`}
+                      >
+                        {reachedNobody ? "Alert recorded — nobody reached" : "Alert Sent!"}
+                      </h3>
+                    </>
+                  );
+                })()}
+                <DispatchReport dispatch={dispatch} />
                 {profileWarning && (
                   <p className="mx-auto mt-3 max-w-sm rounded-lg bg-warning/10 p-3 text-sm text-warning">
                     ⚠️ {profileWarning}

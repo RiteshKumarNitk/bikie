@@ -23,7 +23,13 @@ interface RiderProfileRow {
   riderFrequency: string | null;
   ridingClubType: string | null;
   clubName: string | null;
-  emergencyContacts: { id: string; name: string; phone: string; relation: string | null }[];
+  emergencyContacts: {
+    id: string;
+    name: string;
+    phone: string;
+    email: string | null;
+    relation: string | null;
+  }[];
 }
 
 function toDTO(profile: RiderProfileRow) {
@@ -54,6 +60,7 @@ function toDTO(profile: RiderProfileRow) {
       id: c.id,
       name: c.name,
       phone: c.phone,
+      email: c.email,
       relation: c.relation,
     })),
   };
@@ -97,7 +104,7 @@ interface RiderProfileInputData {
   riderFrequency?: "OCCASIONAL" | "WEEKLY" | "DAILY";
   ridingClubType?: "SOLO" | "CLUB_MEMBER";
   clubName?: string;
-  emergencyContacts?: { name: string; phone: string; relation?: string }[];
+  emergencyContacts?: { name: string; phone: string; email?: string; relation?: string }[];
 }
 
 function sharedFields(data: RiderProfileInputData) {
@@ -143,6 +150,7 @@ export async function upsertProfile(userId: string, data: RiderProfileInputData)
             riderProfileId: saved.id,
             name: c.name,
             phone: c.phone,
+            email: c.email,
             relation: c.relation,
           })),
         });
