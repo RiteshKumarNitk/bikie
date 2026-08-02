@@ -8,6 +8,7 @@ import {
   emptyPartnerBusinessDetails,
   type PartnerBusinessDetails,
 } from "@/components/auth/PartnerBusinessFields";
+import { LogoMark } from "@/components/layout/LogoMark";
 
 const inputClassName =
   "mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30";
@@ -90,9 +91,7 @@ export default function PartnerOnboardingPage() {
       <div className="relative mx-auto w-full max-w-2xl lg:max-w-4xl xl:max-w-5xl">
         <div className="flex flex-col items-center text-center">
           <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-base font-bold text-white">
-              B
-            </div>
+            <LogoMark size="lg" />
             <span className="font-display text-2xl font-semibold tracking-tight text-foreground">
               BIKIE
             </span>

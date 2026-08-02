@@ -1,48 +1,39 @@
-import { adminRepository } from "@bikie/database";
+import { getAdministrationModule } from "./modules/administration/public";
 import type { AdminOverviewStatsDTO } from "@bikie/types";
 
+/** Compatibility facade — routes keep importing AdminService. */
 export const AdminService = {
-  async getOverviewStats(): Promise<AdminOverviewStatsDTO> {
-    return adminRepository.getAdminOverviewStats();
+  getOverviewStats(): Promise<AdminOverviewStatsDTO> {
+    return getAdministrationModule().admin.getOverviewStats();
   },
-
-  async getAllUsers() {
-    return adminRepository.findAllUsers();
+  getAllUsers() {
+    return getAdministrationModule().admin.getAllUsers();
   },
-
-  async updateUserRole(userId: string, role: string) {
-    return adminRepository.updateUserRole(userId, role);
+  updateUserRole(userId: string, role: string) {
+    return getAdministrationModule().admin.updateUserRole(userId, role);
   },
-
-  async deleteUser(userId: string) {
-    return adminRepository.deleteUser(userId);
+  deleteUser(userId: string) {
+    return getAdministrationModule().admin.deleteUser(userId);
   },
-
-  async getAllPartners() {
-    return adminRepository.findAllPartners();
+  getAllPartners() {
+    return getAdministrationModule().admin.getAllPartners();
   },
-
-  async updatePartnerVerification(partnerId: string, isVerified: boolean) {
-    return adminRepository.updatePartnerVerification(partnerId, isVerified);
+  updatePartnerVerification(partnerId: string, isVerified: boolean) {
+    return getAdministrationModule().admin.updatePartnerVerification(partnerId, isVerified);
   },
-
-  async deletePartner(partnerId: string) {
-    return adminRepository.deletePartner(partnerId);
+  deletePartner(partnerId: string) {
+    return getAdministrationModule().admin.deletePartner(partnerId);
   },
-
-  async getAllBookings() {
-    return adminRepository.findAllBookingsAdmin();
+  getAllBookings() {
+    return getAdministrationModule().admin.getAllBookings();
   },
-
-  async updateBookingStatus(bookingId: string, status: string) {
-    return adminRepository.updateBookingStatus(bookingId, status);
+  updateBookingStatus(bookingId: string, status: string) {
+    return getAdministrationModule().admin.updateBookingStatus(bookingId, status);
   },
-
-  async deleteBooking(bookingId: string) {
-    return adminRepository.deleteBooking(bookingId);
+  deleteBooking(bookingId: string) {
+    return getAdministrationModule().admin.deleteBooking(bookingId);
   },
-
-  async createBike(data: {
+  createBike(data: {
     name: string;
     slug: string;
     brand: string;
@@ -53,54 +44,39 @@ export const AdminService = {
     ownerId?: string;
     description?: string;
   }) {
-    return adminRepository.createBike(data);
+    return getAdministrationModule().admin.createBike(data);
   },
-
-  async updateBike(bikeId: string, data: any) {
-    return adminRepository.updateBike(bikeId, data);
+  updateBike(bikeId: string, data: Record<string, unknown>) {
+    return getAdministrationModule().admin.updateBike(bikeId, data);
   },
-
-  async deleteBike(bikeId: string) {
-    return adminRepository.deleteBike(bikeId);
+  deleteBike(bikeId: string) {
+    return getAdministrationModule().admin.deleteBike(bikeId);
   },
-
-  // --- Testimonials ---
-
-  async getAllTestimonials() {
-    return adminRepository.findAllTestimonials();
+  getAllTestimonials() {
+    return getAdministrationModule().admin.getAllTestimonials();
   },
-
-  async createTestimonial(data: {
+  createTestimonial(data: {
     authorName: string;
     authorLocation?: string;
     authorAvatarUrl?: string;
     rating: number;
     quote: string;
   }) {
-    return adminRepository.createTestimonial(data);
+    return getAdministrationModule().admin.createTestimonial(data);
   },
-
-  async updateTestimonial(id: string, data: any) {
-    return adminRepository.updateTestimonial(id, data);
+  updateTestimonial(id: string, data: Record<string, unknown>) {
+    return getAdministrationModule().admin.updateTestimonial(id, data);
   },
-
-  async deleteTestimonial(id: string) {
-    return adminRepository.deleteTestimonial(id);
+  deleteTestimonial(id: string) {
+    return getAdministrationModule().admin.deleteTestimonial(id);
   },
-
-  // --- Audit Logs ---
-
-  async getAllAuditLogs() {
-    return adminRepository.findAllAuditLogs();
+  getAllAuditLogs() {
+    return getAdministrationModule().admin.getAllAuditLogs();
   },
-
-  // --- Membership Plans ---
-
-  async getAllMembershipPlans() {
-    return adminRepository.findAllPlansAdmin();
+  getAllMembershipPlans() {
+    return getAdministrationModule().admin.getAllMembershipPlans();
   },
-
-  async createMembershipPlan(data: {
+  createMembershipPlan(data: {
     name: string;
     description: string;
     price: number;
@@ -108,30 +84,21 @@ export const AdminService = {
     benefits: string[];
     sortOrder?: number;
   }) {
-    return adminRepository.createMembershipPlan(data);
+    return getAdministrationModule().admin.createMembershipPlan(data);
   },
-
-  async updateMembershipPlan(id: string, data: any) {
-    return adminRepository.updateMembershipPlan(id, data);
+  updateMembershipPlan(id: string, data: Record<string, unknown>) {
+    return getAdministrationModule().admin.updateMembershipPlan(id, data);
   },
-
-  async deleteMembershipPlan(id: string) {
-    return adminRepository.deleteMembershipPlan(id);
+  deleteMembershipPlan(id: string) {
+    return getAdministrationModule().admin.deleteMembershipPlan(id);
   },
-
-  // --- Referrals ---
-
-  async getAllReferrals() {
-    return adminRepository.findAllReferrals();
+  getAllReferrals() {
+    return getAdministrationModule().admin.getAllReferrals();
   },
-
-  // --- Trips ---
-
-  async getAllTrips() {
-    return adminRepository.findAllTripsAdmin();
+  getAllTrips() {
+    return getAdministrationModule().admin.getAllTrips();
   },
-
-  async updateTrip(
+  updateTrip(
     tripId: string,
     data: Partial<{
       title: string;
@@ -142,20 +109,15 @@ export const AdminService = {
       status: string;
     }>,
   ) {
-    return adminRepository.updateTripAdmin(tripId, data);
+    return getAdministrationModule().admin.updateTrip(tripId, data);
   },
-
-  async deleteTrip(tripId: string) {
-    return adminRepository.deleteTripAdmin(tripId);
+  deleteTrip(tripId: string) {
+    return getAdministrationModule().admin.deleteTrip(tripId);
   },
-
-  // --- Groups ---
-
-  async getAllGroups() {
-    return adminRepository.findAllGroupsAdmin();
+  getAllGroups() {
+    return getAdministrationModule().admin.getAllGroups();
   },
-
-  async createGroup(data: {
+  createGroup(data: {
     name: string;
     description: string;
     imageUrl: string;
@@ -164,10 +126,9 @@ export const AdminService = {
     isPrivate?: boolean;
     ownerId: string;
   }) {
-    return adminRepository.createGroupAdmin(data);
+    return getAdministrationModule().admin.createGroup(data);
   },
-
-  async updateGroup(
+  updateGroup(
     groupId: string,
     data: Partial<{
       name: string;
@@ -179,10 +140,12 @@ export const AdminService = {
       ownerId: string;
     }>,
   ) {
-    return adminRepository.updateGroupAdmin(groupId, data);
+    return getAdministrationModule().admin.updateGroup(groupId, data);
   },
-
-  async deleteGroup(groupId: string) {
-    return adminRepository.deleteGroupAdmin(groupId);
+  deleteGroup(groupId: string) {
+    return getAdministrationModule().admin.deleteGroup(groupId);
+  },
+  exportCsv(type: "users" | "bookings" | "partners") {
+    return getAdministrationModule().admin.exportCsv(type);
   },
 };

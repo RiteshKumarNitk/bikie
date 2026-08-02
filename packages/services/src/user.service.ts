@@ -11,6 +11,14 @@ export const UserService = {
     return { exists: true, hasRealName: user.name !== phoneNumber };
   },
 
+  async updatePhone(userId: string, phone: string | null): Promise<void> {
+    await userRepository.updatePhone(userId, phone);
+  },
+
+  async touchLastActiveAt(userId: string): Promise<void> {
+    await userRepository.touchLastActiveAt(userId);
+  },
+
   async becomePartner(
     userId: string,
     currentRole: string,

@@ -95,7 +95,7 @@ export default async function BikeDetailPage({ params }: { params: Promise<{ slu
       <Breadcrumbs
         items={[
           { label: "Home", href: "/" },
-          { label: "Explore Bikes", href: "/explore-bikes" },
+          { label: "Rent a Bike", href: "/explore-bikes" },
           { label: bike.name },
         ]}
       />

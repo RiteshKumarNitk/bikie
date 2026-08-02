@@ -103,10 +103,12 @@ export function ProfileSettings({ name, email, image: initialImage, phone: initi
           <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Name</label>
           <input readOnly value={name} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm opacity-60" />
         </div>
-        <div>
-          <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Email</label>
-          <input readOnly value={email} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm opacity-60" />
-        </div>
+        {email && !email.endsWith("@bikie.local") && (
+          <div>
+            <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Email</label>
+            <input readOnly value={email} className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm opacity-60" />
+          </div>
+        )}
         <div>
           <label className="text-xs font-medium uppercase tracking-wide text-foreground/50">Phone (for SOS)</label>
           <input

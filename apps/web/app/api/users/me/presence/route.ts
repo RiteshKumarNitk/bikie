@@ -1,15 +1,11 @@
 import { NextResponse } from "next/server";
+import { UserService } from "@bikie/services";
 import { requireSession } from "@/lib/require-role";
-import { prisma } from "@bikie/database";
 
 export async function POST() {
   const { session, error } = await requireSession();
   if (error) return error;
 
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { lastActiveAt: new Date() },
-  });
-
+  await UserService.touchLastActiveAt(session.user.id);
   return NextResponse.json({ ok: true });
 }

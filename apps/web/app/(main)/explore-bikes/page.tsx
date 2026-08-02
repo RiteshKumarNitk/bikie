@@ -8,7 +8,7 @@ import { Pagination } from "@/components/shared/Pagination";
 import { BikeFilters } from "@/components/explore/BikeFilters";
 
 export const metadata: Metadata = {
-  title: "Explore Bikes",
+  title: "Rent a Bike",
   description: "Search and filter premium motorcycles for rent across India — by location, category, price, and more.",
 };
 
@@ -42,10 +42,10 @@ export default async function ExploreBikesPage({
 
   return (
     <div className="pb-24">
-      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Explore Bikes" }]} />
+      <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Rent a Bike" }]} />
 
       <div className="mx-auto max-w-7xl px-6 pt-6">
-        <h1 className="text-3xl font-semibold md:text-4xl">Explore Bikes</h1>
+        <h1 className="text-3xl font-semibold md:text-4xl">Rent a Bike</h1>
         <p className="mt-2 text-foreground/60">{total} bikes ready for instant booking.</p>
 
         <div className="mt-8">

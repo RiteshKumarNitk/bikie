@@ -2,13 +2,9 @@ import { Redis } from "@upstash/redis";
 
 /**
  * Stores OTP codes so the browser UI can retrieve and display them as a toast notification.
- * Enabled by setting SHOW_OTP_TOAST=true (defaults to enabled for testing convenience).
+ * Opt-in only: SHOW_OTP_TOAST must be exactly "true". Always no-ops when NODE_ENV=production.
  *
- * Backed by the same Upstash Redis instance as RateLimitService/RealtimeService/Better Auth's
- * secondaryStorage when configured — Next.js API routes are not guaranteed to share in-process
- * module state with each other, so a plain in-memory `Map` here silently never sees what
- * `packages/auth/src/server.ts`'s `sendOTP` callback wrote. The in-memory Map below is kept
- * only as a best-effort fallback for the (rare) case Upstash isn't configured either.
+ * Backed by Upstash Redis when configured; in-memory Map is a best-effort local fallback.
  */
 let redisClient: Redis | null | undefined;
 function getRedis(): Redis | null {
@@ -23,6 +19,10 @@ function getRedis(): Redis | null {
   return redisClient;
 }
 
+function isEnabled(): boolean {
+  return process.env.NODE_ENV !== "production" && process.env.SHOW_OTP_TOAST === "true";
+}
+
 interface Entry {
   code: string;
   expiresAt: number;
@@ -32,7 +32,7 @@ const KEY_PREFIX = "bikie-dev-otp:";
 
 export const DevOtpStore = {
   async set(phoneNumber: string, code: string, ttlSeconds: number) {
-    if (process.env.SHOW_OTP_TOAST === "false") return;
+    if (!isEnabled()) return;
     const redis = getRedis();
     if (redis) {
       await redis.set(`${KEY_PREFIX}${phoneNumber}`, code, { ex: ttlSeconds });
@@ -42,7 +42,7 @@ export const DevOtpStore = {
   },
 
   async get(phoneNumber: string): Promise<string | null> {
-    if (process.env.SHOW_OTP_TOAST === "false") return null;
+    if (!isEnabled()) return null;
     const redis = getRedis();
     if (redis) {
       return (await redis.get<string>(`${KEY_PREFIX}${phoneNumber}`)) ?? null;

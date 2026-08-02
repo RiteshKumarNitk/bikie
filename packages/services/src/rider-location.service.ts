@@ -1,26 +1,25 @@
-import { riderLocationRepository } from "@bikie/database";
+import { getSafetyLocationModule } from "./modules/safety-location/public";
 
+/** Compatibility facade — routes keep importing RiderLocationService. */
 export const RiderLocationService = {
   async setSharing(userId: string, enabled: boolean): Promise<void> {
-    await riderLocationRepository.setSharingEnabled(userId, enabled);
+    await getSafetyLocationModule().riderLocation.setSharing(userId, enabled);
   },
 
   async getSharing(userId: string): Promise<boolean> {
-    return riderLocationRepository.getSharingEnabled(userId);
+    return getSafetyLocationModule().riderLocation.getSharing(userId);
   },
 
   /** Returns false if the update was rejected because sharing isn't enabled server-side. */
   async updateLocation(userId: string, lat: number, lng: number): Promise<boolean> {
-    const affected = await riderLocationRepository.updateLocationIfSharing(userId, lat, lng);
-    return affected > 0;
+    return getSafetyLocationModule().riderLocation.updateLocation(userId, lat, lng);
   },
 
   async findNearby(userId: string, radiusKm: number) {
-    const rows = await riderLocationRepository.findNearby(userId, radiusKm * 1000);
-    return rows.map((r) => ({ id: r.id, name: r.name, distanceMeters: Math.round(r.distanceMeters) }));
+    return getSafetyLocationModule().riderLocation.findNearby(userId, radiusKm);
   },
 
   async autoDisableStaleSharing(minutes: number): Promise<void> {
-    await riderLocationRepository.autoDisableStaleSharing(minutes);
+    await getSafetyLocationModule().riderLocation.autoDisableStaleSharing(minutes);
   },
 };

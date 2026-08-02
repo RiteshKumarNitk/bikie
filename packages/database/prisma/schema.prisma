@@ -423,6 +423,8 @@ model Bike {
   wishlistedBy      Wishlist[]
 
   @@index([isFeatured])
+  @@index([city])
+  @@index([ownerId])
 }
 
 model Testimonial {
@@ -457,6 +459,8 @@ model Partner {
   contactPerson2Name   String?
   contactPerson2Mobile String?
   createdAt    DateTime    @default(now())
+
+  @@index([city])
 }
 
 // --- Bookings & reviews ---
@@ -478,6 +482,7 @@ model Booking {
 
   @@index([userId])
   @@index([bikeId])
+  @@index([bikeId, startDate, endDate])
 }
 
 model Review {
@@ -542,6 +547,7 @@ model TripParticipant {
   decidedAt DateTime?
 
   @@unique([tripId, userId])
+  @@index([userId])
 }
 
 // --- Wishlist ---

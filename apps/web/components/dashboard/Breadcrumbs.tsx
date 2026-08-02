@@ -11,7 +11,7 @@ const labelMap: Record<string, string> = {
   email: "Email",
   sms: "SMS",
   reports: "Reports",
-  settings: "Settings",
+  settings: "Profile",
   users: "Users",
   partners: "Partners",
   bikes: "Bikes",

@@ -33,7 +33,7 @@ export default function BikeDetailError({
           href="/explore-bikes"
           className="rounded-full border border-foreground/15 px-6 py-2.5 text-sm font-medium hover:bg-foreground/5"
         >
-          Explore Bikes
+          Rent a Bike
         </Link>
       </div>
     </div>

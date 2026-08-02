@@ -31,6 +31,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: path.join(__dirname, "..", ".."),
   },
+  // nodemailer opens raw TCP sockets and must stay a real Node require, not a bundled module.
+  serverExternalPackages: ["nodemailer"],
   transpilePackages: [
     "@bikie/database",
     "@bikie/auth",

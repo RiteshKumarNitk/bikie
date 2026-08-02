@@ -1,0 +1,885 @@
+{
+  "generatedAt": "2026-08-01T19:27:56.333Z",
+  "count": 106,
+  "routes": [
+    {
+      "path": "/api/admin/audit-logs",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/audit-logs/route.ts"
+    },
+    {
+      "path": "/api/admin/bikes/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/bikes/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/bikes",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/bikes/route.ts"
+    },
+    {
+      "path": "/api/admin/bookings/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/bookings/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/bookings",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/bookings/route.ts"
+    },
+    {
+      "path": "/api/admin/email",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/email/route.ts"
+    },
+    {
+      "path": "/api/admin/export",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/export/route.ts"
+    },
+    {
+      "path": "/api/admin/groups/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/groups/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/groups",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/groups/route.ts"
+    },
+    {
+      "path": "/api/admin/membership/plans/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/membership/plans/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/membership/plans",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/membership/plans/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/conversations/{id}/lock",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/conversations/[id]/lock/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/conversations/{id}",
+      "methods": [
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/conversations/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/conversations",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/conversations/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/messages/{id}",
+      "methods": [
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/messages/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/reports/{id}",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/reports/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/reports",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/reports/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/users/{id}/ban",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/users/[id]/ban/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/users/{id}/mute",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/users/[id]/mute/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/users/{id}/restore",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/users/[id]/restore/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/users/{id}/suspend",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/users/[id]/suspend/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/users/{id}/warn",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/users/[id]/warn/route.ts"
+    },
+    {
+      "path": "/api/admin/overview",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/overview/route.ts"
+    },
+    {
+      "path": "/api/admin/partners/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/partners/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/partners",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/partners/route.ts"
+    },
+    {
+      "path": "/api/admin/referrals",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/referrals/route.ts"
+    },
+    {
+      "path": "/api/admin/sms",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/sms/route.ts"
+    },
+    {
+      "path": "/api/admin/testimonials/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/testimonials/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/testimonials",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/testimonials/route.ts"
+    },
+    {
+      "path": "/api/admin/trips/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/trips/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/trips",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/trips/route.ts"
+    },
+    {
+      "path": "/api/admin/users/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/users/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/users",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/users/route.ts"
+    },
+    {
+      "path": "/api/auth-helpers/phone-exists",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/auth-helpers/phone-exists/route.ts"
+    },
+    {
+      "path": "/api/auth/{all}",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "public-auth",
+      "file": "apps/web/app/api/auth/[...all]/route.ts"
+    },
+    {
+      "path": "/api/bikes/{slug}/reviews",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/bikes/[slug]/reviews/route.ts"
+    },
+    {
+      "path": "/api/bikes/{slug}",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/bikes/[slug]/route.ts"
+    },
+    {
+      "path": "/api/bikes/featured",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/bikes/featured/route.ts"
+    },
+    {
+      "path": "/api/bikes",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/bikes/route.ts"
+    },
+    {
+      "path": "/api/bookings",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/bookings/route.ts"
+    },
+    {
+      "path": "/api/categories",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/categories/route.ts"
+    },
+    {
+      "path": "/api/conversations/{id}/messages/{messageId}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/conversations/[id]/messages/[messageId]/route.ts"
+    },
+    {
+      "path": "/api/conversations/{id}/messages",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/conversations/[id]/messages/route.ts"
+    },
+    {
+      "path": "/api/conversations/{id}/read",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/conversations/[id]/read/route.ts"
+    },
+    {
+      "path": "/api/conversations/{id}/typing",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/conversations/[id]/typing/route.ts"
+    },
+    {
+      "path": "/api/conversations",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/conversations/route.ts"
+    },
+    {
+      "path": "/api/cron/rider-location-cleanup",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron",
+      "file": "apps/web/app/api/cron/rider-location-cleanup/route.ts"
+    },
+    {
+      "path": "/api/cron/sos-resolve",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron",
+      "file": "apps/web/app/api/cron/sos-resolve/route.ts"
+    },
+    {
+      "path": "/api/dashboard/overview",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/dashboard/overview/route.ts"
+    },
+    {
+      "path": "/api/destinations/{slug}",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/destinations/[slug]/route.ts"
+    },
+    {
+      "path": "/api/destinations/popular",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/destinations/popular/route.ts"
+    },
+    {
+      "path": "/api/destinations",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/destinations/route.ts"
+    },
+    {
+      "path": "/api/dev/otp",
+      "methods": [
+        "GET"
+      ],
+      "auth": "dev",
+      "file": "apps/web/app/api/dev/otp/route.ts"
+    },
+    {
+      "path": "/api/firebase-config",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/firebase-config/route.ts"
+    },
+    {
+      "path": "/api/membership/active",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/membership/active/route.ts"
+    },
+    {
+      "path": "/api/membership/plans",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/membership/plans/route.ts"
+    },
+    {
+      "path": "/api/membership/purchase",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/membership/purchase/route.ts"
+    },
+    {
+      "path": "/api/messages/{id}/react",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/messages/[id]/react/route.ts"
+    },
+    {
+      "path": "/api/messages/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/messages/[id]/route.ts"
+    },
+    {
+      "path": "/api/notifications/push-token",
+      "methods": [
+        "PUT",
+        "DELETE"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/notifications/push-token/route.ts"
+    },
+    {
+      "path": "/api/notifications",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/notifications/route.ts"
+    },
+    {
+      "path": "/api/openapi",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/openapi/route.ts"
+    },
+    {
+      "path": "/api/partner/bikes",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/bikes/route.ts"
+    },
+    {
+      "path": "/api/partner/bookings",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/bookings/route.ts"
+    },
+    {
+      "path": "/api/partner/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/dashboard/route.ts"
+    },
+    {
+      "path": "/api/partner/profile",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/profile/route.ts"
+    },
+    {
+      "path": "/api/partner/reviews",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/reviews/route.ts"
+    },
+    {
+      "path": "/api/places/nearby",
+      "methods": [
+        "GET"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/places/nearby/route.ts"
+    },
+    {
+      "path": "/api/referrals/link",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/referrals/link/route.ts"
+    },
+    {
+      "path": "/api/referrals/me",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/referrals/me/route.ts"
+    },
+    {
+      "path": "/api/reports",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/reports/route.ts"
+    },
+    {
+      "path": "/api/requests/pending",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/requests/pending/route.ts"
+    },
+    {
+      "path": "/api/reviews/mine",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/reviews/mine/route.ts"
+    },
+    {
+      "path": "/api/rider-location/consent",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/rider-location/consent/route.ts"
+    },
+    {
+      "path": "/api/rider-location",
+      "methods": [
+        "PUT"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/rider-location/route.ts"
+    },
+    {
+      "path": "/api/rider-profile",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/rider-profile/route.ts"
+    },
+    {
+      "path": "/api/rider-profile/skip",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/rider-profile/skip/route.ts"
+    },
+    {
+      "path": "/api/riders/nearby",
+      "methods": [
+        "GET"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/riders/nearby/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/{id}/resolve",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/sos/alerts/[id]/resolve/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/{id}/respond",
+      "methods": [
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/[id]/respond/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/history",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/sos/alerts/history/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/route.ts"
+    },
+    {
+      "path": "/api/sse",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/sse/route.ts"
+    },
+    {
+      "path": "/api/testimonials",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/testimonials/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/group",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/group/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/leave",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/leave/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/requests/{participantId}/approve",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/requests/[participantId]/approve/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/requests/{participantId}/reject",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/requests/[participantId]/reject/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/requests/mine",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/requests/mine/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/requests",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/requests/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/room/announcements/{id}",
+      "methods": [
+        "DELETE"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/room/announcements/[id]/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/room/announcements",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/room/announcements/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/room/emergency-contacts",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/room/emergency-contacts/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/room/media",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/room/media/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/room/meeting-point",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/room/meeting-point/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/room",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/room/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/route.ts"
+    },
+    {
+      "path": "/api/trips/mine",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/mine/route.ts"
+    },
+    {
+      "path": "/api/trips",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/trips/route.ts"
+    },
+    {
+      "path": "/api/upload",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/upload/route.ts"
+    },
+    {
+      "path": "/api/user/become-partner",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/user/become-partner/route.ts"
+    },
+    {
+      "path": "/api/user/complete-phone-signup",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/user/complete-phone-signup/route.ts"
+    },
+    {
+      "path": "/api/user/phone",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/user/phone/route.ts"
+    },
+    {
+      "path": "/api/users/me/presence",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/users/me/presence/route.ts"
+    },
+    {
+      "path": "/api/wishlist/{bikeId}",
+      "methods": [
+        "POST",
+        "DELETE"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/wishlist/[bikeId]/route.ts"
+    },
+    {
+      "path": "/api/wishlist",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/wishlist/route.ts"
+    }
+  ]
+}

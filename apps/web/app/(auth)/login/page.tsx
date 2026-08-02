@@ -10,6 +10,7 @@ import {
   type PartnerBusinessDetails,
 } from "@/components/auth/PartnerBusinessFields";
 import { PhoneNumberInput, DEFAULT_COUNTRY_CODE, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
+import { LogoMark } from "@/components/layout/LogoMark";
 import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
 
@@ -202,9 +203,7 @@ export default function LoginPage() {
     <main className="flex min-h-screen">
       <div className="relative hidden w-1/2 flex-col justify-between bg-gradient-to-br from-navy-900 via-navy-800 to-navy-700 p-12 lg:flex">
         <Link href="/" className="flex items-center gap-2">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-accent text-sm font-bold text-white">
-            B
-          </div>
+          <LogoMark size="md" />
           <span className="font-display text-xl font-semibold text-white">BIKIE</span>
         </Link>
         <div className="max-w-md">
@@ -237,9 +236,7 @@ export default function LoginPage() {
         <div className="w-full max-w-sm">
           <div className="lg:hidden">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-xs font-bold text-white">
-                B
-              </div>
+              <LogoMark />
               <span className="font-display text-lg font-semibold">BIKIE</span>
             </Link>
           </div>

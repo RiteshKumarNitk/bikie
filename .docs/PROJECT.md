@@ -32,4 +32,5 @@ concrete tokens.
 ## Where things live
 
 See `ARCHITECTURE.md` for the monorepo layout and layering rules, `API.md` for the
-REST surface, and `DECISIONS.md` for why specific technical choices were made.
+REST surface, `DECISIONS.md` for why specific technical choices were made, and `SOS.md`
+for the SOS feature flow (Mermaid diagrams).

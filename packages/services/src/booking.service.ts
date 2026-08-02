@@ -1,48 +1,23 @@
-import { bikeRepository, bookingRepository } from "@bikie/database";
+import {
+  getRentalsBookingsModule,
+  type CreateBookingResult,
+} from "./modules/rentals-bookings/public";
 import type { BookingDTO } from "@bikie/types";
 import type { CreateBookingInput } from "@bikie/validation";
 
-export type CreateBookingResult =
-  | { ok: true; booking: BookingDTO }
-  | { ok: false; reason: "BIKE_NOT_FOUND" | "INVALID_DATES" | "BIKE_UNAVAILABLE" };
+export type { CreateBookingResult };
 
-function daysBetween(start: Date, end: Date) {
-  const ms = end.getTime() - start.getTime();
-  return Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24)));
-}
-
+/** Compatibility facade — routes keep importing BookingService. */
 export const BookingService = {
   async getForUser(userId: string, status?: string): Promise<BookingDTO[]> {
-    return bookingRepository.findBookingsByUser(userId, status);
+    return getRentalsBookingsModule().bookings.getForUser(userId, status);
   },
 
   async getForPartner(ownerId: string): Promise<BookingDTO[]> {
-    return bookingRepository.findBookingsForPartnerBikes(ownerId);
+    return getRentalsBookingsModule().bookings.getForPartner(ownerId);
   },
 
   async create(userId: string, input: CreateBookingInput): Promise<CreateBookingResult> {
-    const bike = await bikeRepository.findBikeForBooking(input.bikeId);
-    if (!bike) return { ok: false, reason: "BIKE_NOT_FOUND" };
-
-    const startDate = new Date(input.startDate);
-    const endDate = new Date(input.endDate);
-    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate <= startDate) {
-      return { ok: false, reason: "INVALID_DATES" };
-    }
-
-    const totalPrice = bike.pricePerDay * daysBetween(startDate, endDate);
-    const status = bike.instantBooking ? "CONFIRMED" : "PENDING";
-
-    const booking = await bookingRepository.createBookingIfAvailable({
-      userId,
-      bikeId: input.bikeId,
-      startDate,
-      endDate,
-      pickupCity: input.pickupCity,
-      totalPrice,
-      status,
-    });
-    if (!booking) return { ok: false, reason: "BIKE_UNAVAILABLE" };
-    return { ok: true, booking };
+    return getRentalsBookingsModule().bookings.create(userId, input);
   },
 };

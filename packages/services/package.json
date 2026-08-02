@@ -14,9 +14,11 @@
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.38.0",
     "cloudinary": "^2.10.0",
-    "firebase-admin": "^13.0.0"
+    "firebase-admin": "^13.0.0",
+    "nodemailer": "^9.0.3"
   },
   "devDependencies": {
+    "@types/nodemailer": "^8.0.1",
     "typescript": "^5.7.0"
   }
 }

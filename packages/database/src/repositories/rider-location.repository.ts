@@ -41,6 +41,11 @@ export interface NearbyRiderRow {
   distanceMeters: number;
 }
 
+export interface NearbyRiderContactRow extends NearbyRiderRow {
+  phone: string | null;
+  email: string;
+}
+
 /**
  * Nearby riders around the CALLER's own last known fix (a self-join, not an externally passed
  * lat/lng) — this makes "you must have a fix on file to search" a natural side effect of the
@@ -65,6 +70,40 @@ export async function findNearby(
       AND rl."userId" != ${userId}
       AND rl."updatedAt" > now() - (${staleMinutes} || ' minutes')::interval
       AND ST_DWithin(rl."location", self."location", ${radiusMeters})
+    ORDER BY "distanceMeters" ASC
+    LIMIT 50
+  `;
+}
+
+/**
+ * Nearby riders around an arbitrary GPS fix (used by SOS dispatch). Unlike `findNearby`, this
+ * does NOT require the reporter to have opted into live sharing — SOS alerts carry their own
+ * lat/lng from the panic button's one-shot geolocation.
+ */
+export async function findNearbyAroundPoint(
+  latitude: number,
+  longitude: number,
+  excludeUserId: string,
+  radiusMeters: number,
+  staleMinutes = 30,
+): Promise<NearbyRiderContactRow[]> {
+  return prisma.$queryRaw<NearbyRiderContactRow[]>`
+    SELECT u."id" AS "id", u."name" AS "name", u."phone" AS "phone", u."email" AS "email",
+           ST_Distance(
+             rl."location",
+             ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
+           ) AS "distanceMeters"
+    FROM "rider_location" rl
+    JOIN "user" u ON u."id" = rl."userId"
+    WHERE rl."sharingEnabled" = true
+      AND rl."location" IS NOT NULL
+      AND rl."userId" != ${excludeUserId}
+      AND rl."updatedAt" > now() - (${staleMinutes} || ' minutes')::interval
+      AND ST_DWithin(
+        rl."location",
+        ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography,
+        ${radiusMeters}
+      )
     ORDER BY "distanceMeters" ASC
     LIMIT 50
   `;

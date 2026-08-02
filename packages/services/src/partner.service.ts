@@ -1,9 +1,10 @@
-import { partnerRepository } from "@bikie/database";
+import { getPartnersModule } from "./modules/partners/public";
 import type { PartnerDashboardStatsDTO, PartnerProfileDTO } from "@bikie/types";
 
+/** Compatibility facade — routes keep importing PartnerService. */
 export const PartnerService = {
   async getProfile(userId: string): Promise<PartnerProfileDTO | null> {
-    return partnerRepository.findPartnerByUserId(userId);
+    return getPartnersModule().partners.getProfile(userId);
   },
 
   async upsertProfile(
@@ -20,10 +21,10 @@ export const PartnerService = {
       contactPerson2Mobile?: string;
     },
   ): Promise<PartnerProfileDTO> {
-    return partnerRepository.upsertPartnerProfile(userId, data);
+    return getPartnersModule().partners.upsertProfile(userId, data);
   },
 
   async getDashboardStats(userId: string): Promise<PartnerDashboardStatsDTO> {
-    return partnerRepository.getPartnerDashboardStats(userId);
+    return getPartnersModule().partners.getDashboardStats(userId);
   },
 };

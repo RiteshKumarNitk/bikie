@@ -4,6 +4,12 @@ All routes live under `apps/web/app/api/**`. Each validates input with Zod
 (`@bikie/validation`) where applicable, calls a `@bikie/services` function, and returns
 typed JSON. No route imports `@prisma/client` directly.
 
+**Contract version:** the current `/api/*` surface is **stable v1** (ADR-028). Machine-readable
+OpenAPI 3.1: `GET /api/openapi` or `/openapi-v1.json`. Regenerate after adding routes with
+`pnpm openapi:generate`. Narrative docs below remain authoritative for request/response shapes
+until schemas are fully enriched in OpenAPI. There is **no `/api/v2`** until an ADR approves a
+breaking change with a consumer migration window.
+
 ## Auth
 
 `ALL /api/auth/[...all]` — Better Auth catch-all (signup, login, session, signout).
@@ -100,7 +106,7 @@ reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md
 
 | Route | Method | Notes |
 |---|---|---|
-| `/api/sos/alerts` | GET/POST | List active alerts / send a new one. `SOSAlertDTO` includes `userEmail`, `userPhone`, `latitude`/`longitude` for full reporter info. `requireMembership()` returns `403 { error: "MEMBERSHIP_REQUIRED", message }` if the caller has no active membership. |
+| `/api/sos/alerts` | GET/POST | List active alerts / send a new one. `SOSAlertDTO` includes `userEmail`, `userPhone`, `latitude`/`longitude` for full reporter info. `requireMembership()` returns `403 { error: "MEMBERSHIP_REQUIRED", message }` if the caller has no active membership. **POST** also runs `SOSDispatchService.fanOut` — SMS + WhatsApp + email (+ in-app `SOS_ALERT`) to nearby riders (PostGIS radius), same-city partners, and the reporter's emergency contacts. Response includes `dispatch` summary counts. Channels log `[SMS\|WHATSAPP\|EMAIL][DEV]` when live credentials are unset. |
 | `/api/sos/alerts/history` | GET | Auth required (no membership gate). Caller's past alerts, including resolved. |
 | `/api/sos/alerts/[id]/respond` | POST | Notify the reporter you're nearby. |
 | `/api/sos/alerts/[id]/resolve` | POST | Mark an alert resolved. |
@@ -268,3 +274,7 @@ ADR-011) as the trust-and-safety-specific audit trail.
   `{ error: "MEMBERSHIP_REQUIRED", message }` for the membership gate), and 404; or
   `{ error: ZodFlattenedError }` (`{ formErrors: string[], fieldErrors: {...} }`) for 400
   validation failures.
+- **Contract headers** (optional helpers in `apps/web/lib/api-contract.ts`): `x-request-id`,
+  `x-api-version: v1`, and when sunsetting an operation `Deprecation` / `Sunset` /
+  `Link: <…>; rel="successor-version"`.
+- **OpenAPI / inventory**: `.docs/openapi/` (`auth-matrix.md`, `facade-registry.md`).

@@ -320,7 +320,8 @@ export function PanicAlertCards({
                 <div className="text-4xl">✅</div>
                 <h3 className="mt-3 font-display text-xl font-bold text-success">Alert Sent!</h3>
                 <p className="mt-2 text-sm text-foreground/60">
-                  GPS shared via SMS and WhatsApp. Help is on the way. Stay safe.
+                  GPS shared via SMS, WhatsApp, and email to nearby riders, service providers,
+                  and your emergency contacts. Help is on the way. Stay safe.
                 </p>
                 {profileWarning && (
                   <p className="mx-auto mt-3 max-w-sm rounded-lg bg-warning/10 p-3 text-sm text-warning">

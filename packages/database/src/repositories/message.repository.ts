@@ -45,12 +45,16 @@ export async function isParticipant(conversationId: string, userId: string): Pro
   return participant !== null;
 }
 
-export async function getMessagesRaw(conversationId: string) {
-  return prisma.message.findMany({
+export async function getMessagesRaw(conversationId: string, take = 200) {
+  const limit = Math.min(Math.max(1, take), 500);
+  // Newest-first fetch, then reverse so callers still receive chronological order.
+  const rows = await prisma.message.findMany({
     where: { conversationId },
-    orderBy: { createdAt: "asc" },
+    orderBy: { createdAt: "desc" },
+    take: limit,
     include: MESSAGE_INCLUDE,
   });
+  return rows.reverse();
 }
 
 export async function getOtherParticipantIds(conversationId: string, excludeUserId: string): Promise<string[]> {

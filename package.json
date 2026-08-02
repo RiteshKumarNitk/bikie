@@ -1,19 +1,24 @@
 {
   "name": "bikie",
   "private": true,
+  "type": "module",
   "packageManager": "pnpm@9.15.0",
   "scripts": {
     "dev": "turbo run dev --filter=web",
     "build": "pnpm db:generate && turbo run build",
     "lint": "turbo run lint",
     "typecheck": "turbo run typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "openapi:generate": "node scripts/generate-openapi.mjs",
     "db:generate": "turbo run db:generate",
     "db:migrate": "turbo run db:migrate",
     "db:seed": "turbo run db:seed"
   },
   "devDependencies": {
+    "prettier": "^3.4.0",
     "turbo": "^2.10.4",
     "typescript": "^5.7.0",
-    "prettier": "^3.4.0"
+    "vitest": "^4.1.10"
   }
 }

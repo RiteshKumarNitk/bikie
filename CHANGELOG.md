@@ -1,5 +1,159 @@
 # Changelog
 
+## Fix — SOS unblocked; channel selection follows configuration (ADR-029)
+- `RateLimitService` no longer fails closed without Upstash: it falls back to a per-instance
+  in-memory window (also when a Redis check throws), so a limiter outage can't block
+  `POST /api/sos/alerts`. Fixes "Rate limiting is unavailable" on the SOS confirm dialog.
+- Channel ports gained optional `isConfigured()`; SOS fan-out now sends SMS/WhatsApp/email only
+  where the provider is configured **and** the recipient has that contact detail, reporting the
+  live channels in `SOSDispatchSummary.channels` and the dispatch log line.
+- Unconfigured WhatsApp still returns a `wa.me` click-to-send link for manual escalation.
+- Twilio SMS accepts `TWILIO_PHONE_NUMBER` as an alias for `TWILIO_FROM_NUMBER`.
+
+## Modular Monolith Phase 9 — OpenAPI v1 + contract gates (ADR-028)
+- Published OpenAPI 3.1 for all Route Handlers (`pnpm openapi:generate`) with route inventory
+  and Vitest sync checks; served at `GET /api/openapi` and `/openapi-v1.json`.
+- Added contract helpers (`x-request-id`, `x-api-version`, Deprecation/Sunset) without mass
+  route rewrites; `/api/v2` and facade deletion remain explicitly gated.
+- Documented auth matrix and facade removal registry under `.docs/openapi/`.
+
+## Modular Monolith Phase 8 — Platform foundation (ADR-027)
+- Added `modules/platform`: sync in-process `JobQueuePort`, Redis/memory `IdempotencyPort`,
+  and `withRetry` (exponential backoff + jitter).
+- SOS fan-out claims `sos-dispatch:{alertId}` before side effects and remembers the summary.
+- Message history bounded to newest 200 (max 500), still returned chronological.
+- Production `RateLimitService` fails closed when Upstash is unset; dev remains a no-op.
+- NFR baseline scaffold for domain hot paths; Kafka/Bull/outbox still deferred.
+
+## Modular Monolith Phase 7 — Admin + Trust/Safety (ADR-026)
+- Extracted `modules/administration` (Admin CRUD + formula-safe, size-bounded CSV export)
+  and `modules/trust-safety` (reports, moderation ledger, audit).
+- CSV export capped at 10,000 rows; formula sanitization also covers leading `\t`/`\r`.
+- `AdminService`, `ReportService`, `ModerationService`, `AuditService` remain facades.
+
+## Modular Monolith Phase 6 — Rides + Messaging (ADR-025)
+- P0 fix: ride approval is now one DB transaction (`approveParticipantAtomically`) —
+  seat decrement + APPROVED status + ride conversation creation cannot partially commit.
+- Extracted `modules/rides-community` (join/decide/leave + Ride Room access) and
+  `modules/messaging` (encrypt/send/receipts/reactions via crypto + realtime ports).
+- `TripService`, `RideRoomService`, and `MessageService` remain compatibility facades.
+- Characterization tests cover participation rules, room access, atomic approve path, mute policy.
+
+## Modular Monolith Phase 5 — Catalog / Rentals / Partners (ADR-024)
+- Extracted `modules/catalog`, `modules/rentals-bookings`, and `modules/partners` with
+  ports/adapters and compatibility facades for `BikeService`, `DestinationService`,
+  `CategoryService`, `TestimonialService`, `BookingService`, `ReviewService`,
+  `WishlistService`, and `PartnerService`.
+- Booking pricing/date/status and review eligibility are pure domain functions with
+  characterization tests; overlap locking remains in `createBookingIfAvailable`.
+- Added additive indexes: `Booking(bikeId,startDate,endDate)`, `Partner(city)`,
+  `Bike(city)`, `Bike(ownerId)`, `TripParticipant(userId)`.
+- No `/api/*` or Flutter contract changes.
+
+## Modular Monolith Phase 4 — Identity-Access Module (ADR-023)
+- Added `packages/services/src/modules/identity-access` holding the account-status,
+  role, permission, and membership policies as pure domain functions plus an
+  `AccessDecision` result type that knows nothing about HTTP.
+- `apps/web/lib/require-role.ts` is now transport mapping only. `assertAccountActive`,
+  `requireSession`, `requireMembership`, and `requireRole` keep identical signatures and
+  return byte-identical status codes and bodies across all ~50 gated routes.
+- Added opt-in `requirePermission()` with a permission catalog derived from `User.role` —
+  no schema, session, or token change, and no permission can exceed its role.
+- Better Auth OTP delivery now goes through the module's `sendLoginOtp` use case
+  (communications `SmsPort` + dev echo store); `callbackOnVerification` uses
+  `userRepository.updatePhone` instead of a direct `prisma.user.update`.
+- OTP expiry is a single shared constant, so the plugin config and SMS copy can't disagree.
+- Better Auth remains the session authority — no parallel JWT/refresh-token stack.
+
+## Modular Monolith Phase 3 — Safety-Location Module (ADR-022)
+- Extracted `packages/services/src/modules/safety-location` with domain helpers (maps,
+  alert kind, dispatch message builders), application use cases (SOS CRUD, rider location,
+  Places, fan-out), and ports/adapters for repositories, partner dispatch DTOs, emergency
+  contacts, Places (Google + Redis), and in-app notifications.
+- `SOSService`, `SOSDispatchService`, `RiderLocationService`, `PlacesService`, and `sos-maps`
+  remain compatibility facades — no `/api/*` or Flutter contract changes; business rules
+  preserved (RED/AMBER prefixes, dispatch summary fields, PostGIS stale windows, Places
+  cache key formula).
+- Characterization tests cover alert kind, message builders, rider-location mapping, profile
+  warning, fan-out accounting, and `@bikie.local` email skip.
+
+## Security + Layering P0 Hardening (Audit Follow-up)
+- `requireRole` / `requireMembership` now share `requireSession`'s banned/suspended account check.
+- Better Auth `user.role` is no longer client-writable (`input: false`); Partner/Admin changes stay on server paths only.
+- `/api/dev/otp` and `DevOtpStore` are opt-in (`SHOW_OTP_TOAST=true`) and always disabled in production.
+- Removed direct Prisma from `user/phone`, `users/me/presence`, `sos/alerts`, and `admin/export` routes; added `UserService`/`SOSService`/`AdminService.exportCsv`/`AuditService` facades.
+- Added `updateUserPhoneSchema` + `adminExportQuerySchema` validation.
+
+## Modular Monolith Foundation — Communications Ports (ADR-021)
+- Added Cursor agent/rule/skill governance under `.cursor/` and the audit-first plan in
+  `project doc/MODULAR_MONOLITH_IMPLEMENTATION_PLAN.md`.
+- Introduced communications ports/adapters (`EmailPort` / `SmsPort` / `WhatsAppPort` /
+  `PushPort`) under `packages/services/src/modules/communications`. Legacy
+  `EmailService` / `SMSService` / `WhatsAppService` / `PushService` remain as compatibility
+  facades — no API/import breakage.
+- SOS dispatch now uses communications ports and `partnerRepository.findPartnersByCityForDispatch`
+  instead of importing Prisma in the service layer.
+- Provider HTTP calls share a timeout helper (`PROVIDER_HTTP_TIMEOUT_MS`, default 10s).
+- Added Vitest (`pnpm test` / `pnpm test:watch`) with characterization tests for SOS map/phone
+  helpers and DEV adapter fallbacks.
+
+## SOS Email + WhatsApp Sent Directly (SMTP / Meta Cloud API)
+- `EmailService` now delivers over plain SMTP via `nodemailer` (`SMTP_HOST`/`SMTP_USER`/
+  `SMTP_PASS` — a Gmail App Password is enough), so alerts reach real inboxes from local.
+  Resend is demoted to a fallback used only when SMTP is unset.
+- `WhatsAppService` now sends through Meta's WhatsApp Cloud API (`WHATSAPP_ACCESS_TOKEN` +
+  `WHATSAPP_PHONE_NUMBER_ID`) and follows the text with a **native WhatsApp location card**.
+  Twilio WhatsApp is the fallback; outside the 24h window the send retries as an approved
+  template (`WHATSAPP_TEMPLATE_NAME`).
+- With no credentials, WhatsApp emits a `wa.me` click-to-send link per recipient (logged as
+  `[SOS][DISPATCH][WA-LINK]` and returned as `whatsappClickToSend`) so alerts can still be
+  pushed by hand during testing.
+- Delivery is now measured, not assumed: SMS/email/WhatsApp services return
+  `{ ok, provider, error }`, and the dispatch summary reports `smsSent` / `whatsappSent` /
+  `emailSent` alongside the attempt counts plus an `errors` list with the provider's own
+  rejection text.
+- Docs: ADR-020 in `.docs/DECISIONS.md`, credential walkthrough + provider-selection Mermaid
+  diagram in `project doc/SOS_E2E_TESTING.md`, new env vars in `.env.example`.
+
+## SOS Map Links + Live Test Contacts
+- SOS messages (SMS / WhatsApp / email / in-app) now include WhatsApp-style location sharing:
+  a Maps **pin** plus a **navigate** link (`/maps/dir/?api=1&destination=…`) so recipients see
+  distance/route from their own GPS. Nearby riders also get PostGIS approx distance in copy.
+- Notifications UI: clickable Maps URLs + orange "Open in Maps" CTA for `SOS_ALERT`.
+- Seed nearby riders updated to live test WhatsApp `+918107800370` / `+919664361738` and
+  emails `arun8107800370@gmail.com` / `sharmamo@gmail.com`.
+- Testing docs: Mermaid flow diagrams in `project doc/SOS_E2E_TESTING.md`.
+
+## SOS Dispatch Fan-out (Red / Amber → SMS + WhatsApp + Email)
+- Wired `SOSDispatchService.fanOut` into `POST /api/sos/alerts`: after persist + SSE broadcast,
+  notifies nearby riders (PostGIS around alert GPS), same-city service providers, and the
+  reporter's emergency contacts via SMS (`SMSService`), WhatsApp (`WhatsAppService` — new),
+  email (`EmailService`), and in-app/push (`NotificationService` / `SOS_ALERT`).
+- New `findNearbyAroundPoint` repository helper so SOS does not require the reporter to have
+  opted into live location sharing.
+- Seed extended with Premium membership for `rider@bikie.app`, emergency contacts, Bangalore
+  partner contact mobiles, and two nearby riders with PostGIS fixes for E2E testing.
+- Docs: `project doc/SOS_DISPATCH_PLAN.md`, `project doc/SOS_E2E_TESTING.md`. Live credentials
+  remain optional — unset Twilio/Resend keys log `[SMS|WHATSAPP|EMAIL][DEV]`.
+
+## Nav Copy: Explore Bikes → Rent a Bike
+- Renamed the user-facing "Explore Bikes" label to "Rent a Bike" across the navbar,
+  footer/mega-menu, explore page title/breadcrumbs, 404/error CTAs, and empty states.
+  The `/explore-bikes` route path is unchanged.
+
+## Docker Deployment + Brand Mark Consistency
+- Added `Dockerfile` / `docker-compose.yml` / `docker/entrypoint.sh` to run the web app in a
+  container against the existing Neon database, reading secrets from `apps/.env`. The
+  entrypoint applies `prisma migrate deploy` before starting the server.
+- The container's internal `PORT` is pinned to the published host port (3001) because Server
+  Components self-fetch `/api/*` using the request's `Host` header (`apps/web/lib/api.ts`) — a
+  mismatch made every authenticated (uncached) page fail with `ECONNREFUSED` and render the
+  500 page after login.
+- New `--color-brand` token (`#FF4D1A`) and a shared `LogoMark` component
+  (`apps/web/components/layout/LogoMark.tsx`). The navbar, footer, login, signup, onboarding
+  and partner-onboarding logos previously used the indigo `bg-accent` fill, which read as a
+  blue tile; they now all match the orange "B" mark from the `/welcome` splash.
+
 ## "Continue with Google" Sign-In
 - Added Google as a Better Auth social provider (`socialProviders.google` in
   `packages/auth/src/server.ts`) — a standard OAuth2 flow, not Firebase Authentication. No

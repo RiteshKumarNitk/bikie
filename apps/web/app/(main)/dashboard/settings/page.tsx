@@ -8,7 +8,7 @@ import { BecomeServiceProviderAction } from "@/components/dashboard/BecomeServic
 import { PushNotificationToggle } from "@/components/dashboard/PushNotificationToggle";
 import { RiderLocationToggle } from "@/components/dashboard/RiderLocationToggle";
 
-export const metadata: Metadata = { title: "Settings" };
+export const metadata: Metadata = { title: "Profile" };
 
 export default async function DashboardSettingsPage() {
   const session = await getServerSession();
@@ -19,7 +19,7 @@ export default async function DashboardSettingsPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold">Settings</h1>
+      <h1 className="text-2xl font-semibold">Profile</h1>
 
       <section className="mt-6 rounded-3xl bg-card p-6">
         <p className="font-semibold">Profile</p>

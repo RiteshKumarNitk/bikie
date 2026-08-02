@@ -91,3 +91,16 @@ export async function getPartnerDashboardStats(userId: string) {
     ratingCount: partner?.ratingCount ?? 0,
   };
 }
+
+/** Same-city partners for SOS fan-out — includes contact-person mobiles. */
+export async function findPartnersByCityForDispatch(city: string, take = 25) {
+  return prisma.partner.findMany({
+    where: {
+      city: { equals: city, mode: "insensitive" },
+    },
+    include: {
+      user: { select: { id: true, name: true, email: true, phone: true } },
+    },
+    take,
+  });
+}

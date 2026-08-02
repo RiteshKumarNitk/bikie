@@ -21,3 +21,15 @@ export const completePhoneSignupSchema = z.object({
 export type SignUpInput = z.infer<typeof signUpSchema>;
 export type SignInInput = z.infer<typeof signInSchema>;
 export type CompletePhoneSignupInput = z.infer<typeof completePhoneSignupSchema>;
+
+export const updateUserPhoneSchema = z.object({
+  phone: z
+    .string()
+    .trim()
+    .max(20)
+    .refine((value) => value === "" || /^[\d+\s()-]+$/.test(value), {
+      message: "Enter a valid phone number",
+    }),
+});
+
+export type UpdateUserPhoneInput = z.infer<typeof updateUserPhoneSchema>;
