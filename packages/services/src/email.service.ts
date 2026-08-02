@@ -1,34 +1,19 @@
-type EmailPayload = {
-  to: string;
-  subject: string;
-  html: string;
-};
+import { getCommunicationsPorts, type ChannelResult } from "./modules/communications/public";
 
+export type EmailResult = ChannelResult & { provider: "smtp" | "resend" | "dev" | string };
+
+/**
+ * Compatibility facade — business callers keep importing EmailService.
+ * Provider selection (SMTP → Resend → DEV) lives in the email adapter.
+ */
 export const EmailService = {
-  async send(payload: EmailPayload): Promise<void> {
-    if (!process.env.RESEND_API_KEY) {
-      console.log(`[EMAIL][DEV] To: ${payload.to} | Subject: ${payload.subject}`);
-      return;
-    }
-
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        from: process.env.EMAIL_FROM ?? "noreply@bikie.app",
-        to: payload.to,
-        subject: payload.subject,
-        html: payload.html,
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(`[EMAIL] Failed: ${body}`);
-    }
+  async send(payload: {
+    to: string;
+    subject: string;
+    html: string;
+    text?: string;
+  }): Promise<EmailResult> {
+    return getCommunicationsPorts().email.send(payload);
   },
 
   async sendBookingConfirmation(email: string, bikeName: string, startDate: string, endDate: string) {
@@ -43,11 +28,13 @@ export const EmailService = {
     });
   },
 
-  async sendSOSAlert(email: string, type: string, city: string) {
+  async sendSOSAlert(email: string, type: string, city: string, mapsUrl?: string) {
     await this.send({
       to: email,
       subject: `SOS Alert: ${type}`,
-      html: `<h2>SOS Alert</h2><p>Type: ${type}</p><p>City: ${city}</p><p>Help is on the way.</p>`,
+      html: `<h2>SOS Alert</h2><p>Type: ${type}</p><p>City: ${city}</p>
+             ${mapsUrl ? `<p><a href="${mapsUrl}">Open live GPS on Google Maps</a></p>` : ""}
+             <p>Open BIKIE → Dashboard → SOS to respond.</p>`,
     });
   },
 };

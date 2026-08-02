@@ -488,3 +488,50 @@ export async function findAllReferrals() {
     referrerEmail: r.referredBy!.email,
   }));
 }
+
+/** Full-table CSV rows — keep shapes identical to the legacy admin export route. */
+export async function exportUsersCsvRows(take = 10_000) {
+  const users = await prisma.user.findMany({ take, orderBy: { createdAt: "desc" } });
+  return users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    createdAt: u.createdAt.toISOString(),
+  }));
+}
+
+export async function exportBookingsCsvRows(take = 10_000) {
+  const bookings = await prisma.booking.findMany({
+    take,
+    orderBy: { createdAt: "desc" },
+    include: { user: true, bike: true },
+  });
+  return bookings.map((b) => ({
+    id: b.id,
+    user: b.user.email,
+    bike: b.bike.name,
+    status: b.status,
+    startDate: b.startDate.toISOString(),
+    endDate: b.endDate.toISOString(),
+    totalPrice: Number(b.totalPrice),
+    createdAt: b.createdAt.toISOString(),
+  }));
+}
+
+export async function exportPartnersCsvRows(take = 10_000) {
+  const partners = await prisma.partner.findMany({
+    take,
+    orderBy: { createdAt: "desc" },
+    include: { user: true },
+  });
+  return partners.map((p) => ({
+    id: p.id,
+    userEmail: p.user.email,
+    businessName: p.businessName,
+    type: p.type,
+    city: p.city,
+    isVerified: p.isVerified,
+    createdAt: p.createdAt.toISOString(),
+  }));
+}

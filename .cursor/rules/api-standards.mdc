@@ -1,0 +1,20 @@
+---
+description: Backward-compatible REST API and NFR standards
+globs: "apps/web/app/api/**/*.ts"
+alwaysApply: false
+---
+
+# API Standards
+
+- Preserve documented `/api/*` contracts during migration; use additive changes by default.
+- Authenticate with shared Better Auth helpers and authorize role, membership, ownership,
+  and account status at every protected object boundary.
+- Validate body, path, and query input; bound pagination and collection sizes.
+- Return the established resource envelope and documented status/error shape.
+- Do not add unsupported CRUD verbs merely for symmetry.
+- Map domain errors centrally; do not expose stacks, provider internals, secrets, or PII.
+- Apply rate limits to abuse-sensitive and provider-billed routes.
+- Add idempotency protection before retryable side effects such as payments and fan-out.
+- Document cache/revalidation behavior and avoid user-specific caching leaks.
+- Add route integration tests for success, validation, authentication, authorization,
+  conflict, provider failure, and backward compatibility.

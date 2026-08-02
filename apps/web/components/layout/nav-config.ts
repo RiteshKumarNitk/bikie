@@ -11,7 +11,7 @@ export interface NavColumn {
 }
 
 export const riderPrimaryLinks: NavLink[] = [
-  { label: "Explore Bikes", href: "/explore-bikes" },
+  { label: "Rent a Bike", href: "/explore-bikes" },
   { label: "Rides", href: "/trips" },
 ];
 
@@ -23,7 +23,7 @@ export const partnerPrimaryLinks: NavLink[] = [
 // Shared between the mega-menu and the footer where both render the exact same set of
 // links, so the two surfaces can't silently drift apart (audit finding L5).
 const exploreLinks: NavLink[] = [
-  { label: "Explore Bikes", href: "/explore-bikes" },
+  { label: "Rent a Bike", href: "/explore-bikes" },
   { label: "Destinations", href: "/destinations" },
   { label: "Rides", href: "/trips" },
   { label: "Community", href: "/community" },

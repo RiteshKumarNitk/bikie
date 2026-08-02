@@ -1,16 +1,17 @@
-import { destinationRepository } from "@bikie/database";
+import { getCatalogModule } from "./modules/catalog/public";
 import type { DestinationDetailDTO, DestinationSummaryDTO } from "@bikie/types";
 
+/** Compatibility facade — routes keep importing DestinationService. */
 export const DestinationService = {
   async getPopular(limit: number): Promise<DestinationSummaryDTO[]> {
-    return destinationRepository.findPopularDestinations(limit);
+    return getCatalogModule().destinations.getPopular(limit);
   },
 
   async getAll(): Promise<DestinationSummaryDTO[]> {
-    return destinationRepository.findAllDestinations();
+    return getCatalogModule().destinations.getAll();
   },
 
   async getBySlug(slug: string): Promise<DestinationDetailDTO | null> {
-    return destinationRepository.findDestinationBySlug(slug);
+    return getCatalogModule().destinations.getBySlug(slug);
   },
 };

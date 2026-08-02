@@ -20,7 +20,7 @@ export default async function WishlistPage() {
             title="Your wishlist is empty"
             description="Save bikes you like while exploring to find them here later."
             actionHref="/explore-bikes"
-            actionLabel="Explore bikes"
+            actionLabel="Rent a Bike"
           />
         </div>
       ) : (

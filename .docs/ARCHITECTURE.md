@@ -24,15 +24,53 @@ bike/
 ```
 UI (Server/Client Components)
   → Route Handler (apps/web/app/api/**)
-    → Service (packages/services)
-      → Repository (packages/database/src/repositories)
-        → Prisma → Neon Postgres
+    → Service / Application (packages/services)
+      → Port (module interface)
+        → Repository (packages/database) | Adapter (Twilio/Meta/SMTP/FCM/…)
+          → Prisma / vendor API
 ```
+
+External vendors (Twilio, Meta WhatsApp, SMTP/Resend, FCM, Cloudinary, Google Places)
+must be reached only through adapters behind ports. Compatibility facades
+(`EmailService`, `SMSService`, `WhatsAppService`, `PushService`, `SOSService`,
+`SOSDispatchService`, `RiderLocationService`, `PlacesService`, `BikeService`,
+`BookingService`, `PartnerService`, …) keep existing imports stable while the
+modular-monolith migration proceeds (see ADR-021–024).
+
+First extracted modules under `packages/services/src/modules/`:
+
+| Module | Owns | Facade entry points |
+|---|---|---|
+| `communications` | Email/SMS/WhatsApp/push ports + adapters | `EmailService`, `SMSService`, `WhatsAppService`, `PushService` |
+| `safety-location` | SOS alerts, dispatch policy, rider location, Places | `SOSService`, `SOSDispatchService`, `RiderLocationService`, `PlacesService` |
+| `identity-access` | Account status, roles, permissions, membership gate, login OTP | `apps/web/lib/require-role.ts`, Better Auth `sendOTP` hook |
+| `catalog` | Bikes, destinations, categories, testimonials | `BikeService`, `DestinationService`, `CategoryService`, `TestimonialService` |
+| `rentals-bookings` | Booking pricing/lifecycle, review eligibility, wishlist | `BookingService`, `ReviewService`, `WishlistService` |
+| `partners` | Partner profile and dashboard stats | `PartnerService` |
+| `rides-community` | Trips/rides, join/approve/leave, Ride Room | `TripService`, `RideRoomService` |
+| `messaging` | Conversations, encrypted messages, receipts/reactions | `MessageService` |
+| `administration` | Admin CRUD, bounded CSV export | `AdminService` |
+| `trust-safety` | Reports, moderation actions, audit log | `ReportService`, `ModerationService`, `AuditService` |
+| `platform` | Retry, idempotency, sync job queue | used by SOS fan-out + future workers |
+
+Authorization policy lives in `identity-access` and returns a transport-neutral
+`AccessDecision`; `apps/web/lib/require-role.ts` maps each denial reason to the HTTP status
+and body it has always returned (ADR-023). Permissions are derived from `User.role`, not
+stored, so they can never grant more than the equivalent role check.
 
 Server Components fetch their own `/api/*` routes rather than importing
 `packages/services` directly — this keeps the API boundary real, since it's the
 exact contract a future Flutter app will consume. No `@prisma/client` import may
 appear anywhere under `apps/web`.
+
+## Modular monolith migration (in progress)
+
+Bounded contexts are being extracted under `packages/services/src/modules/*` using a
+Strangler pattern: characterization tests → ports/adapters → compatibility facades →
+caller migration → delete legacy paths. Plan:
+`project doc/MODULAR_MONOLITH_IMPLEMENTATION_PLAN.md`. Phases 1–9 foundation landed
+(ADR-021–028); OpenAPI v1 is generated from Route Handlers. Full async outbox/workers and
+facade deletion remain deferred until staging NFR baselines / zero-use proof.
 
 ## Why API stays inside `apps/web` (no separate `apps/api`)
 

@@ -7,6 +7,7 @@ import {
   riderFooterColumns,
   switchRoleLabel,
 } from "./nav-config";
+import { LogoMark } from "./LogoMark";
 import { SwitchRoleLink } from "./SwitchRoleLink";
 
 export function Footer({ role }: { role: SelectedRole | null }) {
@@ -18,9 +19,7 @@ export function Footer({ role }: { role: SelectedRole | null }) {
         <div className="grid grid-cols-1 gap-12 md:grid-cols-6">
           <div className="md:col-span-2">
             <Link href="/" className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent text-xs font-bold text-white">
-                B
-              </div>
+              <LogoMark />
               <span className="font-display text-lg font-semibold tracking-tight">BIKIE</span>
             </Link>
             <p className="mt-3 max-w-xs text-sm text-foreground/50 leading-relaxed">

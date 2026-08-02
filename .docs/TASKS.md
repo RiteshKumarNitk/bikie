@@ -2,6 +2,77 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Modular Monolith Migration (2026-08-01, ADR-021)
+
+Audit-first Strangler migration toward module ports/adapters without breaking `/api/*`.
+Plan: `project doc/MODULAR_MONOLITH_IMPLEMENTATION_PLAN.md`. Agents: `.cursor/agents/*`.
+Audits: architecture / security-API / database-NFR (completed 2026-08-01).
+
+| Task | Status |
+|---|---|
+| Cursor agents / rules / skills / implementation-plan prompt | Completed |
+| Full architecture audit + implementation plan document | Completed |
+| Vitest runner + root `pnpm test` scripts | Completed |
+| Communications ports/adapters + compatibility facades | Completed |
+| SOS dispatch: inject ports; partner lookup via repository | Completed |
+| Characterization tests (maps/phone/DEV adapters) | Completed |
+| P0: accountStatus on all auth gates; `role` input:false | Completed |
+| P0: lock down `/api/dev/otp` + opt-in `SHOW_OTP_TOAST` | Completed |
+| P0: remove Prisma from phone/presence/SOS/export + AuditService | Completed |
+| Safety-location module extraction (SOS/location/Places + facades) | Completed |
+| Characterization tests (alert kind, fan-out accounting, rider-location) | Completed |
+| Identity-access policy centralization (SmsPort for auth) | Completed |
+| Permission-based access gate (`requirePermission`, derived from role) | Completed — not yet wired into routes |
+| Catalog / destinations / categories / testimonials module | Completed |
+| Rentals-bookings module (pricing + review eligibility + wishlist) | Completed |
+| Partners module (profile + dashboard) | Completed |
+| P1 indexes: booking overlap, Partner.city, Bike.city/ownerId, TripParticipant.userId | Completed — apply migration `20260802000000_phase5_query_indexes` |
+| P0: ride approval atomic transaction (seat + approve + conversation) | Completed |
+| Rides-community module (trip + ride-room) | Completed |
+| Messaging module (crypto/realtime ports + MessageService facade) | Completed |
+| Administration module (Admin CRUD + bounded CSV export) | Completed |
+| Trust-safety module (reports + moderation + audit) | Completed |
+| P1: unbounded admin export size | Completed — capped at 10k rows |
+| Platform module (retry + idempotency + sync job queue) | Completed |
+| SOS fan-out idempotency (`sos-dispatch:{alertId}`) | Completed |
+| Bound message history (newest 200 / max 500) | Completed |
+| P1: mandate Upstash in prod for rate limits | Superseded by ADR-029 — degrades to in-memory instead of denying |
+| P0: SOS blocked by fail-closed rate limiter (Docker) | Completed — ADR-029 |
+| Channel selection by configured provider + recipient contact | Completed — `isConfigured()` on channel ports |
+| NFR baseline scaffold (domain hot paths) | Completed — full load suite still backlog |
+| OpenAPI v1 snapshot + route inventory + `GET /api/openapi` | Completed |
+| API contract CI (inventory ↔ filesystem ↔ OpenAPI) | Completed |
+| Deprecation / request-id contract helpers | Completed |
+| Auth matrix + facade removal registry | Completed — no facade deletes yet |
+| P0/doc: Google login UI missing vs ADR-017 claims | Planned |
+| P1: Zod gaps on admin/mutation routes (~15) | Planned |
+| Wire `requirePermission` into admin/partner routes (per-route review) | Planned |
+| `/api/v2` for approved breaking changes | Backlog — none approved |
+| Remove compatibility facades after zero-use proof | Backlog |
+| Load/NFR baseline suite (staging dataset + p95 budgets) | Backlog |
+| Async outbox / worker adapters (only if baselines demand) | Backlog |
+| Enrich OpenAPI schemas beyond path/method stubs | Backlog |
+
+## SOS Dispatch Fan-out (2026-08-01)
+
+Red/Amber panic alerts now fan out SMS + WhatsApp + email (+ in-app) with GPS to nearby
+riders, same-city partners, and emergency contacts. Credentials stay env-only until go-live.
+
+| Task | Status |
+|---|---|
+| `SOSDispatchService` + `WhatsAppService` (DEV console fallback) | Completed |
+| `findNearbyAroundPoint` PostGIS helper for alert GPS | Completed |
+| Wire fan-out into `POST /api/sos/alerts`; response includes `dispatch` summary | Completed |
+| Seed: membership, emergency contacts, nearby riders GPS, Bangalore partner phones | Completed |
+| Docs in `project doc/` (plan + E2E testing); `.env.example` WhatsApp/Resend/SOS vars | Completed |
+| WhatsApp-style map links (Maps pin + directions deep link) in every channel + in-app "Open in Maps" CTA | Completed |
+| Direct email over SMTP (`nodemailer`), Resend demoted to fallback (ADR-020) | Completed |
+| Direct WhatsApp over Meta Cloud API + native location card; Twilio demoted to fallback (ADR-020) | Completed |
+| `wa.me` click-to-send fallback (`whatsappClickToSend`) when no WhatsApp credentials | Completed |
+| Per-channel delivery results (`smsSent`/`whatsappSent`/`emailSent` + `errors`) in the dispatch summary | Completed |
+| Verified live: `sms=7/7` real Twilio sends to seeded riders/partners/contacts | Completed |
+| Fill `SMTP_USER`/`SMTP_PASS` + `WHATSAPP_ACCESS_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID` in `apps/.env` | Blocked — needs credentials from the account owner |
+
 ## "Continue with Google" Sign-In (2026-07-17, ADR-017)
 
 Google OAuth via Better Auth's `socialProviders` — not Firebase Authentication. Also finished

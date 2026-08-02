@@ -1,23 +1,21 @@
-import { bikeRepository } from "@bikie/database";
+import { getCatalogModule } from "./modules/catalog/public";
 import type { BikeDetailDTO, BikeSearchParams, BikeSearchResultDTO, BikeSummaryDTO } from "@bikie/types";
 
+/** Compatibility facade — routes keep importing BikeService. */
 export const BikeService = {
   async getFeatured(limit: number): Promise<BikeSummaryDTO[]> {
-    return bikeRepository.findFeaturedBikes(limit);
+    return getCatalogModule().bikes.getFeatured(limit);
   },
 
   async search(params: BikeSearchParams): Promise<BikeSearchResultDTO> {
-    const page = params.page ?? 1;
-    const pageSize = params.pageSize ?? 12;
-    const { bikes, total } = await bikeRepository.searchBikes({ ...params, page, pageSize });
-    return { bikes, total, page, pageSize };
+    return getCatalogModule().bikes.search(params);
   },
 
   async getBySlug(slug: string): Promise<BikeDetailDTO | null> {
-    return bikeRepository.findBikeBySlug(slug);
+    return getCatalogModule().bikes.getBySlug(slug);
   },
 
   async getByOwner(ownerId: string): Promise<BikeSummaryDTO[]> {
-    return bikeRepository.findBikesByOwner(ownerId);
+    return getCatalogModule().bikes.getByOwner(ownerId);
   },
 };

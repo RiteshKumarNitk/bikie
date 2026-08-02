@@ -1,0 +1,19 @@
+---
+description: TypeScript and Next.js coding rules for BIKIE
+globs: "**/*.{ts,tsx}"
+alwaysApply: false
+---
+
+# Coding Guidelines
+
+- Follow the installed Next.js 16 docs in `node_modules/next/dist/docs/`.
+- Route Handlers perform transport concerns only: auth, validation, invocation, HTTP mapping.
+- Put business rules in application/domain services and persistence in repositories.
+- Validate untrusted input with Zod and return DTOs, never Prisma records.
+- Avoid `any`, non-null assertions, silent catches, magic values, and unbounded operations.
+- Use dependency injection through explicit factories/composition roots for ports.
+- Use structured domain/application errors and one consistent HTTP error mapper.
+- External calls need timeouts; retry only safe/idempotent operations with bounds.
+- Preserve accessibility and use existing UI primitives/tokens.
+- Relative TS imports inside `packages/*` must not use `.js` extensions, except generated Prisma JS.
+- Add focused tests for changed behavior and concurrency-sensitive invariants.

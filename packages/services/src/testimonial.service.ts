@@ -1,8 +1,9 @@
-import { testimonialRepository } from "@bikie/database";
+import { getCatalogModule } from "./modules/catalog/public";
 import type { TestimonialDTO } from "@bikie/types";
 
+/** Compatibility facade — routes keep importing TestimonialService. */
 export const TestimonialService = {
   async getFeatured(limit: number): Promise<TestimonialDTO[]> {
-    return testimonialRepository.findFeaturedTestimonials(limit);
+    return getCatalogModule().testimonials.getFeatured(limit);
   },
 };

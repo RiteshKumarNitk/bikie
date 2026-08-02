@@ -18,9 +18,12 @@
     "@prisma/client": "^7.8.0",
     "@prisma/client-runtime-utils": "^7.8.0",
     "@prisma/adapter-neon": "^7.8.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "pg": "^8.13.0",
     "@bikie/types": "workspace:*"
   },
   "devDependencies": {
+    "@types/pg": "^8.11.0",
     "prisma": "^7.8.0",
     "tsx": "^4.19.0",
     "dotenv-cli": "^8.0.0",

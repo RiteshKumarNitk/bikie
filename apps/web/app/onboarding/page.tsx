@@ -7,6 +7,7 @@ import Link from "next/link";
 import { riderProfileSchema } from "@bikie/validation";
 import { formatZodError } from "@/lib/format-zod-error";
 import { authClient } from "@/lib/auth-client";
+import { LogoMark } from "@/components/layout/LogoMark";
 import {
   EmergencyContactsEditor,
   type EmergencyContactValue,
@@ -190,9 +191,7 @@ export default function OnboardingPage() {
       <div className="relative mx-auto w-full max-w-2xl lg:max-w-4xl xl:max-w-5xl">
         <div className="flex flex-col items-center text-center">
           <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-base font-bold text-white">
-              B
-            </div>
+            <LogoMark size="lg" />
             <span className="font-display text-2xl font-semibold tracking-tight text-foreground">
               BIKIE
             </span>

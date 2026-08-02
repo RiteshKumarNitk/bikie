@@ -1,6 +1,7 @@
-import { auditRepository } from "@bikie/database";
+import { AuditService } from "@bikie/services";
 import { headers } from "next/headers";
 
+/** HTTP-edge helper: attaches client IP then delegates to AuditService. */
 export async function logAdminAction(params: {
   userId: string;
   action: string;
@@ -9,7 +10,7 @@ export async function logAdminAction(params: {
   metadata?: Record<string, unknown>;
 }) {
   const reqHeaders = await headers();
-  return auditRepository.log({
+  return AuditService.logAdminAction({
     ...params,
     ipAddress: reqHeaders.get("x-forwarded-for") ?? reqHeaders.get("x-real-ip") ?? undefined,
   });

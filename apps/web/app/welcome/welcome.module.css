@@ -16,7 +16,7 @@
   position: absolute;
   inset: 0;
   border-radius: 9999px;
-  border: 3px solid #ff4d1a;
+  border: 3px solid var(--color-brand);
   animation: ringPulse 2.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
@@ -38,7 +38,7 @@
 .logoCircle {
   position: relative;
   z-index: 1;
-  background: #ff4d1a;
+  background: var(--color-brand);
   border: 2px solid rgba(255, 255, 255, 0.15);
   box-shadow: 0 0 35px rgba(255, 77, 26, 0.6);
 }

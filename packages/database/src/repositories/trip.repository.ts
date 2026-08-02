@@ -400,6 +400,92 @@ export async function getOrCreateRideConversation(
   });
 }
 
+/**
+ * Single transaction for ride approval (P0): lock trip → conditional seat decrement →
+ * mark participant APPROVED → get-or-create ride conversation. Side effects
+ * (system message, push) stay outside so a notification failure cannot roll back seats.
+ */
+export async function approveParticipantAtomically(participantId: string, organizerId: string) {
+  return prisma.$transaction(async (tx) => {
+    const participant = await tx.tripParticipant.findUnique({
+      where: { id: participantId },
+      include: {
+        trip: { include: { organizer: { select: { id: true, name: true } } } },
+        user: { select: { id: true, name: true } },
+      },
+    });
+    if (!participant) return { ok: false as const, reason: "NOT_FOUND" as const };
+    if (participant.trip.organizerId !== organizerId) {
+      return { ok: false as const, reason: "FORBIDDEN" as const };
+    }
+    if (participant.status !== "PENDING") {
+      return { ok: false as const, reason: "ALREADY_DECIDED" as const };
+    }
+
+    await tx.$queryRaw`SELECT id FROM "Trip" WHERE id = ${participant.tripId} FOR UPDATE`;
+
+    // Re-check after lock — a concurrent approve may have already consumed this request.
+    const fresh = await tx.tripParticipant.findUnique({
+      where: { id: participantId },
+      select: { status: true },
+    });
+    if (!fresh || fresh.status !== "PENDING") {
+      return { ok: false as const, reason: "ALREADY_DECIDED" as const };
+    }
+
+    const seat = await tx.trip.updateMany({
+      where: { id: participant.tripId, seatsLeft: { gt: 0 } },
+      data: { seatsLeft: { decrement: 1 } },
+    });
+    if (seat.count !== 1) return { ok: false as const, reason: "NO_SEATS" as const };
+
+    await tx.tripParticipant.update({
+      where: { id: participantId },
+      data: { status: "APPROVED", decidedAt: new Date() },
+    });
+
+    const existing = await tx.conversation.findUnique({
+      where: { tripId: participant.tripId },
+      select: { id: true },
+    });
+    let conversationId: string;
+    if (existing) {
+      await tx.conversationParticipant.upsert({
+        where: {
+          conversationId_userId: { conversationId: existing.id, userId: participant.userId },
+        },
+        create: { conversationId: existing.id, userId: participant.userId, role: "MEMBER" },
+        update: {},
+      });
+      conversationId = existing.id;
+    } else {
+      const conversation = await tx.conversation.create({
+        data: {
+          subject: `Ride: ${participant.trip.title}`,
+          tripId: participant.tripId,
+          participants: {
+            create: [
+              { userId: organizerId, role: "ORGANIZER" },
+              { userId: participant.userId, role: "MEMBER" },
+            ],
+          },
+        },
+      });
+      conversationId = conversation.id;
+    }
+
+    return {
+      ok: true as const,
+      conversationId,
+      tripId: participant.tripId,
+      tripTitle: participant.trip.title,
+      organizerName: participant.trip.organizer.name,
+      userId: participant.userId,
+      userName: participant.user.name,
+    };
+  });
+}
+
 export async function getRideStatsForUser(userId: string) {
   const [ridesOrganized, requestsSent, requestsApproved, ridesCancelled] = await Promise.all([
     prisma.trip.count({ where: { organizerId: userId } }),

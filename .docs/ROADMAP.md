@@ -12,6 +12,16 @@ SSE real-time messaging, AuditLog system with admin CRUD instrumentation, admin 
 ## Milestone 3b — SOS Hardening, Membership Gating, Referrals ✅ Completed
 SOS alerts show full reporter info (email, phone, map link); SOS send/view/respond gated behind active membership; referral system (auto-generated codes, signup linking, dashboard + admin pages, tracking only); dummy payment checkout modal for membership purchase; admin Membership Plans CRUD.
 
+## Milestone 8c — Modular Monolith Hardening (in progress)
+Strangler migration toward bounded contexts with ports/adapters, without breaking `/api/*`
+or Flutter contracts. See `project doc/MODULAR_MONOLITH_IMPLEMENTATION_PLAN.md` and ADR-021/022.
+Phase 1–9 foundation landed: communications through OpenAPI contract snapshot (ADR-021–028).
+Ride approval is atomic; admin CSV exports are formula-safe and capped at 10k rows;
+SOS fan-out is idempotent; message history is bounded; prod rate limits fail closed without Redis;
+OpenAPI v1 is published at `GET /api/openapi` (regenerate with `pnpm openapi:generate`).
+Business behavior and `/api/*` contracts unchanged. `/api/v2` and facade deletion remain gated;
+full async outbox/workers wait on staging NFR baselines.
+
 ## Milestone 4 — Real Bookings & Payments (future)
 Real Razorpay integration, availability calendar, cancellation policy engine, security deposits.
 

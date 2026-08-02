@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { DevOtpStore } from "@bikie/services";
 
 /**
- * Returns the OTP code for a given phone number so the login/signup UI can display it as a toast.
- * Gated by SHOW_OTP_TOAST env var (defaults to enabled when not set to "false").
+ * Returns the OTP for login/signup toast UI during local/test builds only.
+ * Requires explicit SHOW_OTP_TOAST=true and is always disabled in production.
  */
 export async function GET(req: NextRequest) {
-  if (process.env.SHOW_OTP_TOAST === "false") {
+  if (process.env.NODE_ENV === "production" || process.env.SHOW_OTP_TOAST !== "true") {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 

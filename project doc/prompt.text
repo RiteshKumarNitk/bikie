@@ -1,0 +1,569 @@
+You are a Principal Software Architect and Senior Staff Engineer.
+
+Your task is to completely analyze the current project and refactor it into a Production Ready Modular Monolithic Architecture.
+
+DO NOT simply move files.
+
+Completely redesign the architecture while preserving existing business logic.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Convert the entire project into a scalable Modular Monolith which can easily handle
+
+Current Users
+------------
+1,000+
+
+Future
+-------
+1 Million+
+
+without changing business logic.
+
+The architecture should be clean enough so that in the future every module can be extracted into a microservice with minimum effort.
+
+==================================================
+IMPORTANT
+==================================================
+
+Before writing code
+
+Perform a complete project audit.
+
+Generate
+
+1. Existing Architecture
+2. Problems
+3. Code Smells
+4. Duplicate Logic
+5. Circular Dependencies
+6. Dead Code
+7. Security Issues
+8. Performance Issues
+9. API Issues
+10. Folder Structure Issues
+11. Naming Issues
+12. Database Issues
+
+After analysis
+
+Create a migration plan.
+
+Only then start refactoring.
+
+==================================================
+TARGET ARCHITECTURE
+==================================================
+
+Use 3 Layer Architecture
+
+Presentation Layer
+↓
+
+Business Layer
+↓
+
+Data Layer
+
+Controller
+↓
+
+Service
+↓
+
+Repository
+↓
+
+Database
+
+Never allow
+
+Controller
+↓
+
+Repository
+
+or
+
+Controller
+↓
+
+Database
+
+==================================================
+FOLDER STRUCTURE
+==================================================
+
+src/
+
+    common/
+        config/
+        constants/
+        enums/
+        exceptions/
+        interceptor/
+        middleware/
+        filters/
+        response/
+        validation/
+        security/
+        cache/
+        logging/
+
+    modules/
+
+        auth/
+
+            controller/
+            service/
+            repository/
+            dto/
+            entity/
+            mapper/
+            validator/
+            model/
+            util/
+            helper/
+            config/
+
+        user/
+
+        bike/
+
+        booking/
+
+        payment/
+
+        notification/
+
+        location/
+
+        review/
+
+        chat/
+
+        admin/
+
+        dashboard/
+
+        etc...
+
+    infrastructure/
+
+        database/
+        redis/
+        kafka/
+        scheduler/
+        storage/
+        websocket/
+
+    ports/
+
+        payment/
+
+            PaymentGateway.java
+
+        sms/
+
+            SmsGateway.java
+
+        otp/
+
+            OtpProvider.java
+
+        mail/
+
+            EmailProvider.java
+
+        notification/
+
+            PushNotificationPort.java
+
+        storage/
+
+            FileStoragePort.java
+
+    adapters/
+
+        payment/
+
+            razorpay/
+                RazorPayAdapter.java
+
+            paypal/
+                PaypalAdapter.java
+
+            stripe/
+                StripeAdapter.java
+
+        sms/
+
+            twilio/
+            msg91/
+
+        otp/
+
+            firebase/
+            twilio/
+
+        storage/
+
+            s3/
+            cloudinary/
+
+        notification/
+
+            firebase/
+
+        mail/
+
+            resend/
+            smtp/
+
+==================================================
+PORT & ADAPTER (HEXAGONAL)
+==================================================
+
+Business Logic should NEVER know
+
+Razorpay
+
+Paypal
+
+Twilio
+
+Firebase
+
+Cloudinary
+
+etc.
+
+Example
+
+PaymentService
+
+↓
+
+PaymentGateway (Port)
+
+↓
+
+Razorpay Adapter
+
+Tomorrow
+
+Replace Razorpay
+
+↓
+
+Paypal Adapter
+
+Business Logic should remain unchanged.
+
+Do this for
+
+Payment
+
+SMS
+
+OTP
+
+Notification
+
+Email
+
+Storage
+
+Maps
+
+Location
+
+Analytics
+
+Third Party APIs
+
+==================================================
+AUTHENTICATION
+==================================================
+
+Implement
+
+✔ Login with Mobile OTP
+
+✔ Login with Google
+
+✔ Refresh Token
+
+✔ JWT
+
+✔ Role Based Access
+
+✔ Permission Based Access
+
+✔ Session Management
+
+✔ Token Rotation
+
+✔ Secure Cookie
+
+==================================================
+SECURITY
+==================================================
+
+Implement
+
+Spring Security / NextAuth / JWT (according to project)
+
+CSRF
+
+CORS
+
+Helmet
+
+Rate Limiter
+
+API Throttling
+
+XSS Protection
+
+SQL Injection Protection
+
+Validation
+
+DTO Validation
+
+Request Validation
+
+Global Exception Handler
+
+Response Encryption (where required)
+
+Sensitive Data Masking
+
+Audit Logging
+
+Password Encryption
+
+OTP Expiry
+
+OTP Retry Limit
+
+OTP Lock
+
+Account Lock
+
+Login Attempt Tracking
+
+Refresh Token Revocation
+
+==================================================
+REST API STANDARDS
+==================================================
+
+Every API should have
+
+GET
+
+POST
+
+PUT
+
+PATCH
+
+DELETE
+
+Pagination
+
+Filtering
+
+Sorting
+
+Searching
+
+API Versioning
+
+Swagger/OpenAPI
+
+Consistent Response Wrapper
+
+Success Response
+
+Error Response
+
+Validation Response
+
+==================================================
+DATABASE
+==================================================
+
+Improve
+
+Indexes
+
+Foreign Keys
+
+Constraints
+
+Transactions
+
+Optimistic Locking
+
+Connection Pooling
+
+N+1 Query Fixes
+
+Lazy Loading
+
+Caching
+
+==================================================
+SCALABILITY
+==================================================
+
+Prepare architecture for
+
+1 Million Users
+
+Implement
+
+Caching
+
+Redis
+
+Async Jobs
+
+Background Workers
+
+Queue
+
+Retry
+
+Dead Letter Queue
+
+Idempotency
+
+Horizontal Scaling
+
+Read-heavy optimization
+
+Database Indexes
+
+Connection Pool
+
+Rate Limiting
+
+==================================================
+PERFORMANCE
+==================================================
+
+Reduce
+
+API Response Time
+
+Memory Usage
+
+Duplicate Queries
+
+Large DTOs
+
+Blocking Calls
+
+Use
+
+Batch Processing
+
+Caching
+
+Parallel Processing
+
+Streaming
+
+Pagination
+
+==================================================
+CODE QUALITY
+==================================================
+
+Use
+
+SOLID
+
+DRY
+
+KISS
+
+YAGNI
+
+Clean Architecture
+
+Hexagonal Architecture
+
+Repository Pattern
+
+Builder Pattern
+
+Factory Pattern
+
+Strategy Pattern
+
+Dependency Injection
+
+==================================================
+TESTING
+==================================================
+
+Generate
+
+Unit Tests
+
+Integration Tests
+
+Controller Tests
+
+Repository Tests
+
+Security Tests
+
+==================================================
+DELIVERABLES
+==================================================
+
+Generate in this order
+
+1. Current Project Analysis
+
+2. Refactoring Strategy
+
+3. Migration Roadmap
+
+4. New Folder Structure
+
+5. Module Diagram
+
+6. API Flow Diagram
+
+7. Authentication Flow
+
+8. Database Diagram
+
+9. Port Adapter Diagram
+
+10. Sequence Diagram
+
+11. Security Checklist
+
+12. Performance Checklist
+
+13. Coding Standards
+
+14. Step-by-Step Refactoring Plan
+
+15. Start implementation module by module.
+
+Never break existing APIs during migration.
+
+Use feature flags wherever required.
+
+Backward compatibility is mandatory.

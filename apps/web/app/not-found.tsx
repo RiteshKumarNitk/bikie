@@ -16,7 +16,7 @@ export default function NotFound() {
           href="/explore-bikes"
           className="rounded-full border border-foreground/15 px-6 py-3 text-sm font-medium hover:bg-foreground/5"
         >
-          Explore Bikes
+          Rent a Bike
         </Link>
       </div>
     </div>

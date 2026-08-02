@@ -27,3 +27,22 @@ export async function findById(userId: string) {
 export async function updateName(userId: string, name: string) {
   await prisma.user.update({ where: { id: userId }, data: { name } });
 }
+
+export async function updatePhone(userId: string, phone: string | null) {
+  await prisma.user.update({ where: { id: userId }, data: { phone } });
+}
+
+export async function touchLastActiveAt(userId: string) {
+  await prisma.user.update({
+    where: { id: userId },
+    data: { lastActiveAt: new Date() },
+  });
+}
+
+/** Fields used for SOS profile-completeness warnings. */
+export async function findSosContactFields(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { phone: true, name: true },
+  });
+}

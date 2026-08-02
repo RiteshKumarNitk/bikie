@@ -1,0 +1,30 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+        DIRECT_URL: ${DIRECT_URL}
+        BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+        MESSAGE_ENCRYPTION_KEY: ${MESSAGE_ENCRYPTION_KEY}
+        # Literal, not from apps/.env: that file targets port 3000 for `pnpm dev`,
+        # while this container is published on 3001.
+        BETTER_AUTH_URL: http://localhost:3001
+        NEXT_PUBLIC_APP_URL: http://localhost:3001
+    restart: unless-stopped
+    # Host 3000 is taken by another local project, and the container port must match
+    # the published one: server components self-fetch /api/* using the request's Host
+    # header, so "localhost:3001" has to resolve inside the container too.
+    ports:
+      - "3001:3001"
+    env_file:
+      - ./apps/.env
+    environment:
+      SHOW_OTP_TOAST: "true"
+      SEED_DB: "false"
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3001"
+      BETTER_AUTH_URL: http://localhost:3001
+      NEXT_PUBLIC_APP_URL: http://localhost:3001

@@ -1,0 +1,19 @@
+---
+description: Core BIKIE modular-monolith migration and delivery rules
+alwaysApply: true
+---
+
+# BIKIE Project Rules
+
+- Read `CLAUDE.md` and relevant `.docs/*` before non-trivial work.
+- Audit and characterize behavior before architectural refactoring.
+- Migrate one bounded context at a time; never perform a repository-wide file move.
+- Preserve existing API routes, payloads, status codes, auth behavior, and mobile compatibility.
+- Enforce `UI → Route → Application Service → Port → Repository/Adapter`.
+- No Prisma outside `packages/database`; no vendor SDK in domain/application business logic.
+- Cross-module consumers import only a module's public API.
+- Keep Next.js Route Handlers in `apps/web` unless a new ADR changes ADR-001.
+- Use feature flags for risky parallel implementations, with owner and removal condition.
+- Add tests before deleting compatibility paths.
+- Never add secrets; document variable names only in `.env.example`.
+- Update tasks, roadmap, changelog, and architecture/API/ADR docs as required.

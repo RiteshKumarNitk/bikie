@@ -33,7 +33,7 @@ const navGroups = [
       { label: "SOS Emergency", href: "/dashboard/sos" },
       { label: "Nearby Riders", href: "/dashboard/nearby" },
       { label: "Membership", href: "/dashboard/membership" },
-      { label: "Settings", href: "/dashboard/settings" },
+      { label: "Profile", href: "/dashboard/settings" },
     ]
   }
 ];

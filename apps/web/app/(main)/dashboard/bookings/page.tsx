@@ -48,7 +48,7 @@ export default async function DashboardBookingsPage({
 
       {bookings.length === 0 ? (
         <div className="mt-8">
-          <EmptyState title="No bookings here" actionHref="/explore-bikes" actionLabel="Explore bikes" />
+          <EmptyState title="No bookings here" actionHref="/explore-bikes" actionLabel="Rent a Bike" />
         </div>
       ) : (
         <div className="mt-8 space-y-4">

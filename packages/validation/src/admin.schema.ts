@@ -67,3 +67,11 @@ export const updateTestimonialSchema = z.object({
 });
 
 export type UpdateTestimonialInput = z.infer<typeof updateTestimonialSchema>;
+
+// --- CSV export ---
+
+export const adminExportQuerySchema = z.object({
+  type: z.enum(["users", "bookings", "partners"]).default("users"),
+});
+
+export type AdminExportQuery = z.infer<typeof adminExportQuerySchema>;

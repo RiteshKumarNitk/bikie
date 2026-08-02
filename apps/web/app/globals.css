@@ -31,6 +31,9 @@
   /* Text/link usages of accent (not backgrounds): same as --color-accent here,
      since #26258f already contrasts ~10.7:1 against this light background. */
   --color-accent-text: #26258f;
+  /* Brand mark only (the "B" logo) — deliberately outside the accent scale so the
+     logo reads the same orange in both themes. Not a general-purpose fill. */
+  --color-brand: #ff4d1a;
 }
 
 /* Dark mode: Premium navy blue — the primary BIKIE look */
@@ -57,6 +60,7 @@
   --color-accent: var(--color-accent);
   --color-accent-hover: var(--color-accent-hover);
   --color-accent-text: var(--color-accent-text);
+  --color-brand: var(--color-brand);
   --color-success: var(--color-success);
   --color-warning: var(--color-warning);
   --color-background: var(--color-background);

@@ -1,9 +1,6 @@
-import "dotenv/config";
-import { PrismaClient } from "../src/generated/prisma/client.js";
-import { PrismaNeon } from "@prisma/adapter-neon";
-
-const adapter = new PrismaNeon({ connectionString: process.env.DATABASE_URL! });
-const prisma = new PrismaClient({ adapter });
+// Env vars come from the process (Docker compose env_file, dotenv-cli, or shell).
+// Avoid importing `dotenv` here — it isn't a direct dependency of @bikie/database in the image.
+import { prisma } from "../src/client";
 
 const AUTH_BASE_URL = process.env.BETTER_AUTH_URL ?? "http://localhost:4000";
 
@@ -11,7 +8,25 @@ const SEED_ACCOUNTS = {
   admin: { name: "BIKIE Admin", email: "admin@bikie.app", password: "Admin@12345" },
   partner: { name: "Arjun Rentals", email: "partner@bikie.app", password: "Partner@12345" },
   user: { name: "Demo Rider", email: "rider@bikie.app", password: "Rider@12345" },
+  // Nearby riders used by the SOS fan-out E2E flow (see project doc / SOS testing guide).
+  // Phones/emails are the live test WhatsApp + Gmail inboxes for local dispatch verification.
+  nearby1: {
+    name: "Nearby Rider One",
+    email: "arun8107800370@gmail.com",
+    password: "Nearby@12345",
+    phone: "+918107800370",
+  },
+  nearby2: {
+    name: "Nearby Rider Two",
+    email: "sharmamo@gmail.com",
+    password: "Nearby@12345",
+    phone: "+919664361738",
+  },
 };
+
+/** Fixed Bangalore coordinates for SOS E2E — trigger a panic with this GPS (or city "Bangalore")
+ * so seeded nearby riders + the Bangalore partner are in range. */
+const SOS_SEED_GPS = { lat: 12.9716, lng: 77.5946, city: "Bangalore" };
 
 // Real password hashing (Better Auth's scrypt scheme) only happens through its own
 // HTTP API, so seed accounts are created via the running dev server rather than
@@ -113,18 +128,37 @@ async function main() {
 
   await prisma.partner.upsert({
     where: { userId: partnerUser.id },
-    update: {},
+    update: {
+      city: SOS_SEED_GPS.city,
+      contactPerson1Name: "Arjun Desk",
+      contactPerson1Mobile: "+919876543210",
+      contactPerson2Name: "Roadside Van",
+      contactPerson2Mobile: "+919876543211",
+    },
     create: {
       userId: partnerUser.id,
       businessName: "Arjun Rentals",
       type: "RENTAL",
-      city: "Jaipur",
-      description: "Family-run motorcycle rental fleet operating across Rajasthan since 2018.",
+      city: SOS_SEED_GPS.city,
+      description: "Family-run motorcycle rental fleet — SOS test partner for Bangalore.",
       logoUrl: "https://picsum.photos/seed/partner-arjun/200/200",
       isVerified: true,
       ratingAvg: 4.7,
       ratingCount: 58,
+      contactPerson1Name: "Arjun Desk",
+      contactPerson1Mobile: "+919876543210",
+      contactPerson2Name: "Roadside Van",
+      contactPerson2Mobile: "+919876543211",
     },
+  });
+
+  await prisma.user.update({
+    where: { id: partnerUser.id },
+    data: { phone: "+919876543200" },
+  });
+  await prisma.user.update({
+    where: { id: demoUser.id },
+    data: { phone: "+919900001111", name: "Demo Rider" },
   });
 
   const categoryRecords: Record<string, { id: string }> = {};
@@ -301,9 +335,141 @@ async function main() {
     console.log("Seeded membership plans.");
   }
 
+  // --- SOS E2E fixtures (membership + emergency contacts + nearby riders with GPS) ---
+  console.log("Seeding SOS E2E fixtures around", SOS_SEED_GPS, "...");
+
+  const premiumPlan = await prisma.membershipPlan.findFirst({ where: { name: "Premium" } });
+  if (premiumPlan) {
+    const existingMembership = await prisma.userMembership.findFirst({
+      where: { userId: demoUser.id, status: "ACTIVE" },
+    });
+    if (!existingMembership) {
+      const start = new Date();
+      const end = new Date(start);
+      end.setDate(end.getDate() + premiumPlan.durationDays);
+      await prisma.userMembership.create({
+        data: {
+          userId: demoUser.id,
+          planId: premiumPlan.id,
+          startDate: start,
+          endDate: end,
+          status: "ACTIVE",
+        },
+      });
+      console.log("Seeded ACTIVE Premium membership for demo rider.");
+    }
+  }
+
+  const riderProfile = await prisma.riderProfile.upsert({
+    where: { userId: demoUser.id },
+    update: { onboardingSkipped: false, area: "MG Road", district: SOS_SEED_GPS.city, pincode: "560001" },
+    create: {
+      userId: demoUser.id,
+      addressLine: "12 MG Road",
+      area: "MG Road",
+      district: SOS_SEED_GPS.city,
+      pincode: "560001",
+      country: "India",
+      bloodGroup: "O+",
+      onboardingSkipped: false,
+    },
+  });
+
+  await prisma.riderEmergencyContact.deleteMany({ where: { riderProfileId: riderProfile.id } });
+  await prisma.riderEmergencyContact.createMany({
+    data: [
+      {
+        riderProfileId: riderProfile.id,
+        name: "Priya Demo (Spouse)",
+        phone: "+919911112222",
+        relation: "Spouse",
+      },
+      {
+        riderProfileId: riderProfile.id,
+        name: "Ravi Demo (Brother)",
+        phone: "+919933334444",
+        relation: "Brother",
+      },
+    ],
+  });
+  console.log("Seeded emergency contacts for demo rider.");
+
+  const nearby1 = await signUpViaAuthApi(SEED_ACCOUNTS.nearby1);
+  const nearby2 = await signUpViaAuthApi(SEED_ACCOUNTS.nearby2);
+
+  // Also migrate older seed accounts that still use nearbyN@bikie.app.
+  for (const legacy of ["nearby1@bikie.app", "nearby2@bikie.app"] as const) {
+    const legacyUser = await prisma.user.findUnique({ where: { email: legacy } });
+    if (!legacyUser) continue;
+    const target = legacy.startsWith("nearby1") ? SEED_ACCOUNTS.nearby1 : SEED_ACCOUNTS.nearby2;
+    const taken = await prisma.user.findUnique({ where: { email: target.email } });
+    if (!taken) {
+      await prisma.user.update({
+        where: { id: legacyUser.id },
+        data: { email: target.email, phone: target.phone, name: target.name },
+      });
+    } else {
+      await prisma.user.update({
+        where: { id: legacyUser.id },
+        data: { phone: target.phone },
+      });
+    }
+  }
+
+  await prisma.user.update({
+    where: { id: nearby1.id },
+    data: { phone: SEED_ACCOUNTS.nearby1.phone, email: SEED_ACCOUNTS.nearby1.email, name: SEED_ACCOUNTS.nearby1.name },
+  });
+  await prisma.user.update({
+    where: { id: nearby2.id },
+    data: { phone: SEED_ACCOUNTS.nearby2.phone, email: SEED_ACCOUNTS.nearby2.email, name: SEED_ACCOUNTS.nearby2.name },
+  });
+
+  // Give nearby riders membership too so they can respond to alerts in the UI.
+  if (premiumPlan) {
+    for (const u of [nearby1, nearby2]) {
+      const has = await prisma.userMembership.findFirst({ where: { userId: u.id, status: "ACTIVE" } });
+      if (!has) {
+        const start = new Date();
+        const end = new Date(start);
+        end.setDate(end.getDate() + premiumPlan.durationDays);
+        await prisma.userMembership.create({
+          data: { userId: u.id, planId: premiumPlan.id, startDate: start, endDate: end, status: "ACTIVE" },
+        });
+      }
+    }
+  }
+
+  // Opt them into live location sharing ~1–2 km from the SOS seed point (PostGIS).
+  const nearbyFixes: { userId: string; lat: number; lng: number }[] = [
+    { userId: nearby1.id, lat: SOS_SEED_GPS.lat + 0.008, lng: SOS_SEED_GPS.lng + 0.006 },
+    { userId: nearby2.id, lat: SOS_SEED_GPS.lat - 0.01, lng: SOS_SEED_GPS.lng + 0.004 },
+    // Also put the demo rider's own fix on file so /dashboard/nearby works for them.
+    { userId: demoUser.id, lat: SOS_SEED_GPS.lat, lng: SOS_SEED_GPS.lng },
+  ];
+
+  for (const fix of nearbyFixes) {
+    await prisma.riderLocation.upsert({
+      where: { userId: fix.userId },
+      create: { userId: fix.userId, sharingEnabled: true },
+      update: { sharingEnabled: true },
+    });
+    await prisma.$executeRaw`
+      UPDATE "rider_location"
+      SET "location" = ST_SetSRID(ST_MakePoint(${fix.lng}, ${fix.lat}), 4326)::geography,
+          "updatedAt" = now(),
+          "sharingEnabled" = true
+      WHERE "userId" = ${fix.userId}
+    `;
+  }
+  console.log("Seeded nearby rider GPS fixes (PostGIS) for SOS fan-out.");
+
   console.log("Admin:", SEED_ACCOUNTS.admin.email, "/", SEED_ACCOUNTS.admin.password);
   console.log("Partner:", SEED_ACCOUNTS.partner.email, "/", SEED_ACCOUNTS.partner.password);
   console.log("Demo user:", SEED_ACCOUNTS.user.email, "/", SEED_ACCOUNTS.user.password);
+  console.log("Nearby1:", SEED_ACCOUNTS.nearby1.email, "/", SEED_ACCOUNTS.nearby1.password, "WA", SEED_ACCOUNTS.nearby1.phone);
+  console.log("Nearby2:", SEED_ACCOUNTS.nearby2.email, "/", SEED_ACCOUNTS.nearby2.password, "WA", SEED_ACCOUNTS.nearby2.phone);
+  console.log("SOS test GPS:", SOS_SEED_GPS.lat, SOS_SEED_GPS.lng, "city=", SOS_SEED_GPS.city);
 }
 
 main()
