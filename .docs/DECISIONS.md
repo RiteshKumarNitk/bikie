@@ -685,3 +685,33 @@ changes:
   still apply per instance while degraded (under-counting across replicas is accepted). Channel
   counters now reflect real delivery attempts. Supersedes the fail-closed rule in ADR-027.
 
+## ADR-030: An SOS must never silently reach nobody
+
+- **Context.** Field testing produced three consecutive alerts logging
+  `nearby=0 providers=0 contacts=0 sms=0/0 wa=0/0 email=0/0 inApp=0 channels=sms:on,wa:off,email:off`
+  while the UI showed "Alert Sent! GPS shared via SMS, WhatsApp, and email to nearby riders,
+  service providers, and your emergency contacts." Nothing was misfiring in the dispatch code —
+  the recipient set was genuinely empty (no saved emergency contacts, nobody sharing location
+  in range, no same-city partner, `SOS_EMERGENCY_SERVICES_*` unset) and the email/WhatsApp
+  providers had no credentials. `RiderEmergencyContact` also stored only `name`/`phone`, so
+  contacts were structurally unreachable by email even once SMTP was configured.
+- **Decision.**
+  1. The success screen reports the actual `SOSDispatchSummary` instead of a fixed sentence:
+     recipient counts, per-channel `sent/attempted`, which channels are unconfigured, and a
+     distinct "nobody reached" state that tells the rider to call emergency services and links
+     to the emergency-contacts form. A null summary (fan-out threw) is its own error state.
+  2. `RiderEmergencyContact.email` — nullable, additive. SOS fan-out emails contacts who have
+     one; phone-only contacts behave exactly as before.
+  3. A dispatch that resolves to zero recipients escalates to up to five `ADMIN` users through
+     a new `EscalationPort`, logs `[SOS][DISPATCH][NO-RECIPIENTS]`, and reports
+     `escalatedToAdmins` in the summary. Admins are an escalation path only — they are never
+     added to a dispatch that already found responders.
+  4. The reporter always receives an in-app notification confirming the alert is live (with the
+     responder count, or an explicit "no responders could be reached" instruction), independent
+     of whether any provider is configured.
+  5. `getProfileWarning` also flags missing emergency contacts, not just a missing phone number,
+     so the gap is visible before an emergency rather than during one.
+- **Consequences.** A misconfigured or thinly-populated deployment now fails loudly and
+  actionably instead of showing a false success. `escalatedToAdmins > 0` in logs is the signal
+  that recipient coverage — not the delivery code — is what needs attention.
+

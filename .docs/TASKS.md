@@ -72,6 +72,14 @@ riders, same-city partners, and emergency contacts. Credentials stay env-only un
 | Per-channel delivery results (`smsSent`/`whatsappSent`/`emailSent` + `errors`) in the dispatch summary | Completed |
 | Verified live: `sms=7/7` real Twilio sends to seeded riders/partners/contacts | Completed |
 | Fill `SMTP_USER`/`SMTP_PASS` + `WHATSAPP_ACCESS_TOKEN`/`WHATSAPP_PHONE_NUMBER_ID` in `apps/.env` | Blocked — needs credentials from the account owner |
+| P0: success screen reported a fixed "sent via SMS/WhatsApp/email" sentence even with 0 recipients and 0 configured providers | Completed — ADR-030, UI now renders the real `SOSDispatchSummary` |
+| Optional `email` on `RiderEmergencyContact` (nullable column + onboarding/settings field) so contacts are email-reachable | Completed — ADR-030, migration applied live |
+| Zero-recipient dispatch escalates to `ADMIN` users via `EscalationPort` + `[SOS][DISPATCH][NO-RECIPIENTS]` log | Completed — ADR-030 |
+| Reporter always gets an in-app confirmation (responder count, or "no responders could be reached") | Completed — ADR-030 |
+| `getProfileWarning` flags missing emergency contacts, not just a missing phone | Completed — ADR-030 |
+| Seed nearby riders with location sharing + a GPS fix near test coordinates so `nearby > 0` in staging | Open — recipient coverage, not a code gap |
+| Fill `UPSTASH_REDIS_REST_URL`/`TOKEN` (realtime in-app push is a no-op without them) and `FIREBASE_CLIENT_EMAIL`/`FIREBASE_PRIVATE_KEY`/`NEXT_PUBLIC_FIREBASE_VAPID_KEY` (browser push) | Blocked — needs credentials from the account owner |
+| Set `SOS_EMERGENCY_SERVICES_PHONE`/`_EMAIL` as a guaranteed catch-all recipient | Open — currently empty, so no fallback recipient exists |
 
 ## "Continue with Google" Sign-In (2026-07-17, ADR-017)
 

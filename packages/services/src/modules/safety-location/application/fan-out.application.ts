@@ -24,11 +24,33 @@ export interface SOSDispatchSummary {
   emailAttempted: number;
   emailSent: number;
   inAppNotified: number;
+  /** Admins notified because the alert resolved to zero real recipients (ADR-030). */
+  escalatedToAdmins: number;
   /** Populated when a channel has no live credentials, so the alert can still be pushed by hand. */
   whatsappClickToSend: { name: string; phone: string; url: string }[];
   errors: string[];
   /** Which channels this deployment could actually deliver on for this dispatch. */
   channels?: ChannelAvailability;
+}
+
+function emptySummary(channels: ChannelAvailability): SOSDispatchSummary {
+  return {
+    nearbyRiders: 0,
+    serviceProviders: 0,
+    emergencyContacts: 0,
+    emergencyServices: 0,
+    smsAttempted: 0,
+    smsSent: 0,
+    whatsappAttempted: 0,
+    whatsappSent: 0,
+    emailAttempted: 0,
+    emailSent: 0,
+    inAppNotified: 0,
+    escalatedToAdmins: 0,
+    whatsappClickToSend: [],
+    errors: [],
+    channels,
+  };
 }
 
 export type FanOutDeps = {
@@ -104,7 +126,22 @@ async function resolveEmergencyContacts(
     role: "EMERGENCY_CONTACT" as const,
     name: c.relation ? `${c.name} (${c.relation})` : c.name,
     phone: c.phone,
-    email: null,
+    email: c.email,
+  }));
+}
+
+/**
+ * An alert that resolves to zero recipients is silently useless — the reporter sees "sent"
+ * while nobody is told. Escalate to platform admins so someone always picks it up (ADR-030).
+ */
+async function resolveEscalationRecipients(ports: SafetyLocationPorts): Promise<SOSRecipient[]> {
+  const admins = await ports.escalation.findAdminContacts().catch(() => []);
+  return admins.map((a) => ({
+    role: "PLATFORM_ADMIN" as const,
+    name: a.name,
+    phone: a.phone,
+    email: a.email,
+    userId: a.id,
   }));
 }
 
@@ -257,22 +294,7 @@ export function createFanOutApplication(ports: SafetyLocationPorts) {
         const cached = await idempotency.recall<SOSDispatchSummary>(idemKey);
         if (cached) return cached;
         // In-flight duplicate — skip side effects; return an empty accounting summary.
-        return {
-          nearbyRiders: 0,
-          serviceProviders: 0,
-          emergencyContacts: 0,
-          emergencyServices: 0,
-          smsAttempted: 0,
-          smsSent: 0,
-          whatsappAttempted: 0,
-          whatsappSent: 0,
-          emailAttempted: 0,
-          emailSent: 0,
-          inAppNotified: 0,
-          whatsappClickToSend: [],
-          errors: [],
-          channels: resolveChannelAvailability(communications),
-        };
+        return emptySummary(resolveChannelAvailability(communications));
       }
 
       const availability = resolveChannelAvailability(communications);
@@ -284,23 +306,41 @@ export function createFanOutApplication(ports: SafetyLocationPorts) {
       ]);
 
       const summary: SOSDispatchSummary = {
+        ...emptySummary(availability),
         nearbyRiders: nearbyRiders.length,
         serviceProviders: serviceProviders.length,
         emergencyContacts: emergencyContacts.length,
         emergencyServices: emergencyServices.length,
-        smsAttempted: 0,
-        smsSent: 0,
-        whatsappAttempted: 0,
-        whatsappSent: 0,
-        emailAttempted: 0,
-        emailSent: 0,
-        inAppNotified: 0,
-        whatsappClickToSend: [],
-        errors: [],
-        channels: availability,
       };
 
       const recipients = [...nearbyRiders, ...serviceProviders, ...emergencyContacts, ...emergencyServices];
+
+      const respondersFound = recipients.length;
+
+      if (respondersFound === 0) {
+        const admins = await resolveEscalationRecipients(ports);
+        summary.escalatedToAdmins = admins.length;
+        recipients.push(...admins);
+        console.error(
+          `[SOS][DISPATCH][NO-RECIPIENTS] alert=${alert.id} city=${alert.city} — no nearby riders, ` +
+            `providers, or emergency contacts; escalated to ${admins.length} admin(s).`,
+        );
+      }
+
+      // The reporter always gets an in-app confirmation, even with no channels configured and
+      // nobody nearby — otherwise the only feedback they get is a success screen that lies.
+      await ports.notifications
+        .notify(
+          alert.userId,
+          "SOS_ALERT",
+          "Your SOS alert is live",
+          respondersFound > 0
+            ? `Alerting ${respondersFound} responder(s) in ${alert.city}. Track responses in Dashboard → SOS.`
+            : `No responders could be reached in ${alert.city}. Add emergency contacts in your profile and call local emergency services now.`,
+          "sos_alert",
+          alert.id,
+        )
+        .catch(console.error);
 
       if (availability.email && alert.userEmail && !alert.userEmail.endsWith("@bikie.local")) {
         summary.emailAttempted += 1;
@@ -326,7 +366,7 @@ export function createFanOutApplication(ports: SafetyLocationPorts) {
         `[SOS][DISPATCH] alert=${alert.id} nearby=${summary.nearbyRiders} providers=${summary.serviceProviders} ` +
           `contacts=${summary.emergencyContacts} sms=${summary.smsSent}/${summary.smsAttempted} ` +
           `wa=${summary.whatsappSent}/${summary.whatsappAttempted} email=${summary.emailSent}/${summary.emailAttempted} ` +
-          `inApp=${summary.inAppNotified} ` +
+          `inApp=${summary.inAppNotified} admins=${summary.escalatedToAdmins} ` +
           `channels=sms:${availability.sms ? "on" : "off"},wa:${availability.whatsapp ? "on" : "off"},email:${availability.email ? "on" : "off"}`,
       );
       for (const failure of summary.errors) console.error(`[SOS][DISPATCH][ERROR] ${failure}`);

@@ -22,18 +22,26 @@ flowchart LR
   I --> J[Resolve or auto-cron]
 ```
 
+
+
 ---
+
+
 
 ## 2. Alert kinds
 
-| Kind | UI label | Intent |
-|---|---|---|
-| **RED** | Red Alert — Emergency | Accident, medical, serious hazard — strongest confirm copy |
-| **AMBER** | Amber Alert — Assistance | Breakdown, fuel, lost — help needed, less critical tone |
+
+| Kind      | UI label                 | Intent                                                     |
+| --------- | ------------------------ | ---------------------------------------------------------- |
+| **RED**   | Red Alert — Emergency    | Accident, medical, serious hazard — strongest confirm copy |
+| **AMBER** | Amber Alert — Assistance | Breakdown, fuel, lost — help needed, less critical tone    |
+
 
 **Categories** (API `type`): `ACCIDENT` · `BIKE_BREAKDOWN` · `FUEL_EMPTY` · `MEDICAL` · `LOST` · `OTHER`
 
 ---
+
+
 
 ## 3. Create-alert sequence (happy path)
 
@@ -66,7 +74,11 @@ sequenceDiagram
   API-->>UI: { alert, dispatch, profileWarning }
 ```
 
+
+
 ---
+
+
 
 ## 4. Fan-out: who gets notified
 
@@ -81,10 +93,16 @@ flowchart TB
   Resolve --> SP[Same-city partners<br/>+ contact mobiles]
   Resolve --> ES[Optional emergency services<br/>from env]
 
-  EC --> Chan
-  NR --> Chan
-  SP --> Chan
-  ES --> Chan
+  EC --> Count{Any recipients?}
+  NR --> Count
+  SP --> Count
+  ES --> Count
+
+  Count -->|None| Esc[Escalate to ADMIN users<br/>log NO-RECIPIENTS]
+  Count -->|Some| Chan
+  Esc --> Chan
+
+  Count --> Self[Always: in-app notice to the reporter<br/>responder count or 'nobody reached']
 
   Chan[Per recipient: channel selection] --> SMS[SMS if phone + Twilio]
   Chan --> WA[WhatsApp if phone + Meta/Twilio WA]
@@ -98,9 +116,23 @@ flowchart TB
   Sum --> Remember[Remember summary for idempotency TTL]
 ```
 
+
+
 **Channel rule (ADR-029):** a channel is used only when the **provider is configured** *and* the recipient has that contact field (phone → SMS/WhatsApp, email → email). Unconfigured WhatsApp still yields a `wa.me` click-to-send link for manual escalation.
 
+**Never-silent rule (ADR-030):** an alert that resolves to zero recipients escalates to platform admins, logs `[SOS][DISPATCH][NO-RECIPIENTS]`, and reports `escalatedToAdmins` in the summary. The reporter always receives an in-app notice regardless of provider configuration, and the confirmation screen renders the real summary — recipient counts, per-channel `sent/attempted`, and which channels are unconfigured — instead of a fixed "sent via SMS, WhatsApp, and email" sentence. Emergency contacts may carry an optional `email`, so they are reachable by email too.
+
+Reading a dispatch log line:
+
+```
+[SOS][DISPATCH] alert=… nearby=0 providers=0 contacts=0 sms=0/0 wa=0/0 email=0/0 inApp=0 admins=1 channels=sms:on,wa:off,email:off
+```
+
+`nearby/providers/contacts` are recipient coverage (a data/consent problem when zero); `channels=…:off` is a missing-credentials problem; `admins>0` means the alert reached nobody and had to be escalated.
+
 ---
+
+
 
 ## 5. Channel decision (per recipient)
 
@@ -123,7 +155,11 @@ flowchart TD
   U -->|No| SkipApp[Skip in-app]
 ```
 
+
+
 ---
+
+
 
 ## 6. Module layout (code)
 
@@ -159,9 +195,13 @@ flowchart TB
   Repo --> PG
 ```
 
+
+
 Layering: **UI → Route → Service facade → safety-location application → ports → repositories / provider adapters.**
 
 ---
+
+
 
 ## 7. Lifecycle after send
 
@@ -176,16 +216,22 @@ stateDiagram-v2
   RESOLVED --> [*]: History via /history
 ```
 
-| Route | Who | What |
-|---|---|---|
-| `GET /api/sos/alerts?city=` | Member | Active alerts (non-admin **must** pass city) |
-| `POST /api/sos/alerts` | Member | Create + fan-out |
-| `GET /api/sos/alerts/history` | Session | Caller’s past alerts |
-| `POST /api/sos/alerts/[id]/respond` | Member | Notify reporter you’re nearby |
-| `POST /api/sos/alerts/[id]/resolve` | Session | Mark resolved |
-| `GET /api/cron/sos-resolve` | Cron Bearer | Auto-resolve stale alerts |
+
+
+
+| Route                               | Who         | What                                         |
+| ----------------------------------- | ----------- | -------------------------------------------- |
+| `GET /api/sos/alerts?city=`         | Member      | Active alerts (non-admin **must** pass city) |
+| `POST /api/sos/alerts`              | Member      | Create + fan-out                             |
+| `GET /api/sos/alerts/history`       | Session     | Caller’s past alerts                         |
+| `POST /api/sos/alerts/[id]/respond` | Member      | Notify reporter you’re nearby                |
+| `POST /api/sos/alerts/[id]/resolve` | Session     | Mark resolved                                |
+| `GET /api/cron/sos-resolve`         | Cron Bearer | Auto-resolve stale alerts                    |
+
 
 ---
+
+
 
 ## 8. Related SOS surfaces
 
@@ -205,35 +251,45 @@ flowchart LR
   Nearby -.-> Feed
 ```
 
+
+
 - **Nearby riders** need sharing consent + a recent GPS fix (PostGIS radius, default ~10 km via `SOS_NEARBY_RADIUS_KM`).
 - **Nearby help** uses Google Places (petrol / mechanic / hospital) — separate from panic fan-out.
 - Profile **phone** + **emergency contacts** improve dispatch quality (`profileWarning` if phone missing).
 
 ---
 
+
+
 ## 9. Providers (production)
 
-| Channel | Primary | Fallback |
-|---|---|---|
-| SMS | Twilio | DEV console log |
-| WhatsApp | Meta Cloud API | Twilio WhatsApp → `wa.me` link |
-| Email | SMTP (nodemailer) | Resend → DEV log |
-| Push | Firebase FCM | DEV log |
-| Realtime / rate limit / idempotency | Upstash Redis | In-memory degrade (never block SOS) |
+
+| Channel                             | Primary           | Fallback                            |
+| ----------------------------------- | ----------------- | ----------------------------------- |
+| SMS                                 | Twilio            | DEV console log                     |
+| WhatsApp                            | Meta Cloud API    | Twilio WhatsApp → `wa.me` link      |
+| Email                               | SMTP (nodemailer) | Resend → DEV log                    |
+| Push                                | Firebase FCM      | DEV log                             |
+| Realtime / rate limit / idempotency | Upstash Redis     | In-memory degrade (never block SOS) |
+
 
 Full vendor table: `.docs/PRODUCTION_INTEGRATIONS.md`.
 
 ---
 
+
+
 ## 10. Key files
 
-| Area | Path |
-|---|---|
-| UI | `apps/web/components/shared/PanicAlertCards.tsx` |
-| Create API | `apps/web/app/api/sos/alerts/route.ts` |
-| Fan-out | `packages/services/src/modules/safety-location/application/fan-out.application.ts` |
-| Channel policy | `packages/services/src/modules/safety-location/domain/channel-selection.ts` |
-| Facades | `packages/services/src/sos.service.ts`, `sos-dispatch.service.ts` |
+
+| Area           | Path                                                                               |
+| -------------- | ---------------------------------------------------------------------------------- |
+| UI             | `apps/web/components/shared/PanicAlertCards.tsx`                                   |
+| Create API     | `apps/web/app/api/sos/alerts/route.ts`                                             |
+| Fan-out        | `packages/services/src/modules/safety-location/application/fan-out.application.ts` |
+| Channel policy | `packages/services/src/modules/safety-location/domain/channel-selection.ts`        |
+| Facades        | `packages/services/src/sos.service.ts`, `sos-dispatch.service.ts`                  |
+
 
 ---
 

@@ -38,6 +38,7 @@ export function RiderDetailsSettings({ profile }: { profile: RiderProfileDTO | n
     profile?.emergencyContacts.map((contact) => ({
       name: contact.name,
       phone: contact.phone,
+      email: contact.email ?? "",
       relation: contact.relation ?? "",
     })) ?? [],
   );
@@ -104,6 +105,7 @@ export function RiderDetailsSettings({ profile }: { profile: RiderProfileDTO | n
         .map((contact) => ({
           name: contact.name.trim(),
           phone: contact.phone.trim(),
+          email: contact.email.trim() || undefined,
           relation: contact.relation.trim() || undefined,
         })),
     };

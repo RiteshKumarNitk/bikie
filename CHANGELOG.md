@@ -1,5 +1,18 @@
 # Changelog
 
+## Fix — SOS reports what it actually delivered; zero-recipient escalation (ADR-030)
+- The SOS success screen no longer claims "GPS shared via SMS, WhatsApp, and email" regardless of
+  outcome. It reports real recipient counts, per-channel `sent/attempted`, which channels are
+  unconfigured on the deployment, and a separate "nobody reached" state that links to the
+  emergency-contacts form and tells the rider to call emergency services.
+- Emergency contacts can now hold an optional `email` (nullable column + onboarding/settings
+  field), so fan-out can reach them by email and not just SMS/WhatsApp.
+- A dispatch that resolves to zero recipients escalates to platform admins, logs
+  `[SOS][DISPATCH][NO-RECIPIENTS]`, and reports `escalatedToAdmins` in the summary.
+- The reporter always gets an in-app notification confirming the alert is live, even when no
+  provider is configured and nobody is nearby.
+- `getProfileWarning` now also flags missing emergency contacts, not just a missing phone number.
+
 ## Fix — SOS unblocked; channel selection follows configuration (ADR-029)
 - `RateLimitService` no longer fails closed without Upstash: it falls back to a per-instance
   in-memory window (also when a Redis check throws), so a limiter outage can't block

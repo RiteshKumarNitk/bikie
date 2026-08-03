@@ -4,6 +4,7 @@ export interface RiderEmergencyContactDTO {
   id: string;
   name: string;
   phone: string;
+  email: string | null;
   relation: string | null;
 }
 

@@ -11,6 +11,7 @@ import { createInAppNotificationAdapter } from "./infrastructure/notification.ad
 import { createPlacesAdapter } from "./infrastructure/places.adapter";
 import {
   createEmergencyContactsAdapter,
+  createEscalationAdapter,
   createPartnerDispatchAdapter,
   createRiderLocationRepositoryAdapter,
   createSosAlertRepositoryAdapter,
@@ -39,6 +40,7 @@ export function createSafetyLocationModule(overrides: SafetyLocationDeps = {}): 
     partnerDispatch: overrides.partnerDispatch ?? createPartnerDispatchAdapter(),
     emergencyContacts: overrides.emergencyContacts ?? createEmergencyContactsAdapter(),
     userContact: overrides.userContact ?? createUserContactAdapter(),
+    escalation: overrides.escalation ?? createEscalationAdapter(),
     places: overrides.places ?? createPlacesAdapter(),
     notifications: overrides.notifications ?? createInAppNotificationAdapter(),
     communications: overrides.communications ?? communications,
