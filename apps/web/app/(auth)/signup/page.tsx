@@ -4,7 +4,8 @@ import { useState, useEffect } from "react";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
 import { SELECTED_ROLE_COOKIE, selectedRoleToDbRole } from "@/lib/role";
-import { PhoneNumberInput, DEFAULT_COUNTRY_CODE, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
+import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
+import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { LogoMark } from "@/components/layout/LogoMark";
 import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
@@ -31,7 +32,6 @@ export default function SignUpPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<"RIDER" | "PARTNER">("RIDER");
 
-  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [localNumber, setLocalNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -40,6 +40,7 @@ export default function SignUpPage() {
 
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const resendTimer = useResendCountdown(60);
 
   async function fetchDevOtp(phone: string) {
     try {
@@ -69,7 +70,7 @@ export default function SignUpPage() {
 
   async function handleSendCode() {
     setServerError(null);
-    const normalized = composePhoneNumber(countryCode, localNumber);
+    const normalized = composePhoneNumber(localNumber);
     if (!normalized) {
       setServerError("Enter a 10-digit phone number.");
       return;
@@ -86,6 +87,7 @@ export default function SignUpPage() {
       setPhoneNumber(normalized);
       setExists(existsData.exists);
       setStep("otp");
+      resendTimer.start();
       fetchDevOtp(normalized);
     } catch {
       setServerError("Could not send the verification code. Please try again.");
@@ -95,6 +97,7 @@ export default function SignUpPage() {
   }
 
   async function handleResend() {
+    if (!resendTimer.canResend) return;
     setServerError(null);
     setSendingOtp(true);
     try {
@@ -103,6 +106,7 @@ export default function SignUpPage() {
         setServerError(error.message ?? "Could not resend the verification code. Please try again.");
         return;
       }
+      resendTimer.start();
       fetchDevOtp(phoneNumber);
     } finally {
       setSendingOtp(false);
@@ -211,8 +215,6 @@ export default function SignUpPage() {
                 </label>
                 <div className="mt-1.5">
                   <PhoneNumberInput
-                    countryCode={countryCode}
-                    onCountryCodeChange={setCountryCode}
                     localNumber={localNumber}
                     onLocalNumberChange={setLocalNumber}
                   />
@@ -273,10 +275,10 @@ export default function SignUpPage() {
                 <button
                   type="button"
                   onClick={handleResend}
-                  disabled={sendingOtp}
+                  disabled={sendingOtp || !resendTimer.canResend}
                   className="mt-1.5 text-xs font-medium text-accent-text hover:text-accent-hover disabled:opacity-50"
                 >
-                  Resend code
+                  {resendTimer.canResend ? "Resend code" : `Resend code in ${resendTimer.remaining}s`}
                 </button>
               </div>
 

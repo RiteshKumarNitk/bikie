@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "../../sos-maps";
-import { toE164Phone } from "./domain/phone";
+import { isValidIndianMobile, toE164Phone } from "./domain/phone";
 import {
   createWhatsAppAdapter,
   toMsisdn,
@@ -49,6 +49,16 @@ describe("phone normalization", () => {
     expect(toE164Phone("whatsapp:+919876543210")).toBe("+919876543210");
   });
 
+  it("validates Indian mobile numbers", () => {
+    expect(isValidIndianMobile("9876543210")).toBe(true);
+    expect(isValidIndianMobile("+91 98765 43210")).toBe(true);
+    expect(isValidIndianMobile("919876543210")).toBe(true);
+    expect(isValidIndianMobile("1234567890")).toBe(false); // doesn't start 6-9
+    expect(isValidIndianMobile("98765432")).toBe(false); // too short
+    expect(isValidIndianMobile("+1 9876543210")).toBe(false); // not +91
+    expect(isValidIndianMobile("")).toBe(false);
+  });
+
   it("builds Meta MSISDN and wa.me links", () => {
     expect(toMsisdn("9876543210")).toBe("919876543210");
     expect(whatsappShareUrl("9876543210", "hello")).toBe(
@@ -58,13 +68,8 @@ describe("phone normalization", () => {
 });
 
 describe("communications adapters (DEV fallback)", () => {
-  it("SMS logs DEV when Twilio is unset", async () => {
-    const keys = [
-      "TWILIO_ACCOUNT_SID",
-      "TWILIO_AUTH_TOKEN",
-      "TWILIO_FROM_NUMBER",
-      "TWILIO_MESSAGING_SERVICE_SID",
-    ];
+  it("SMS logs DEV when MSG91 is unset", async () => {
+    const keys = ["MSG91_AUTH_KEY", "MSG91_SENDER_ID", "MSG91_ROUTE", "MSG91_TEMPLATE_ID"];
     const prev = snapshotEnv(keys);
     clearEnv(keys);
 
@@ -72,7 +77,7 @@ describe("communications adapters (DEV fallback)", () => {
     expect(result).toEqual({
       ok: false,
       provider: "dev",
-      error: "Twilio credentials not configured",
+      error: "MSG91 credentials not configured",
     });
 
     restoreEnv(prev);

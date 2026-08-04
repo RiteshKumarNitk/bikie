@@ -42,3 +42,4 @@ export type {
 } from "./ports";
 export { whatsappShareUrl, toMsisdn } from "./infrastructure/whatsapp.adapter";
 export { fetchWithTimeout } from "./infrastructure/http";
+export { isValidIndianMobile } from "./domain/phone";

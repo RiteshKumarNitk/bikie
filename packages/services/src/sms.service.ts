@@ -1,9 +1,9 @@
 import { getCommunicationsPorts, type ChannelResult } from "./modules/communications/public";
 
-export type SMSResult = ChannelResult & { provider: "twilio" | "dev" | string };
+export type SMSResult = ChannelResult & { provider: "msg91" | "dev" | string };
 
 /**
- * Compatibility facade — Twilio details live in the SMS adapter.
+ * Compatibility facade — MSG91 details live in the SMS adapter.
  */
 export const SMSService = {
   async send(to: string, message: string): Promise<SMSResult> {

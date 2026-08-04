@@ -715,3 +715,65 @@ changes:
   actionably instead of showing a false success. `escalatedToAdmins > 0` in logs is the signal
   that recipient coverage — not the delivery code — is what needs attention.
 
+## ADR-031: SMS provider switched from Twilio to MSG91
+
+- **Context.** Per explicit product decision, Twilio is replaced as the SMS provider. ADR-018's
+  ports/adapters design (`SmsPort`) meant the swap is contained entirely to
+  `packages/services/src/modules/communications/infrastructure/sms.adapter.ts` — every caller
+  (`SMSService`, the identity-access OTP flow, SOS fan-out) goes through `SmsPort.send(to, message)`
+  and is provider-agnostic already.
+- **Decision.** `createSmsAdapter()` now calls MSG91's v2 `sendsms` API
+  (`POST https://api.msg91.com/api/v2/sendsms`, `authkey` header) instead of Twilio's REST API.
+  New env vars: `MSG91_AUTH_KEY`, `MSG91_SENDER_ID`, `MSG91_ROUTE` (default `4`, transactional),
+  `MSG91_TEMPLATE_ID`. `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_MESSAGING_SERVICE_SID`/
+  `TWILIO_FROM_NUMBER`/`TWILIO_PHONE_NUMBER` are no longer read for SMS. `isConfigured()` still
+  gates SOS channel selection (ADR-029) the same way, just against MSG91 credentials.
+- **Known gap.** OTP and SOS-alert bodies are built as free text in TypeScript
+  (`buildOtpMessage`, `SMSService.sendSOSAlert`), but India's TRAI DLT rules require the SMS body
+  sent through MSG91 to match a pre-registered template per sender ID. `MSG91_TEMPLATE_ID` is a
+  single env var today; if OTP and SOS need different registered templates, this will need to
+  become per-message-type config, not a single shared ID. Not yet load-bearing until real DLT
+  templates are registered and delivery is tested end-to-end.
+- **Consequences.** `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN` are still read by
+  `whatsapp.adapter.ts`'s Twilio-WhatsApp fallback (separate from this change, ADR-018) — if that
+  fallback is ever activated, its credentials need to be reintroduced independently of the SMS vars
+  removed here.
+
+## ADR-032: Phone-OTP hardening stays on Better Auth, not MSG91's OTP API
+
+- **Context.** A request came in to "integrate MSG91's OTP API" with production-grade OTP
+  security (rate limits, resend cooldown, attempt caps, logging). Before building anything, the
+  existing `phoneNumber()` plugin (`better-auth/plugins/phone-number`) was checked directly against
+  its shipped source: it already does race-safe OTP generation, storage, and wrong-attempt
+  counting (`verifyPhoneNumberOTP` in `routes.mjs` — an atomic consume-then-recreate pattern), and
+  its default 5-minute expiry already matched the requested spec exactly. There was no dummy/mock
+  OTP logic anywhere in `identity-access` to replace.
+- **Decision.** Better Auth remains the OTP system of record (generation, expiry, wrong-attempt
+  counting via its built-in `allowedAttempts`, bumped 3→5). MSG91 stays a pure SMS-delivery
+  channel behind `SmsPort` (ADR-031) — the plugin's `verifyOTP` override (built for "SMS providers
+  that handle their own OTP generation and verification") was deliberately **not** used, since
+  switching to it would discard Better Auth's already-correct atomic attempt counting in favor of
+  trusting MSG91's own OTP product as a second, untested source of truth for the same state.
+  Everything the spec asked for that Better Auth doesn't already do — resend cooldown, per-window
+  send caps, phone+IP rate limiting, structured logging, Indian-number validation — is layered on
+  top instead:
+  - `phoneNumberValidator: isValidIndianMobile` (new, `communications/domain/phone.ts`) rejects
+    non-Indian/malformed numbers before Better Auth even generates a code.
+  - `apps/web/app/api/auth/[...all]/route.ts` gates `/phone-number/send-otp` and
+    `/phone-number/verify` before delegating to Better Auth's handler: a 60s per-phone resend
+    cooldown (also covers "no duplicate OTP while one is active"), a 3-per-10-minute per-phone
+    send cap, a 10-per-10-minute per-IP send cap, and a 20-per-10-minute per-IP verify cap, all via
+    the existing `RateLimitService`/`enforceRateLimit` (ADR-027/029) — no new rate-limit mechanism.
+    This had to happen at the route layer, not inside the `sendOTP` callback, because Better Auth's
+    `send-otp` endpoint always returns 200 once the request body is valid regardless of what that
+    callback does (it awaits it, but there's no built-in path from callback failure to an HTTP
+    error status).
+  - Every send/verify request is logged with phone number, IP, and outcome/status — never the OTP
+    code itself (SMS delivery success/failure is already logged separately by the MSG91 adapter).
+  - `apps/web/lib/use-resend-countdown.ts` drives the resend button's 60s countdown client-side on
+    both `/login` and `/signup`, so the server-side cooldown is a backstop, not the primary UX.
+- **Consequences.** OTP state lives in exactly one place (Better Auth's `verification` table), so
+  there's no cross-system drift to reason about. The tradeoff: MSG91's own OTP-specific dashboard
+  analytics (if any) won't reflect this flow, since MSG91 only ever sees an SMS send request, not
+  an OTP verification. Revisit only if a hard requirement emerges to keep OTP state on MSG91's side.
+

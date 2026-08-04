@@ -2,6 +2,23 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SMS provider swap + phone-OTP hardening (2026-08-03, ADR-031/ADR-032)
+
+Twilio → MSG91 for SMS delivery, then production-hardened the phone-OTP flow (Better Auth stays
+the OTP system of record — see ADR-032 for why MSG91's own OTP API was deliberately not used).
+
+| Task | Status |
+|---|---|
+| `sms.adapter.ts` rewritten against MSG91 v2 `sendsms`; `MSG91_*` env vars replace `TWILIO_*` for SMS | Completed |
+| Live credential + delivery verification against MSG91's API (auth key, sender ID, IP-whitelist gotcha found and resolved) | Completed |
+| Firebase push client config switched to `bikie-b9459` project (unrelated side request, same session) | Completed |
+| `isValidIndianMobile` validator wired into Better Auth's `phoneNumberValidator` | Completed |
+| `allowedAttempts` 3→5 for wrong-code verification | Completed |
+| Rate-limit gate in `apps/web/app/api/auth/[...all]/route.ts`: 60s resend cooldown, 3/10min per-phone send cap, 10/10min per-IP send cap, 20/10min per-IP verify cap | Completed |
+| OTP send/verify logging (phone + IP + outcome, never the code) | Completed |
+| Resend countdown UI (`use-resend-countdown.ts`) on `/login` + `/signup` | Completed |
+| DLT template registration for OTP/SOS message text — still needed for guaranteed real-world delivery, not yet done by the user | Blocked |
+
 ## Modular Monolith Migration (2026-08-01, ADR-021)
 
 Audit-first Strangler migration toward module ports/adapters without breaking `/api/*`.

@@ -34,6 +34,7 @@ export {
   createCommunicationsPorts,
   getCommunicationsPorts,
   whatsappShareUrl as communicationsWhatsappShareUrl,
+  isValidIndianMobile,
 } from "./modules/communications/public";
 export type {
   CommunicationsPorts,

@@ -9,7 +9,8 @@ import {
   emptyPartnerBusinessDetails,
   type PartnerBusinessDetails,
 } from "@/components/auth/PartnerBusinessFields";
-import { PhoneNumberInput, DEFAULT_COUNTRY_CODE, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
+import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
+import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { LogoMark } from "@/components/layout/LogoMark";
 import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
@@ -40,7 +41,6 @@ export default function LoginPage() {
     setSelectedRole(readSelectedRoleCookie());
   }, []);
 
-  const [countryCode, setCountryCode] = useState(DEFAULT_COUNTRY_CODE);
   const [localNumber, setLocalNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -55,6 +55,7 @@ export default function LoginPage() {
   const [verifying, setVerifying] = useState(false);
   const [upgrading, setUpgrading] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
+  const resendTimer = useResendCountdown(60);
 
   async function fetchDevOtp(phone: string) {
     try {
@@ -70,7 +71,7 @@ export default function LoginPage() {
 
   async function handleSendCode() {
     setServerError(null);
-    const normalized = composePhoneNumber(countryCode, localNumber);
+    const normalized = composePhoneNumber(localNumber);
     if (!normalized) {
       setServerError("Enter a 10-digit phone number.");
       return;
@@ -94,6 +95,7 @@ export default function LoginPage() {
       }
       setPhoneNumber(normalized);
       setStep("otp");
+      resendTimer.start();
       fetchDevOtp(normalized);
     } catch {
       setServerError("Could not send the verification code. Please try again.");
@@ -103,6 +105,7 @@ export default function LoginPage() {
   }
 
   async function handleResend() {
+    if (!resendTimer.canResend) return;
     setServerError(null);
     setSendingOtp(true);
     try {
@@ -111,6 +114,7 @@ export default function LoginPage() {
         setServerError(error.message ?? "Could not resend the verification code. Please try again.");
         return;
       }
+      resendTimer.start();
       fetchDevOtp(phoneNumber);
     } finally {
       setSendingOtp(false);
@@ -327,8 +331,6 @@ export default function LoginPage() {
                 </label>
                 <div className="mt-1.5">
                   <PhoneNumberInput
-                    countryCode={countryCode}
-                    onCountryCodeChange={setCountryCode}
                     localNumber={localNumber}
                     onLocalNumberChange={setLocalNumber}
                   />
@@ -388,10 +390,10 @@ export default function LoginPage() {
                   <button
                     type="button"
                     onClick={handleResend}
-                    disabled={sendingOtp}
+                    disabled={sendingOtp || !resendTimer.canResend}
                     className="text-xs text-accent-text hover:text-accent-hover disabled:opacity-50"
                   >
-                    Resend
+                    {resendTimer.canResend ? "Resend" : `Resend in ${resendTimer.remaining}s`}
                   </button>
                 </div>
                 <input
