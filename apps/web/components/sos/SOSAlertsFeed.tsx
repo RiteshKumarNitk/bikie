@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 
 type Alert = {
   id: string;
@@ -14,13 +15,19 @@ type Alert = {
   longitude: number;
   city: string;
   status: string;
+  severity: string;
+  escalationTier: string;
+  assignedHelperId: string | null;
   createdAt: string;
 };
 
 const alertLabels: Record<string, string> = {
   ACCIDENT: "🚑 Accident",
+  LIFE_THREATENING: "🔥 Life Threatening",
   BIKE_BREAKDOWN: "🔧 Bike Breakdown",
-  FUEL_EMPTY: "⛽ Out of Fuel",
+  FLAT_TYRE: "🔩 Flat Tyre",
+  FUEL_EMPTY: "⛽ Fuel Required",
+  BATTERY_ISSUE: "🔋 Battery Issue",
   MEDICAL: "🏥 Medical Emergency",
   LOST: "🗺️ Lost",
   OTHER: "❗ Other",
@@ -66,6 +73,20 @@ export function SOSAlertsFeed({ alerts: initial, live }: { alerts: Alert[]; live
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-red-500" />
                 <span className="text-sm font-semibold">{alertLabels[alert.type] ?? alert.type}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                    alert.severity === "EMERGENCY" ? "bg-red-500/15 text-red-400" : "bg-[#ffaa00]/15 text-[#ffaa00]"
+                  }`}
+                >
+                  {alert.severity}
+                </span>
+                {alert.assignedHelperId ? (
+                  <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success">Assigned</span>
+                ) : (
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-medium text-white/50">
+                    {alert.escalationTier.replace(/_/g, " ").toLowerCase()}
+                  </span>
+                )}
               </div>
               <p className="mt-1 text-sm font-medium text-white/80">{alert.userName}</p>
               <div className="mt-1 space-y-0.5 text-sm text-white/60">
@@ -87,12 +108,20 @@ export function SOSAlertsFeed({ alerts: initial, live }: { alerts: Alert[]; live
               {alert.description && <p className="mt-2 text-sm text-white/70">{alert.description}</p>}
               <p className="mt-2 text-xs text-white/40">{new Date(alert.createdAt).toLocaleString("en-IN")}</p>
             </div>
-            <button
-              onClick={() => resolve(alert.id)}
-              className="rounded-lg bg-green-600/20 px-4 py-1.5 text-xs font-medium text-green-400 transition hover:bg-green-600/30"
-            >
-              Resolve
-            </button>
+            <div className="flex shrink-0 gap-2">
+              <Link
+                href={`/dashboard/sos/${alert.id}`}
+                className="rounded-lg border border-white/15 px-4 py-1.5 text-xs font-medium text-white/80 transition hover:bg-white/5"
+              >
+                View
+              </Link>
+              <button
+                onClick={() => resolve(alert.id)}
+                className="rounded-lg bg-green-600/20 px-4 py-1.5 text-xs font-medium text-green-400 transition hover:bg-green-600/30"
+              >
+                Resolve
+              </button>
+            </div>
           </div>
         </div>
       ))}

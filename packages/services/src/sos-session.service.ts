@@ -20,6 +20,9 @@ export const SOSSessionService = {
   getSession(sessionId: string, actorId: string, isAdmin: boolean) {
     return getSafetyLocationModule().session.getSession(sessionId, actorId, isAdmin);
   },
+  getActiveSessionForAlert(alertId: string) {
+    return getSafetyLocationModule().ports.sosSessions.getActiveSessionForAlert(alertId);
+  },
   updateSessionStatus(
     sessionId: string,
     status: "HELPER_ARRIVED" | "ASSISTANCE_IN_PROGRESS" | "COMPLETED" | "CANCELLED",

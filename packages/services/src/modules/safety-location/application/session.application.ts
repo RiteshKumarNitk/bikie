@@ -1,5 +1,5 @@
 import { estimateEtaMinutes, haversineDistanceMeters } from "../domain/eta";
-import { AlreadyAssignedError, OfferNotAvailableError, type SafetyLocationPorts } from "../ports";
+import { AlreadyAssignedError, AlreadyOfferedError, OfferNotAvailableError, type SafetyLocationPorts } from "../ports";
 
 export function createSessionApplication(ports: SafetyLocationPorts) {
   return {
@@ -25,7 +25,13 @@ export function createSessionApplication(ports: SafetyLocationPorts) {
         etaMinutes = estimateEtaMinutes(distanceMeters);
       }
 
-      const offer = await ports.sosOffers.createOffer({ alertId, responderId, distanceMeters, etaMinutes, message });
+      let offer;
+      try {
+        offer = await ports.sosOffers.createOffer({ alertId, responderId, distanceMeters, etaMinutes, message });
+      } catch (err) {
+        if (err instanceof AlreadyOfferedError) return { ok: false as const, reason: "ALREADY_OFFERED" as const };
+        throw err;
+      }
       await ports.sosTimeline.record({
         alertId,
         type: "HELPER_OFFERED",

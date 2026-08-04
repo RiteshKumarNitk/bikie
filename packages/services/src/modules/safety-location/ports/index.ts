@@ -96,18 +96,18 @@ export interface SosSessionRow {
 
 export class AlreadyAssignedError extends Error {}
 export class OfferNotAvailableError extends Error {}
+export class AlreadyOfferedError extends Error {}
+
+export type SosSessionWithParticipants = SosSessionRow & {
+  helper: { id: string; name: string; phone: string | null; email: string };
+  rider: { id: string; name: string; phone: string | null; email: string };
+};
 
 export interface SosSessionRepositoryPort {
   /** The transactional accept — see sos-session.repository.ts for the concurrency guard. */
   acceptOffer(params: { alertId: string; offerId: string; actorId: string }): Promise<SosSessionRow>;
-  getSessionById(sessionId: string): Promise<
-    (SosSessionRow & {
-      helper: { id: string; name: string; phone: string | null; email: string };
-      rider: { id: string; name: string; phone: string | null; email: string };
-    })
-    | null
-  >;
-  getActiveSessionForAlert(alertId: string): Promise<SosSessionRow | null>;
+  getSessionById(sessionId: string): Promise<SosSessionWithParticipants | null>;
+  getActiveSessionForAlert(alertId: string): Promise<SosSessionWithParticipants | null>;
   updateSessionStatus(
     sessionId: string,
     status: "HELPER_ARRIVED" | "ASSISTANCE_IN_PROGRESS" | "COMPLETED" | "CANCELLED",

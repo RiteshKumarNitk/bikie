@@ -19,12 +19,14 @@ Full redesign, phased. Phase A (backend core) below is done; B/C/D are queued in
 | `CommunityMembershipPort` (fully implemented, not yet wired into tier selection) | Completed |
 | Application-layer test coverage (offer/accept/reject, tier advancement, resolve ownership) | Completed |
 | OpenAPI inventory regenerated (117 routes) | Completed |
-| **Phase B — web UI rebuild** | Planned |
-| Regroup panic categories into 🔴 Emergency / 🟠 Assistance with new types | Planned |
-| New session detail page/panel: offers list, accept/reject, I'm Coming/Cannot Help/Share Mechanic/Share Fuel/Call/Chat/Navigate | Planned |
-| Session chat (reuse existing Community Platform conversation UI, not a new component) | Planned |
-| Timeline stepper component | Planned |
-| Admin feed: severity/tier/assigned-helper columns | Planned |
+| **Phase B — web UI rebuild** | Completed |
+| Regroup panic categories into 🔴 Emergency / 🟠 Assistance with new types | Completed |
+| Backend gap found + fixed mid-phase: `acceptOffer` never created the `Conversation` a session needs for chat; `createOffer` had no handling for the `[alertId,responderId]` unique constraint (would 500 on a duplicate offer) | Completed |
+| New session detail page (`/dashboard/sos/[id]`): offers list, accept/reject, I'm Coming/Cannot Help/Share Mechanic/Share Fuel/Call/Navigate | Completed |
+| Session chat (`SOSSessionChat.tsx` — thin wrapper on the existing Community Platform `ChatArea`, not a new component) | Completed |
+| Timeline stepper component (`SOSTimeline.tsx`) | Completed |
+| Active Alerts tab + admin feed: severity/tier/assigned-helper badges, link into session detail | Completed |
+| Full-browser authenticated click-through (offer → accept → chat → status → rating) | **Not done** — typecheck/build/compile verified, but real interactive testing needs a browser session, not curl |
 | **Phase C — Flutter parity** | Planned |
 | Fix pre-existing bug: `sos_repository.dart`'s `getActive()` called without required `city` param | Planned |
 | Mirror offer/session/timeline DTOs + repository calls (same API routes, no duplicates) | Planned |

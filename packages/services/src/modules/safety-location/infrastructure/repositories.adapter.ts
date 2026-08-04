@@ -20,7 +20,7 @@ import type {
   SosTimelineRepositoryPort,
   UserContactPort,
 } from "../ports";
-import { AlreadyAssignedError, OfferNotAvailableError } from "../ports";
+import { AlreadyAssignedError, AlreadyOfferedError, OfferNotAvailableError } from "../ports";
 
 export function createSosAlertRepositoryAdapter(): SosAlertRepositoryPort {
   return {
@@ -41,7 +41,14 @@ export function createSosAlertRepositoryAdapter(): SosAlertRepositoryPort {
 
 export function createSosOfferRepositoryAdapter(): SosOfferRepositoryPort {
   return {
-    createOffer: (params) => sosSessionRepository.createOffer(params) as any,
+    createOffer: async (params) => {
+      try {
+        return (await sosSessionRepository.createOffer(params)) as any;
+      } catch (err) {
+        if (err instanceof sosSessionRepository.AlreadyOfferedError) throw new AlreadyOfferedError(err.message);
+        throw err;
+      }
+    },
     withdrawOffer: async (offerId, responderId) => {
       try {
         await sosSessionRepository.withdrawOffer(offerId, responderId);

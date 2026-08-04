@@ -20,13 +20,19 @@ interface SOSAlert {
   longitude: number;
   city: string;
   status: string;
+  severity: string;
+  escalationTier: string;
+  assignedHelperId: string | null;
   createdAt: string;
 }
 
 const alertTypes = [
   { value: "ACCIDENT", label: "🚑 Accident", desc: "I've been in an accident" },
+  { value: "LIFE_THREATENING", label: "🔥 Life Threatening", desc: "Life-threatening emergency" },
   { value: "BIKE_BREAKDOWN", label: "🔧 Bike Breakdown", desc: "My bike has broken down" },
-  { value: "FUEL_EMPTY", label: "⛽ Out of Fuel", desc: "I've run out of fuel" },
+  { value: "FLAT_TYRE", label: "🔩 Flat Tyre", desc: "I have a flat tyre" },
+  { value: "FUEL_EMPTY", label: "⛽ Fuel Required", desc: "I've run out of fuel" },
+  { value: "BATTERY_ISSUE", label: "🔋 Battery Issue", desc: "My battery has an issue" },
   { value: "MEDICAL", label: "🏥 Medical Emergency", desc: "I need medical help" },
   { value: "LOST", label: "🗺️ Lost", desc: "I'm lost and need directions" },
   { value: "OTHER", label: "❗ Other", desc: "Other emergency" },
@@ -211,6 +217,13 @@ export default function SOSPage() {
                       {isMyAlert(a) && (
                         <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-medium text-red-400">You</span>
                       )}
+                      {a.assignedHelperId ? (
+                        <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success">Assigned</span>
+                      ) : (
+                        <span className="rounded-full bg-foreground/10 px-2 py-0.5 text-[10px] font-medium text-foreground/50">
+                          {a.escalationTier.replace(/_/g, " ").toLowerCase()}
+                        </span>
+                      )}
                     </div>
                     <p className="mt-1 text-sm font-medium text-foreground/80">{a.userName}</p>
                     <div className="mt-1 space-y-0.5 text-sm text-foreground/50">
@@ -237,22 +250,12 @@ export default function SOSPage() {
                     </p>
                   </div>
                   <div className="flex shrink-0 gap-2">
-                    {!isMyAlert(a) && (
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          await fetch(`/api/sos/alerts/${a.id}/respond`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({ message: "On my way!" }),
-                          });
-                          window.alert("Response sent! The person has been notified.");
-                        }}
-                        className="rounded-lg bg-accent px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover"
-                      >
-                        I&apos;m Nearby
-                      </button>
-                    )}
+                    <Link
+                      href={`/dashboard/sos/${a.id}`}
+                      className="rounded-lg bg-accent px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover"
+                    >
+                      {isMyAlert(a) ? "View" : "Respond"}
+                    </Link>
                     {session?.user.role === "ADMIN" && (
                       <button
                         type="button"
