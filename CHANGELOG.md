@@ -1,5 +1,28 @@
 # Changelog
 
+## Change — SOS redesign Phases B–D: web UI, Flutter parity, reputation + community tier (ADR-033)
+- **Web (Phase B):** panic categories regrouped into 🔴 Emergency / 🟠 Assistance with the new
+  types; new `/dashboard/sos/[id]` session detail page (offers, accept/reject, I'm Coming/Cannot
+  Help/Share Mechanic/Share Fuel/Call/Navigate, status buttons, rating, timeline, chat reusing
+  the existing `ChatArea` component). Found and fixed two backend gaps while building this:
+  `acceptOffer` never created the session's `Conversation`, and `createOffer` had no handling for
+  the `[alertId,responderId]` unique constraint (would 500 on a duplicate offer — new
+  `AlreadyOfferedError` end-to-end).
+- **Flutter (Phase C):** full parity on the same API routes, no duplicate endpoints. Fixed two
+  pre-existing bugs found while rebuilding: `getActive()` was called with no `city` param
+  (required for non-admins), and `getHistory()` force-parsed the history response as a full
+  `SOSAlert` despite it having a different (smaller) shape — new `SOSHistoryEntry` model matches
+  reality. New session screen, timeline, and — reusing the existing `ConversationThreadBody`
+  directly — chat with zero new chat code. New `nearby_riders` feature (didn't exist on mobile at
+  all before). `flutter analyze`: clean. `flutter test`: 73/73.
+- **Reputation + community tier (Phase D):** minimal counters (`emergencyResponseCount`,
+  `helperRatingAvg`, `helperRatingCount`) in a new small `modules/reputation`, wired into session
+  completion and rating submission. Community/Club members among the nearby-rider pool now get
+  a `NEARBY_RIDERS_COMMUNITY` tier with a shorter timeout before the full `NEARBY_RIDERS_GENERAL`
+  pool is notified (de-duped, no double-texting the same rider). Badges/trusted-rider tier remain
+  explicitly out of scope.
+- Repo-wide: 9/9 packages typecheck clean, 102/102 vitest passing, 73/73 flutter tests passing.
+
 ## Change — SOS becomes a staged Community Emergency Response System, Phase A/backend (ADR-033)
 - **Security fix, independent of the rest:** `POST /api/sos/alerts/[id]/resolve` had no ownership
   check at all — any authenticated user could resolve any alert. Now `requireMembership()` +

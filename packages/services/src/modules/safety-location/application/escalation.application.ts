@@ -10,6 +10,9 @@ const INITIAL_RADIUS_METERS = 5000;
 const radiusStepMeters = () => Number(process.env.SOS_RADIUS_STEP_KM ?? "5") * 1000;
 const radiusMaxMeters = () => Number(process.env.SOS_RADIUS_MAX_KM ?? "20") * 1000;
 const tierTimeoutMs = () => Number(process.env.SOS_TIER_TIMEOUT_SECONDS ?? "300") * 1000;
+// Shorter window before falling through to the general population — community members get
+// first crack, not the only crack (ADR-033 Phase D).
+const communityTierTimeoutMs = () => Number(process.env.SOS_COMMUNITY_TIER_TIMEOUT_SECONDS ?? "120") * 1000;
 
 const TIER_ORDER = ["NEARBY_RIDERS_COMMUNITY", "NEARBY_RIDERS_GENERAL", "SERVICE_PROVIDERS", "ADMIN"] as const;
 type Tier = (typeof TIER_ORDER)[number];
@@ -91,11 +94,14 @@ export type EscalationDeps = { communications?: CommunicationsPorts };
 
 export function createEscalationApplication(ports: SafetyLocationPorts) {
   /**
-   * Called once, right after alert creation. Notifies tier-1 (nearby riders, general — the
-   * community tier is reserved but not yet activated, see ADR-033 Phase D) and schedules the
-   * first escalation tick. Returns the tier-1 summary AND the raw nearby-rider count so the
-   * caller (sos.application.ts's createAlert) can fold zero-recipient detection across this
-   * leg together with the emergency-contacts leg, before deciding whether to escalate to admin
+   * Called once, right after alert creation. If any nearby rider shares a Community/Club with
+   * the reporter (`CommunityMembershipPort`, ADR-033 Phase D), tier starts at
+   * NEARBY_RIDERS_COMMUNITY and notifies only that subset, on a shorter timeout — everyone else
+   * nearby is reached once the tier advances to NEARBY_RIDERS_GENERAL, not left out. Otherwise
+   * tier starts at NEARBY_RIDERS_GENERAL exactly as before Phase D. Returns the tier-1 summary
+   * AND the *total* nearby-rider count found (not just who was notified this round) so the
+   * caller (sos.application.ts's createAlert) can fold zero-recipient detection across this leg
+   * together with the emergency-contacts leg, before deciding whether to escalate to admin
    * immediately (ADR-030's guarantee, preserved even though the search is now staged).
    */
   async function seedEscalation(
@@ -106,20 +112,32 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
     const availability = resolveChannelAvailability(communications);
 
     const nearby = await resolveNearbyRiders(alert, ports, INITIAL_RADIUS_METERS);
-    const summary = await notifyRecipients(alert, nearby, ports, communications, availability);
-    summary.nearbyRiders = nearby.length;
+    const nearbyUserIds = nearby.filter((r): r is SOSRecipient & { userId: string } => Boolean(r.userId)).map((r) => r.userId);
+    const communityIds = nearbyUserIds.length > 0
+      ? await ports.community.findSharedGroupMemberIds(alert.userId, nearbyUserIds).catch(() => new Set<string>())
+      : new Set<string>();
 
-    for (const r of nearby) {
-      if (r.userId) await ports.sosTimeline.record({ alertId: alert.id, type: "HELPER_OFFERED", metadata: { candidateId: r.userId, tier: "NEARBY_RIDERS_GENERAL" } }).catch(() => undefined);
+    const tier: "NEARBY_RIDERS_COMMUNITY" | "NEARBY_RIDERS_GENERAL" =
+      communityIds.size > 0 ? "NEARBY_RIDERS_COMMUNITY" : "NEARBY_RIDERS_GENERAL";
+    const toNotify = tier === "NEARBY_RIDERS_COMMUNITY" ? nearby.filter((r) => r.userId && communityIds.has(r.userId)) : nearby;
+    const timeoutMs = tier === "NEARBY_RIDERS_COMMUNITY" ? communityTierTimeoutMs() : tierTimeoutMs();
+
+    const summary = await notifyRecipients(alert, toNotify, ports, communications, availability);
+    summary.nearbyRiders = toNotify.length;
+
+    for (const r of toNotify) {
+      if (r.userId) await ports.sosTimeline.record({ alertId: alert.id, type: "HELPER_OFFERED", metadata: { candidateId: r.userId, tier } }).catch(() => undefined);
     }
 
     await ports.sosAlerts.updateEscalationState(alert.id, {
+      escalationTier: tier,
       currentRadiusMeters: INITIAL_RADIUS_METERS,
-      nextEscalationAt: new Date(Date.now() + tierTimeoutMs()),
+      nextEscalationAt: new Date(Date.now() + timeoutMs),
     });
 
     console.log(
-      `[SOS][ESCALATE][SEED] alert=${alert.id} tier=NEARBY_RIDERS_GENERAL radius=${INITIAL_RADIUS_METERS}m notified=${nearby.length}`,
+      `[SOS][ESCALATE][SEED] alert=${alert.id} tier=${tier} radius=${INITIAL_RADIUS_METERS}m ` +
+        `notified=${toNotify.length} totalNearby=${nearby.length}`,
     );
 
     return { summary, nearbyRiderCount: nearby.length };
@@ -135,7 +153,35 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
 
     const communications = deps.communications ?? ports.communications;
     const availability = resolveChannelAvailability(communications);
-    const isRiderTier = alert.escalationTier === "NEARBY_RIDERS_GENERAL" || alert.escalationTier === "NEARBY_RIDERS_COMMUNITY";
+
+    // COMMUNITY is a one-shot window, not its own radius-widening cycle — once it times out,
+    // advance straight to GENERAL and notify the full nearby pool, minus whoever community
+    // already reached (de-duped via the same Notification-table lookup radius-widening uses).
+    if (alert.escalationTier === "NEARBY_RIDERS_COMMUNITY") {
+      const [nearby, alreadyNotified] = await Promise.all([
+        resolveNearbyRiders(alert, ports, INITIAL_RADIUS_METERS),
+        ports.sosAlerts.findNotifiedUserIdsForAlert(alert.id),
+      ]);
+      const fresh = nearby.filter((r) => !r.userId || !alreadyNotified.has(r.userId));
+      const summary = await notifyRecipients(alert, fresh, ports, communications, availability);
+      await ports.sosTimeline.record({
+        alertId: alert.id,
+        type: "RADIUS_EXPANDED", // community-only pool -> full nearby pool; closest existing event type
+        metadata: { tier: "NEARBY_RIDERS_GENERAL", notified: fresh.length },
+      });
+      await ports.sosAlerts.updateEscalationState(alert.id, {
+        escalationTier: "NEARBY_RIDERS_GENERAL",
+        currentRadiusMeters: INITIAL_RADIUS_METERS,
+        nextEscalationAt: new Date(Date.now() + tierTimeoutMs()),
+      });
+      console.log(
+        `[SOS][ESCALATE][TIER] alert=${alert.id} tier=NEARBY_RIDERS_GENERAL (from COMMUNITY) notified=${fresh.length} ` +
+          `sms=${summary.smsSent}/${summary.smsAttempted}`,
+      );
+      return;
+    }
+
+    const isRiderTier = alert.escalationTier === "NEARBY_RIDERS_GENERAL";
 
     if (isRiderTier && alert.currentRadiusMeters < radiusMaxMeters()) {
       const widened = Math.min(alert.currentRadiusMeters + radiusStepMeters(), radiusMaxMeters());

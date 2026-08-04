@@ -878,9 +878,25 @@ changes:
   Prisma, no application method imports a repository directly. Test coverage added at the
   application layer (offer/accept/reject ownership, `AlreadyAssignedError` mapping, radius
   widening only notifying fresh riders, tier advancement, resolve-route ownership) rather than
-  only at the route layer, since Flutter (Phase C, not yet built) will exercise the same
-  application methods through the same routes — no duplicate API surface planned. Web UI (Phase
-  B), Flutter parity (Phase C, plus a pre-existing bug where `sos_repository.dart`'s `getActive()`
-  is called without the required `city` param), and community/reputation activation (Phase D)
-  remain queued — see `.docs/TASKS.md`.
+  only at the route layer, since Flutter exercises the same application methods through the same
+  routes — no duplicate API surface.
+- **Update (Phases B–D, same pass).** All three remaining phases shipped:
+  - **B (web UI):** new `/dashboard/sos/[id]` session page. Found two more real gaps while
+    building it — `acceptOffer` never created the session's `Conversation` (chat had nothing to
+    attach to) and `createOffer` didn't handle the `[alertId,responderId]` unique constraint (a
+    duplicate offer attempt would 500) — both fixed as part of Phase A's own files.
+  - **C (Flutter):** full parity, same routes. Found two *more* pre-existing bugs while porting —
+    `getActive()` was called with no `city` param (the API requires one for non-admins), and
+    `getHistory()` force-parsed the history response as a full `SOSAlertDTO` even though that
+    endpoint returns a smaller, different shape (would throw on every required-field mismatch);
+    fixed with a dedicated `SOSHistoryEntry` model. Chat needed zero new code — the existing
+    `ConversationThreadBody` widget is already fully self-contained and was just embedded
+    directly, mirroring the web's `ChatArea` reuse.
+  - **D (reputation + community):** minimal counters only, as scoped (no badges/trust-tier).
+    Community/Club members among the nearby-rider pool get first crack via a
+    `NEARBY_RIDERS_COMMUNITY` tier (shorter timeout) using the port reserved in Phase A, then the
+    tier advances to the full general pool with already-notified riders excluded via the same
+    `Notification`-table de-dup radius-widening already used — no new dedup mechanism needed.
+  - Final state: 9/9 packages typecheck clean, 102/102 vitest passing, 73/73 flutter tests
+    passing, `flutter analyze` clean. Not done: a full authenticated browser click-through — typecheck/build/compile-verified only, real interactive testing needs a browser session.
 

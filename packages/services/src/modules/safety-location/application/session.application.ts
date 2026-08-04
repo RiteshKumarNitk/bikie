@@ -1,7 +1,12 @@
 import { estimateEtaMinutes, haversineDistanceMeters } from "../domain/eta";
+import { getReputationModule, type ReputationApplication } from "../../reputation/public";
 import { AlreadyAssignedError, AlreadyOfferedError, OfferNotAvailableError, type SafetyLocationPorts } from "../ports";
 
-export function createSessionApplication(ports: SafetyLocationPorts) {
+export type SessionApplicationDeps = { reputation?: ReputationApplication };
+
+export function createSessionApplication(ports: SafetyLocationPorts, deps: SessionApplicationDeps = {}) {
+  const reputation = deps.reputation ?? getReputationModule().reputation;
+
   return {
     /** Helper taps "I'm Coming." */
     async offerHelp(
@@ -152,6 +157,10 @@ export function createSessionApplication(ports: SafetyLocationPorts) {
               : "SOS_CANCELLED";
       await ports.sosTimeline.record({ alertId: updated.alertId, sessionId, type: eventType, actorId });
 
+      if (status === "COMPLETED") {
+        await reputation.recordAssist(updated.helperId).catch(console.error);
+      }
+
       const notifyUserId = isHelper ? updated.riderId : updated.helperId;
       const label =
         status === "HELPER_ARRIVED"
@@ -176,6 +185,7 @@ export function createSessionApplication(ports: SafetyLocationPorts) {
 
       await ports.sosSessions.submitRating(sessionId, rating, comment);
       await ports.sosTimeline.record({ alertId: session.alertId, sessionId, type: "RATING_SUBMITTED", actorId: riderId, metadata: { rating } });
+      await reputation.recordRating(session.helperId, rating).catch(console.error);
       return { ok: true as const };
     },
   };

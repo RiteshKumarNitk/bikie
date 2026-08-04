@@ -2,9 +2,9 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
-## SOS → Community Emergency Response System (2026-08-04, ADR-033)
+## SOS → Community Emergency Response System (2026-08-04/05, ADR-033)
 
-Full redesign, phased. Phase A (backend core) below is done; B/C/D are queued in that order.
+Full redesign, phased. All four phases (A–D) are complete.
 
 | Task | Status |
 |---|---|
@@ -27,15 +27,20 @@ Full redesign, phased. Phase A (backend core) below is done; B/C/D are queued in
 | Timeline stepper component (`SOSTimeline.tsx`) | Completed |
 | Active Alerts tab + admin feed: severity/tier/assigned-helper badges, link into session detail | Completed |
 | Full-browser authenticated click-through (offer → accept → chat → status → rating) | **Not done** — typecheck/build/compile verified, but real interactive testing needs a browser session, not curl |
-| **Phase C — Flutter parity** | Planned |
-| Fix pre-existing bug: `sos_repository.dart`'s `getActive()` called without required `city` param | Planned |
-| Mirror offer/session/timeline DTOs + repository calls (same API routes, no duplicates) | Planned |
-| Session screen, helper-offer card, timeline view | Planned |
-| Nearby-riders mobile UI (doesn't exist yet at all, per earlier Milestone 4 entry) | Planned |
-| **Phase D — reputation (minimal) + community prioritization** | Planned |
-| `User.emergencyResponseCount`/`helperRatingAvg`/`helperRatingCount` + small `modules/reputation` | Planned |
-| Wire `CommunityMembershipPort` into `escalation.seedEscalation`'s `NEARBY_RIDERS_COMMUNITY` tier | Planned |
-| Badges / trusted-rider tier — explicitly out of scope until a dedicated design pass | Backlog |
+| **Phase C — Flutter parity** | Completed |
+| Fixed pre-existing bug: `sos_repository.dart`'s `getActive()` called without required `city` param | Completed |
+| Second pre-existing bug found + fixed: `getHistory()` force-parsed the history response as a full `SOSAlert` (missing required fields) — new `SOSHistoryEntry` model matches the actual response shape | Completed |
+| Mirrored offer/session/timeline DTOs + repository calls (same API routes, no duplicate endpoints) | Completed |
+| Session screen (`sos_detail_screen.dart`), helper-offer card, timeline view — chat reuses the existing `ConversationThreadBody` directly, no new chat code | Completed |
+| `send_sos_sheet.dart` regrouped into 🔴 Emergency / 🟠 Assistance matching web | Completed |
+| Nearby-riders mobile feature (`features/nearby_riders/`) — didn't exist at all before; sharing toggle, radius chips, live list | Completed |
+| `flutter analyze`: 0 issues. `flutter test`: 73/73 passing | Completed |
+| **Phase D — reputation (minimal) + community prioritization** | Completed |
+| `User.emergencyResponseCount`/`helperRatingAvg`/`helperRatingCount` + small `modules/reputation` (hand-migrated, applied to Neon) | Completed |
+| Wired `CommunityMembershipPort` into `escalation.seedEscalation`/`tickEscalation`: shared-Group nearby riders get a `NEARBY_RIDERS_COMMUNITY` tier with a shorter timeout before falling through to the full `NEARBY_RIDERS_GENERAL` pool (de-duped, no double-texting) | Completed |
+| `reputation.recordAssist`/`recordRating` wired into session COMPLETED transition + rating submission | Completed |
+| Badges / trusted-rider tier — still explicitly out of scope, needs a dedicated design pass | Backlog |
+| **Repo-wide final state** | 9/9 packages typecheck clean, 102/102 vitest passing, 73/73 flutter tests passing, `flutter analyze` clean |
 
 ## SMS provider swap + phone-OTP hardening (2026-08-03, ADR-031/ADR-032)
 

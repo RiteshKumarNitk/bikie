@@ -11,6 +11,14 @@ vi.mock("@bikie/database", () => ({
   riderProfileRepository: {},
   userRepository: {},
   notificationRepository: {},
+  // session.application.ts's COMPLETED/rating paths call the reputation module's real
+  // singleton by default (mirrors how fan-out.application.ts defaults to the real platform
+  // module) — stub it so those code paths don't crash on an unmocked import.
+  reputationRepository: {
+    recordAssist: vi.fn(async () => undefined),
+    recordRating: vi.fn(async () => undefined),
+    getStats: vi.fn(async () => null),
+  },
 }));
 
 vi.mock("../../../notification.service", () => ({
@@ -893,5 +901,188 @@ describe("escalation application — tier advancement", () => {
 
     expect(findByCity).not.toHaveBeenCalled();
     expect(updateEscalationState).toHaveBeenCalledWith("alert-1", { nextEscalationAt: null });
+  });
+});
+
+describe("escalation application — community prioritization (ADR-033 Phase D)", () => {
+  it("seeds NEARBY_RIDERS_COMMUNITY and notifies only the shared-group subset when found", async () => {
+    const notify = notifyMock();
+    const findNearbyAroundPoint = vi.fn(async () => [
+      { id: "friend-1", name: "Friend", phone: null, email: "friend@example.com", distanceMeters: 500 },
+      { id: "stranger-1", name: "Stranger", phone: null, email: "stranger@example.com", distanceMeters: 800 },
+    ]);
+    const findSharedGroupMemberIds = vi.fn(async () => new Set(["friend-1"]));
+    const updateEscalationState = vi.fn(async () => undefined);
+
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any,
+        community: { findSharedGroupMemberIds },
+        notifications: { notify },
+        sosAlerts: { ...emptyRepos().sosAlerts, updateEscalationState } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.escalation.seedEscalation(sampleAlert());
+
+    const notifiedIds = notify.mock.calls.map((c) => c[0]);
+    expect(notifiedIds).toEqual(["friend-1"]);
+    expect(result.summary.nearbyRiders).toBe(1);
+    expect(result.nearbyRiderCount).toBe(2); // total found, for the zero-recipient check
+    expect(updateEscalationState).toHaveBeenCalledWith(
+      "alert-1",
+      expect.objectContaining({ escalationTier: "NEARBY_RIDERS_COMMUNITY" }),
+    );
+  });
+
+  it("seeds NEARBY_RIDERS_GENERAL as before when no shared-group rider is nearby", async () => {
+    const notify = notifyMock();
+    const findNearbyAroundPoint = vi.fn(async () => [
+      { id: "stranger-1", name: "Stranger", phone: null, email: "stranger@example.com", distanceMeters: 800 },
+    ]);
+    const findSharedGroupMemberIds = vi.fn(async () => new Set<string>());
+    const updateEscalationState = vi.fn(async () => undefined);
+
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any,
+        community: { findSharedGroupMemberIds },
+        notifications: { notify },
+        sosAlerts: { ...emptyRepos().sosAlerts, updateEscalationState } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.escalation.seedEscalation(sampleAlert());
+
+    expect(notify.mock.calls.map((c) => c[0])).toEqual(["stranger-1"]);
+    expect(result.nearbyRiderCount).toBe(1);
+    expect(updateEscalationState).toHaveBeenCalledWith(
+      "alert-1",
+      expect.objectContaining({ escalationTier: "NEARBY_RIDERS_GENERAL" }),
+    );
+  });
+
+  it("advances COMMUNITY straight to GENERAL on tick, skipping already-notified riders", async () => {
+    const notify = notifyMock();
+    const findNearbyAroundPoint = vi.fn(async () => [
+      { id: "friend-1", name: "Friend", phone: null, email: "friend@example.com", distanceMeters: 500 },
+      { id: "stranger-1", name: "Stranger", phone: null, email: "stranger@example.com", distanceMeters: 800 },
+    ]);
+    const updateEscalationState = vi.fn(async () => undefined);
+
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any,
+        notifications: { notify },
+        sosAlerts: {
+          ...emptyRepos().sosAlerts,
+          findNotifiedUserIdsForAlert: vi.fn(async () => new Set(["friend-1"])),
+          updateEscalationState,
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    await module.escalation.tickEscalation(
+      sampleAlert({ escalationTier: "NEARBY_RIDERS_COMMUNITY", currentRadiusMeters: 5000 }),
+    );
+
+    expect(notify.mock.calls.map((c) => c[0])).toEqual(["stranger-1"]);
+    expect(updateEscalationState).toHaveBeenCalledWith(
+      "alert-1",
+      expect.objectContaining({ escalationTier: "NEARBY_RIDERS_GENERAL" }),
+    );
+  });
+});
+
+describe("session application — reputation wiring (ADR-033 Phase D)", () => {
+  it("records an assist when a session is marked COMPLETED", async () => {
+    const { reputationRepository } = (await import("@bikie/database")) as unknown as {
+      reputationRepository: { recordAssist: ReturnType<typeof vi.fn> };
+    };
+    reputationRepository.recordAssist.mockClear();
+
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosSessions: {
+          ...emptyRepos().sosSessions,
+          getSessionById: vi.fn(async () => ({
+            id: "session-1",
+            alertId: "alert-1",
+            helperId: "helper-1",
+            riderId: "rider-1",
+            status: "ASSISTANCE_IN_PROGRESS",
+            conversationId: null,
+            startedAt: new Date(),
+            helperArrivedAt: null,
+            assistanceStartedAt: null,
+            completedAt: null,
+            cancelledAt: null,
+            cancelReason: null,
+            rating: null,
+            ratingComment: null,
+          })),
+          updateSessionStatus: vi.fn(async () => ({
+            id: "session-1",
+            alertId: "alert-1",
+            helperId: "helper-1",
+            riderId: "rider-1",
+            status: "COMPLETED",
+            conversationId: null,
+            startedAt: new Date(),
+            helperArrivedAt: null,
+            assistanceStartedAt: null,
+            completedAt: new Date(),
+            cancelledAt: null,
+            cancelReason: null,
+            rating: null,
+            ratingComment: null,
+          })),
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.session.updateSessionStatus("session-1", "COMPLETED", "rider-1", false);
+    expect(result.ok).toBe(true);
+    expect(reputationRepository.recordAssist).toHaveBeenCalledWith("helper-1");
+  });
+
+  it("records a rating against the helper on submitRating", async () => {
+    const { reputationRepository } = (await import("@bikie/database")) as unknown as {
+      reputationRepository: { recordRating: ReturnType<typeof vi.fn> };
+    };
+    reputationRepository.recordRating.mockClear();
+
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosSessions: {
+          ...emptyRepos().sosSessions,
+          getSessionById: vi.fn(async () => ({
+            id: "session-1",
+            alertId: "alert-1",
+            helperId: "helper-1",
+            riderId: "rider-1",
+            status: "COMPLETED",
+            conversationId: null,
+            startedAt: new Date(),
+            helperArrivedAt: null,
+            assistanceStartedAt: null,
+            completedAt: new Date(),
+            cancelledAt: null,
+            cancelReason: null,
+            rating: null,
+            ratingComment: null,
+          })),
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.session.submitRating("session-1", "rider-1", 5, "Great help!");
+    expect(result).toEqual({ ok: true });
+    expect(reputationRepository.recordRating).toHaveBeenCalledWith("helper-1", 5);
   });
 });

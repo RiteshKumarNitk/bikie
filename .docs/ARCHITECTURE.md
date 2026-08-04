@@ -43,6 +43,7 @@ First extracted modules under `packages/services/src/modules/`:
 |---|---|---|
 | `communications` | Email/SMS/WhatsApp/push ports + adapters | `EmailService`, `SMSService`, `WhatsAppService`, `PushService` |
 | `safety-location` | SOS alerts, staged escalation, helper-acceptance sessions, rider location, Places (ADR-033) | `SOSService`, `SOSDispatchService`, `SOSSessionService`, `RiderLocationService`, `PlacesService` |
+| `reputation` | Minimal SOS-helper reputation — assist counter + rating avg only, no badges (ADR-033 Phase D) | consumed by `safety-location`'s `session.application.ts` via `getReputationModule()`, no facade of its own yet |
 | `identity-access` | Account status, roles, permissions, membership gate, login OTP | `apps/web/lib/require-role.ts`, Better Auth `sendOTP` hook |
 | `catalog` | Bikes, destinations, categories, testimonials | `BikeService`, `DestinationService`, `CategoryService`, `TestimonialService` |
 | `rentals-bookings` | Booking pricing/lifecycle, review eligibility, wishlist | `BookingService`, `ReviewService`, `WishlistService` |

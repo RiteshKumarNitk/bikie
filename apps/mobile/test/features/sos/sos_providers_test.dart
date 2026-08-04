@@ -18,6 +18,19 @@ SOSAlert _alert({String status = 'ACTIVE'}) => SOSAlert(
       longitude: 77.5946,
       city: 'Bengaluru',
       status: status,
+      severity: 'ASSISTANCE',
+      escalationTier: 'NEARBY_RIDERS_GENERAL',
+      currentRadiusMeters: 5000,
+      createdAt: '2026-07-14T00:00:00.000Z',
+    );
+
+SOSHistoryEntry _historyEntry({String status = 'RESOLVED'}) => SOSHistoryEntry(
+      id: 'alert-1',
+      type: 'BREAKDOWN',
+      city: 'Bengaluru',
+      status: status,
+      severity: 'ASSISTANCE',
+      escalationTier: 'NEARBY_RIDERS_GENERAL',
       createdAt: '2026-07-14T00:00:00.000Z',
     );
 
@@ -34,17 +47,17 @@ void main() {
   });
 
   test('activeSosAlertsProvider delegates to SosRepository.getActive', () async {
-    when(() => repository.getActive()).thenAnswer((_) async => [_alert()]);
+    when(() => repository.getActive(city: any(named: 'city'))).thenAnswer((_) async => [_alert()]);
 
     final result = await container.read(activeSosAlertsProvider.future);
 
     expect(result, hasLength(1));
     expect(result.single.status, 'ACTIVE');
-    verify(() => repository.getActive()).called(1);
+    verify(() => repository.getActive(city: null)).called(1);
   });
 
   test('sosHistoryProvider delegates to SosRepository.getHistory', () async {
-    when(() => repository.getHistory()).thenAnswer((_) async => [_alert(status: 'RESOLVED')]);
+    when(() => repository.getHistory()).thenAnswer((_) async => [_historyEntry(status: 'RESOLVED')]);
 
     final result = await container.read(sosHistoryProvider.future);
 
@@ -54,7 +67,8 @@ void main() {
   });
 
   test('activeSosAlertsProvider surfaces an ApiException as an AsyncError rather than throwing synchronously', () async {
-    when(() => repository.getActive()).thenThrow(ApiException(statusCode: 500, message: 'Something went wrong'));
+    when(() => repository.getActive(city: any(named: 'city')))
+        .thenThrow(ApiException(statusCode: 500, message: 'Something went wrong'));
 
     await expectLater(
       container.read(activeSosAlertsProvider.future),

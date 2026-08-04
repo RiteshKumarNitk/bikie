@@ -6,7 +6,23 @@ import '../../../core/network/api_exception.dart';
 import '../data/sos_repository.dart';
 import '../domain/sos_providers.dart';
 
-const _sosTypes = ['ACCIDENT', 'BIKE_BREAKDOWN', 'FUEL_EMPTY', 'MEDICAL', 'LOST', 'OTHER'];
+// Matches PanicAlertCards.tsx's grouping exactly — every category has its own real
+// SOSAlertType now (ADR-033), and severity is always server-derived from `type`.
+const _emergencyTypes = {
+  'ACCIDENT': '🚨 Accident',
+  'MEDICAL': '🏥 Medical Emergency',
+  'LIFE_THREATENING': '🔥 Life Threatening',
+};
+const _assistanceTypes = {
+  'BIKE_BREAKDOWN': '🔧 Bike Breakdown',
+  'FLAT_TYRE': '🔩 Flat Tyre',
+  'FUEL_EMPTY': '⛽ Fuel Required',
+  'BATTERY_ISSUE': '🔋 Battery Issue',
+  'LOST': '🗺️ Lost',
+  'OTHER': '❗ Other',
+};
+final _sosTypes = [..._emergencyTypes.keys, ..._assistanceTypes.keys];
+final _sosTypeLabels = {..._emergencyTypes, ..._assistanceTypes};
 
 Future<void> showSendSosSheet(BuildContext context) {
   return showModalBottomSheet(
@@ -115,9 +131,12 @@ class _SendSosSheetState extends ConsumerState<SendSosSheet> {
           DropdownButtonFormField<String>(
             initialValue: _type,
             decoration: const InputDecoration(labelText: 'Type'),
-            items: _sosTypes
-                .map((t) => DropdownMenuItem(value: t, child: Text(t.replaceAll('_', ' '))))
-                .toList(),
+            items: [
+              const DropdownMenuItem(enabled: false, child: Text('🔴 Emergency', style: TextStyle(fontWeight: FontWeight.bold))),
+              ..._emergencyTypes.keys.map((t) => DropdownMenuItem(value: t, child: Text(_sosTypeLabels[t]!))),
+              const DropdownMenuItem(enabled: false, child: Text('🟠 Assistance', style: TextStyle(fontWeight: FontWeight.bold))),
+              ..._assistanceTypes.keys.map((t) => DropdownMenuItem(value: t, child: Text(_sosTypeLabels[t]!))),
+            ],
             onChanged: (value) => setState(() => _type = value!),
           ),
           const SizedBox(height: 16),

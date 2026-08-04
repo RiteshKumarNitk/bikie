@@ -281,6 +281,12 @@ model User {
   sosHelperSessions SOSSession[]       @relation("SOSSessionHelper")
   sosRiderSessions  SOSSession[]       @relation("SOSSessionRider")
   sosTimelineEvents SOSTimelineEvent[]
+  // --- Minimal SOS-helper reputation (ADR-033 Phase D — counters + rating only, no badges/
+  // trust-tier, deliberately deferred per client's explicit call). Never client-writable —
+  // derived only from SOSSession completion/rating, see reputation.application.ts. ---
+  emergencyResponseCount Int     @default(0)
+  helperRatingAvg        Decimal @default(0) @db.Decimal(2, 1)
+  helperRatingCount      Int     @default(0)
   referralCode  String?   @unique
   referredById  String?
   referredBy    User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
