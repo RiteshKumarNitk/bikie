@@ -2,6 +2,39 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SOS → Community Emergency Response System (2026-08-04, ADR-033)
+
+Full redesign, phased. Phase A (backend core) below is done; B/C/D are queued in that order.
+
+| Task | Status |
+|---|---|
+| **Phase A — backend core** | |
+| Resolve-route ownership security fix (`requireMembership` + reporter/helper/admin check) | Completed |
+| Schema: severity/assignedHelperId/escalationTier/radius/nextEscalationAt on `SOSAlert`; `SOSResponseStatus` enum on `SOSAlertResponse` (hand-migrated backfill); new `SOSSession`/`SOSTimelineEvent` models; new alert types | Completed |
+| Transactional helper-accept (`sos-session.repository.ts`, `WHERE assignedHelperId IS NULL` guard) | Completed |
+| Staged escalation engine (`escalation.application.ts`) + `GET /api/cron/sos-escalate` ticker | Completed |
+| Dispatch orchestrator merging contacts leg + tier-1 riders, preserving ADR-030's zero-recipient admin escalation | Completed |
+| Helper offer/accept/reject/withdraw routes + session status/rating routes | Completed |
+| `Partner.type`/`isVerified`-aware SERVICE_PROVIDERS tier (`GET /api/sos/partners` for Share Mechanic/Fuel) | Completed |
+| `CommunityMembershipPort` (fully implemented, not yet wired into tier selection) | Completed |
+| Application-layer test coverage (offer/accept/reject, tier advancement, resolve ownership) | Completed |
+| OpenAPI inventory regenerated (117 routes) | Completed |
+| **Phase B — web UI rebuild** | Planned |
+| Regroup panic categories into 🔴 Emergency / 🟠 Assistance with new types | Planned |
+| New session detail page/panel: offers list, accept/reject, I'm Coming/Cannot Help/Share Mechanic/Share Fuel/Call/Chat/Navigate | Planned |
+| Session chat (reuse existing Community Platform conversation UI, not a new component) | Planned |
+| Timeline stepper component | Planned |
+| Admin feed: severity/tier/assigned-helper columns | Planned |
+| **Phase C — Flutter parity** | Planned |
+| Fix pre-existing bug: `sos_repository.dart`'s `getActive()` called without required `city` param | Planned |
+| Mirror offer/session/timeline DTOs + repository calls (same API routes, no duplicates) | Planned |
+| Session screen, helper-offer card, timeline view | Planned |
+| Nearby-riders mobile UI (doesn't exist yet at all, per earlier Milestone 4 entry) | Planned |
+| **Phase D — reputation (minimal) + community prioritization** | Planned |
+| `User.emergencyResponseCount`/`helperRatingAvg`/`helperRatingCount` + small `modules/reputation` | Planned |
+| Wire `CommunityMembershipPort` into `escalation.seedEscalation`'s `NEARBY_RIDERS_COMMUNITY` tier | Planned |
+| Badges / trusted-rider tier — explicitly out of scope until a dedicated design pass | Backlog |
+
 ## SMS provider swap + phone-OTP hardening (2026-08-03, ADR-031/ADR-032)
 
 Twilio → MSG91 for SMS delivery, then production-hardened the phone-OTP flow (Better Auth stays

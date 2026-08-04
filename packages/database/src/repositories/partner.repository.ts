@@ -92,11 +92,21 @@ export async function getPartnerDashboardStats(userId: string) {
   };
 }
 
-/** Same-city partners for SOS fan-out — includes contact-person mobiles. */
-export async function findPartnersByCityForDispatch(city: string, take = 25) {
+/**
+ * Same-city partners for SOS fan-out — includes contact-person mobiles. `type`/`verifiedOnly`
+ * (ADR-033) finally give the general emergency-provider blast a way to target just, say,
+ * MECHANIC partners for a breakdown instead of every partner type in the city.
+ */
+export async function findPartnersByCityForDispatch(
+  city: string,
+  take = 25,
+  options: { type?: string; verifiedOnly?: boolean } = {},
+) {
   return prisma.partner.findMany({
     where: {
       city: { equals: city, mode: "insensitive" },
+      ...(options.type ? { type: options.type as any } : {}),
+      ...(options.verifiedOnly ? { isVerified: true } : {}),
     },
     include: {
       user: { select: { id: true, name: true, email: true, phone: true } },

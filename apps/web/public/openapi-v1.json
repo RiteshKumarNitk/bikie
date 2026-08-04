@@ -3218,6 +3218,54 @@
         }
       }
     },
+    "/api/cron/sos-escalate": {
+      "get": {
+        "operationId": "get_api_cron_sos-escalate",
+        "tags": [
+          "other"
+        ],
+        "summary": "GET /api/cron/sos-escalate",
+        "description": "Source: `apps/web/app/api/cron/sos-escalate/route.ts`. Auth class: `cron`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "CronBearer": []
+          }
+        ],
+        "x-bikie-auth": "cron",
+        "x-bikie-source": "apps/web/app/api/cron/sos-escalate/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
     "/api/cron/sos-resolve": {
       "get": {
         "operationId": "get_api_cron_sos-resolve",
@@ -5074,14 +5122,14 @@
         }
       }
     },
-    "/api/sos/alerts/{id}/resolve": {
+    "/api/sos/alerts/{id}/offer": {
       "post": {
-        "operationId": "post_api_sos_alerts_id_resolve",
+        "operationId": "post_api_sos_alerts_id_offer",
         "tags": [
           "sos"
         ],
-        "summary": "POST /api/sos/alerts/{id}/resolve",
-        "description": "Source: `apps/web/app/api/sos/alerts/[id]/resolve/route.ts`. Auth class: `session`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "summary": "POST /api/sos/alerts/{id}/offer",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/offer/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
         "security": [
           {
             "SessionCookie": []
@@ -5090,7 +5138,262 @@
             "BearerAuth": []
           }
         ],
-        "x-bikie-auth": "session",
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/offer/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/alerts/{id}/offers/{offerId}/accept": {
+      "post": {
+        "operationId": "post_api_sos_alerts_id_offers_offerId_accept",
+        "tags": [
+          "sos"
+        ],
+        "summary": "POST /api/sos/alerts/{id}/offers/{offerId}/accept",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/offers/[offerId]/accept/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/offers/[offerId]/accept/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/alerts/{id}/offers/{offerId}/reject": {
+      "post": {
+        "operationId": "post_api_sos_alerts_id_offers_offerId_reject",
+        "tags": [
+          "sos"
+        ],
+        "summary": "POST /api/sos/alerts/{id}/offers/{offerId}/reject",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/offers/[offerId]/reject/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/offers/[offerId]/reject/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/alerts/{id}/offers/{offerId}/withdraw": {
+      "post": {
+        "operationId": "post_api_sos_alerts_id_offers_offerId_withdraw",
+        "tags": [
+          "sos"
+        ],
+        "summary": "POST /api/sos/alerts/{id}/offers/{offerId}/withdraw",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/offers/[offerId]/withdraw/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/offers/[offerId]/withdraw/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/alerts/{id}/offers": {
+      "get": {
+        "operationId": "get_api_sos_alerts_id_offers",
+        "tags": [
+          "sos"
+        ],
+        "summary": "GET /api/sos/alerts/{id}/offers",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/offers/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/offers/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/alerts/{id}/resolve": {
+      "post": {
+        "operationId": "post_api_sos_alerts_id_resolve",
+        "tags": [
+          "sos"
+        ],
+        "summary": "POST /api/sos/alerts/{id}/resolve",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/resolve/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
         "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/resolve/route.ts",
         "responses": {
           "200": {
@@ -5143,6 +5446,57 @@
         ],
         "x-bikie-auth": "membership",
         "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/respond/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/alerts/{id}": {
+      "get": {
+        "operationId": "get_api_sos_alerts_id_",
+        "tags": [
+          "sos"
+        ],
+        "summary": "GET /api/sos/alerts/{id}",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/route.ts",
         "responses": {
           "200": {
             "description": "Success (shape documented in .docs/API.md for this route).",
@@ -5294,6 +5648,210 @@
         ],
         "x-bikie-auth": "membership",
         "x-bikie-source": "apps/web/app/api/sos/alerts/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/partners": {
+      "get": {
+        "operationId": "get_api_sos_partners",
+        "tags": [
+          "sos"
+        ],
+        "summary": "GET /api/sos/partners",
+        "description": "Source: `apps/web/app/api/sos/partners/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/partners/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/sessions/{id}/rating": {
+      "post": {
+        "operationId": "post_api_sos_sessions_id_rating",
+        "tags": [
+          "sos"
+        ],
+        "summary": "POST /api/sos/sessions/{id}/rating",
+        "description": "Source: `apps/web/app/api/sos/sessions/[id]/rating/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/sessions/[id]/rating/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/sessions/{id}": {
+      "get": {
+        "operationId": "get_api_sos_sessions_id_",
+        "tags": [
+          "sos"
+        ],
+        "summary": "GET /api/sos/sessions/{id}",
+        "description": "Source: `apps/web/app/api/sos/sessions/[id]/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/sessions/[id]/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/sessions/{id}/status": {
+      "post": {
+        "operationId": "post_api_sos_sessions_id_status",
+        "tags": [
+          "sos"
+        ],
+        "summary": "POST /api/sos/sessions/{id}/status",
+        "description": "Source: `apps/web/app/api/sos/sessions/[id]/status/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/sessions/[id]/status/route.ts",
         "responses": {
           "200": {
             "description": "Success (shape documented in .docs/API.md for this route).",

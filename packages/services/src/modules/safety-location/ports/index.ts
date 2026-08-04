@@ -2,10 +2,21 @@ import type { SOSAlertCreateInput, SOSAlertDTO } from "@bikie/types";
 import type { CommunicationsPorts } from "../../communications/ports";
 import type { SOSRecipient } from "../domain/dispatch-message";
 
+/** Internal create input — severity/radius/escalation timing are always server-derived
+ * (escalation.application.ts), never taken from the client's SOSAlertCreateInput. */
+export type SosAlertCreateData = SOSAlertCreateInput & {
+  userId: string;
+  severity: string;
+  currentRadiusMeters: number;
+  nextEscalationAt: Date | null;
+};
+
 export interface SosAlertRepositoryPort {
-  createAlert(data: SOSAlertCreateInput & { userId: string }): Promise<SOSAlertDTO>;
+  createAlert(data: SosAlertCreateData): Promise<SOSAlertDTO>;
   getActiveAlerts(city?: string): Promise<SOSAlertDTO[]>;
+  getAlertById(alertId: string): Promise<SOSAlertDTO | null>;
   resolveAlert(alertId: string, userId: string): Promise<void>;
+  /** Deprecated alias target for the old /respond route — new callers use SosOfferRepositoryPort. */
   respondToAlert(alertId: string, responderId: string, message?: string): Promise<void>;
   getAlertHistory(userId: string): Promise<
     Array<{
@@ -14,6 +25,9 @@ export interface SosAlertRepositoryPort {
       description: string | null;
       city: string;
       status: string;
+      severity: string;
+      escalationTier: string;
+      assignedHelperId: string | null;
       resolvedAt: string | null;
       createdAt: string;
       responses: Array<{
@@ -24,7 +38,100 @@ export interface SosAlertRepositoryPort {
       }>;
     }>
   >;
-  autoResolveStaleAlerts(minutes: number): Promise<void>;
+  /** Returns the alerts that are now stale, so the caller (application layer) can cascade
+   * timeline/session cleanup before writing RESOLVED — not a raw bulk update itself. */
+  autoResolveStaleAlerts(minutes: number): Promise<Array<{ id: string }>>;
+  bulkResolve(alertIds: string[]): Promise<void>;
+  /** Cron-poll query key for GET /api/cron/sos-escalate. */
+  findAlertsDueForEscalation(before: Date, take?: number): Promise<SOSAlertDTO[]>;
+  updateEscalationState(
+    alertId: string,
+    data: { escalationTier?: string; currentRadiusMeters?: number; nextEscalationAt: Date | null },
+  ): Promise<void>;
+  /** De-dup source for radius-expansion notifications. */
+  findNotifiedUserIdsForAlert(alertId: string): Promise<Set<string>>;
+}
+
+export interface SosOfferRow {
+  id: string;
+  alertId: string;
+  responderId: string;
+  responder: { id: string; name: string; phone: string | null; email: string };
+  status: string;
+  distanceMeters: number | null;
+  etaMinutes: number | null;
+  message: string | null;
+  createdAt: Date;
+}
+
+export interface SosOfferRepositoryPort {
+  createOffer(params: {
+    alertId: string;
+    responderId: string;
+    distanceMeters?: number;
+    etaMinutes?: number;
+    message?: string;
+  }): Promise<SosOfferRow>;
+  withdrawOffer(offerId: string, responderId: string): Promise<void>;
+  rejectOffer(alertId: string, offerId: string, actorId: string): Promise<void>;
+  listOffersForAlert(alertId: string): Promise<SosOfferRow[]>;
+}
+
+export interface SosSessionRow {
+  id: string;
+  alertId: string;
+  helperId: string;
+  riderId: string;
+  status: string;
+  conversationId: string | null;
+  startedAt: Date;
+  helperArrivedAt: Date | null;
+  assistanceStartedAt: Date | null;
+  completedAt: Date | null;
+  cancelledAt: Date | null;
+  cancelReason: string | null;
+  rating: number | null;
+  ratingComment: string | null;
+}
+
+export class AlreadyAssignedError extends Error {}
+export class OfferNotAvailableError extends Error {}
+
+export interface SosSessionRepositoryPort {
+  /** The transactional accept — see sos-session.repository.ts for the concurrency guard. */
+  acceptOffer(params: { alertId: string; offerId: string; actorId: string }): Promise<SosSessionRow>;
+  getSessionById(sessionId: string): Promise<
+    (SosSessionRow & {
+      helper: { id: string; name: string; phone: string | null; email: string };
+      rider: { id: string; name: string; phone: string | null; email: string };
+    })
+    | null
+  >;
+  getActiveSessionForAlert(alertId: string): Promise<SosSessionRow | null>;
+  updateSessionStatus(
+    sessionId: string,
+    status: "HELPER_ARRIVED" | "ASSISTANCE_IN_PROGRESS" | "COMPLETED" | "CANCELLED",
+    cancelReason?: string,
+  ): Promise<SosSessionRow>;
+  submitRating(sessionId: string, rating: number, comment?: string): Promise<void>;
+}
+
+export interface SosTimelineRepositoryPort {
+  record(event: {
+    alertId: string;
+    sessionId?: string;
+    type: string;
+    actorId?: string;
+    metadata?: unknown;
+  }): Promise<void>;
+  listForAlert(alertId: string): Promise<
+    Array<{ id: string; alertId: string; sessionId: string | null; type: string; actorId: string | null; actorName: string | null; createdAt: Date }>
+  >;
+}
+
+/** Community/club prioritization (ADR-033 Phase D hook — port fully implemented in Phase A). */
+export interface CommunityMembershipPort {
+  findSharedGroupMemberIds(reporterId: string, candidateUserIds: string[]): Promise<Set<string>>;
 }
 
 export interface NearbyRiderRow {
@@ -72,7 +179,11 @@ export interface PartnerDispatchRow {
 }
 
 export interface PartnerDispatchPort {
-  findByCity(city: string, take?: number): Promise<PartnerDispatchRow[]>;
+  findByCity(
+    city: string,
+    take?: number,
+    options?: { type?: string; verifiedOnly?: boolean },
+  ): Promise<PartnerDispatchRow[]>;
 }
 
 export interface EmergencyContactRow {
@@ -130,6 +241,10 @@ export interface PlacesPort {
 
 export interface SafetyLocationPorts {
   sosAlerts: SosAlertRepositoryPort;
+  sosOffers: SosOfferRepositoryPort;
+  sosSessions: SosSessionRepositoryPort;
+  sosTimeline: SosTimelineRepositoryPort;
+  community: CommunityMembershipPort;
   riderLocation: RiderLocationRepositoryPort;
   partnerDispatch: PartnerDispatchPort;
   emergencyContacts: EmergencyContactsPort;

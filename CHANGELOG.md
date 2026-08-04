@@ -1,5 +1,31 @@
 # Changelog
 
+## Change — SOS becomes a staged Community Emergency Response System, Phase A/backend (ADR-033)
+- **Security fix, independent of the rest:** `POST /api/sos/alerts/[id]/resolve` had no ownership
+  check at all — any authenticated user could resolve any alert. Now `requireMembership()` +
+  reporter/assigned-helper/admin only, enforced in the application layer.
+- Fan-out no longer blasts nearby riders + all same-city partners simultaneously. New staged
+  escalation: tier-1 nearby riders (5km) on creation → radius widens in steps up to a max, only
+  notifying newly-in-range riders → advances to `SERVICE_PROVIDERS` (now targets `Partner.type`
+  + `isVerified` relevant to the alert type, not every partner in the city) → terminal `ADMIN`
+  tier. Driven by a new `GET /api/cron/sos-escalate` ticker (same cron-bearer pattern as the
+  existing `sos-resolve` cron).
+- New helper-acceptance flow: `POST /api/sos/alerts/[id]/offer` ("I'm Coming"), `.../offer/withdraw`,
+  `GET .../offers` (reporter/admin, helper phone hidden until accepted), `.../offers/[id]/accept`,
+  `.../offers/[id]/reject`. Accepting is a single DB transaction — `WHERE assignedHelperId IS
+  NULL` embedded in the update — so two helpers can never both be assigned; the loser gets 409.
+- New `SOSSession` (reuses the existing Community Platform chat, not a new one; not a Trip) and
+  `SOSTimelineEvent` (full audit trail, separate from the moderation-only `AuditLog`) models.
+  Session status routes: `POST /api/sos/sessions/[id]/status`, `.../rating`.
+- New categories: `LIFE_THREATENING`, `FLAT_TYRE`, `BATTERY_ISSUE`. Severity (`EMERGENCY`/
+  `ASSISTANCE`) is now a real column, always server-derived from `type` — never client input.
+- `GET /api/sos/partners?city=&type=` backs new "Share Mechanic"/"Share Fuel Contact" actions.
+- ADR-030's zero-recipient admin escalation is preserved but its trigger changed shape — see
+  ADR-033's "Consequences" for the exact (deliberate) behavior difference.
+- Deferred to later phases (see `.docs/TASKS.md`): web UI rebuild, Flutter parity (plus fixing a
+  pre-existing bug where mobile's `getActive()` omits the required `city` param), community/club
+  prioritization, and reputation (counters + rating only, no badges — client's explicit call).
+
 ## Change — Phone-OTP hardening: validation, rate limits, resend cooldown (ADR-032)
 - Added `isValidIndianMobile` (`packages/services/.../communications/domain/phone.ts`) and wired
   it into Better Auth's `phoneNumberValidator`, rejecting non-Indian/malformed numbers before any

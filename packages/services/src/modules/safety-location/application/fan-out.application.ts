@@ -1,7 +1,7 @@
 import type { SOSAlertDTO } from "@bikie/types";
 import { toE164Phone } from "../../communications/domain/phone";
 import { whatsappShareUrl, type CommunicationsPorts } from "../../communications/public";
-import { getPlatformModule, type IdempotencyPort } from "../../platform/public";
+import type { IdempotencyPort } from "../../platform/public";
 import { alertKind } from "../domain/alert-kind";
 import {
   channelsForRecipient,
@@ -33,7 +33,7 @@ export interface SOSDispatchSummary {
   channels?: ChannelAvailability;
 }
 
-function emptySummary(channels: ChannelAvailability): SOSDispatchSummary {
+export function emptySummary(channels: ChannelAvailability): SOSDispatchSummary {
   return {
     nearbyRiders: 0,
     serviceProviders: 0,
@@ -58,65 +58,6 @@ export type FanOutDeps = {
   idempotency?: IdempotencyPort;
 };
 
-const SOS_DISPATCH_IDEMPOTENCY_TTL_SECONDS = 86_400;
-
-async function resolveNearbyRiders(
-  alert: SOSAlertDTO,
-  ports: SafetyLocationPorts,
-): Promise<SOSRecipient[]> {
-  const radiusKm = Number(process.env.SOS_NEARBY_RADIUS_KM ?? "10");
-  const radiusMeters = (Number.isFinite(radiusKm) ? radiusKm : 10) * 1000;
-  const rows = await ports.riderLocation.findNearbyAroundPoint(
-    alert.latitude,
-    alert.longitude,
-    alert.userId,
-    radiusMeters,
-  );
-  return rows.map((r) => ({
-    role: "NEARBY_RIDER" as const,
-    name: r.name,
-    phone: r.phone,
-    email: r.email,
-    userId: r.id,
-    distanceMeters: Math.round(r.distanceMeters),
-  }));
-}
-
-async function resolveServiceProviders(
-  alert: SOSAlertDTO,
-  ports: SafetyLocationPorts,
-): Promise<SOSRecipient[]> {
-  const partners = await ports.partnerDispatch.findByCity(alert.city);
-
-  const recipients: SOSRecipient[] = [];
-  for (const p of partners) {
-    recipients.push({
-      role: "SERVICE_PROVIDER",
-      name: p.businessName || p.user.name,
-      phone: p.user.phone ?? p.contactPerson1Mobile,
-      email: p.user.email,
-      userId: p.userId,
-    });
-    if (p.contactPerson1Mobile && p.contactPerson1Mobile !== p.user.phone) {
-      recipients.push({
-        role: "SERVICE_PROVIDER",
-        name: p.contactPerson1Name ?? `${p.businessName} contact`,
-        phone: p.contactPerson1Mobile,
-        email: null,
-      });
-    }
-    if (p.contactPerson2Mobile) {
-      recipients.push({
-        role: "SERVICE_PROVIDER",
-        name: p.contactPerson2Name ?? `${p.businessName} contact 2`,
-        phone: p.contactPerson2Mobile,
-        email: null,
-      });
-    }
-  }
-  return recipients;
-}
-
 async function resolveEmergencyContacts(
   reporterUserId: string,
   ports: SafetyLocationPorts,
@@ -132,9 +73,12 @@ async function resolveEmergencyContacts(
 
 /**
  * An alert that resolves to zero recipients is silently useless — the reporter sees "sent"
- * while nobody is told. Escalate to platform admins so someone always picks it up (ADR-030).
+ * while nobody is told. Escalate to platform admins so someone always picks it up (ADR-030,
+ * ADR-033: the check for "zero recipients" now spans contacts/emergency-services/tier-1 nearby
+ * riders together — see sos.application.ts's createAlert, which is what actually decides
+ * whether to fire this).
  */
-async function resolveEscalationRecipients(ports: SafetyLocationPorts): Promise<SOSRecipient[]> {
+export async function resolveEscalationRecipients(ports: SafetyLocationPorts): Promise<SOSRecipient[]> {
   const admins = await ports.escalation.findAdminContacts().catch(() => []);
   return admins.map((a) => ({
     role: "PLATFORM_ADMIN" as const,
@@ -158,7 +102,7 @@ function resolveEmergencyServices(): SOSRecipient[] {
   ];
 }
 
-async function dispatchToRecipient(
+export async function dispatchToRecipient(
   alert: SOSAlertDTO,
   recipient: SOSRecipient,
   summary: SOSDispatchSummary,
@@ -275,72 +219,60 @@ async function dispatchToRecipient(
   await Promise.all(tasks);
 }
 
+/** Sums two dispatch summaries — used to combine fanOut()'s "always fire" legs (contacts,
+ * emergency services) with escalation.seedEscalation()'s tier-1 nearby-rider leg into the one
+ * summary the create-alert API response and UI actually render (ADR-033). */
+export function mergeSummaries(a: SOSDispatchSummary, b: SOSDispatchSummary): SOSDispatchSummary {
+  return {
+    nearbyRiders: a.nearbyRiders + b.nearbyRiders,
+    serviceProviders: a.serviceProviders + b.serviceProviders,
+    emergencyContacts: a.emergencyContacts + b.emergencyContacts,
+    emergencyServices: a.emergencyServices + b.emergencyServices,
+    smsAttempted: a.smsAttempted + b.smsAttempted,
+    smsSent: a.smsSent + b.smsSent,
+    whatsappAttempted: a.whatsappAttempted + b.whatsappAttempted,
+    whatsappSent: a.whatsappSent + b.whatsappSent,
+    emailAttempted: a.emailAttempted + b.emailAttempted,
+    emailSent: a.emailSent + b.emailSent,
+    inAppNotified: a.inAppNotified + b.inAppNotified,
+    escalatedToAdmins: a.escalatedToAdmins + b.escalatedToAdmins,
+    whatsappClickToSend: [...a.whatsappClickToSend, ...b.whatsappClickToSend],
+    errors: [...a.errors, ...b.errors],
+    channels: a.channels ?? b.channels,
+  };
+}
+
 /**
- * Fan-out after an SOS alert is persisted: SMS + WhatsApp + email (and in-app/push where the
- * recipient is a platform user) to nearby riders, same-city service providers, the reporter's
- * emergency contacts, and optional emergency-services numbers from env.
+ * The "always fire immediately" leg of SOS dispatch: the reporter's emergency contacts,
+ * optional env-configured emergency-services contact, the reporter's own in-app confirmation,
+ * and an email receipt. Nearby riders / service providers are no longer resolved here — they're
+ * the staged escalation engine's job now (escalation.application.ts), reached tier by tier
+ * instead of blasted all at once (ADR-033). Zero-recipient admin escalation also moved out of
+ * this function — sos.application.ts's createAlert decides that after seeing BOTH this leg's
+ * and tier-1's results, so the "never silently reach nobody" guarantee still holds.
  *
  * Channels go through communications ports/adapters — business policy never names Twilio/Meta/SMTP.
  */
 export function createFanOutApplication(ports: SafetyLocationPorts) {
   return {
+    // Idempotency is the orchestrator's responsibility now (dispatch.application.ts) — it has
+    // to span this leg AND escalation.seedEscalation's tier-1 leg together, since both run on
+    // every alert creation and a retried request must not double-notify either one.
     async fanOut(alert: SOSAlertDTO, deps: FanOutDeps = {}): Promise<SOSDispatchSummary> {
       const communications = deps.communications ?? ports.communications;
-      const idempotency = deps.idempotency ?? getPlatformModule().ports.idempotency;
-      const idemKey = `sos-dispatch:${alert.id}`;
-
-      const claimed = await idempotency.claim(idemKey, SOS_DISPATCH_IDEMPOTENCY_TTL_SECONDS);
-      if (!claimed) {
-        const cached = await idempotency.recall<SOSDispatchSummary>(idemKey);
-        if (cached) return cached;
-        // In-flight duplicate — skip side effects; return an empty accounting summary.
-        return emptySummary(resolveChannelAvailability(communications));
-      }
-
       const availability = resolveChannelAvailability(communications);
-      const [nearbyRiders, serviceProviders, emergencyContacts, emergencyServices] = await Promise.all([
-        resolveNearbyRiders(alert, ports),
-        resolveServiceProviders(alert, ports),
+      const [emergencyContacts, emergencyServices] = await Promise.all([
         resolveEmergencyContacts(alert.userId, ports),
         Promise.resolve(resolveEmergencyServices()),
       ]);
 
       const summary: SOSDispatchSummary = {
         ...emptySummary(availability),
-        nearbyRiders: nearbyRiders.length,
-        serviceProviders: serviceProviders.length,
         emergencyContacts: emergencyContacts.length,
         emergencyServices: emergencyServices.length,
       };
 
-      const recipients = [...nearbyRiders, ...serviceProviders, ...emergencyContacts, ...emergencyServices];
-
-      const respondersFound = recipients.length;
-
-      if (respondersFound === 0) {
-        const admins = await resolveEscalationRecipients(ports);
-        summary.escalatedToAdmins = admins.length;
-        recipients.push(...admins);
-        console.error(
-          `[SOS][DISPATCH][NO-RECIPIENTS] alert=${alert.id} city=${alert.city} — no nearby riders, ` +
-            `providers, or emergency contacts; escalated to ${admins.length} admin(s).`,
-        );
-      }
-
-      // The reporter always gets an in-app confirmation, even with no channels configured and
-      // nobody nearby — otherwise the only feedback they get is a success screen that lies.
-      await ports.notifications
-        .notify(
-          alert.userId,
-          "SOS_ALERT",
-          "Your SOS alert is live",
-          respondersFound > 0
-            ? `Alerting ${respondersFound} responder(s) in ${alert.city}. Track responses in Dashboard → SOS.`
-            : `No responders could be reached in ${alert.city}. Add emergency contacts in your profile and call local emergency services now.`,
-          "sos_alert",
-          alert.id,
-        )
-        .catch(console.error);
+      const recipients = [...emergencyContacts, ...emergencyServices];
 
       if (availability.email && alert.userEmail && !alert.userEmail.endsWith("@bikie.local")) {
         summary.emailAttempted += 1;
@@ -350,8 +282,8 @@ export function createFanOutApplication(ports: SafetyLocationPorts) {
             subject: `BIKIE SOS sent: ${alert.type} in ${alert.city}`,
             html: `<h2>Your SOS was sent</h2>
                ${buildEmailHtml(alert, { role: "NEARBY_RIDER", name: alert.userName })}
-               <p>Notified: ${nearbyRiders.length} nearby riders, ${serviceProviders.length} providers,
-               ${emergencyContacts.length} emergency contacts.</p>`,
+               <p>Notified: ${emergencyContacts.length} emergency contacts. Nearby riders are being
+               alerted in stages — check Dashboard → SOS for live updates.</p>`,
           })
           .catch((e) => ({ ok: false, provider: "smtp" as const, error: String(e) }));
         if (receipt.ok) summary.emailSent += 1;
@@ -363,18 +295,15 @@ export function createFanOutApplication(ports: SafetyLocationPorts) {
       );
 
       console.log(
-        `[SOS][DISPATCH] alert=${alert.id} nearby=${summary.nearbyRiders} providers=${summary.serviceProviders} ` +
-          `contacts=${summary.emergencyContacts} sms=${summary.smsSent}/${summary.smsAttempted} ` +
-          `wa=${summary.whatsappSent}/${summary.whatsappAttempted} email=${summary.emailSent}/${summary.emailAttempted} ` +
-          `inApp=${summary.inAppNotified} admins=${summary.escalatedToAdmins} ` +
-          `channels=sms:${availability.sms ? "on" : "off"},wa:${availability.whatsapp ? "on" : "off"},email:${availability.email ? "on" : "off"}`,
+        `[SOS][DISPATCH][CONTACTS] alert=${alert.id} contacts=${summary.emergencyContacts} ` +
+          `sms=${summary.smsSent}/${summary.smsAttempted} wa=${summary.whatsappSent}/${summary.whatsappAttempted} ` +
+          `email=${summary.emailSent}/${summary.emailAttempted}`,
       );
       for (const failure of summary.errors) console.error(`[SOS][DISPATCH][ERROR] ${failure}`);
       for (const link of summary.whatsappClickToSend) {
         console.log(`[SOS][DISPATCH][WA-LINK] ${link.name} ${link.phone} ${link.url}`);
       }
 
-      await idempotency.remember(idemKey, summary, SOS_DISPATCH_IDEMPOTENCY_TTL_SECONDS);
       return summary;
     },
   };

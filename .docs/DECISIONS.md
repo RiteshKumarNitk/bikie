@@ -777,3 +777,110 @@ changes:
   analytics (if any) won't reflect this flow, since MSG91 only ever sees an SMS send request, not
   an OTP verification. Revisit only if a hard requirement emerges to keep OTP state on MSG91's side.
 
+## ADR-033: SOS becomes a staged Community Emergency Response System (Phase A — backend core)
+
+- **Context.** The SOS module was Phase 1: `POST /api/sos/alerts` fanned out to nearby riders,
+  same-city partners, and emergency contacts **all at once**, with no accept/assignment flow —
+  the only responder action was a dashboard "I'm Nearby" button that wrote one
+  `SOSAlertResponse` row and never notified the reporter. A full redesign was requested toward
+  "the community responds first, providers are secondary," with staged escalation, mutual
+  helper/rider confirmation, a live session, and a real audit timeline. Before writing any code,
+  the existing implementation was audited directly against its source (schema, `fan-out.application.ts`,
+  routes, UI, Flutter) — see the current-implementation analysis delivered ahead of this ADR.
+  Four scope questions were confirmed with the client up front: (1) auth stays OTP-only for
+  Riders/Partners, Admin keeps email+password — out of scope here; (2) implementation proceeds in
+  phases, backend core first; (3) ETA uses a straight-line-distance + assumed-average-speed
+  estimate, not a paid routing API; (4) reputation ships minimal (counters + rating) in a later
+  phase, no badges/trust-tier yet.
+- **Decision — extend `modules/safety-location`, don't replace it.** Per ARCHITECTURE.md's
+  Strangler-fig convention, every change below extends the existing ports/adapters module rather
+  than standing up a parallel system.
+  - **Schema (additive only).** `SOSAlert` gains `severity` (server-derived from `type`, never
+    client-trusted — prevents a reporter jumping tiers by mislabeling a case),
+    `assignedHelperId`, `escalationTier`, `currentRadiusMeters` (default 5000, was a hardcoded
+    10000 in `fan-out.application.ts`), `nextEscalationAt`. `SOSAlertType` gains
+    `LIFE_THREATENING`/`FLAT_TYRE`/`BATTERY_ISSUE` (existing values untouched — no backfill on
+    historical rows). `SOSAlertResponse.status` moves from a free-text `String` (100% of existing
+    rows literally `"RESPONDING"`) to a real `SOSResponseStatus` enum — this **required a
+    hand-written migration** (`prisma migrate dev`'s shadow-DB step hung indefinitely against
+    this project's Neon instance, so the migration was hand-authored matching Prisma's exact
+    naming conventions and applied via `prisma migrate deploy`, verified zero-drift afterward via
+    `prisma migrate status`). New `SOSSession` (rider, helper, offer, status, `conversationId`
+    reusing the Community Platform's existing `Conversation`/`Message` — no new chat system) and
+    `SOSTimelineEvent` (deliberately separate from the moderation-only `AuditLog`) models.
+    `SOSEscalationTier` includes `NEARBY_RIDERS_COMMUNITY` — reserved now, unused until the
+    community-prioritization phase, so that phase needs no further migration.
+  - **Duplicate-assignment prevention (client's explicit "use database transactions"
+    requirement).** `sos-session.repository.ts`'s `acceptOffer` is one `prisma.$transaction`:
+    `UPDATE sos_alert SET assignedHelperId=? WHERE id=? AND assignedHelperId IS NULL` is the
+    guard, embedded in the mutating statement itself, not a separate read-then-write. Under
+    Postgres's default Read Committed isolation, concurrent accept transactions serialize on the
+    row lock; the loser's conditional update genuinely affects 0 rows once the winner commits —
+    no Serializable isolation needed. A thrown `AlreadyAssignedError`/`OfferNotAvailableError`
+    rolls back the whole transaction, so no partial assignment can persist; routes map these to
+    409.
+  - **Staged escalation, not simultaneous fan-out.** `dispatch.application.ts` is the new
+    orchestrator: on alert creation it runs the "always fire" leg (emergency contacts, optional
+    `SOS_EMERGENCY_SERVICES_*`, reporter confirmation/receipt — unchanged in spirit, now in
+    `fan-out.application.ts`) together with `escalation.application.ts`'s `seedEscalation` (tier-1
+    nearby riders, 5km). If nearby riders/providers don't respond, `GET /api/cron/sos-escalate`
+    (same `Bearer CRON_SECRET` pattern as the existing `sos-resolve` cron, polled ~1min) drives
+    `tickEscalation`: widen radius in `SOS_RADIUS_STEP_KM` steps up to `SOS_RADIUS_MAX_KM` (only
+    notifying newly-in-range riders, de-duped via the `Notification` table's existing
+    `entity='sos_alert'` rows — no new join table), then advance tier
+    `NEARBY_RIDERS_GENERAL → SERVICE_PROVIDERS → ADMIN`. `SERVICE_PROVIDERS` now uses
+    `Partner.type`/`isVerified` to target relevant, verified partners first (a breakdown pages
+    `MECHANIC`s, not every partner type in the city — the fan-out never did this before),
+    broadening to any partner if the strict search is empty. `ADMIN` is terminal, matching
+    ADR-030's original behavior. A cron-poll ticker was chosen over precise per-alert scheduling
+    (e.g. Upstash QStash) because it needs zero new vendor dependency and matches the existing
+    `sos-resolve` precedent — QStash is a clearly-scoped, additive follow-up behind the same
+    `tickEscalation` interface if poll-interval latency ever becomes a real problem.
+  - **ADR-030's zero-recipient escalation is preserved, not silently weakened, but its trigger
+    changed shape.** Previously the immediate-admin-escalation check spanned all four legs
+    (riders+providers+contacts+services) synchronously in one request. Providers are no longer
+    resolved synchronously (`SERVICE_PROVIDERS` is tier 2, reached later), so
+    `dispatch.application.ts` now escalates to admin **immediately** only when contacts +
+    emergency-services + tier-1 nearby riders are *all* empty (the rider's personal safety net
+    plus the first responder search both come up empty) — otherwise the staged engine still
+    reaches `ADMIN` as its terminal tier if nothing else works out. This is a deliberate,
+    documented behavior change, not an oversight: the degenerate "reaches literally nobody" case
+    still pings admins synchronously; a merely-slow case now waits for tier timeouts instead of
+    firing an admin ping the same second SOS_ALERT is fired.
+  - **Helper-acceptance flow.** New routes: `POST .../offer` ("I'm Coming" — replaces `/respond`,
+    which becomes a thin deprecated alias per ADR-028, no facade deletion without zero-use proof),
+    `.../offer/withdraw`, `GET .../offers` (reporter/admin only — **helper phone stays hidden
+    until their specific offer is `ACCEPTED`**, symmetric with the reporter's own contact info
+    already being hidden from non-city-matching members), `.../offers/[id]/accept`,
+    `.../offers/[id]/reject`. Accepting creates the `SOSSession` and expires every other open
+    offer on that alert.
+  - **Session status ownership** (flagged to the client as a product call, not purely
+    architectural, then implemented with the sensible default): helper drives
+    `HELPER_ARRIVED`/`ASSISTANCE_IN_PROGRESS` (they're the one physically there to say so), rider
+    drives `COMPLETED` (confirming the emergency is actually over), either drives `CANCELLED`,
+    admin always overrides. Cancelling releases `assignedHelperId` so the alert re-opens.
+  - **Security fix shipped independently of the rest:** `POST /api/sos/alerts/[id]/resolve` used
+    `requireSession()` with **zero ownership check anywhere in the chain** — confirmed by reading
+    both the route and `sos.repository.ts`'s `resolveAlert` directly — meaning any authenticated
+    user could resolve *any* SOS alert, not just their own. Fixed to `requireMembership()` +
+    reporter/assigned-helper/admin check, enforced in the application layer (not just the route)
+    so Flutter can't bypass it either.
+  - **ETA** is `domain/eta.ts`'s `estimateEtaMinutes(distanceMeters, avgSpeedKmph=25)` — pure,
+    synchronous, no external call. A future Google Distance Matrix implementation is a drop-in
+    replacement behind the same signature.
+  - **Deliberately deferred, hooks only:** `CommunityMembershipPort.findSharedGroupMemberIds` is
+    fully implemented against `GroupMember` but not yet wired into `seedEscalation`'s tier
+    selection — that's the community-prioritization phase. `SOSSession.rating`/`ratingComment`
+    columns exist so something can capture a rating now, but nothing aggregates them into
+    `User.emergencyResponseCount`/`helperRatingAvg` until the reputation phase (deliberately
+    minimal per the client's call — no badges/trust-tier).
+- **Consequences.** OTP-style ports/adapters discipline held throughout — no route imports
+  Prisma, no application method imports a repository directly. Test coverage added at the
+  application layer (offer/accept/reject ownership, `AlreadyAssignedError` mapping, radius
+  widening only notifying fresh riders, tier advancement, resolve-route ownership) rather than
+  only at the route layer, since Flutter (Phase C, not yet built) will exercise the same
+  application methods through the same routes — no duplicate API surface planned. Web UI (Phase
+  B), Flutter parity (Phase C, plus a pre-existing bug where `sos_repository.dart`'s `getActive()`
+  is called without the required `city` param), and community/reputation activation (Phase D)
+  remain queued — see `.docs/TASKS.md`.
+

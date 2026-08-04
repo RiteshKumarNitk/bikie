@@ -42,7 +42,7 @@ First extracted modules under `packages/services/src/modules/`:
 | Module | Owns | Facade entry points |
 |---|---|---|
 | `communications` | Email/SMS/WhatsApp/push ports + adapters | `EmailService`, `SMSService`, `WhatsAppService`, `PushService` |
-| `safety-location` | SOS alerts, dispatch policy, rider location, Places | `SOSService`, `SOSDispatchService`, `RiderLocationService`, `PlacesService` |
+| `safety-location` | SOS alerts, staged escalation, helper-acceptance sessions, rider location, Places (ADR-033) | `SOSService`, `SOSDispatchService`, `SOSSessionService`, `RiderLocationService`, `PlacesService` |
 | `identity-access` | Account status, roles, permissions, membership gate, login OTP | `apps/web/lib/require-role.ts`, Better Auth `sendOTP` hook |
 | `catalog` | Bikes, destinations, categories, testimonials | `BikeService`, `DestinationService`, `CategoryService`, `TestimonialService` |
 | `rentals-bookings` | Booking pricing/lifecycle, review eligibility, wishlist | `BookingService`, `ReviewService`, `WishlistService` |

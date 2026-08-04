@@ -12,6 +12,7 @@ export { MessageService } from "./message.service";
 export { MembershipService } from "./membership.service";
 export { SOSService } from "./sos.service";
 export { SOSDispatchService } from "./sos-dispatch.service";
+export { SOSSessionService } from "./sos-session.service";
 export { mapsNavigateUrl, mapsPinUrl, formatDistance } from "./sos-maps";
 export { EmailService } from "./email.service";
 export { SMSService } from "./sms.service";

@@ -11,8 +11,21 @@ export const SOSService = {
     return getSafetyLocationModule().sos.getActiveAlerts(city);
   },
 
-  async resolveAlert(alertId: string, userId: string) {
-    return getSafetyLocationModule().sos.resolveAlert(alertId, userId);
+  async getAlertById(alertId: string): Promise<SOSAlertDTO | null> {
+    return getSafetyLocationModule().sos.getAlertById(alertId);
+  },
+
+  async getTimeline(alertId: string) {
+    return getSafetyLocationModule().ports.sosTimeline.listForAlert(alertId);
+  },
+
+  /** Backs "Share Mechanic" / "Share Fuel Contact" quick-actions on an open SOS session. */
+  async findNearbyPartners(city: string, type?: string) {
+    return getSafetyLocationModule().ports.partnerDispatch.findByCity(city, 10, { type, verifiedOnly: true });
+  },
+
+  async resolveAlert(alertId: string, userId: string, isAdmin: boolean) {
+    return getSafetyLocationModule().sos.resolveAlert(alertId, userId, isAdmin);
   },
 
   async respondToAlert(alertId: string, responderId: string, message?: string) {

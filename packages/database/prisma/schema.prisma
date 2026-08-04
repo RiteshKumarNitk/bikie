@@ -82,12 +82,66 @@ enum SOSAlertType {
   MEDICAL
   LOST
   OTHER
+  LIFE_THREATENING
+  FLAT_TYRE
+  BATTERY_ISSUE
 }
 
 enum SOSStatus {
   ACTIVE
   RESOLVED
   FALSE_ALARM
+}
+
+// --- Community Emergency Response System (ADR-033) ---
+
+enum SOSSeverity {
+  EMERGENCY
+  ASSISTANCE
+}
+
+// NEARBY_RIDERS_COMMUNITY is reserved now (server-derived, not yet set by any code path) so
+// the community/club-prioritization pass (a deliberately separate later phase) doesn't need
+// its own schema migration — see ADR-033.
+enum SOSEscalationTier {
+  NEARBY_RIDERS_COMMUNITY
+  NEARBY_RIDERS_GENERAL
+  SERVICE_PROVIDERS
+  ADMIN
+}
+
+enum SOSResponseStatus {
+  OFFERED
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  EXPIRED
+}
+
+enum SOSSessionStatus {
+  ACTIVE
+  HELPER_ARRIVED
+  ASSISTANCE_IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum SOSTimelineEventType {
+  SOS_CREATED
+  RADIUS_EXPANDED
+  ESCALATED_SERVICE_PROVIDERS
+  ESCALATED_ADMIN
+  HELPER_OFFERED
+  HELPER_WITHDRAWN
+  HELPER_ACCEPTED
+  HELPER_REJECTED
+  NAVIGATION_STARTED
+  HELPER_ARRIVED
+  ASSISTANCE_STARTED
+  ASSISTANCE_COMPLETED
+  SOS_RESOLVED
+  SOS_CANCELLED
+  RATING_SUBMITTED
 }
 
 enum MembershipStatus {
@@ -223,6 +277,10 @@ model User {
   membership    UserMembership[]
   sosAlerts     SOSAlert[]
   sosResponses  SOSAlertResponse[]
+  assignedSosAlerts SOSAlert[]         @relation("SOSAssignedHelper")
+  sosHelperSessions SOSSession[]       @relation("SOSSessionHelper")
+  sosRiderSessions  SOSSession[]       @relation("SOSSessionRider")
+  sosTimelineEvents SOSTimelineEvent[]
   referralCode  String?   @unique
   referredById  String?
   referredBy    User?     @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
@@ -580,6 +638,7 @@ model Conversation {
   participants ConversationParticipant[]
   messages     Message[]
   group        Group?
+  sosSession   SOSSession?
 
   @@map("conversation")
 }
@@ -834,23 +893,104 @@ model SOSAlert {
   createdAt   DateTime    @default(now())
   responses   SOSAlertResponse[]
 
+  // --- Community Emergency Response System (ADR-033) ---
+  // `severity` is always server-derived from `type` — never trust a client-supplied value,
+  // it would let a reporter jump straight to the ADMIN tier by mislabeling an assistance case.
+  severity           SOSSeverity        @default(ASSISTANCE)
+  // The guarded column the transactional accept hangs on (see sos-session.repository.ts) —
+  // `WHERE assignedHelperId IS NULL` inside the accept transaction is what prevents two
+  // helpers from both being told they're "the one."
+  assignedHelperId   String?
+  assignedHelper     User?              @relation("SOSAssignedHelper", fields: [assignedHelperId], references: [id])
+  escalationTier     SOSEscalationTier  @default(NEARBY_RIDERS_GENERAL)
+  currentRadiusMeters Int               @default(5000)
+  // Cron-poll key for the escalation ticker (GET /api/cron/sos-escalate) — null once
+  // assigned or resolved, so the ticker's query naturally stops picking the alert up.
+  nextEscalationAt  DateTime?
+  sessions          SOSSession[]
+  timelineEvents    SOSTimelineEvent[]
+
   @@index([city, status])
   @@index([status])
+  @@index([status, nextEscalationAt])
+  @@index([assignedHelperId])
   @@map("sos_alert")
 }
 
 model SOSAlertResponse {
-  id          String   @id @default(cuid())
+  id          String            @id @default(cuid())
   alertId     String
-  alert       SOSAlert @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  alert       SOSAlert          @relation(fields: [alertId], references: [id], onDelete: Cascade)
   responderId String
-  responder   User     @relation(fields: [responderId], references: [id])
+  responder   User              @relation(fields: [responderId], references: [id])
   message     String?
-  status      String   @default("RESPONDING")
-  createdAt   DateTime @default(now())
+  status      SOSResponseStatus @default(OFFERED)
+  distanceMeters Float?
+  etaMinutes     Int?
+  respondedAt    DateTime?
+  respondedBy    String?
+  createdAt   DateTime          @default(now())
+  session     SOSSession?
 
   @@unique([alertId, responderId])
   @@map("sos_alert_response")
+}
+
+// SOS Session — deliberately NOT a Trip. Created only once a rider accepts a specific
+// helper's offer; owns the live chat/timeline/status for that one incident. Not unique on
+// alertId: if a helper cancels, the alert re-opens and a second session can form later for
+// the same alert. "Only one truly active assignment" is enforced by SOSAlert.assignedHelperId
+// (see the transactional accept), not by a DB constraint on this table.
+model SOSSession {
+  id                  String           @id @default(cuid())
+  alertId             String
+  alert               SOSAlert         @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  helperId            String
+  helper              User             @relation("SOSSessionHelper", fields: [helperId], references: [id])
+  riderId             String
+  rider               User             @relation("SOSSessionRider", fields: [riderId], references: [id])
+  offerId             String           @unique
+  offer               SOSAlertResponse @relation(fields: [offerId], references: [id])
+  status              SOSSessionStatus @default(ACTIVE)
+  conversationId      String?          @unique
+  conversation        Conversation?    @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  startedAt           DateTime         @default(now())
+  helperArrivedAt     DateTime?
+  assistanceStartedAt DateTime?
+  completedAt         DateTime?
+  cancelledAt         DateTime?
+  cancelReason        String?
+  // Minimal Phase-D reputation hook (ADR-033): the raw rating lives here since it belongs to
+  // exactly one session; nothing aggregates it into User.helperRatingAvg until Phase D.
+  rating              Int?
+  ratingComment       String?
+  timelineEvents      SOSTimelineEvent[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([alertId])
+  @@index([helperId])
+  @@index([riderId])
+  @@map("sos_session")
+}
+
+// Full audit trail for the SOS lifecycle, deliberately separate from the moderation-only
+// AuditLog model — different lifecycle, different consumers (the rider-facing timeline UI).
+model SOSTimelineEvent {
+  id        String                @id @default(cuid())
+  alertId   String
+  alert     SOSAlert              @relation(fields: [alertId], references: [id], onDelete: Cascade)
+  sessionId String?
+  session   SOSSession?           @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  type      SOSTimelineEventType
+  actorId   String?
+  actor     User?                 @relation(fields: [actorId], references: [id])
+  metadata  Json?
+  createdAt DateTime              @default(now())
+
+  @@index([alertId, createdAt])
+  @@index([sessionId])
+  @@map("sos_timeline_event")
 }
 
 // --- Audit Log ---
