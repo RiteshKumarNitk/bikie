@@ -302,61 +302,53 @@ async function main() {
 
   console.log("Seed complete.");
   // --- Seed Membership Plans ---
+  // Single plan, matching the live production offering (one tier only, ₹99/year) — not the
+  // three-tier Basic/Premium/Pro lineup this used to seed.
   const planCount = await prisma.membershipPlan.count();
   if (planCount === 0) {
     await prisma.membershipPlan.createMany({
       data: [
         {
-          name: "Basic",
-          description: "Essential coverage for occasional riders",
-          price: 0,
-          durationDays: 36500,
-          benefits: ["Standard booking", "Email support", "Community access"],
+          name: "Membership",
+          description: "Everything BIKIE offers, in one plan",
+          price: 99,
+          durationDays: 365,
+          benefits: [
+            "SOS Emergency network access",
+            "Nearby riders & service providers",
+            "Ride community access",
+            "Priority support",
+            "Discounted bookings",
+          ],
           sortOrder: 0,
-        },
-        {
-          name: "Premium",
-          description: "Best value for regular riders",
-          price: 999,
-          durationDays: 365,
-          benefits: ["Up to 15% off every booking", "Free cancellation", "Priority support", "Early access to trips", "Exclusive community rides", "Reward points on every ride"],
-          sortOrder: 1,
-        },
-        {
-          name: "Pro",
-          description: "For power riders who want it all",
-          price: 2499,
-          durationDays: 365,
-          benefits: ["Up to 25% off every booking", "Free cancellation & reschedule", "24/7 priority support", "Early access to all trips", "Exclusive Pro-only trips", "Double reward points", "Free delivery & pickup", "VIP roadside assistance"],
-          sortOrder: 2,
         },
       ],
     });
-    console.log("Seeded membership plans.");
+    console.log("Seeded membership plan.");
   }
 
   // --- SOS E2E fixtures (membership + emergency contacts + nearby riders with GPS) ---
   console.log("Seeding SOS E2E fixtures around", SOS_SEED_GPS, "...");
 
-  const premiumPlan = await prisma.membershipPlan.findFirst({ where: { name: "Premium" } });
-  if (premiumPlan) {
+  const membershipPlan = await prisma.membershipPlan.findFirst({ where: { name: "Membership" } });
+  if (membershipPlan) {
     const existingMembership = await prisma.userMembership.findFirst({
       where: { userId: demoUser.id, status: "ACTIVE" },
     });
     if (!existingMembership) {
       const start = new Date();
       const end = new Date(start);
-      end.setDate(end.getDate() + premiumPlan.durationDays);
+      end.setDate(end.getDate() + membershipPlan.durationDays);
       await prisma.userMembership.create({
         data: {
           userId: demoUser.id,
-          planId: premiumPlan.id,
+          planId: membershipPlan.id,
           startDate: start,
           endDate: end,
           status: "ACTIVE",
         },
       });
-      console.log("Seeded ACTIVE Premium membership for demo rider.");
+      console.log("Seeded ACTIVE membership for demo rider.");
     }
   }
 
@@ -426,15 +418,15 @@ async function main() {
   });
 
   // Give nearby riders membership too so they can respond to alerts in the UI.
-  if (premiumPlan) {
+  if (membershipPlan) {
     for (const u of [nearby1, nearby2]) {
       const has = await prisma.userMembership.findFirst({ where: { userId: u.id, status: "ACTIVE" } });
       if (!has) {
         const start = new Date();
         const end = new Date(start);
-        end.setDate(end.getDate() + premiumPlan.durationDays);
+        end.setDate(end.getDate() + membershipPlan.durationDays);
         await prisma.userMembership.create({
-          data: { userId: u.id, planId: premiumPlan.id, startDate: start, endDate: end, status: "ACTIVE" },
+          data: { userId: u.id, planId: membershipPlan.id, startDate: start, endDate: end, status: "ACTIVE" },
         });
       }
     }
