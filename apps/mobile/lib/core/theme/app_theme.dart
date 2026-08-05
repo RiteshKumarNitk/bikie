@@ -123,9 +123,16 @@ class AppTheme {
           shape: const StadiumBorder(),
         ),
       ),
+      // `accent` (`#3B3A91`) is a *fill* color (buttons/badges) — as text/icon color against
+      // the dark background it's ~1.8:1 contrast, well under WCAG AA (see ADR-009 in
+      // .docs/DECISIONS.md, and `accentTextOf()` above for the same fix applied where a
+      // BuildContext is available). `foreground` is this theme's near-white/near-black text
+      // color, always readable against `background` regardless of brightness — TextButtons are
+      // secondary actions read as plain text (Skip, "Don't have an account? Sign up", etc.),
+      // not accent-branded links, so this is the correct default rather than a low-contrast one.
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
-          foregroundColor: accent,
+          foregroundColor: foreground,
           shape: const StadiumBorder(),
         ),
       ),

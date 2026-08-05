@@ -41,6 +41,11 @@ class HomeScreen extends ConsumerWidget {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
             ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _SosBanner(onTap: () => context.push('/sos')),
+            ),
             const SizedBox(height: 20),
             _SectionHeader(title: 'Featured bikes', onSeeAll: () => context.go('/bikes')),
             SizedBox(
@@ -133,6 +138,57 @@ class HomeScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 24),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// One-tap SOS entry point on Home — mirrors the web homepage, where the panic CTA sits above
+/// the Hero (ADR-015), rather than being buried a level deep in Profile.
+class _SosBanner extends StatelessWidget {
+  const _SosBanner({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final error = Theme.of(context).colorScheme.error;
+    return Material(
+      color: error.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(20),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: error.withValues(alpha: 0.35))),
+          child: Row(
+            children: [
+              Container(
+                height: 44,
+                width: 44,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(color: error, shape: BoxShape.circle),
+                child: const Icon(Icons.sos, color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('SOS Emergency', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: error, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 2),
+                    Text(
+                      'One tap alerts nearby riders and admins with your location.',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: error),
+            ],
+          ),
         ),
       ),
     );

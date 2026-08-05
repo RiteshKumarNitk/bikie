@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/widgets/app_logo.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_controller.dart';
 import '../domain/role_provider.dart';
@@ -146,148 +147,174 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('BIKIE', style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 8),
+                const Center(child: AppLogo(size: 60, glow: true)),
+                const SizedBox(height: 18),
+                Text(
+                  'BIKIE',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(letterSpacing: 1.2),
+                ),
+                const SizedBox(height: 6),
                 Text(
                   selectedRole == 'PARTNER' ? 'Sign in to Service Provider' : 'Sign in to Rider',
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).hintColor),
                 ),
-                const SizedBox(height: 24),
-                if (_mode == 'phone' && _step == 'phone') ...[
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton(
-                      onPressed: () => setState(() {
-                        _mode = 'email';
-                        _error = null;
-                      }),
-                      child: const Text('Admin or existing email account? Log in with email instead'),
-                    ),
+                const SizedBox(height: 28),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  const SizedBox(height: 8),
-                  PhoneNumberField(
-                    onLocalNumberChanged: (v) => _localNumber = v,
-                  ),
-                  const SizedBox(height: 16),
-                  if (_error == _noAccountError)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(
-                        'No account found for this number.',
-                        style: TextStyle(color: Theme.of(context).colorScheme.error),
-                      ),
-                    )
-                  else if (_error != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                    ),
-                  if (_error == _noAccountError)
-                    OutlinedButton(onPressed: () => context.go('/signup'), child: const Text('Sign up instead')),
-                  const SizedBox(height: 8),
-                  ElevatedButton(
-                    onPressed: _sendingOtp ? null : _sendCode,
-                    child: _sendingOtp ? const _Spinner() : const Text('Send code'),
-                  ),
-                ],
-                if (_mode == 'email') ...[
-                  Form(
-                    key: _emailFormKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextFormField(
-                          controller: _emailController,
-                          keyboardType: TextInputType.emailAddress,
-                          decoration: const InputDecoration(labelText: 'Email'),
-                          validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          controller: _passwordController,
-                          obscureText: true,
-                          decoration: const InputDecoration(labelText: 'Password'),
-                          validator: (v) => (v == null || v.isEmpty) ? 'Password is required' : null,
-                          onFieldSubmitted: (_) => _emailSignIn(),
-                        ),
-                        if (_error != null) ...[
-                          const SizedBox(height: 12),
-                          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                        ],
-                        const SizedBox(height: 20),
-                        ElevatedButton(
-                          onPressed: _signingIn ? null : _emailSignIn,
-                          child: _signingIn ? const _Spinner() : const Text('Sign in'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_mode == 'phone' && _step == 'phone') ...[
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: TextButton(
+                            style: TextButton.styleFrom(padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
+                            onPressed: () => setState(() {
+                              _mode = 'email';
+                              _error = null;
+                            }),
+                            child: const Text('Admin or existing email? Log in with email instead', style: TextStyle(fontSize: 12)),
+                          ),
                         ),
                         const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: () => setState(() {
-                            _mode = 'phone';
-                            _error = null;
-                          }),
-                          child: const Text('Log in with phone instead'),
+                        PhoneNumberField(
+                          onLocalNumberChanged: (v) => _localNumber = v,
+                        ),
+                        const SizedBox(height: 16),
+                        if (_error == _noAccountError)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Text(
+                              'No account found for this number.',
+                              style: TextStyle(color: Theme.of(context).colorScheme.error),
+                            ),
+                          )
+                        else if (_error != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                          ),
+                        if (_error == _noAccountError) ...[
+                          OutlinedButton(onPressed: () => context.go('/signup'), child: const Text('Sign up instead')),
+                          const SizedBox(height: 12),
+                        ],
+                        ElevatedButton(
+                          onPressed: _sendingOtp ? null : _sendCode,
+                          child: _sendingOtp ? const _Spinner() : const Text('Send code'),
                         ),
                       ],
-                    ),
-                  ),
-                ],
-                if (_step == 'otp') ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Theme.of(context).dividerColor),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_phoneNumber),
-                        TextButton(
-                          onPressed: () => setState(() {
-                            _step = 'phone';
-                            _otpController.clear();
-                            _error = null;
-                            _devOtp = null;
-                          }),
-                          child: const Text('Change'),
+                      if (_mode == 'email') ...[
+                        Form(
+                          key: _emailFormKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              TextFormField(
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: const InputDecoration(labelText: 'Email'),
+                                validator: (v) => (v == null || !v.contains('@')) ? 'Enter a valid email' : null,
+                              ),
+                              const SizedBox(height: 16),
+                              TextFormField(
+                                controller: _passwordController,
+                                obscureText: true,
+                                decoration: const InputDecoration(labelText: 'Password'),
+                                validator: (v) => (v == null || v.isEmpty) ? 'Password is required' : null,
+                                onFieldSubmitted: (_) => _emailSignIn(),
+                              ),
+                              if (_error != null) ...[
+                                const SizedBox(height: 12),
+                                Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                              ],
+                              const SizedBox(height: 20),
+                              ElevatedButton(
+                                onPressed: _signingIn ? null : _emailSignIn,
+                                child: _signingIn ? const _Spinner() : const Text('Sign in'),
+                              ),
+                              const SizedBox(height: 8),
+                              Center(
+                                child: TextButton(
+                                  onPressed: () => setState(() {
+                                    _mode = 'phone';
+                                    _error = null;
+                                  }),
+                                  child: const Text('Log in with phone instead'),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
-                    ),
+                      if (_step == 'otp') ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Theme.of(context).dividerColor),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(_phoneNumber),
+                              TextButton(
+                                onPressed: () => setState(() {
+                                  _step = 'phone';
+                                  _otpController.clear();
+                                  _error = null;
+                                  _devOtp = null;
+                                }),
+                                child: const Text('Change'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _otpController,
+                          keyboardType: TextInputType.number,
+                          autofillHints: const [AutofillHints.oneTimeCode],
+                          decoration: const InputDecoration(labelText: 'Verification code', hintText: '6-digit code'),
+                          onSubmitted: (_) => _verify(),
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: (_sendingOtp || !canResend) ? null : _resend,
+                            child: Text(canResend ? 'Resend' : 'Resend in ${resendRemaining}s'),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (_error != null) ...[
+                          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                          const SizedBox(height: 8),
+                        ],
+                        ElevatedButton(
+                          onPressed: _verifying ? null : _verify,
+                          child: _verifying ? const _Spinner() : const Text('Sign in'),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _otpController,
-                    keyboardType: TextInputType.number,
-                    autofillHints: const [AutofillHints.oneTimeCode],
-                    decoration: const InputDecoration(labelText: 'Verification code', hintText: '6-digit code'),
-                    onSubmitted: (_) => _verify(),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: (_sendingOtp || !canResend) ? null : _resend,
-                      child: Text(canResend ? 'Resend' : 'Resend in ${resendRemaining}s'),
-                    ),
-                  ),
-                  if (_error != null) ...[
-                    Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                    const SizedBox(height: 8),
-                  ],
-                  ElevatedButton(
-                    onPressed: _verifying ? null : _verify,
-                    child: _verifying ? const _Spinner() : const Text('Sign in'),
-                  ),
-                ],
+                ),
                 if (_mode == 'phone') ...[
                   const SizedBox(height: 20),
-                  TextButton(
-                    onPressed: () => context.go('/signup'),
-                    child: const Text("Don't have an account? Sign up"),
+                  Center(
+                    child: TextButton(
+                      onPressed: () => context.go('/signup'),
+                      child: const Text("Don't have an account? Sign up"),
+                    ),
                   ),
                 ],
               ],

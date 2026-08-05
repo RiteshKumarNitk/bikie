@@ -6,9 +6,12 @@ import '../../../core/network/api_exception.dart';
 import '../data/auth_repository.dart';
 import '../domain/auth_controller.dart';
 import '../domain/role_provider.dart';
+import '../../../core/widgets/app_logo.dart';
 import 'widgets/dev_otp_banner.dart';
 import 'widgets/phone_number_field.dart';
 import 'widgets/resend_countdown.dart';
+
+const _accountExistsError = 'ACCOUNT_EXISTS';
 
 /// `/signup` — phone + OTP, mirroring the web (ADR-013/ADR-015). Name and
 /// the fuller rider-profile onboarding form are collected later on web
@@ -57,11 +60,19 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
     setState(() => _sendingOtp = true);
     try {
       final repo = ref.read(authRepositoryProvider);
-      await repo.sendOtp(normalized);
+      // Check existence up front, before texting a code — the converse of the login screen's
+      // check. Without this, signing up with a number that already has an account silently logs
+      // that existing user in instead of creating anything, which is confusing: they came here
+      // to create a new account.
       final result = await repo.phoneExists(normalized);
+      if (result.exists) {
+        setState(() => _error = _accountExistsError);
+        return;
+      }
+      await repo.sendOtp(normalized);
       setState(() {
         _phoneNumber = normalized;
-        _exists = result.exists;
+        _exists = false;
         _step = 'otp';
       });
       startResendCountdown();
@@ -95,6 +106,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       if (_exists == false) {
         final role = ref.read(selectedRoleProvider);
         await ref.read(authRepositoryProvider).completePhoneSignup(role: role);
+        // Brand-new account: collect the same rider-profile details the website gathers post
+        // signup, so an SOS alert has more than just a name/phone to show responders. Existing
+        // users never reach this branch (blocked earlier in `_sendCode`).
+        if (mounted) context.go('/onboarding');
+        return;
       }
       if (mounted) context.go('/');
     } on ApiException catch (e) {
@@ -119,13 +135,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                const Center(child: AppLogo(size: 56, glow: true)),
+                const SizedBox(height: 18),
                 Text(
                   selectedRole == 'PARTNER' ? 'Create your partner account' : 'Create your rider account',
+                  textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
@@ -133,76 +152,104 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
                   selectedRole == 'PARTNER'
                       ? 'List your bikes, organize rides, and grow your business.'
                       : 'Join the community, book rides, and explore India.',
-                  style: Theme.of(context).textTheme.bodyMedium,
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Theme.of(context).hintColor),
                 ),
-                const SizedBox(height: 24),
-                if (_step == 'phone') ...[
-                  PhoneNumberField(
-                    onLocalNumberChanged: (v) => _localNumber = v,
+                const SizedBox(height: 28),
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(24),
                   ),
-                  const SizedBox(height: 6),
-                  Text("We'll text you a 6-digit code.", style: Theme.of(context).textTheme.bodySmall),
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                  ],
-                  const SizedBox(height: 20),
-                  ElevatedButton(
-                    onPressed: _sendingOtp ? null : _sendCode,
-                    child: _sendingOtp ? const _Spinner() : const Text('Send code'),
-                  ),
-                ],
-                if (_step == 'otp') ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Theme.of(context).dividerColor),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(_phoneNumber),
-                        TextButton(
-                          onPressed: () => setState(() {
-                            _step = 'phone';
-                            _otpController.clear();
-                            _error = null;
-                            _devOtp = null;
-                          }),
-                          child: const Text('Change'),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_step == 'phone') ...[
+                        PhoneNumberField(
+                          onLocalNumberChanged: (v) => _localNumber = v,
+                        ),
+                        const SizedBox(height: 6),
+                        Text("We'll text you a 6-digit code.", style: Theme.of(context).textTheme.bodySmall),
+                        if (_error == _accountExistsError)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12),
+                            child: Text(
+                              'An account already exists for this number.',
+                              style: TextStyle(color: Theme.of(context).colorScheme.error),
+                            ),
+                          )
+                        else if (_error != null) ...[
+                          const SizedBox(height: 12),
+                          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                        ],
+                        const SizedBox(height: 16),
+                        if (_error == _accountExistsError) ...[
+                          OutlinedButton(onPressed: () => context.go('/login'), child: const Text('Log in instead')),
+                          const SizedBox(height: 12),
+                        ],
+                        ElevatedButton(
+                          onPressed: _sendingOtp ? null : _sendCode,
+                          child: _sendingOtp ? const _Spinner() : const Text('Send code'),
                         ),
                       ],
-                    ),
+                      if (_step == 'otp') ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Theme.of(context).dividerColor),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(_phoneNumber),
+                              TextButton(
+                                onPressed: () => setState(() {
+                                  _step = 'phone';
+                                  _otpController.clear();
+                                  _error = null;
+                                  _devOtp = null;
+                                }),
+                                child: const Text('Change'),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _otpController,
+                          keyboardType: TextInputType.number,
+                          autofillHints: const [AutofillHints.oneTimeCode],
+                          decoration: const InputDecoration(labelText: 'Verification code', hintText: '6-digit code'),
+                          onSubmitted: (_) => _verify(),
+                        ),
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: (_sendingOtp || !canResend) ? null : _resend,
+                            child: Text(canResend ? 'Resend code' : 'Resend code in ${resendRemaining}s'),
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (_error != null) ...[
+                          Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                          const SizedBox(height: 8),
+                        ],
+                        ElevatedButton(
+                          onPressed: _verifying ? null : _verify,
+                          child: _verifying ? const _Spinner() : const Text('Verify'),
+                        ),
+                      ],
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _otpController,
-                    keyboardType: TextInputType.number,
-                    autofillHints: const [AutofillHints.oneTimeCode],
-                    decoration: const InputDecoration(labelText: 'Verification code', hintText: '6-digit code'),
-                    onSubmitted: (_) => _verify(),
-                  ),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton(
-                      onPressed: (_sendingOtp || !canResend) ? null : _resend,
-                      child: Text(canResend ? 'Resend code' : 'Resend code in ${resendRemaining}s'),
-                    ),
-                  ),
-                  if (_error != null) ...[
-                    Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-                    const SizedBox(height: 8),
-                  ],
-                  ElevatedButton(
-                    onPressed: _verifying ? null : _verify,
-                    child: _verifying ? const _Spinner() : const Text('Verify'),
-                  ),
-                ],
+                ),
                 const SizedBox(height: 20),
-                TextButton(
-                  onPressed: () => context.go('/login'),
-                  child: const Text('Already have an account? Log in'),
+                Center(
+                  child: TextButton(
+                    onPressed: () => context.go('/login'),
+                    child: const Text('Already have an account? Log in'),
+                  ),
                 ),
               ],
             ),

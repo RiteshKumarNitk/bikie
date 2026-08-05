@@ -71,7 +71,7 @@ class _PhoneNumberFieldState extends State<PhoneNumberField> {
               FilteringTextInputFormatter.digitsOnly,
               LengthLimitingTextInputFormatter(10),
             ],
-            decoration: const InputDecoration(hintText: '98765 43210'),
+            decoration: const InputDecoration(labelText: 'Mobile number'),
             onChanged: widget.onLocalNumberChanged,
           ),
         ),

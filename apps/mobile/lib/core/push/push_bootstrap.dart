@@ -3,7 +3,7 @@ import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
+import 'package:flutter/foundation.dart' show TargetPlatform, debugPrint, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'push_channels.dart';
@@ -41,61 +41,71 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// with no device attached falls back to Chrome, and `Firebase.initializeApp()` on web needs
 /// explicit `FirebaseOptions` we don't provide (there is no `google-services.json` equivalent
 /// auto-loaded on web) — calling it unconditionally crashes the app on launch there.
+///
+/// Everything below is wrapped in a try/catch and must never let an exception escape: `main()`
+/// awaits this *before* `runApp()`, so an uncaught throw here — e.g. `Firebase.initializeApp()`
+/// failing because `android/app/google-services.json` hasn't been added yet — would take the
+/// entire app down before a single frame renders, on every device, not just fail push setup.
+/// Push notifications are an enhancement; the app must always start without them.
 Future<void> bootstrapPushNotifications() async {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
 
-  await Firebase.initializeApp();
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
-  await localNotificationsPlugin.initialize(
-    const InitializationSettings(android: AndroidInitializationSettings('@mipmap/launcher_icon')),
-    onDidReceiveNotificationResponse: (response) {
-      final payload = response.payload;
-      if (payload == null || payload.isEmpty) return;
-      final decoded = jsonDecode(payload) as Map;
-      notificationTapController.add(decoded.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')));
-    },
-  );
-
-  final androidPlugin = localNotificationsPlugin
-      .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-  if (androidPlugin != null) {
-    for (final channel in PushChannels.all) {
-      await androidPlugin.createNotificationChannel(channel);
-    }
-  }
-
-  // Foreground: FCM does NOT auto-display a system-tray notification while the app is open —
-  // draw it ourselves via flutter_local_notifications, in the channel matching its type.
-  FirebaseMessaging.onMessage.listen((message) async {
-    final notification = message.notification;
-    if (notification == null) return;
-    final channel = PushChannels.forType(message.data['type'] as String?);
-    await localNotificationsPlugin.show(
-      message.hashCode,
-      notification.title,
-      notification.body,
-      NotificationDetails(
-        android: AndroidNotificationDetails(
-          channel.id,
-          channel.name,
-          channelDescription: channel.description,
-          importance: Importance.max,
-          priority: Priority.high,
-        ),
-      ),
-      payload: jsonEncode(_stringData(message.data)),
+    await localNotificationsPlugin.initialize(
+      const InitializationSettings(android: AndroidInitializationSettings('@mipmap/launcher_icon')),
+      onDidReceiveNotificationResponse: (response) {
+        final payload = response.payload;
+        if (payload == null || payload.isEmpty) return;
+        final decoded = jsonDecode(payload) as Map;
+        notificationTapController.add(decoded.map((k, v) => MapEntry(k.toString(), v?.toString() ?? '')));
+      },
     );
-  });
 
-  // Backgrounded app, tapped: the OS already drew the notification; this only fires on tap.
-  FirebaseMessaging.onMessageOpenedApp.listen((message) {
-    notificationTapController.add(_stringData(message.data));
-  });
+    final androidPlugin = localNotificationsPlugin
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+    if (androidPlugin != null) {
+      for (final channel in PushChannels.all) {
+        await androidPlugin.createNotificationChannel(channel);
+      }
+    }
 
-  // Terminated app, launched by tapping a notification: check once at startup.
-  final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
-  if (initialMessage != null) {
-    notificationTapController.add(_stringData(initialMessage.data));
+    // Foreground: FCM does NOT auto-display a system-tray notification while the app is open —
+    // draw it ourselves via flutter_local_notifications, in the channel matching its type.
+    FirebaseMessaging.onMessage.listen((message) async {
+      final notification = message.notification;
+      if (notification == null) return;
+      final channel = PushChannels.forType(message.data['type'] as String?);
+      await localNotificationsPlugin.show(
+        message.hashCode,
+        notification.title,
+        notification.body,
+        NotificationDetails(
+          android: AndroidNotificationDetails(
+            channel.id,
+            channel.name,
+            channelDescription: channel.description,
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+        ),
+        payload: jsonEncode(_stringData(message.data)),
+      );
+    });
+
+    // Backgrounded app, tapped: the OS already drew the notification; this only fires on tap.
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
+      notificationTapController.add(_stringData(message.data));
+    });
+
+    // Terminated app, launched by tapping a notification: check once at startup.
+    final initialMessage = await FirebaseMessaging.instance.getInitialMessage();
+    if (initialMessage != null) {
+      notificationTapController.add(_stringData(initialMessage.data));
+    }
+  } catch (error, stackTrace) {
+    debugPrint('[Push] bootstrap failed, continuing without push notifications: $error\n$stackTrace');
   }
 }

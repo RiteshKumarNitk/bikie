@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_logo.dart';
 
 /// Shown in `main.dart` while `AuthController.bootstrap()` resolves — the
 /// very first thing the app displays, before it knows whether there's a
@@ -16,23 +17,7 @@ class SplashScreen extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              height: 88,
-              width: 88,
-              decoration: BoxDecoration(
-                color: AppColors.darkAccent,
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(color: AppColors.darkAccent.withValues(alpha: 0.5), blurRadius: 32, spreadRadius: 4),
-                ],
-              ),
-              child: const Center(
-                child: Text(
-                  'B',
-                  style: TextStyle(fontSize: 44, fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-              ),
-            ),
+            const AppLogo(size: 88, glow: true),
             const SizedBox(height: 20),
             const Text(
               'BIKIE',

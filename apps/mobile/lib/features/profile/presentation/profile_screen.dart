@@ -39,7 +39,6 @@ class ProfileScreen extends ConsumerWidget {
             onTap: () => context.push('/notifications'),
           ),
           _ProfileTile(icon: Icons.favorite_border, label: 'Wishlist', onTap: () => context.push('/wishlist')),
-          _ProfileTile(icon: Icons.sos, label: 'SOS Emergency', onTap: () => context.push('/sos')),
           _ProfileTile(
             icon: Icons.workspace_premium_outlined,
             label: 'Membership',
