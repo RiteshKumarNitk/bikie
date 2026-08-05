@@ -207,3 +207,73 @@ Map<String, dynamic> _$$SOSAlertDetailImplToJson(
   'timeline': instance.timeline,
   'session': instance.session,
 };
+
+_$SOSDispatchChannelsImpl _$$SOSDispatchChannelsImplFromJson(
+  Map<String, dynamic> json,
+) => _$SOSDispatchChannelsImpl(
+  sms: json['sms'] as bool? ?? false,
+  whatsapp: json['whatsapp'] as bool? ?? false,
+  email: json['email'] as bool? ?? false,
+);
+
+Map<String, dynamic> _$$SOSDispatchChannelsImplToJson(
+  _$SOSDispatchChannelsImpl instance,
+) => <String, dynamic>{
+  'sms': instance.sms,
+  'whatsapp': instance.whatsapp,
+  'email': instance.email,
+};
+
+_$SOSDispatchSummaryImpl _$$SOSDispatchSummaryImplFromJson(
+  Map<String, dynamic> json,
+) => _$SOSDispatchSummaryImpl(
+  nearbyRiders: (json['nearbyRiders'] as num?)?.toInt() ?? 0,
+  serviceProviders: (json['serviceProviders'] as num?)?.toInt() ?? 0,
+  emergencyContacts: (json['emergencyContacts'] as num?)?.toInt() ?? 0,
+  emergencyServices: (json['emergencyServices'] as num?)?.toInt() ?? 0,
+  smsAttempted: (json['smsAttempted'] as num?)?.toInt() ?? 0,
+  smsSent: (json['smsSent'] as num?)?.toInt() ?? 0,
+  whatsappAttempted: (json['whatsappAttempted'] as num?)?.toInt() ?? 0,
+  whatsappSent: (json['whatsappSent'] as num?)?.toInt() ?? 0,
+  emailAttempted: (json['emailAttempted'] as num?)?.toInt() ?? 0,
+  emailSent: (json['emailSent'] as num?)?.toInt() ?? 0,
+  escalatedToAdmins: (json['escalatedToAdmins'] as num?)?.toInt() ?? 0,
+  channels: json['channels'] == null
+      ? null
+      : SOSDispatchChannels.fromJson(json['channels'] as Map<String, dynamic>),
+);
+
+Map<String, dynamic> _$$SOSDispatchSummaryImplToJson(
+  _$SOSDispatchSummaryImpl instance,
+) => <String, dynamic>{
+  'nearbyRiders': instance.nearbyRiders,
+  'serviceProviders': instance.serviceProviders,
+  'emergencyContacts': instance.emergencyContacts,
+  'emergencyServices': instance.emergencyServices,
+  'smsAttempted': instance.smsAttempted,
+  'smsSent': instance.smsSent,
+  'whatsappAttempted': instance.whatsappAttempted,
+  'whatsappSent': instance.whatsappSent,
+  'emailAttempted': instance.emailAttempted,
+  'emailSent': instance.emailSent,
+  'escalatedToAdmins': instance.escalatedToAdmins,
+  'channels': instance.channels,
+};
+
+_$SOSCreateResultImpl _$$SOSCreateResultImplFromJson(
+  Map<String, dynamic> json,
+) => _$SOSCreateResultImpl(
+  alert: SOSAlert.fromJson(json['alert'] as Map<String, dynamic>),
+  dispatch: json['dispatch'] == null
+      ? null
+      : SOSDispatchSummary.fromJson(json['dispatch'] as Map<String, dynamic>),
+  profileWarning: json['profileWarning'] as String?,
+);
+
+Map<String, dynamic> _$$SOSCreateResultImplToJson(
+  _$SOSCreateResultImpl instance,
+) => <String, dynamic>{
+  'alert': instance.alert,
+  'dispatch': instance.dispatch,
+  'profileWarning': instance.profileWarning,
+};

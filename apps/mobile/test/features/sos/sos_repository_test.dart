@@ -64,7 +64,7 @@ void main() {
         ),
       );
 
-      final alert = await repository.create(
+      final result = await repository.create(
         type: 'BREAKDOWN',
         description: 'Bike stalled on the highway',
         latitude: 12.9716,
@@ -72,10 +72,10 @@ void main() {
         city: 'Bengaluru',
       );
 
-      expect(alert, isA<SOSAlert>());
-      expect(alert.id, 'alert-1');
-      expect(alert.status, 'ACTIVE');
-      expect(alert.city, 'Bengaluru');
+      expect(result, isA<SOSCreateResult>());
+      expect(result.alert.id, 'alert-1');
+      expect(result.alert.status, 'ACTIVE');
+      expect(result.alert.city, 'Bengaluru');
 
       final captured = verify(() => dio.post('/api/sos/alerts', data: captureAny(named: 'data'))).captured.single
           as Map<String, dynamic>;
@@ -116,6 +116,56 @@ void main() {
       final captured = verify(() => dio.post('/api/sos/alerts', data: captureAny(named: 'data'))).captured.single
           as Map<String, dynamic>;
       expect(captured.containsKey('description'), isFalse);
+    });
+
+    test('parses the dispatch summary and profileWarning alongside the alert', () async {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/sos/alerts'),
+          statusCode: 200,
+          data: {
+            'alert': buildAlertJson(),
+            'dispatch': {
+              'nearbyRiders': 2,
+              'serviceProviders': 0,
+              'emergencyContacts': 1,
+              'emergencyServices': 0,
+              'smsAttempted': 3,
+              'smsSent': 3,
+              'whatsappAttempted': 0,
+              'whatsappSent': 0,
+              'emailAttempted': 0,
+              'emailSent': 0,
+              'escalatedToAdmins': 0,
+              'channels': {'sms': true, 'whatsapp': false, 'email': false},
+            },
+            'profileWarning': 'Add an emergency contact for faster response.',
+          },
+        ),
+      );
+
+      final result = await repository.create(type: 'ACCIDENT', latitude: 1, longitude: 2, city: 'Mysuru');
+
+      expect(result.dispatch, isNotNull);
+      expect(result.dispatch!.nearbyRiders, 2);
+      expect(result.dispatch!.smsSent, 3);
+      expect(result.dispatch!.channels?.sms, isTrue);
+      expect(result.profileWarning, 'Add an emergency contact for faster response.');
+    });
+
+    test('tolerates a null dispatch (fan-out threw server-side)', () async {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/sos/alerts'),
+          statusCode: 200,
+          data: {'alert': buildAlertJson(), 'dispatch': null, 'profileWarning': null},
+        ),
+      );
+
+      final result = await repository.create(type: 'ACCIDENT', latitude: 1, longitude: 2, city: 'Mysuru');
+
+      expect(result.dispatch, isNull);
+      expect(result.profileWarning, isNull);
     });
 
     test('surfaces a 403 MEMBERSHIP_REQUIRED error as a typed ApiException', () async {

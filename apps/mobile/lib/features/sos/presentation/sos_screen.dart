@@ -30,6 +30,11 @@ class SosScreen extends ConsumerWidget {
             tooltip: 'Nearby riders',
             onPressed: () => context.push('/sos/nearby-riders'),
           ),
+          IconButton(
+            icon: const Icon(Icons.history_outlined),
+            tooltip: 'SOS history',
+            onPressed: () => context.push('/sos/history'),
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(

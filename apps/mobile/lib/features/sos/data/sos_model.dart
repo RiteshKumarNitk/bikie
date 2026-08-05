@@ -137,6 +137,56 @@ class SOSAlertDetail with _$SOSAlertDetail {
   factory SOSAlertDetail.fromJson(Map<String, dynamic> json) => _$SOSAlertDetailFromJson(json);
 }
 
+/// Mirrors `ChannelAvailability` from `safety-location/domain/channel-selection.ts` — which
+/// channels this deployment could actually deliver on for a given dispatch.
+@freezed
+class SOSDispatchChannels with _$SOSDispatchChannels {
+  const factory SOSDispatchChannels({
+    @Default(false) bool sms,
+    @Default(false) bool whatsapp,
+    @Default(false) bool email,
+  }) = _SOSDispatchChannels;
+
+  factory SOSDispatchChannels.fromJson(Map<String, dynamic> json) => _$SOSDispatchChannelsFromJson(json);
+}
+
+/// Mirrors `SOSDispatchSummary` (`fan-out.application.ts`) — the fields the web's
+/// `PanicAlertCards.tsx` `DispatchReport` actually renders. ADR-030: the success screen must
+/// report what really happened (recipients reached, per-channel sent/attempted, a distinct
+/// "nobody reached" state) instead of a fixed "sent via SMS/WhatsApp/email" sentence.
+@freezed
+class SOSDispatchSummary with _$SOSDispatchSummary {
+  const factory SOSDispatchSummary({
+    @Default(0) int nearbyRiders,
+    @Default(0) int serviceProviders,
+    @Default(0) int emergencyContacts,
+    @Default(0) int emergencyServices,
+    @Default(0) int smsAttempted,
+    @Default(0) int smsSent,
+    @Default(0) int whatsappAttempted,
+    @Default(0) int whatsappSent,
+    @Default(0) int emailAttempted,
+    @Default(0) int emailSent,
+    @Default(0) int escalatedToAdmins,
+    SOSDispatchChannels? channels,
+  }) = _SOSDispatchSummary;
+
+  factory SOSDispatchSummary.fromJson(Map<String, dynamic> json) => _$SOSDispatchSummaryFromJson(json);
+}
+
+/// `POST /api/sos/alerts` response envelope — the created alert plus the fan-out's dispatch
+/// summary (null if the fan-out itself threw) and an optional profile-completeness warning.
+@freezed
+class SOSCreateResult with _$SOSCreateResult {
+  const factory SOSCreateResult({
+    required SOSAlert alert,
+    SOSDispatchSummary? dispatch,
+    String? profileWarning,
+  }) = _SOSCreateResult;
+
+  factory SOSCreateResult.fromJson(Map<String, dynamic> json) => _$SOSCreateResultFromJson(json);
+}
+
 /// `GET /api/sos/partners` — backs "Share Mechanic" / "Share Fuel Contact". Plain class (not
 /// freezed) since it just flattens one nested `user.phone` field from the API response.
 class SOSPartner {

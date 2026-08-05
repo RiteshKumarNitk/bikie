@@ -2495,3 +2495,886 @@ abstract class _SOSAlertDetail implements SOSAlertDetail {
   _$$SOSAlertDetailImplCopyWith<_$SOSAlertDetailImpl> get copyWith =>
       throw _privateConstructorUsedError;
 }
+
+SOSDispatchChannels _$SOSDispatchChannelsFromJson(Map<String, dynamic> json) {
+  return _SOSDispatchChannels.fromJson(json);
+}
+
+/// @nodoc
+mixin _$SOSDispatchChannels {
+  bool get sms => throw _privateConstructorUsedError;
+  bool get whatsapp => throw _privateConstructorUsedError;
+  bool get email => throw _privateConstructorUsedError;
+
+  /// Serializes this SOSDispatchChannels to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of SOSDispatchChannels
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $SOSDispatchChannelsCopyWith<SOSDispatchChannels> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $SOSDispatchChannelsCopyWith<$Res> {
+  factory $SOSDispatchChannelsCopyWith(
+    SOSDispatchChannels value,
+    $Res Function(SOSDispatchChannels) then,
+  ) = _$SOSDispatchChannelsCopyWithImpl<$Res, SOSDispatchChannels>;
+  @useResult
+  $Res call({bool sms, bool whatsapp, bool email});
+}
+
+/// @nodoc
+class _$SOSDispatchChannelsCopyWithImpl<$Res, $Val extends SOSDispatchChannels>
+    implements $SOSDispatchChannelsCopyWith<$Res> {
+  _$SOSDispatchChannelsCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of SOSDispatchChannels
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? sms = null,
+    Object? whatsapp = null,
+    Object? email = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            sms: null == sms
+                ? _value.sms
+                : sms // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            whatsapp: null == whatsapp
+                ? _value.whatsapp
+                : whatsapp // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            email: null == email
+                ? _value.email
+                : email // ignore: cast_nullable_to_non_nullable
+                      as bool,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$SOSDispatchChannelsImplCopyWith<$Res>
+    implements $SOSDispatchChannelsCopyWith<$Res> {
+  factory _$$SOSDispatchChannelsImplCopyWith(
+    _$SOSDispatchChannelsImpl value,
+    $Res Function(_$SOSDispatchChannelsImpl) then,
+  ) = __$$SOSDispatchChannelsImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({bool sms, bool whatsapp, bool email});
+}
+
+/// @nodoc
+class __$$SOSDispatchChannelsImplCopyWithImpl<$Res>
+    extends _$SOSDispatchChannelsCopyWithImpl<$Res, _$SOSDispatchChannelsImpl>
+    implements _$$SOSDispatchChannelsImplCopyWith<$Res> {
+  __$$SOSDispatchChannelsImplCopyWithImpl(
+    _$SOSDispatchChannelsImpl _value,
+    $Res Function(_$SOSDispatchChannelsImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of SOSDispatchChannels
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? sms = null,
+    Object? whatsapp = null,
+    Object? email = null,
+  }) {
+    return _then(
+      _$SOSDispatchChannelsImpl(
+        sms: null == sms
+            ? _value.sms
+            : sms // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        whatsapp: null == whatsapp
+            ? _value.whatsapp
+            : whatsapp // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        email: null == email
+            ? _value.email
+            : email // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$SOSDispatchChannelsImpl implements _SOSDispatchChannels {
+  const _$SOSDispatchChannelsImpl({
+    this.sms = false,
+    this.whatsapp = false,
+    this.email = false,
+  });
+
+  factory _$SOSDispatchChannelsImpl.fromJson(Map<String, dynamic> json) =>
+      _$$SOSDispatchChannelsImplFromJson(json);
+
+  @override
+  @JsonKey()
+  final bool sms;
+  @override
+  @JsonKey()
+  final bool whatsapp;
+  @override
+  @JsonKey()
+  final bool email;
+
+  @override
+  String toString() {
+    return 'SOSDispatchChannels(sms: $sms, whatsapp: $whatsapp, email: $email)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SOSDispatchChannelsImpl &&
+            (identical(other.sms, sms) || other.sms == sms) &&
+            (identical(other.whatsapp, whatsapp) ||
+                other.whatsapp == whatsapp) &&
+            (identical(other.email, email) || other.email == email));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, sms, whatsapp, email);
+
+  /// Create a copy of SOSDispatchChannels
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SOSDispatchChannelsImplCopyWith<_$SOSDispatchChannelsImpl> get copyWith =>
+      __$$SOSDispatchChannelsImplCopyWithImpl<_$SOSDispatchChannelsImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SOSDispatchChannelsImplToJson(this);
+  }
+}
+
+abstract class _SOSDispatchChannels implements SOSDispatchChannels {
+  const factory _SOSDispatchChannels({
+    final bool sms,
+    final bool whatsapp,
+    final bool email,
+  }) = _$SOSDispatchChannelsImpl;
+
+  factory _SOSDispatchChannels.fromJson(Map<String, dynamic> json) =
+      _$SOSDispatchChannelsImpl.fromJson;
+
+  @override
+  bool get sms;
+  @override
+  bool get whatsapp;
+  @override
+  bool get email;
+
+  /// Create a copy of SOSDispatchChannels
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$SOSDispatchChannelsImplCopyWith<_$SOSDispatchChannelsImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+SOSDispatchSummary _$SOSDispatchSummaryFromJson(Map<String, dynamic> json) {
+  return _SOSDispatchSummary.fromJson(json);
+}
+
+/// @nodoc
+mixin _$SOSDispatchSummary {
+  int get nearbyRiders => throw _privateConstructorUsedError;
+  int get serviceProviders => throw _privateConstructorUsedError;
+  int get emergencyContacts => throw _privateConstructorUsedError;
+  int get emergencyServices => throw _privateConstructorUsedError;
+  int get smsAttempted => throw _privateConstructorUsedError;
+  int get smsSent => throw _privateConstructorUsedError;
+  int get whatsappAttempted => throw _privateConstructorUsedError;
+  int get whatsappSent => throw _privateConstructorUsedError;
+  int get emailAttempted => throw _privateConstructorUsedError;
+  int get emailSent => throw _privateConstructorUsedError;
+  int get escalatedToAdmins => throw _privateConstructorUsedError;
+  SOSDispatchChannels? get channels => throw _privateConstructorUsedError;
+
+  /// Serializes this SOSDispatchSummary to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of SOSDispatchSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $SOSDispatchSummaryCopyWith<SOSDispatchSummary> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $SOSDispatchSummaryCopyWith<$Res> {
+  factory $SOSDispatchSummaryCopyWith(
+    SOSDispatchSummary value,
+    $Res Function(SOSDispatchSummary) then,
+  ) = _$SOSDispatchSummaryCopyWithImpl<$Res, SOSDispatchSummary>;
+  @useResult
+  $Res call({
+    int nearbyRiders,
+    int serviceProviders,
+    int emergencyContacts,
+    int emergencyServices,
+    int smsAttempted,
+    int smsSent,
+    int whatsappAttempted,
+    int whatsappSent,
+    int emailAttempted,
+    int emailSent,
+    int escalatedToAdmins,
+    SOSDispatchChannels? channels,
+  });
+
+  $SOSDispatchChannelsCopyWith<$Res>? get channels;
+}
+
+/// @nodoc
+class _$SOSDispatchSummaryCopyWithImpl<$Res, $Val extends SOSDispatchSummary>
+    implements $SOSDispatchSummaryCopyWith<$Res> {
+  _$SOSDispatchSummaryCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of SOSDispatchSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? nearbyRiders = null,
+    Object? serviceProviders = null,
+    Object? emergencyContacts = null,
+    Object? emergencyServices = null,
+    Object? smsAttempted = null,
+    Object? smsSent = null,
+    Object? whatsappAttempted = null,
+    Object? whatsappSent = null,
+    Object? emailAttempted = null,
+    Object? emailSent = null,
+    Object? escalatedToAdmins = null,
+    Object? channels = freezed,
+  }) {
+    return _then(
+      _value.copyWith(
+            nearbyRiders: null == nearbyRiders
+                ? _value.nearbyRiders
+                : nearbyRiders // ignore: cast_nullable_to_non_nullable
+                      as int,
+            serviceProviders: null == serviceProviders
+                ? _value.serviceProviders
+                : serviceProviders // ignore: cast_nullable_to_non_nullable
+                      as int,
+            emergencyContacts: null == emergencyContacts
+                ? _value.emergencyContacts
+                : emergencyContacts // ignore: cast_nullable_to_non_nullable
+                      as int,
+            emergencyServices: null == emergencyServices
+                ? _value.emergencyServices
+                : emergencyServices // ignore: cast_nullable_to_non_nullable
+                      as int,
+            smsAttempted: null == smsAttempted
+                ? _value.smsAttempted
+                : smsAttempted // ignore: cast_nullable_to_non_nullable
+                      as int,
+            smsSent: null == smsSent
+                ? _value.smsSent
+                : smsSent // ignore: cast_nullable_to_non_nullable
+                      as int,
+            whatsappAttempted: null == whatsappAttempted
+                ? _value.whatsappAttempted
+                : whatsappAttempted // ignore: cast_nullable_to_non_nullable
+                      as int,
+            whatsappSent: null == whatsappSent
+                ? _value.whatsappSent
+                : whatsappSent // ignore: cast_nullable_to_non_nullable
+                      as int,
+            emailAttempted: null == emailAttempted
+                ? _value.emailAttempted
+                : emailAttempted // ignore: cast_nullable_to_non_nullable
+                      as int,
+            emailSent: null == emailSent
+                ? _value.emailSent
+                : emailSent // ignore: cast_nullable_to_non_nullable
+                      as int,
+            escalatedToAdmins: null == escalatedToAdmins
+                ? _value.escalatedToAdmins
+                : escalatedToAdmins // ignore: cast_nullable_to_non_nullable
+                      as int,
+            channels: freezed == channels
+                ? _value.channels
+                : channels // ignore: cast_nullable_to_non_nullable
+                      as SOSDispatchChannels?,
+          )
+          as $Val,
+    );
+  }
+
+  /// Create a copy of SOSDispatchSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $SOSDispatchChannelsCopyWith<$Res>? get channels {
+    if (_value.channels == null) {
+      return null;
+    }
+
+    return $SOSDispatchChannelsCopyWith<$Res>(_value.channels!, (value) {
+      return _then(_value.copyWith(channels: value) as $Val);
+    });
+  }
+}
+
+/// @nodoc
+abstract class _$$SOSDispatchSummaryImplCopyWith<$Res>
+    implements $SOSDispatchSummaryCopyWith<$Res> {
+  factory _$$SOSDispatchSummaryImplCopyWith(
+    _$SOSDispatchSummaryImpl value,
+    $Res Function(_$SOSDispatchSummaryImpl) then,
+  ) = __$$SOSDispatchSummaryImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    int nearbyRiders,
+    int serviceProviders,
+    int emergencyContacts,
+    int emergencyServices,
+    int smsAttempted,
+    int smsSent,
+    int whatsappAttempted,
+    int whatsappSent,
+    int emailAttempted,
+    int emailSent,
+    int escalatedToAdmins,
+    SOSDispatchChannels? channels,
+  });
+
+  @override
+  $SOSDispatchChannelsCopyWith<$Res>? get channels;
+}
+
+/// @nodoc
+class __$$SOSDispatchSummaryImplCopyWithImpl<$Res>
+    extends _$SOSDispatchSummaryCopyWithImpl<$Res, _$SOSDispatchSummaryImpl>
+    implements _$$SOSDispatchSummaryImplCopyWith<$Res> {
+  __$$SOSDispatchSummaryImplCopyWithImpl(
+    _$SOSDispatchSummaryImpl _value,
+    $Res Function(_$SOSDispatchSummaryImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of SOSDispatchSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? nearbyRiders = null,
+    Object? serviceProviders = null,
+    Object? emergencyContacts = null,
+    Object? emergencyServices = null,
+    Object? smsAttempted = null,
+    Object? smsSent = null,
+    Object? whatsappAttempted = null,
+    Object? whatsappSent = null,
+    Object? emailAttempted = null,
+    Object? emailSent = null,
+    Object? escalatedToAdmins = null,
+    Object? channels = freezed,
+  }) {
+    return _then(
+      _$SOSDispatchSummaryImpl(
+        nearbyRiders: null == nearbyRiders
+            ? _value.nearbyRiders
+            : nearbyRiders // ignore: cast_nullable_to_non_nullable
+                  as int,
+        serviceProviders: null == serviceProviders
+            ? _value.serviceProviders
+            : serviceProviders // ignore: cast_nullable_to_non_nullable
+                  as int,
+        emergencyContacts: null == emergencyContacts
+            ? _value.emergencyContacts
+            : emergencyContacts // ignore: cast_nullable_to_non_nullable
+                  as int,
+        emergencyServices: null == emergencyServices
+            ? _value.emergencyServices
+            : emergencyServices // ignore: cast_nullable_to_non_nullable
+                  as int,
+        smsAttempted: null == smsAttempted
+            ? _value.smsAttempted
+            : smsAttempted // ignore: cast_nullable_to_non_nullable
+                  as int,
+        smsSent: null == smsSent
+            ? _value.smsSent
+            : smsSent // ignore: cast_nullable_to_non_nullable
+                  as int,
+        whatsappAttempted: null == whatsappAttempted
+            ? _value.whatsappAttempted
+            : whatsappAttempted // ignore: cast_nullable_to_non_nullable
+                  as int,
+        whatsappSent: null == whatsappSent
+            ? _value.whatsappSent
+            : whatsappSent // ignore: cast_nullable_to_non_nullable
+                  as int,
+        emailAttempted: null == emailAttempted
+            ? _value.emailAttempted
+            : emailAttempted // ignore: cast_nullable_to_non_nullable
+                  as int,
+        emailSent: null == emailSent
+            ? _value.emailSent
+            : emailSent // ignore: cast_nullable_to_non_nullable
+                  as int,
+        escalatedToAdmins: null == escalatedToAdmins
+            ? _value.escalatedToAdmins
+            : escalatedToAdmins // ignore: cast_nullable_to_non_nullable
+                  as int,
+        channels: freezed == channels
+            ? _value.channels
+            : channels // ignore: cast_nullable_to_non_nullable
+                  as SOSDispatchChannels?,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$SOSDispatchSummaryImpl implements _SOSDispatchSummary {
+  const _$SOSDispatchSummaryImpl({
+    this.nearbyRiders = 0,
+    this.serviceProviders = 0,
+    this.emergencyContacts = 0,
+    this.emergencyServices = 0,
+    this.smsAttempted = 0,
+    this.smsSent = 0,
+    this.whatsappAttempted = 0,
+    this.whatsappSent = 0,
+    this.emailAttempted = 0,
+    this.emailSent = 0,
+    this.escalatedToAdmins = 0,
+    this.channels,
+  });
+
+  factory _$SOSDispatchSummaryImpl.fromJson(Map<String, dynamic> json) =>
+      _$$SOSDispatchSummaryImplFromJson(json);
+
+  @override
+  @JsonKey()
+  final int nearbyRiders;
+  @override
+  @JsonKey()
+  final int serviceProviders;
+  @override
+  @JsonKey()
+  final int emergencyContacts;
+  @override
+  @JsonKey()
+  final int emergencyServices;
+  @override
+  @JsonKey()
+  final int smsAttempted;
+  @override
+  @JsonKey()
+  final int smsSent;
+  @override
+  @JsonKey()
+  final int whatsappAttempted;
+  @override
+  @JsonKey()
+  final int whatsappSent;
+  @override
+  @JsonKey()
+  final int emailAttempted;
+  @override
+  @JsonKey()
+  final int emailSent;
+  @override
+  @JsonKey()
+  final int escalatedToAdmins;
+  @override
+  final SOSDispatchChannels? channels;
+
+  @override
+  String toString() {
+    return 'SOSDispatchSummary(nearbyRiders: $nearbyRiders, serviceProviders: $serviceProviders, emergencyContacts: $emergencyContacts, emergencyServices: $emergencyServices, smsAttempted: $smsAttempted, smsSent: $smsSent, whatsappAttempted: $whatsappAttempted, whatsappSent: $whatsappSent, emailAttempted: $emailAttempted, emailSent: $emailSent, escalatedToAdmins: $escalatedToAdmins, channels: $channels)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SOSDispatchSummaryImpl &&
+            (identical(other.nearbyRiders, nearbyRiders) ||
+                other.nearbyRiders == nearbyRiders) &&
+            (identical(other.serviceProviders, serviceProviders) ||
+                other.serviceProviders == serviceProviders) &&
+            (identical(other.emergencyContacts, emergencyContacts) ||
+                other.emergencyContacts == emergencyContacts) &&
+            (identical(other.emergencyServices, emergencyServices) ||
+                other.emergencyServices == emergencyServices) &&
+            (identical(other.smsAttempted, smsAttempted) ||
+                other.smsAttempted == smsAttempted) &&
+            (identical(other.smsSent, smsSent) || other.smsSent == smsSent) &&
+            (identical(other.whatsappAttempted, whatsappAttempted) ||
+                other.whatsappAttempted == whatsappAttempted) &&
+            (identical(other.whatsappSent, whatsappSent) ||
+                other.whatsappSent == whatsappSent) &&
+            (identical(other.emailAttempted, emailAttempted) ||
+                other.emailAttempted == emailAttempted) &&
+            (identical(other.emailSent, emailSent) ||
+                other.emailSent == emailSent) &&
+            (identical(other.escalatedToAdmins, escalatedToAdmins) ||
+                other.escalatedToAdmins == escalatedToAdmins) &&
+            (identical(other.channels, channels) ||
+                other.channels == channels));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    nearbyRiders,
+    serviceProviders,
+    emergencyContacts,
+    emergencyServices,
+    smsAttempted,
+    smsSent,
+    whatsappAttempted,
+    whatsappSent,
+    emailAttempted,
+    emailSent,
+    escalatedToAdmins,
+    channels,
+  );
+
+  /// Create a copy of SOSDispatchSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SOSDispatchSummaryImplCopyWith<_$SOSDispatchSummaryImpl> get copyWith =>
+      __$$SOSDispatchSummaryImplCopyWithImpl<_$SOSDispatchSummaryImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SOSDispatchSummaryImplToJson(this);
+  }
+}
+
+abstract class _SOSDispatchSummary implements SOSDispatchSummary {
+  const factory _SOSDispatchSummary({
+    final int nearbyRiders,
+    final int serviceProviders,
+    final int emergencyContacts,
+    final int emergencyServices,
+    final int smsAttempted,
+    final int smsSent,
+    final int whatsappAttempted,
+    final int whatsappSent,
+    final int emailAttempted,
+    final int emailSent,
+    final int escalatedToAdmins,
+    final SOSDispatchChannels? channels,
+  }) = _$SOSDispatchSummaryImpl;
+
+  factory _SOSDispatchSummary.fromJson(Map<String, dynamic> json) =
+      _$SOSDispatchSummaryImpl.fromJson;
+
+  @override
+  int get nearbyRiders;
+  @override
+  int get serviceProviders;
+  @override
+  int get emergencyContacts;
+  @override
+  int get emergencyServices;
+  @override
+  int get smsAttempted;
+  @override
+  int get smsSent;
+  @override
+  int get whatsappAttempted;
+  @override
+  int get whatsappSent;
+  @override
+  int get emailAttempted;
+  @override
+  int get emailSent;
+  @override
+  int get escalatedToAdmins;
+  @override
+  SOSDispatchChannels? get channels;
+
+  /// Create a copy of SOSDispatchSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$SOSDispatchSummaryImplCopyWith<_$SOSDispatchSummaryImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+SOSCreateResult _$SOSCreateResultFromJson(Map<String, dynamic> json) {
+  return _SOSCreateResult.fromJson(json);
+}
+
+/// @nodoc
+mixin _$SOSCreateResult {
+  SOSAlert get alert => throw _privateConstructorUsedError;
+  SOSDispatchSummary? get dispatch => throw _privateConstructorUsedError;
+  String? get profileWarning => throw _privateConstructorUsedError;
+
+  /// Serializes this SOSCreateResult to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of SOSCreateResult
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $SOSCreateResultCopyWith<SOSCreateResult> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $SOSCreateResultCopyWith<$Res> {
+  factory $SOSCreateResultCopyWith(
+    SOSCreateResult value,
+    $Res Function(SOSCreateResult) then,
+  ) = _$SOSCreateResultCopyWithImpl<$Res, SOSCreateResult>;
+  @useResult
+  $Res call({
+    SOSAlert alert,
+    SOSDispatchSummary? dispatch,
+    String? profileWarning,
+  });
+
+  $SOSAlertCopyWith<$Res> get alert;
+  $SOSDispatchSummaryCopyWith<$Res>? get dispatch;
+}
+
+/// @nodoc
+class _$SOSCreateResultCopyWithImpl<$Res, $Val extends SOSCreateResult>
+    implements $SOSCreateResultCopyWith<$Res> {
+  _$SOSCreateResultCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of SOSCreateResult
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? alert = null,
+    Object? dispatch = freezed,
+    Object? profileWarning = freezed,
+  }) {
+    return _then(
+      _value.copyWith(
+            alert: null == alert
+                ? _value.alert
+                : alert // ignore: cast_nullable_to_non_nullable
+                      as SOSAlert,
+            dispatch: freezed == dispatch
+                ? _value.dispatch
+                : dispatch // ignore: cast_nullable_to_non_nullable
+                      as SOSDispatchSummary?,
+            profileWarning: freezed == profileWarning
+                ? _value.profileWarning
+                : profileWarning // ignore: cast_nullable_to_non_nullable
+                      as String?,
+          )
+          as $Val,
+    );
+  }
+
+  /// Create a copy of SOSCreateResult
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $SOSAlertCopyWith<$Res> get alert {
+    return $SOSAlertCopyWith<$Res>(_value.alert, (value) {
+      return _then(_value.copyWith(alert: value) as $Val);
+    });
+  }
+
+  /// Create a copy of SOSCreateResult
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $SOSDispatchSummaryCopyWith<$Res>? get dispatch {
+    if (_value.dispatch == null) {
+      return null;
+    }
+
+    return $SOSDispatchSummaryCopyWith<$Res>(_value.dispatch!, (value) {
+      return _then(_value.copyWith(dispatch: value) as $Val);
+    });
+  }
+}
+
+/// @nodoc
+abstract class _$$SOSCreateResultImplCopyWith<$Res>
+    implements $SOSCreateResultCopyWith<$Res> {
+  factory _$$SOSCreateResultImplCopyWith(
+    _$SOSCreateResultImpl value,
+    $Res Function(_$SOSCreateResultImpl) then,
+  ) = __$$SOSCreateResultImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    SOSAlert alert,
+    SOSDispatchSummary? dispatch,
+    String? profileWarning,
+  });
+
+  @override
+  $SOSAlertCopyWith<$Res> get alert;
+  @override
+  $SOSDispatchSummaryCopyWith<$Res>? get dispatch;
+}
+
+/// @nodoc
+class __$$SOSCreateResultImplCopyWithImpl<$Res>
+    extends _$SOSCreateResultCopyWithImpl<$Res, _$SOSCreateResultImpl>
+    implements _$$SOSCreateResultImplCopyWith<$Res> {
+  __$$SOSCreateResultImplCopyWithImpl(
+    _$SOSCreateResultImpl _value,
+    $Res Function(_$SOSCreateResultImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of SOSCreateResult
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? alert = null,
+    Object? dispatch = freezed,
+    Object? profileWarning = freezed,
+  }) {
+    return _then(
+      _$SOSCreateResultImpl(
+        alert: null == alert
+            ? _value.alert
+            : alert // ignore: cast_nullable_to_non_nullable
+                  as SOSAlert,
+        dispatch: freezed == dispatch
+            ? _value.dispatch
+            : dispatch // ignore: cast_nullable_to_non_nullable
+                  as SOSDispatchSummary?,
+        profileWarning: freezed == profileWarning
+            ? _value.profileWarning
+            : profileWarning // ignore: cast_nullable_to_non_nullable
+                  as String?,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$SOSCreateResultImpl implements _SOSCreateResult {
+  const _$SOSCreateResultImpl({
+    required this.alert,
+    this.dispatch,
+    this.profileWarning,
+  });
+
+  factory _$SOSCreateResultImpl.fromJson(Map<String, dynamic> json) =>
+      _$$SOSCreateResultImplFromJson(json);
+
+  @override
+  final SOSAlert alert;
+  @override
+  final SOSDispatchSummary? dispatch;
+  @override
+  final String? profileWarning;
+
+  @override
+  String toString() {
+    return 'SOSCreateResult(alert: $alert, dispatch: $dispatch, profileWarning: $profileWarning)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$SOSCreateResultImpl &&
+            (identical(other.alert, alert) || other.alert == alert) &&
+            (identical(other.dispatch, dispatch) ||
+                other.dispatch == dispatch) &&
+            (identical(other.profileWarning, profileWarning) ||
+                other.profileWarning == profileWarning));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, alert, dispatch, profileWarning);
+
+  /// Create a copy of SOSCreateResult
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$SOSCreateResultImplCopyWith<_$SOSCreateResultImpl> get copyWith =>
+      __$$SOSCreateResultImplCopyWithImpl<_$SOSCreateResultImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$SOSCreateResultImplToJson(this);
+  }
+}
+
+abstract class _SOSCreateResult implements SOSCreateResult {
+  const factory _SOSCreateResult({
+    required final SOSAlert alert,
+    final SOSDispatchSummary? dispatch,
+    final String? profileWarning,
+  }) = _$SOSCreateResultImpl;
+
+  factory _SOSCreateResult.fromJson(Map<String, dynamic> json) =
+      _$SOSCreateResultImpl.fromJson;
+
+  @override
+  SOSAlert get alert;
+  @override
+  SOSDispatchSummary? get dispatch;
+  @override
+  String? get profileWarning;
+
+  /// Create a copy of SOSCreateResult
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$SOSCreateResultImplCopyWith<_$SOSCreateResultImpl> get copyWith =>
+      throw _privateConstructorUsedError;
+}

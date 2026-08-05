@@ -69,7 +69,7 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
-
+  flutter_launcher_icons: ^0.13.1
   build_runner: ^2.4.13
   # Pinned to what pubspec.lock actually resolves (freezed 2.5.8 against
   # freezed_annotation 2.4.4 above — freezed_annotation intentionally lags
@@ -128,3 +128,9 @@ flutter:
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Variable.ttf
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon.png"
+  min_sdk_android: 21

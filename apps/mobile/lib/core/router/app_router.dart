@@ -22,6 +22,7 @@ import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/referrals/presentation/referrals_screen.dart';
 import '../../features/ride_room/presentation/ride_room_screen.dart';
 import '../../features/sos/presentation/sos_detail_screen.dart';
+import '../../features/sos/presentation/sos_history_screen.dart';
 import '../../features/sos/presentation/sos_screen.dart';
 import '../../features/trips/presentation/create_ride_screen.dart';
 import '../../features/trips/presentation/my_rides_screen.dart';
@@ -106,6 +107,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/wishlist', builder: (context, state) => const WishlistScreen()),
       GoRoute(path: '/sos', builder: (context, state) => const SosScreen()),
       GoRoute(path: '/sos/nearby-riders', builder: (context, state) => const NearbyRidersScreen()),
+      GoRoute(path: '/sos/history', builder: (context, state) => const SosHistoryScreen()),
       GoRoute(
         path: '/sos/:id',
         builder: (context, state) => SosDetailScreen(alertId: state.pathParameters['id']!),

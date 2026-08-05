@@ -34,7 +34,10 @@ class SosRepository {
     });
   }
 
-  Future<SOSAlert> create({
+  /// Returns the full response envelope (alert + dispatch summary + profile warning), not just
+  /// the created alert — the caller needs `dispatch` to report real delivery results (ADR-030),
+  /// not a fixed "sent via SMS/WhatsApp/email" success message.
+  Future<SOSCreateResult> create({
     required String type,
     String? description,
     required double latitude,
@@ -52,7 +55,7 @@ class SosRepository {
           'city': city,
         },
       );
-      return SOSAlert.fromJson(res.data['alert'] as Map<String, dynamic>);
+      return SOSCreateResult.fromJson(res.data as Map<String, dynamic>);
     });
   }
 
