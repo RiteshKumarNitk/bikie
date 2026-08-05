@@ -17,13 +17,13 @@ const isDev = process.env.NODE_ENV === "development";
 // documented script URLs; the widget's exact runtime network origins weren't confirmed from
 // renderable docs and need to be captured from the Network tab on first live test, then this
 // list tightened/corrected to match reality rather than guesswork.
-const msg91WidgetScriptSrc = "https://verify.msg91.com https://verify.phone91.com";
-const msg91WidgetConnectSrc = "https://verify.msg91.com https://verify.phone91.com https://control.msg91.com";
+const msg91WidgetScriptSrc = "https://verify.msg91.com https://verify.phone91.com https://hcaptcha.com https://*.hcaptcha.com";
+const msg91WidgetConnectSrc = "https://verify.msg91.com https://verify.phone91.com https://control.msg91.com https://hcaptcha.com https://*.hcaptcha.com";
 
 const cspHeader = `
   default-src 'self';
   script-src 'self' 'unsafe-inline' ${msg91WidgetScriptSrc}${isDev ? " 'unsafe-eval'" : ""};
-  style-src 'self' 'unsafe-inline';
+  style-src 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com;
   img-src 'self' data: blob: https:;
   font-src 'self' data:;
   connect-src 'self' https://res.cloudinary.com https://api.cloudinary.com ${msg91WidgetConnectSrc};
@@ -31,6 +31,7 @@ const cspHeader = `
   base-uri 'self';
   form-action 'self';
   frame-ancestors 'none';
+  frame-src 'self' https://hcaptcha.com https://*.hcaptcha.com;
   ${isDev ? "" : "upgrade-insecure-requests;"}
 `
   .replace(/\s{2,}/g, " ")
