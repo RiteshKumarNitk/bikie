@@ -6,6 +6,7 @@ import '../../bikes/domain/bike_providers.dart';
 import '../../bikes/presentation/widgets/bike_card.dart';
 import '../../destinations/domain/destination_providers.dart';
 import '../../onboarding/domain/rider_profile_providers.dart';
+import '../../sos/presentation/send_sos_sheet.dart';
 import '../domain/home_providers.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -30,6 +31,14 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.symmetric(vertical: 16),
           children: [
+            // SOS leads Home — the safety network is the first thing a rider sees, ahead of
+            // browsing bikes/destinations (kept below, unchanged, per product decision: the
+            // marketplace stays, SOS just leads).
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: _SosPanicCards(onOpen: () => showSendSosSheet(context)),
+            ),
+            const SizedBox(height: 20),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text('Rent the ride, own the road', style: Theme.of(context).textTheme.headlineSmall),
@@ -41,11 +50,6 @@ class HomeScreen extends ConsumerWidget {
                 'Airbnb for motorcycles — find your next ride anywhere in India.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
-            ),
-            const SizedBox(height: 16),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: _SosBanner(onTap: () => context.push('/sos')),
             ),
             const _ProfileCompletionBanner(),
             const SizedBox(height: 20),
@@ -146,49 +150,115 @@ class HomeScreen extends ConsumerWidget {
   }
 }
 
-/// One-tap SOS entry point on Home — mirrors the web homepage, where the panic CTA sits above
-/// the Hero (ADR-015), rather than being buried a level deep in Profile.
-class _SosBanner extends StatelessWidget {
-  const _SosBanner({required this.onTap});
+/// Red/Amber alert cards leading Home — mirrors web's `PanicAlertCards.tsx` (same two exact
+/// brand hexes, same category groupings as `send_sos_sheet.dart`'s picker), but as a lighter
+/// read-only preview: tapping either card opens the real `SendSosSheet` (reused as-is, not
+/// duplicated) rather than re-implementing category selection here.
+const _sosRed = Color(0xFFE8000D);
+const _sosAmber = Color(0xFFFFAA00);
+const _redCategoryPreview = ['🚨 Accident', '🏥 Medical', '🔥 Life Threatening'];
+const _amberCategoryPreview = ['🔧 Breakdown', '🔩 Flat Tyre', '⛽ Fuel', '🔋 Battery'];
 
+class _SosPanicCards extends StatelessWidget {
+  const _SosPanicCards({required this.onOpen});
+
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _SosAlertCard(
+          color: _sosRed,
+          icon: Icons.sos,
+          title: 'Red Alert — Emergency',
+          tagline: 'Accident or life-threatening. Instantly alerts fellow riders with your GPS.',
+          categories: _redCategoryPreview,
+          onTap: onOpen,
+        ),
+        const SizedBox(height: 12),
+        _SosAlertCard(
+          color: _sosAmber,
+          icon: Icons.warning_amber_rounded,
+          title: 'Amber Alert — Assistance',
+          tagline: 'Non-emergency. Nearby riders and service providers get notified.',
+          categories: _amberCategoryPreview,
+          onTap: onOpen,
+        ),
+      ],
+    );
+  }
+}
+
+class _SosAlertCard extends StatelessWidget {
+  const _SosAlertCard({
+    required this.color,
+    required this.icon,
+    required this.title,
+    required this.tagline,
+    required this.categories,
+    required this.onTap,
+  });
+
+  final Color color;
+  final IconData icon;
+  final String title;
+  final String tagline;
+  final List<String> categories;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final error = Theme.of(context).colorScheme.error;
     return Material(
-      color: error.withValues(alpha: 0.1),
+      color: color.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(20),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
         onTap: onTap,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: error.withValues(alpha: 0.35))),
-          child: Row(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(borderRadius: BorderRadius.circular(20), border: Border.all(color: color.withValues(alpha: 0.35))),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                height: 44,
-                width: 44,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(color: error, shape: BoxShape.circle),
-                child: const Icon(Icons.sos, color: Colors.white, size: 22),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('SOS Emergency', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: error, fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 2),
-                    Text(
-                      'One tap alerts nearby riders and admins with your location.',
-                      style: Theme.of(context).textTheme.bodySmall,
+              Row(
+                children: [
+                  Container(
+                    height: 48,
+                    width: 48,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                    child: Icon(icon, color: Colors.white, size: 24),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(title, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: color, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 2),
+                        Text(tagline, style: Theme.of(context).textTheme.bodySmall),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                  Icon(Icons.chevron_right, color: color),
+                ],
               ),
-              Icon(Icons.chevron_right, color: error),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: categories
+                    .map((c) => Chip(
+                          label: Text(c, style: const TextStyle(fontSize: 11)),
+                          backgroundColor: color.withValues(alpha: 0.12),
+                          side: BorderSide(color: color.withValues(alpha: 0.3)),
+                          visualDensity: VisualDensity.compact,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ))
+                    .toList(),
+              ),
             ],
           ),
         ),

@@ -1,5 +1,14 @@
 # Changelog
 
+## Change — Mobile Home leads with SOS, Red/Amber alert cards
+- Mobile Home now opens with SOS front-and-center: a new `_SosPanicCards` section (Red
+  Alert/Amber Alert, mirroring web's `PanicAlertCards.tsx` — same brand colors, same category
+  groupings as `send_sos_sheet.dart`'s picker) replaces the old single small SOS banner and sits
+  above the "Rent the ride" headline, ahead of Featured Bikes/Popular Destinations. Marketplace
+  sections stay, unchanged, just lower on the page — product decision: reorder, not remove.
+- Tapping either card opens the existing `SendSosSheet` (`showSendSosSheet`, reused as-is, not
+  duplicated) — the cards are a preview/entry point, not a second alert-sending implementation.
+
 ## Change — Partner shop location, map pin, and typed government ID (ADR-036)
 - `Partner` gains a real shop address (`addressLine`/`area`/`pincode`) and a map pin
   (`latitude`/`longitude`), plus a typed `governmentIdType`/`governmentIdNumber` pair replacing
