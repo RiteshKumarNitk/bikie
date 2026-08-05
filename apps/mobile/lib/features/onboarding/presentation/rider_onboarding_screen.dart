@@ -1,15 +1,22 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../auth/data/auth_repository.dart';
 import '../data/rider_profile_model.dart';
 import '../data/rider_profile_repository.dart';
+import 'onboarding_widgets.dart';
 
 /// `/onboarding` — mirrors the web's post-signup rider-profile form (`apps/web/app/onboarding/
 /// page.tsx`), collecting the same `RiderProfile` fields via the same `PUT /api/rider-profile`
-/// route. Shown once, right after a brand-new signup completes (see `signup_screen.dart`).
+/// route, plus full name/photo via Better Auth's `update-user` (mirrors
+/// `authClient.updateUser`). Shown once, right after a brand-new signup completes (see
+/// `signup_screen.dart`), and reachable afterward from Profile > Rider Details.
 /// Skippable (ADR-012) — nothing here blocks using the app, but the more filled in, the more
 /// useful an SOS alert is to whoever responds to it (blood group, medical history, vehicle,
 /// emergency contacts all surface on the SOS alert/session screens).
@@ -41,6 +48,11 @@ class _ContactControllers {
 }
 
 class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
+  final _fullName = TextEditingController();
+  File? _photoFile;
+  String? _photoUrl;
+  bool _uploadingPhoto = false;
+
   final _drivingLicenceNumber = TextEditingController();
   final _addressLine = TextEditingController();
   final _area = TextEditingController();
@@ -73,6 +85,7 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
 
   @override
   void dispose() {
+    _fullName.dispose();
     for (final c in [
       _drivingLicenceNumber,
       _addressLine,
@@ -106,6 +119,25 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
       lastDate: DateTime(now.year + 20),
     );
     if (picked != null) onPicked(picked);
+  }
+
+  Future<void> _pickPhoto() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null) return;
+
+    setState(() {
+      _photoFile = File(picked.path);
+      _uploadingPhoto = true;
+      _error = null;
+    });
+    try {
+      final url = await ref.read(riderProfileRepositoryProvider).uploadPhoto(_photoFile!);
+      if (mounted) setState(() => _photoUrl = url);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = "Couldn't upload that photo: ${e.message}");
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
   }
 
   void _addContact() {
@@ -152,12 +184,22 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
     );
   }
 
+  /// Mirrors web's `saveNameAndPhoto()` — replaces the phone-number placeholder name once the
+  /// user actually supplies one. Called before both Save and Skip, same as web's `handleSubmit`
+  /// / `handleSkip`, so a name/photo entered right before tapping Skip isn't silently dropped.
+  Future<void> _saveNameAndPhoto() async {
+    final name = _fullName.text.trim();
+    if (name.isEmpty && _photoUrl == null) return;
+    await ref.read(authRepositoryProvider).updateUser(name: name.isEmpty ? null : name, image: _photoUrl);
+  }
+
   Future<void> _save() async {
     setState(() {
       _error = null;
       _saving = true;
     });
     try {
+      await _saveNameAndPhoto();
       await ref.read(riderProfileRepositoryProvider).save(_buildInput());
       if (mounted) context.go('/');
     } on ApiException catch (e) {
@@ -173,6 +215,7 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
       _skipping = true;
     });
     try {
+      await _saveNameAndPhoto();
       await ref.read(riderProfileRepositoryProvider).skip();
       if (mounted) context.go('/');
     } on ApiException catch (e) {
@@ -201,54 +244,77 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               const SizedBox(height: 20),
-              _Section(
+              OnboardingSection(
+                title: 'Rider profile',
+                children: [
+                  Row(
+                    children: [
+                      _PhotoAvatar(file: _photoFile, uploading: _uploadingPhoto),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _uploadingPhoto ? null : _pickPhoto,
+                          child: Text(_photoUrl != null ? 'Change photo' : 'Upload photo'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  OnboardingTextField(controller: _fullName, label: 'Full name', hint: 'As per government ID'),
+                ],
+              ),
+              OnboardingSection(
                 title: 'Vehicle details',
                 children: [
-                  _Dropdown(
+                  OnboardingDropdown(
                     label: 'Vehicle type',
                     value: _vehicleType,
                     options: vehicleTypeOptions,
                     onChanged: (v) => setState(() => _vehicleType = v),
                   ),
-                  _field(_vehicleBrand, 'Brand', hint: 'e.g. Royal Enfield'),
-                  _field(_vehicleModel, 'Model', hint: 'e.g. Classic 350'),
+                  OnboardingTextField(controller: _vehicleBrand, label: 'Brand', hint: 'e.g. Royal Enfield'),
+                  OnboardingTextField(controller: _vehicleModel, label: 'Model', hint: 'e.g. Classic 350'),
                 ],
               ),
-              _Section(
-                title: 'Rider profile',
+              OnboardingSection(
+                title: 'Personal details',
                 children: [
-                  _field(_fatherName, "Father's name"),
-                  _field(_motherName, "Mother's name"),
+                  OnboardingTextField(controller: _fatherName, label: "Father's name"),
+                  OnboardingTextField(controller: _motherName, label: "Mother's name"),
                   _DatePickerField(
                     label: 'Date of birth',
                     value: _dateOfBirth,
                     onTap: () => _pickDate(initial: _dateOfBirth, onPicked: (d) => setState(() => _dateOfBirth = d)),
                   ),
-                  _Dropdown(
+                  OnboardingDropdown(
                     label: 'Gender',
                     value: _gender,
                     options: genderOptions,
                     onChanged: (v) => setState(() => _gender = v),
                   ),
-                  _Dropdown(
+                  OnboardingDropdown(
                     label: 'Blood group',
                     value: _bloodGroup,
                     options: bloodGroupOptions,
                     onChanged: (v) => setState(() => _bloodGroup = v),
                   ),
-                  _field(
-                    _medicalHistory,
-                    'Medical history (optional)',
+                  OnboardingTextField(
+                    controller: _medicalHistory,
+                    label: 'Medical history (optional)',
                     hint: 'Any conditions responders should know about in an emergency',
                     maxLines: 3,
                   ),
-                  _field(_allergies, 'Allergies (optional)', maxLines: 2),
+                  OnboardingTextField(controller: _allergies, label: 'Allergies (optional)', maxLines: 2),
                 ],
               ),
-              _Section(
+              OnboardingSection(
                 title: 'Driving licence',
                 children: [
-                  _field(_drivingLicenceNumber, 'Licence number', hint: 'e.g. KA0120230012345'),
+                  OnboardingTextField(
+                    controller: _drivingLicenceNumber,
+                    label: 'Licence number',
+                    hint: 'e.g. KA0120230012345',
+                  ),
                   _DatePickerField(
                     label: 'Expiry date',
                     value: _drivingLicenceExpiry,
@@ -259,17 +325,17 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
                   ),
                 ],
               ),
-              _Section(
+              OnboardingSection(
                 title: 'Address',
                 children: [
-                  _field(_addressLine, 'Address line', hint: 'House / street'),
-                  _field(_area, 'Area'),
-                  _field(_district, 'District'),
-                  _field(_pincode, 'Pincode', keyboardType: TextInputType.number),
-                  _field(_country, 'Country'),
+                  OnboardingTextField(controller: _addressLine, label: 'Address line', hint: 'House / street'),
+                  OnboardingTextField(controller: _area, label: 'Area'),
+                  OnboardingTextField(controller: _district, label: 'District'),
+                  OnboardingTextField(controller: _pincode, label: 'Pincode', keyboardType: TextInputType.number),
+                  OnboardingTextField(controller: _country, label: 'Country'),
                 ],
               ),
-              _Section(
+              OnboardingSection(
                 title: 'Emergency contacts',
                 subtitle: 'Add up to 3 people we can reach in case of an emergency during a ride.',
                 children: [
@@ -282,24 +348,24 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
                     ),
                 ],
               ),
-              _Section(
+              OnboardingSection(
                 title: 'Government ID',
                 subtitle: "Collected as plain text for reference only — we don't run identity verification on this.",
                 children: [
-                  _Dropdown(
+                  OnboardingDropdown(
                     label: 'ID type',
                     value: _governmentIdType,
                     options: governmentIdTypeOptions.keys.toList(),
                     optionLabels: governmentIdTypeOptions,
                     onChanged: (v) => setState(() => _governmentIdType = v),
                   ),
-                  _field(_governmentIdNumber, 'ID number'),
+                  OnboardingTextField(controller: _governmentIdNumber, label: 'ID number'),
                 ],
               ),
-              _Section(
+              OnboardingSection(
                 title: 'Riding details',
                 children: [
-                  _Dropdown(
+                  OnboardingDropdown(
                     label: 'How often do you ride?',
                     value: _riderFrequency,
                     options: riderFrequencyOptions.keys.toList(),
@@ -330,7 +396,11 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
                   ),
                   if (_ridingClubType == 'CLUB_MEMBER') ...[
                     const SizedBox(height: 12),
-                    _field(_clubName, 'Club name', hint: 'e.g. Himalayan Riders Collective'),
+                    OnboardingTextField(
+                      controller: _clubName,
+                      label: 'Club name',
+                      hint: 'e.g. Himalayan Riders Collective',
+                    ),
                   ],
                 ],
               ),
@@ -386,88 +456,42 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
               ),
             ],
           ),
-          _field(c.name, 'Name'),
-          _field(c.phone, 'Phone', keyboardType: TextInputType.phone, hint: '+91 98765 43210'),
-          _field(c.email, 'Email (optional)', keyboardType: TextInputType.emailAddress),
-          _field(c.relation, 'Relation (optional)', hint: 'e.g. Parent, Spouse, Friend'),
+          OnboardingTextField(controller: c.name, label: 'Name'),
+          OnboardingTextField(controller: c.phone, label: 'Phone', keyboardType: TextInputType.phone, hint: '+91 98765 43210'),
+          OnboardingTextField(controller: c.email, label: 'Email (optional)', keyboardType: TextInputType.emailAddress),
+          OnboardingTextField(controller: c.relation, label: 'Relation (optional)', hint: 'e.g. Parent, Spouse, Friend'),
         ],
-      ),
-    );
-  }
-
-  Widget _field(
-    TextEditingController controller,
-    String label, {
-    String? hint,
-    int maxLines = 1,
-    TextInputType? keyboardType,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(labelText: label, hintText: hint),
       ),
     );
   }
 }
 
-class _Section extends StatelessWidget {
-  const _Section({required this.title, required this.children, this.subtitle});
+class _PhotoAvatar extends StatelessWidget {
+  const _PhotoAvatar({required this.file, required this.uploading});
 
-  final String title;
-  final String? subtitle;
-  final List<Widget> children;
+  final File? file;
+  final bool uploading;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: Theme.of(context).cardColor, borderRadius: BorderRadius.circular(kCardRadius)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 1, color: AppTheme.accentTextOf(context)),
+    return Stack(
+      children: [
+        CircleAvatar(
+          radius: 32,
+          backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+          backgroundImage: file != null ? FileImage(file!) : null,
+          child: file == null ? const Icon(Icons.camera_alt_outlined) : null,
+        ),
+        if (uploading)
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.35), shape: BoxShape.circle),
+              child: const Center(
+                child: SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+              ),
+            ),
           ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 4),
-            Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
-          ],
-          const SizedBox(height: 12),
-          ...children,
-        ],
-      ),
-    );
-  }
-}
-
-class _Dropdown extends StatelessWidget {
-  const _Dropdown({required this.label, required this.value, required this.options, required this.onChanged, this.optionLabels});
-
-  final String label;
-  final String? value;
-  final List<String> options;
-  final Map<String, String>? optionLabels;
-  final ValueChanged<String?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: DropdownButtonFormField<String>(
-        initialValue: value,
-        decoration: InputDecoration(labelText: label),
-        isExpanded: true,
-        items: options
-            .map((o) => DropdownMenuItem(value: o, child: Text(optionLabels?[o] ?? o, overflow: TextOverflow.ellipsis)))
-            .toList(),
-        onChanged: onChanged,
-      ),
+      ],
     );
   }
 }

@@ -1,5 +1,23 @@
 # Changelog
 
+## Change — Mobile registration parity + rider-profile completion reminder
+- Mobile signup was navigating straight to Home after phone-OTP verification, regardless of
+  role — the existing `RiderOnboardingScreen` (already field-for-field matching web) was
+  registered as a route but linked from nowhere. Now routes new riders to `/onboarding` and new
+  partners to a new `/partner-onboarding` (built from scratch — didn't exist on mobile at all),
+  mirroring web's role-based redirect.
+- Rider onboarding (both platforms) now also collects full name + photo, via Better Auth's
+  `update-user` endpoint and the existing `/api/upload` Cloudinary route — closing the gap where
+  a signed-up account kept Better Auth's phone-number placeholder name forever. New
+  `image_picker` dependency + multipart upload plumbing on Flutter (neither existed before).
+- Added a "Rider Details" tile to mobile Profile so `/onboarding` is reachable after signup too,
+  not just once at signup time.
+- New: a dismissible "finish your profile" banner on Home (web + mobile) for riders who skipped
+  onboarding and never substantively filled it in since. Backed by a new
+  `RiderProfileService.needsCompletionReminder`, exposed as `showCompletionReminder` on the
+  existing `GET /api/rider-profile` — no new endpoint. Dismissal isn't persisted, so it
+  reappears next visit rather than needing a scheduled/push reminder.
+
 ## Change — Android push notifications (FCM), reusing the existing pipeline (ADR-035)
 - Native FCM for `apps/mobile` Android only (iOS explicitly out of scope): `firebase_core`/
   `firebase_messaging`/`flutter_local_notifications`/`device_info_plus`/`package_info_plus`,

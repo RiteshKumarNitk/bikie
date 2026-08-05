@@ -2,6 +2,7 @@ import type { BikeSummaryDTO, CategoryDTO, DestinationSummaryDTO, TestimonialDTO
 import { getJson } from "@/lib/api";
 import { Hero } from "@/components/home/Hero";
 import { PanicButtonSection } from "@/components/home/PanicButtonSection";
+import { ProfileCompletionBanner } from "@/components/home/ProfileCompletionBanner";
 import { PopularDestinations } from "@/components/home/PopularDestinations";
 import { Categories } from "@/components/home/Categories";
 import { FeaturedBikes } from "@/components/home/FeaturedBikes";
@@ -23,6 +24,7 @@ export default async function HomePage() {
 
   return (
     <>
+      <ProfileCompletionBanner />
       <PanicButtonSection />
       <Hero />
       <PopularDestinations destinations={destinationsRes.destinations} />

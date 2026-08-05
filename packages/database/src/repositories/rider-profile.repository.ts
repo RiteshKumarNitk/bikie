@@ -81,6 +81,36 @@ export async function hasCompletedOnboardingGate(userId: string): Promise<boolea
   return profile !== null;
 }
 
+/**
+ * True only for someone who explicitly skipped onboarding *and* never substantively filled the
+ * profile in afterward (e.g. from Settings) — `onboardingSkipped` alone isn't enough, since it's
+ * never reset back to false once someone later completes their profile through a normal save.
+ * Checked against a handful of representative fields rather than every column; good enough to
+ * distinguish "skipped and still empty" from "actually done" without over-specifying what counts.
+ */
+export async function needsCompletionReminder(userId: string): Promise<boolean> {
+  const profile = await prisma.riderProfile.findUnique({
+    where: { userId },
+    select: {
+      onboardingSkipped: true,
+      drivingLicenceNumber: true,
+      addressLine: true,
+      vehicleType: true,
+      governmentIdNumber: true,
+      emergencyContacts: { select: { id: true }, take: 1 },
+    },
+  });
+  if (!profile || !profile.onboardingSkipped) return false;
+
+  return (
+    profile.drivingLicenceNumber === null &&
+    profile.addressLine === null &&
+    profile.vehicleType === null &&
+    profile.governmentIdNumber === null &&
+    profile.emergencyContacts.length === 0
+  );
+}
+
 interface RiderProfileInputData {
   drivingLicenceNumber?: string;
   drivingLicenceExpiry?: string;

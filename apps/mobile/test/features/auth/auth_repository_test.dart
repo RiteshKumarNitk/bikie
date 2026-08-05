@@ -220,6 +220,37 @@ void main() {
     });
   });
 
+  group('AuthRepository.updateUser', () {
+    setUp(() {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => Response(requestOptions: RequestOptions(path: '/api/auth/update-user'), statusCode: 200, data: {}),
+      );
+    });
+
+    test('posts only the non-null/non-empty fields to /api/auth/update-user', () async {
+      await repository.updateUser(name: 'Priya Verma', image: 'https://res.cloudinary.com/demo/priya.jpg');
+
+      verify(
+        () => dio.post('/api/auth/update-user', data: {
+          'name': 'Priya Verma',
+          'image': 'https://res.cloudinary.com/demo/priya.jpg',
+        }),
+      ).called(1);
+    });
+
+    test('omits image when only name is provided', () async {
+      await repository.updateUser(name: 'Priya Verma');
+
+      verify(() => dio.post('/api/auth/update-user', data: {'name': 'Priya Verma'})).called(1);
+    });
+
+    test('makes no request at all when both name and image are absent', () async {
+      await repository.updateUser();
+
+      verifyNever(() => dio.post(any(), data: any(named: 'data')));
+    });
+  });
+
   group('AuthRepository.verifyOtp', () {
     test('persists the token from the JSON body (not a header) and parses the user', () async {
       when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(

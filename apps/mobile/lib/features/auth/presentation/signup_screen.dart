@@ -106,10 +106,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       if (_exists == false) {
         final role = ref.read(selectedRoleProvider);
         await ref.read(authRepositoryProvider).completePhoneSignup(role: role);
-        // Brand-new account: collect the same rider-profile details the website gathers post
-        // signup, so an SOS alert has more than just a name/phone to show responders. Existing
-        // users never reach this branch (blocked earlier in `_sendCode`).
-        if (mounted) context.go('/onboarding');
+        // Brand-new account: collect the same profile details the website gathers post-signup
+        // (mirrors web's role-based redirect in apps/web/app/(auth)/signup/page.tsx) — rider
+        // profile is skippable, partner profile is not. Existing users never reach this branch.
+        if (mounted) context.go(role == 'PARTNER' ? '/partner-onboarding' : '/onboarding');
         return;
       }
       if (mounted) context.go('/');

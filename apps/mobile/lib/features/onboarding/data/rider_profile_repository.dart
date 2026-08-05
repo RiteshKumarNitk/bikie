@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -22,6 +24,28 @@ class RiderProfileRepository {
 
   Future<void> skip() {
     return apiGuard(() => _dio.post('/api/rider-profile/skip'));
+  }
+
+  /// `showCompletionReminder` on the same `GET /api/rider-profile` response the web Home banner
+  /// reads (`RiderProfileService.needsCompletionReminder`) — true only for someone who skipped
+  /// onboarding and never substantively filled the profile in since.
+  Future<bool> needsCompletionReminder() {
+    return apiGuard(() async {
+      final res = await _dio.get('/api/rider-profile');
+      return res.data['showCompletionReminder'] as bool? ?? false;
+    });
+  }
+
+  /// `POST /api/upload` — the general-purpose Cloudinary upload endpoint (also used on web for
+  /// bike/trip covers, chat attachments, etc.), used here for the onboarding rider photo. Only
+  /// this one caller exists on mobile today, so it lives on this repository rather than a new
+  /// shared one.
+  Future<String> uploadPhoto(File file) {
+    return apiGuard(() async {
+      final data = FormData.fromMap({'file': await MultipartFile.fromFile(file.path)});
+      final res = await _dio.post('/api/upload', data: data);
+      return res.data['url'] as String;
+    });
   }
 
   /// Every field on the wire is optional (`emptyToUndefined` server-side, see

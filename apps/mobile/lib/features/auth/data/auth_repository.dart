@@ -101,6 +101,22 @@ class AuthRepository {
     }
   }
 
+  /// Better Auth's core `update-user` endpoint (mirrors `authClient.updateUser`) — no Dart
+  /// client exists for it, same rationale as `sendOtp`/`verifyOtp` above. Used by the
+  /// onboarding screens to replace the phone-number placeholder name (and optionally set a
+  /// photo) once the user actually supplies one; Better Auth ignores absent fields, so only
+  /// non-null values are sent.
+  Future<void> updateUser({String? name, String? image}) {
+    return apiGuard(() async {
+      final data = <String, dynamic>{
+        if (name != null && name.isNotEmpty) 'name': name,
+        if (image != null && image.isNotEmpty) 'image': image,
+      };
+      if (data.isEmpty) return;
+      await _dio.post('/api/auth/update-user', data: data);
+    });
+  }
+
   Future<UserModel?> getSession() {
     return apiGuard(() async {
       final token = await _storage.readToken();

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/onboarding/data/rider_profile_model.dart';
@@ -85,5 +87,46 @@ void main() {
     await repository.skip();
 
     verify(() => dio.post('/api/rider-profile/skip')).called(1);
+  });
+
+  test('uploadPhoto() posts multipart form data to /api/upload and returns the parsed url', () async {
+    final file = File('${Directory.systemTemp.path}/rider_profile_repository_test_photo.jpg');
+    await file.writeAsBytes([0xff, 0xd8, 0xff]);
+    addTearDown(() => file.deleteSync());
+
+    when(() => dio.post('/api/upload', data: any(named: 'data'))).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/api/upload'),
+        statusCode: 200,
+        data: {'url': 'https://res.cloudinary.com/demo/image/upload/rider.jpg'},
+      ),
+    );
+
+    final url = await repository.uploadPhoto(file);
+
+    expect(url, 'https://res.cloudinary.com/demo/image/upload/rider.jpg');
+    final captured =
+        verify(() => dio.post('/api/upload', data: captureAny(named: 'data'))).captured.single as FormData;
+    expect(captured.files.single.key, 'file');
+  });
+
+  test('needsCompletionReminder() reads showCompletionReminder off the GET response', () async {
+    when(() => dio.get('/api/rider-profile')).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/api/rider-profile'),
+        statusCode: 200,
+        data: {'profile': null, 'needsOnboarding': true, 'showCompletionReminder': true},
+      ),
+    );
+
+    expect(await repository.needsCompletionReminder(), isTrue);
+  });
+
+  test('needsCompletionReminder() defaults to false when the field is missing', () async {
+    when(() => dio.get('/api/rider-profile')).thenAnswer(
+      (_) async => Response(requestOptions: RequestOptions(path: '/api/rider-profile'), statusCode: 200, data: {}),
+    );
+
+    expect(await repository.needsCompletionReminder(), isFalse);
   });
 }

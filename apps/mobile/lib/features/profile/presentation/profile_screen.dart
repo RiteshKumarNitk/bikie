@@ -38,6 +38,11 @@ class ProfileScreen extends ConsumerWidget {
             badgeCount: unreadNotifications,
             onTap: () => context.push('/notifications'),
           ),
+          _ProfileTile(
+            icon: Icons.badge_outlined,
+            label: 'Rider Details',
+            onTap: () => context.push('/onboarding'),
+          ),
           _ProfileTile(icon: Icons.favorite_border, label: 'Wishlist', onTap: () => context.push('/wishlist')),
           _ProfileTile(
             icon: Icons.workspace_premium_outlined,

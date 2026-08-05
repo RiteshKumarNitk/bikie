@@ -2,6 +2,20 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Mobile registration parity + rider-profile completion reminder (2026-08-05)
+
+Follow-up to the SOS redesign's rider-profile work: mobile signup wasn't reaching the existing
+onboarding forms at all, and nobody was ever reminded to finish a skipped profile.
+
+| Task | Status |
+|---|---|
+| Mobile signup now routes new riders to `/onboarding` and new partners to `/partner-onboarding` by role, instead of always going straight to Home | Completed |
+| Rider onboarding (web + mobile) gained full name + photo collection (`POST /api/auth/update-user`, `POST /api/upload`) — previously only mobile's screen was missing these | Completed |
+| New `/partner-onboarding` built for mobile from scratch (didn't exist at all) — business name/type/city/Aadhaar/contact persons, no skip, same `PUT /api/partner/profile` web uses | Completed |
+| "Rider Details" tile added to mobile Profile so the (previously orphaned) `/onboarding` route is reachable after signup too | Completed |
+| `RiderProfileService.needsCompletionReminder` (skipped + still substantively empty) exposed as `showCompletionReminder` on `GET /api/rider-profile`; dismissible banner on Home (web + mobile) reading it, dismissal not persisted so it reappears next visit | Completed |
+| `flutter analyze`: 0 issues. Backend + mobile tests passing | Completed |
+
 ## Android push notifications (FCM) (2026-08-05, ADR-035)
 
 Backend: code-complete, migration written but not applied. Mobile: code-complete, needs a real

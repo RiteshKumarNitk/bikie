@@ -7,11 +7,12 @@ export async function GET() {
   const { session, error } = await requireSession();
   if (error) return error;
 
-  const [profile, needsOnboarding] = await Promise.all([
+  const [profile, needsOnboarding, showCompletionReminder] = await Promise.all([
     RiderProfileService.getMine(session.user.id),
     RiderProfileService.needsOnboarding(session.user.id),
+    RiderProfileService.needsCompletionReminder(session.user.id),
   ]);
-  return NextResponse.json({ profile, needsOnboarding });
+  return NextResponse.json({ profile, needsOnboarding, showCompletionReminder });
 }
 
 export async function PUT(request: Request) {

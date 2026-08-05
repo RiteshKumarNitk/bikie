@@ -17,6 +17,7 @@ import '../../features/messaging/presentation/conversations_list_screen.dart';
 import '../../features/nearby_riders/presentation/nearby_riders_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/onboarding/presentation/intro_screen.dart';
+import '../../features/onboarding/presentation/partner_onboarding_screen.dart';
 import '../../features/onboarding/presentation/rider_onboarding_screen.dart';
 import '../../features/onboarding/presentation/welcome_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
@@ -114,6 +115,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => SosDetailScreen(alertId: state.pathParameters['id']!),
       ),
       GoRoute(path: '/onboarding', builder: (context, state) => const RiderOnboardingScreen()),
+      GoRoute(path: '/partner-onboarding', builder: (context, state) => const PartnerOnboardingScreen()),
       GoRoute(path: '/membership', builder: (context, state) => const MembershipScreen()),
       GoRoute(path: '/referrals', builder: (context, state) => const ReferralsScreen()),
       GoRoute(path: '/messages', builder: (context, state) => const ConversationsListScreen()),

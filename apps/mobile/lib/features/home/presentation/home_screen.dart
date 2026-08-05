@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../bikes/domain/bike_providers.dart';
 import '../../bikes/presentation/widgets/bike_card.dart';
 import '../../destinations/domain/destination_providers.dart';
+import '../../onboarding/domain/rider_profile_providers.dart';
 import '../domain/home_providers.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -46,6 +47,7 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _SosBanner(onTap: () => context.push('/sos')),
             ),
+            const _ProfileCompletionBanner(),
             const SizedBox(height: 20),
             _SectionHeader(title: 'Featured bikes', onSeeAll: () => context.go('/bikes')),
             SizedBox(
@@ -189,6 +191,63 @@ class _SosBanner extends StatelessWidget {
               Icon(Icons.chevron_right, color: error),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Reminds a rider who skipped `/onboarding` (and never substantively filled the profile in
+/// since) that it's still worth completing — mirrors web's `ProfileCompletionBanner`. Dismissal
+/// is local widget state only, not persisted, so it naturally reappears next time Home is
+/// rebuilt (a fresh navigation, not just a scroll) rather than needing a scheduled reminder.
+class _ProfileCompletionBanner extends ConsumerStatefulWidget {
+  const _ProfileCompletionBanner();
+
+  @override
+  ConsumerState<_ProfileCompletionBanner> createState() => _ProfileCompletionBannerState();
+}
+
+class _ProfileCompletionBannerState extends ConsumerState<_ProfileCompletionBanner> {
+  bool _dismissed = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
+
+    final shouldShow = ref.watch(profileCompletionReminderProvider).valueOrNull ?? false;
+    if (!shouldShow) return const SizedBox.shrink();
+
+    final accent = Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: accent.withValues(alpha: 0.08),
+          border: Border.all(color: accent.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Finish setting up your rider profile — it makes your SOS alerts far more useful.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ),
+            const SizedBox(width: 8),
+            TextButton(
+              onPressed: () => context.push('/onboarding'),
+              child: const Text('Complete'),
+            ),
+            IconButton(
+              onPressed: () => setState(() => _dismissed = true),
+              icon: const Icon(Icons.close, size: 18),
+              tooltip: 'Dismiss',
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
         ),
       ),
     );

@@ -12,6 +12,13 @@ export const RiderProfileService = {
     return !completed;
   },
 
+  /** Skipped onboarding and never substantively filled the profile in since — worth a gentle
+   * reminder on Home. See `riderProfileRepository.needsCompletionReminder` for exactly what
+   * "substantively filled in" means. */
+  async needsCompletionReminder(userId: string): Promise<boolean> {
+    return riderProfileRepository.needsCompletionReminder(userId);
+  },
+
   async saveMine(userId: string, input: RiderProfileInput): Promise<RiderProfileDTO> {
     return riderProfileRepository.upsertProfile(userId, input);
   },
