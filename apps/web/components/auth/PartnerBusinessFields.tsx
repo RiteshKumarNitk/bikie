@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LocationPicker } from "@/components/shared/LocationPicker";
 
 // Reused between the signup page's inline "Partner details" block and the login
 // page's self-service Rider -> Partner upgrade mini-form (ADR-013) — same field
@@ -16,17 +17,26 @@ export const partnerTypes = [
   "PHOTOGRAPHY",
 ];
 
+export const governmentIdTypes = { AADHAAR: "Aadhaar", PASSPORT: "Passport" };
+
 export interface PartnerBusinessDetails {
   businessName: string;
   type: string;
   city: string;
   description: string;
   // --- ADR-014 ---
-  aadhaarNumber: string;
   contactPerson1Name: string;
   contactPerson1Mobile: string;
   contactPerson2Name: string;
   contactPerson2Mobile: string;
+  // --- ADR-036: shop address + map pin + typed government ID ---
+  addressLine: string;
+  area: string;
+  pincode: string;
+  latitude: number | null;
+  longitude: number | null;
+  governmentIdType: string;
+  governmentIdNumber: string;
 }
 
 export const emptyPartnerBusinessDetails: PartnerBusinessDetails = {
@@ -34,11 +44,17 @@ export const emptyPartnerBusinessDetails: PartnerBusinessDetails = {
   type: partnerTypes[0],
   city: "",
   description: "",
-  aadhaarNumber: "",
   contactPerson1Name: "",
   contactPerson1Mobile: "",
   contactPerson2Name: "",
   contactPerson2Mobile: "",
+  addressLine: "",
+  area: "",
+  pincode: "",
+  latitude: null,
+  longitude: null,
+  governmentIdType: "",
+  governmentIdNumber: "",
 };
 
 const inputClassName =
@@ -120,18 +136,92 @@ export function PartnerBusinessFields({
           />
         </div>
       )}
-      <div>
-        <label className="text-sm font-medium" htmlFor={`${idPrefix}-aadhaarNumber`}>
-          Aadhaar number <span className="font-normal text-foreground/40">(optional)</span>
-        </label>
-        <input
-          id={`${idPrefix}-aadhaarNumber`}
-          value={value.aadhaarNumber}
-          onChange={(e) => onChange({ ...value, aadhaarNumber: e.target.value })}
-          placeholder="12-digit Aadhaar number"
-          inputMode="numeric"
-          className={inputClassName}
-        />
+      <div className="space-y-4 border-t border-foreground/10 pt-4">
+        <p className="text-sm font-medium">Shop address</p>
+        <div>
+          <label className="text-sm font-medium" htmlFor={`${idPrefix}-addressLine`}>
+            Address line <span className="font-normal text-foreground/40">(optional)</span>
+          </label>
+          <input
+            id={`${idPrefix}-addressLine`}
+            value={value.addressLine}
+            onChange={(e) => onChange({ ...value, addressLine: e.target.value })}
+            placeholder="Shop / street"
+            className={inputClassName}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium" htmlFor={`${idPrefix}-area`}>
+              Area <span className="font-normal text-foreground/40">(optional)</span>
+            </label>
+            <input
+              id={`${idPrefix}-area`}
+              value={value.area}
+              onChange={(e) => onChange({ ...value, area: e.target.value })}
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium" htmlFor={`${idPrefix}-pincode`}>
+              Pincode <span className="font-normal text-foreground/40">(optional)</span>
+            </label>
+            <input
+              id={`${idPrefix}-pincode`}
+              value={value.pincode}
+              onChange={(e) => onChange({ ...value, pincode: e.target.value })}
+              placeholder="6-digit pincode"
+              inputMode="numeric"
+              className={inputClassName}
+            />
+          </div>
+        </div>
+        <div>
+          <label className="text-sm font-medium">
+            Map location <span className="font-normal text-foreground/40">(optional)</span>
+          </label>
+          <div className="mt-1.5">
+            <LocationPicker
+              value={value.latitude != null && value.longitude != null ? { latitude: value.latitude, longitude: value.longitude } : null}
+              onChange={(coords) => onChange({ ...value, latitude: coords.latitude, longitude: coords.longitude })}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 border-t border-foreground/10 pt-4">
+        <p className="text-sm font-medium">Government ID</p>
+        <p className="text-xs text-foreground/50">Collected as plain text for reference only — no identity verification is run on this.</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium" htmlFor={`${idPrefix}-governmentIdType`}>
+              ID type <span className="font-normal text-foreground/40">(optional)</span>
+            </label>
+            <select
+              id={`${idPrefix}-governmentIdType`}
+              value={value.governmentIdType}
+              onChange={(e) => onChange({ ...value, governmentIdType: e.target.value })}
+              className={inputClassName}
+            >
+              <option value="" className="bg-card">Select ID type</option>
+              {Object.entries(governmentIdTypes).map(([key, label]) => (
+                <option key={key} value={key} className="bg-card">{label}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="text-sm font-medium" htmlFor={`${idPrefix}-governmentIdNumber`}>
+              ID number <span className="font-normal text-foreground/40">(optional)</span>
+            </label>
+            <input
+              id={`${idPrefix}-governmentIdNumber`}
+              value={value.governmentIdNumber}
+              onChange={(e) => onChange({ ...value, governmentIdNumber: e.target.value })}
+              placeholder={value.governmentIdType === "PASSPORT" ? "Passport number" : "12-digit Aadhaar number"}
+              className={inputClassName}
+            />
+          </div>
+        </div>
       </div>
 
       <div className="space-y-4 border-t border-foreground/10 pt-4">

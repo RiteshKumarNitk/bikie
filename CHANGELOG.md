@@ -1,5 +1,28 @@
 # Changelog
 
+## Change — Partner shop location, map pin, and typed government ID (ADR-036)
+- `Partner` gains a real shop address (`addressLine`/`area`/`pincode`) and a map pin
+  (`latitude`/`longitude`), plus a typed `governmentIdType`/`governmentIdNumber` pair replacing
+  the old free-text `aadhaarNumber` (backfilled, then dropped, in the migration).
+- First embedded interactive map anywhere in the app, on both platforms — Leaflet + raw
+  OpenStreetMap tiles on web (`LocationPicker.tsx` for picking a location, `PartnersMap.tsx` for
+  plotting pins), `flutter_map` + OpenStreetMap on mobile. No API key, no billing account, no
+  native Android/iOS config needed at all (an initial Google Maps JS SDK/`google_maps_flutter`
+  pass was fully swapped out before shipping — no key was actually available). Wired into partner
+  onboarding (both platforms), the now-editable `/partner/settings` page (previously a read-only
+  "coming soon" stub), the SOS session's "Share Mechanic"/"Share Fuel Contact" flow, a new
+  "Service providers near you" section on `/roadside-assistance` (web), and a new `/partners`
+  screen (mobile). Mobile's location picker is tap-only (tap again to move the pin) rather than
+  drag-to-adjust like web's — `flutter_map` has no built-in draggable-marker gesture the way
+  Google Maps' SDK or Leaflet do.
+- New public `GET /api/partners/nearby` — plain in-app Haversine over verified, geotagged
+  partners, no auth required, IP rate-limited. Dispatch/escalation matching (`GET /api/sos/partners`)
+  stays city-string-based on purpose; it just returns lat/lng now too for map plotting.
+- Found and fixed, unrelated to the ask: `PartnerDispatchPort.findByCity`'s adapter silently
+  dropped its `type`/`verifiedOnly` options parameter — "Share Mechanic"/"Share Fuel Contact" and
+  the SOS SERVICE_PROVIDERS escalation tier had always been returning every partner type in the
+  city, never the one actually requested.
+
 ## Change — Mobile registration parity + rider-profile completion reminder
 - Mobile signup was navigating straight to Home after phone-OTP verification, regardless of
   role — the existing `RiderOnboardingScreen` (already field-for-field matching web) was

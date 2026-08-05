@@ -426,10 +426,13 @@ describe("fan-out dispatch", () => {
             {
               userId: "partner-1",
               businessName: "Bangalore Garage",
+              type: "MECHANIC",
               contactPerson1Name: "Contact One",
               contactPerson1Mobile: "9123456780",
               contactPerson2Name: null,
               contactPerson2Mobile: null,
+              latitude: null,
+              longitude: null,
               user: {
                 id: "partner-1",
                 name: "Partner User",
@@ -859,10 +862,13 @@ describe("escalation application — tier advancement", () => {
       {
         userId: "partner-1",
         businessName: "Garage",
+        type: "MECHANIC",
         contactPerson1Name: null,
         contactPerson1Mobile: null,
         contactPerson2Name: null,
         contactPerson2Mobile: null,
+        latitude: null,
+        longitude: null,
         user: { id: "partner-1", name: "Partner", email: "p@example.com", phone: "9000000000" },
       },
     ]);

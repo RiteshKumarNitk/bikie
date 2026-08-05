@@ -2,6 +2,27 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Partner shop location + typed government ID + maps (2026-08-05, ADR-036)
+
+First embedded map anywhere in the app (web + mobile), using Leaflet/`flutter_map` + raw
+OpenStreetMap tiles — no API key, no billing account, no native Android/iOS config (an initial
+Google Maps JS SDK/`google_maps_flutter` pass was swapped out before shipping once it turned out
+no Google Maps key was available). Code-complete on both platforms, no external account setup
+needed at all.
+
+| Task | Status |
+|---|---|
+| Schema: `Partner` gains `addressLine`/`area`/`pincode`/`latitude`/`longitude`/`governmentIdType`/`governmentIdNumber`; `aadhaarNumber` dropped with a backfill migration | Completed |
+| Validation/types/service-module updates across `partner.schema.ts`, `PartnerProfileDTO`, `partners` module | Completed |
+| Bug found + fixed: `PartnerDispatchPort.findByCity` silently dropped its `type`/`verifiedOnly` options — "Share Mechanic"/"Share Fuel Contact" and the SERVICE_PROVIDERS escalation tier were returning every partner type, not the one requested | Completed |
+| New public `GET /api/partners/nearby` (Haversine, no PostGIS, IP rate-limited, no auth) | Completed |
+| Web: `LocationPicker.tsx`/`PartnersMap.tsx` (Leaflet + OpenStreetMap tiles, npm-bundled, no API key), wired into `PartnerBusinessFields.tsx`, partner-onboarding, and the SOS session partner-share flow | Completed |
+| Web: `/partner/settings` rebuilt from a read-only "coming soon" stub into a real editable form | Completed |
+| Web: "Service providers near you" map section added to `/roadside-assistance` | Completed |
+| Mobile: `flutter_map`/`latlong2` added (no native key config needed); `LocationPickerField` (tap-to-place, no drag — `flutter_map` has no built-in draggable-marker gesture) wired into partner onboarding; new `/partners` "Find a service provider" screen + map on the SOS partner-share flow | Completed |
+| Backend + mobile tests, `pnpm turbo run typecheck`, `flutter analyze` | Completed |
+| Live-test actual map rendering (tile loading, marker placement) on web + Android + iOS | **Not done** — not visually confirmed in this environment (no browser/device session); no credential/billing blocker unlike the original Google Maps plan, just needs a real run |
+
 ## Mobile registration parity + rider-profile completion reminder (2026-08-05)
 
 Follow-up to the SOS redesign's rider-profile work: mobile signup wasn't reaching the existing

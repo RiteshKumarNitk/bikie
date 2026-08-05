@@ -118,8 +118,14 @@ reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md
 | `/api/partner/bikes` | GET/POST | Partner's fleet |
 | `/api/partner/bookings` | GET | Bookings across the partner's bikes |
 | `/api/partner/dashboard` | GET | `{ stats: PartnerDashboardStatsDTO }` (previously mis-documented as `partner/analytics`) |
-| `/api/partner/profile` | GET/PUT | Partner business profile (`businessName`, `type`, `city`, `description`) |
+| `/api/partner/profile` | GET/PUT | Partner business profile (`businessName`, `type`, `city`, `description`, `addressLine`/`area`/`pincode`, `latitude`/`longitude`, `governmentIdType`/`governmentIdNumber` — ADR-036, superseding the old `aadhaarNumber` field) |
 | `/api/partner/reviews` | GET | See Reviews above |
+
+## Partners (public, ADR-036)
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/partners/nearby` | GET | `?lat=&lng=&type=` (type optional) → `{ partners: NearbyPartnerRow[] }`, verified/geotagged partners within 25km, sorted nearest-first. No session required — IP rate-limited (20/min), not membership-gated (queries our own table, no paid external API involved). Backs the "Service providers near you" map on `/roadside-assistance` (web) and the `/partners` screen (mobile). |
 
 ## SOS Emergency (membership required — admins bypass) — ADR-033 staged Community Emergency Response System
 
@@ -138,7 +144,7 @@ reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md
 | `/api/sos/sessions/[id]` | GET | Session detail — participants (helper/rider) or admin only. |
 | `/api/sos/sessions/[id]/status` | POST | `{status: "HELPER_ARRIVED"\|"ASSISTANCE_IN_PROGRESS"\|"COMPLETED"\|"CANCELLED", cancelReason?}`. Helper drives ARRIVED/IN_PROGRESS, rider drives COMPLETED, either can CANCEL, admin overrides. |
 | `/api/sos/sessions/[id]/rating` | POST | `{rating: 1-5, comment?}`. Rider only, post-COMPLETED, once. |
-| `/api/sos/partners` | GET | `?city=&type=`. Backs "Share Mechanic"/"Share Fuel Contact" — verified partners of the given type, city-scoped (Partner has no lat/lng today). |
+| `/api/sos/partners` | GET | `?city=&type=`. Backs "Share Mechanic"/"Share Fuel Contact" — verified partners of the given type, city-scoped. Now also returns `latitude`/`longitude` (ADR-036, if set) so the result renders as a map alongside the list; matching is still city-string-based, not radius-based (deliberate scope limit, see ADR-036). |
 | `/api/cron/sos-resolve` | GET | Cron-only. Requires `Authorization: Bearer <CRON_SECRET>`. Auto-resolves alerts inactive for 120+ minutes, cascade-cancelling any dangling active session first. |
 | `/api/cron/sos-escalate` | GET | Cron-only. Requires `Authorization: Bearer <CRON_SECRET>`. The staged-escalation ticker — widens radius / advances tier for alerts whose `nextEscalationAt` has passed. Schedule alongside `sos-resolve`. |
 

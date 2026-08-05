@@ -7,6 +7,7 @@ import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "@bikie/ui";
 import { SOSTimeline, type TimelineEvent } from "@/components/sos/SOSTimeline";
 import { SOSSessionChat } from "@/components/sos/SOSSessionChat";
+import { PartnersMap } from "@/components/shared/PartnersMap";
 
 interface Alert {
   id: string;
@@ -53,6 +54,8 @@ interface Partner {
   businessName: string;
   user: { name: string; phone: string | null };
   contactPerson1Mobile: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -446,15 +449,28 @@ export default function SOSAlertDetailPage() {
             </div>
 
             {partners && (
-              <div className="mt-3 space-y-2 rounded-xl border border-foreground/10 p-3">
+              <div className="mt-3 space-y-3">
                 {partners.length === 0 ? (
                   <p className="text-xs text-foreground/40">No matching partners found nearby.</p>
                 ) : (
-                  partners.map((p) => (
-                    <p key={p.userId} className="text-xs text-foreground/70">
-                      {p.businessName} — {p.user.phone ?? p.contactPerson1Mobile ?? "no phone on file"}
-                    </p>
-                  ))
+                  <>
+                    {partners.some((p) => p.latitude != null && p.longitude != null) && (
+                      <PartnersMap
+                        pins={partners
+                          .filter((p): p is Partner & { latitude: number; longitude: number } => p.latitude != null && p.longitude != null)
+                          .map((p) => ({ id: p.userId, name: p.businessName, latitude: p.latitude, longitude: p.longitude }))}
+                        center={{ latitude: alert.latitude, longitude: alert.longitude }}
+                        height="12rem"
+                      />
+                    )}
+                    <div className="space-y-2 rounded-xl border border-foreground/10 p-3">
+                      {partners.map((p) => (
+                        <p key={p.userId} className="text-xs text-foreground/70">
+                          {p.businessName} — {p.user.phone ?? p.contactPerson1Mobile ?? "no phone on file"}
+                        </p>
+                      ))}
+                    </div>
+                  </>
                 )}
               </div>
             )}

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../auth/data/auth_repository.dart';
 import '../data/partner_profile_model.dart';
 import '../data/partner_profile_repository.dart';
+import 'location_picker_field.dart';
 import 'onboarding_widgets.dart';
 
 /// `/partner-onboarding` — mirrors the web's post-signup partner-profile form
@@ -24,13 +26,18 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
   final _fullName = TextEditingController();
   final _businessName = TextEditingController();
   final _city = TextEditingController();
-  final _aadhaarNumber = TextEditingController();
+  final _addressLine = TextEditingController();
+  final _area = TextEditingController();
+  final _pincode = TextEditingController();
+  final _governmentIdNumber = TextEditingController();
   final _contactPerson1Name = TextEditingController();
   final _contactPerson1Mobile = TextEditingController();
   final _contactPerson2Name = TextEditingController();
   final _contactPerson2Mobile = TextEditingController();
 
   String _type = partnerTypes.first;
+  String? _governmentIdType;
+  LatLng? _location;
   bool _showContactPerson2 = false;
 
   bool _saving = false;
@@ -42,7 +49,10 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       _fullName,
       _businessName,
       _city,
-      _aadhaarNumber,
+      _addressLine,
+      _area,
+      _pincode,
+      _governmentIdNumber,
       _contactPerson1Name,
       _contactPerson1Mobile,
       _contactPerson2Name,
@@ -72,11 +82,17 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
             businessName: _businessName.text.trim(),
             type: _type,
             city: _city.text.trim(),
-            aadhaarNumber: _aadhaarNumber.text,
             contactPerson1Name: _contactPerson1Name.text,
             contactPerson1Mobile: _contactPerson1Mobile.text,
             contactPerson2Name: _showContactPerson2 ? _contactPerson2Name.text : null,
             contactPerson2Mobile: _showContactPerson2 ? _contactPerson2Mobile.text : null,
+            addressLine: _addressLine.text,
+            area: _area.text,
+            pincode: _pincode.text,
+            latitude: _location?.latitude,
+            longitude: _location?.longitude,
+            governmentIdType: _governmentIdType,
+            governmentIdNumber: _governmentIdNumber.text,
           ));
       if (mounted) context.go('/');
     } on ApiException catch (e) {
@@ -123,15 +139,49 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                     onChanged: (v) => setState(() => _type = v ?? partnerTypes.first),
                   ),
                   OnboardingTextField(controller: _city, label: 'City', hint: 'e.g. Goa'),
+                ],
+              ),
+              OnboardingSection(
+                title: 'Shop address',
+                children: [
                   OnboardingTextField(
-                    controller: _aadhaarNumber,
-                    label: 'Aadhaar number (optional)',
-                    hint: '12-digit Aadhaar number',
+                    controller: _addressLine,
+                    label: 'Address line (optional)',
+                    hint: 'Shop / street',
+                  ),
+                  OnboardingTextField(controller: _area, label: 'Area (optional)'),
+                  OnboardingTextField(
+                    controller: _pincode,
+                    label: 'Pincode (optional)',
+                    hint: '6-digit pincode',
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 4),
-                  Text('Contact person', style: Theme.of(context).textTheme.labelLarge),
+                  Text('Map location (optional)', style: Theme.of(context).textTheme.labelLarge),
                   const SizedBox(height: 8),
+                  LocationPickerField(
+                    value: _location,
+                    onChanged: (position) => setState(() => _location = position),
+                  ),
+                ],
+              ),
+              OnboardingSection(
+                title: 'Government ID',
+                subtitle: "Collected as plain text for reference only — we don't run identity verification on this.",
+                children: [
+                  OnboardingDropdown(
+                    label: 'ID type (optional)',
+                    value: _governmentIdType,
+                    options: governmentIdTypes.keys.toList(),
+                    optionLabels: governmentIdTypes,
+                    onChanged: (v) => setState(() => _governmentIdType = v),
+                  ),
+                  OnboardingTextField(controller: _governmentIdNumber, label: 'ID number (optional)'),
+                ],
+              ),
+              OnboardingSection(
+                title: 'Contact person',
+                children: [
                   OnboardingTextField(
                     controller: _contactPerson1Name,
                     label: 'Name',

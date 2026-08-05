@@ -190,17 +190,28 @@ class SOSCreateResult with _$SOSCreateResult {
 /// `GET /api/sos/partners` — backs "Share Mechanic" / "Share Fuel Contact". Plain class (not
 /// freezed) since it just flattens one nested `user.phone` field from the API response.
 class SOSPartner {
-  const SOSPartner({required this.userId, required this.businessName, this.userPhone, this.contactPerson1Mobile});
+  const SOSPartner({
+    required this.userId,
+    required this.businessName,
+    this.userPhone,
+    this.contactPerson1Mobile,
+    this.latitude,
+    this.longitude,
+  });
 
   final String userId;
   final String businessName;
   final String? userPhone;
   final String? contactPerson1Mobile;
+  final double? latitude;
+  final double? longitude;
 
   factory SOSPartner.fromJson(Map<String, dynamic> json) => SOSPartner(
         userId: json['userId'] as String,
         businessName: json['businessName'] as String,
         userPhone: (json['user'] as Map<String, dynamic>?)?['phone'] as String?,
         contactPerson1Mobile: json['contactPerson1Mobile'] as String?,
+        latitude: (json['latitude'] as num?)?.toDouble(),
+        longitude: (json['longitude'] as num?)?.toDouble(),
       );
 }

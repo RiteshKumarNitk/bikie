@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-05T02:57:55.411Z",
-  "count": 118,
+  "generatedAt": "2026-08-05T16:44:08.731Z",
+  "count": 119,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -575,6 +575,14 @@
       ],
       "auth": "partner",
       "file": "apps/web/app/api/partner/reviews/route.ts"
+    },
+    {
+      "path": "/api/partners/nearby",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partners/nearby/route.ts"
     },
     {
       "path": "/api/places/nearby",

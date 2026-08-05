@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { NearbyPartnersPanel } from "@/components/shared/NearbyPartnersPanel";
 
 export const metadata: Metadata = {
   title: "Roadside Assistance",
@@ -41,6 +42,10 @@ export default function RoadsideAssistancePage() {
               <p className="mt-2 text-sm text-foreground/60">{service.desc}</p>
             </div>
           ))}
+        </div>
+
+        <div className="mt-14">
+          <NearbyPartnersPanel />
         </div>
       </div>
     </div>

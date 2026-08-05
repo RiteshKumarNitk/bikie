@@ -3,6 +3,10 @@ import { cookies } from "next/headers";
 import { GeistSans } from "geist/font/sans";
 import { Inter } from "next/font/google";
 import "./globals.css";
+// Leaflet + OpenStreetMap (ADR-036 revision) — no API key/billing needed, unlike Google Maps.
+// Global CSS imports are only allowed from the root layout in Next.js's App Router, so this
+// can't live inside LocationPicker.tsx/PartnersMap.tsx themselves.
+import "leaflet/dist/leaflet.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { LenisProvider } from "@/components/providers/LenisProvider";
 import { GsapProvider } from "@/components/providers/GsapProvider";

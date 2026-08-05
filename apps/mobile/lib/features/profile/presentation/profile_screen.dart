@@ -43,6 +43,11 @@ class ProfileScreen extends ConsumerWidget {
             label: 'Rider Details',
             onTap: () => context.push('/onboarding'),
           ),
+          _ProfileTile(
+            icon: Icons.storefront_outlined,
+            label: 'Service Providers',
+            onTap: () => context.push('/partners'),
+          ),
           _ProfileTile(icon: Icons.favorite_border, label: 'Wishlist', onTap: () => context.push('/wishlist')),
           _ProfileTile(
             icon: Icons.workspace_premium_outlined,

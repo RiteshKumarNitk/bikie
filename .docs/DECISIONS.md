@@ -1085,3 +1085,65 @@ changes:
   a real `google-services.json` is added — both are one-time, user-side setup steps, not code
   gaps.
 
+## ADR-036: Partner gains a real shop location (address + map pin) and a typed government ID
+
+- **Context.** `Partner` only ever stored a plain `city` string — no shop address, no map
+  coordinates — and its sole "personal detail" was a single free-text `aadhaarNumber` field,
+  unlike `RiderProfile`'s typed `governmentIdType`/`governmentIdNumber` pair. Asked to add both a
+  text address and a real map pin, and to show partner locations on a map, plus bring the
+  government-ID field up to the same typed shape riders already have (explicitly scoped to
+  government ID only — no DOB/gender/blood-group for partners).
+- **No map library existed anywhere in the app before this.** SOS's "Share Mechanic"/"Share Fuel
+  Contact" and `NearbyHelpPanel.tsx` only ever produced external `https://www.google.com/maps/...`
+  links. First pass used the Google Maps JS SDK (web) / `google_maps_flutter` (mobile) — swapped
+  before shipping for **Leaflet + raw OpenStreetMap tiles** (web) and **`flutter_map` +
+  OpenStreetMap** (mobile) once it turned out no Google Maps API key/billing account was actually
+  available. Zero setup cost: Leaflet is npm-bundled (no external script, no CSP change beyond
+  what the already-broad `img-src https:` covers for tile/marker images) and `flutter_map` needs
+  no native Android/iOS key wiring at all — a real simplification over the Google Maps path, not
+  just a substitution. Trade-off: `flutter_map` has no built-in draggable-marker gesture the way
+  Google Maps' SDK does, so the mobile location picker is tap-only (tap again to move the pin)
+  rather than drag-to-adjust like the web version, which Leaflet supports natively. OSM's public
+  tile server (operations.osmfoundation.org/policies/tiles/) is meant for light/moderate use, not
+  sustained high-traffic production load — fine to start with zero cost; revisit with a dedicated
+  free-tier tile provider (MapTiler, Stadia Maps, etc.) if usage grows enough to matter.
+- **Schema.** `Partner` gains `addressLine`/`area`/`pincode` (plain optional strings, same shape
+  as `RiderProfile`'s address fields), `latitude`/`longitude` (optional `Float`, indexed together),
+  and `governmentIdType`/`governmentIdNumber` (reusing `RiderProfile`'s `GovernmentIdType` enum).
+  `aadhaarNumber` is dropped — hand-written migration (`20260805110000_partner_location_government_id`)
+  backfills `governmentIdType='AADHAAR', governmentIdNumber=aadhaarNumber` for existing rows before
+  dropping the column, same explicit-backfill-then-drop pattern as ADR-033's
+  `sos_alert_response.status` migration.
+- **Dispatch matching stays city-string-based, deliberately.** `findPartnersByCityForDispatch`
+  (SOS fan-out/escalation) now also returns `latitude`/`longitude` for map plotting, but its
+  `WHERE city = ...` filter is unchanged — real radius-based dispatch matching (replacing the
+  city string) is a separate, later improvement, not silently implied as done here.
+- **Bug found and fixed while touching this code, unrelated to the ask:**
+  `PartnerDispatchPort.findByCity`'s adapter (`safety-location/infrastructure/repositories.adapter.ts`)
+  destructured only `(city, take)`, silently dropping the `options` (`type`/`verifiedOnly`)
+  parameter every caller passed. `SOSService.findNearbyPartners` (backs "Share Mechanic"/"Share
+  Fuel Contact") and `escalation.application.ts`'s `resolveServiceProviders` (backs the
+  SERVICE_PROVIDERS escalation tier) had therefore always been returning every partner type in
+  the city, never the type actually requested, and the "broaden if the strict search comes up
+  empty" fallback in `resolveServiceProviders` was comparing a strict result against itself. Fixed
+  as part of this pass, not deferred — it was already reachable code, not new surface area.
+- **New public endpoint, no auth.** `GET /api/partners/nearby` — plain in-app Haversine over
+  verified, geotagged partners (not PostGIS, unlike `rider_location`'s `ST_DWithin` — partner
+  volume is small enough that fetching and filtering in JS is simpler and fine for v1). IP rate
+  limited (not membership-gated like `GET /api/places/nearby`, since it costs nothing per call —
+  no paid external API involved, just our own table). Backs a new "Service providers near you"
+  section on `/roadside-assistance` (web) and a new `/partners` screen (mobile, reachable from
+  Profile — mobile has no roadside-assistance-equivalent page to extend).
+- **`/partner/settings` was a read-only stub before this** — every field a disabled
+  `<input readOnly>`, with the page literally saying "Profile editing is coming soon." Rebuilt into
+  a real form (`PartnerSettingsForm.tsx`, reusing the same `PartnerBusinessFields` this pass
+  already extended) — otherwise a partner who set their location wrong at onboarding would have
+  had no way to ever fix it, same principle as riders revisiting `/onboarding` from Settings.
+- **Consequences.** No API key, no billing account, no native Android/iOS config at all — the
+  Google Maps-specific plumbing (Gradle manifest placeholder, `local.properties`/`Secrets.xcconfig`,
+  `AppDelegate.swift`'s `GMSServices.provideAPIKey`) was fully removed, not just left unconfigured.
+  Still unverified in this environment (no Xcode/macOS to build against, and OSM tile rendering
+  wasn't visually confirmed in a real browser/device) — worth the user's own smoke test on both
+  platforms before relying on it, but there's no credential/billing step blocking that test the
+  way there would have been with Google Maps.
+

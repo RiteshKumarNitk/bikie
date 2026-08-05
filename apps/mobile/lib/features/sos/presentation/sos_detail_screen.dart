@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -464,13 +466,53 @@ class _SessionPanel extends StatelessWidget {
               const SizedBox(height: 8),
               if (partners!.isEmpty)
                 const Text('No matching partners found nearby.', style: TextStyle(fontSize: 12))
-              else
+              else ...[
+                if (partners!.any((p) => p.latitude != null && p.longitude != null))
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        height: 160,
+                        child: FlutterMap(
+                          options: MapOptions(
+                            initialCenter: LatLng(alert.latitude.toDouble(), alert.longitude.toDouble()),
+                            initialZoom: 12,
+                          ),
+                          children: [
+                            TileLayer(
+                              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                              userAgentPackageName: 'com.bikie.mobile',
+                            ),
+                            MarkerLayer(markers: [
+                              Marker(
+                                point: LatLng(alert.latitude.toDouble(), alert.longitude.toDouble()),
+                                width: 36,
+                                height: 36,
+                                child: const Icon(Icons.sos, color: Colors.red, size: 30),
+                              ),
+                              for (final p in partners!)
+                                if (p.latitude != null && p.longitude != null)
+                                  Marker(
+                                    point: LatLng(p.latitude!, p.longitude!),
+                                    width: 36,
+                                    height: 36,
+                                    child: const Icon(Icons.location_pin, color: Colors.blue, size: 36),
+                                  ),
+                            ]),
+                            const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ...partners!.map(
                   (p) => Text(
                     '${p.businessName} — ${p.userPhone ?? p.contactPerson1Mobile ?? "no phone on file"}',
                     style: const TextStyle(fontSize: 12),
                   ),
                 ),
+              ],
             ],
             const SizedBox(height: 12),
             Wrap(

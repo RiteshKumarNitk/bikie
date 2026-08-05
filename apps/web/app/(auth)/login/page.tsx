@@ -149,11 +149,17 @@ export default function LoginPage() {
           type: partnerDetails.type,
           city: partnerDetails.city,
           description: partnerDetails.description.trim() || undefined,
-          aadhaarNumber: partnerDetails.aadhaarNumber.trim() || undefined,
           contactPerson1Name: partnerDetails.contactPerson1Name.trim() || undefined,
           contactPerson1Mobile: partnerDetails.contactPerson1Mobile.trim() || undefined,
           contactPerson2Name: partnerDetails.contactPerson2Name.trim() || undefined,
           contactPerson2Mobile: partnerDetails.contactPerson2Mobile.trim() || undefined,
+          addressLine: partnerDetails.addressLine.trim() || undefined,
+          area: partnerDetails.area.trim() || undefined,
+          pincode: partnerDetails.pincode.trim() || undefined,
+          latitude: partnerDetails.latitude ?? undefined,
+          longitude: partnerDetails.longitude ?? undefined,
+          governmentIdType: partnerDetails.governmentIdType || undefined,
+          governmentIdNumber: partnerDetails.governmentIdNumber.trim() || undefined,
         }),
       });
       if (!res.ok) {

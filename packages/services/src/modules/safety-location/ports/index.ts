@@ -168,10 +168,13 @@ export interface RiderLocationRepositoryPort {
 export interface PartnerDispatchRow {
   userId: string;
   businessName: string;
+  type: string;
   contactPerson1Name: string | null;
   contactPerson1Mobile: string | null;
   contactPerson2Name: string | null;
   contactPerson2Mobile: string | null;
+  latitude: number | null;
+  longitude: number | null;
   user: {
     id: string;
     name: string;

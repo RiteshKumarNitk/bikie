@@ -13,6 +13,10 @@ export function createPartnerApplication(ports: PartnersPorts) {
     getDashboardStats(userId: string) {
       return ports.partners.getDashboardStats(userId);
     },
+
+    findNearby(latitude: number, longitude: number, radiusMeters: number, options?: { type?: string; take?: number }) {
+      return ports.partners.findNearby(latitude, longitude, radiusMeters, options);
+    },
   };
 }
 

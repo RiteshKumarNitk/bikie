@@ -11,11 +11,17 @@ function toDTO(partner: {
   isVerified: boolean;
   ratingAvg: { toNumber(): number };
   ratingCount: number;
-  aadhaarNumber: string | null;
   contactPerson1Name: string | null;
   contactPerson1Mobile: string | null;
   contactPerson2Name: string | null;
   contactPerson2Mobile: string | null;
+  addressLine: string | null;
+  area: string | null;
+  pincode: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  governmentIdType: string | null;
+  governmentIdNumber: string | null;
 }) {
   return {
     id: partner.id,
@@ -27,11 +33,17 @@ function toDTO(partner: {
     isVerified: partner.isVerified,
     ratingAvg: partner.ratingAvg.toNumber(),
     ratingCount: partner.ratingCount,
-    aadhaarNumber: partner.aadhaarNumber,
     contactPerson1Name: partner.contactPerson1Name,
     contactPerson1Mobile: partner.contactPerson1Mobile,
     contactPerson2Name: partner.contactPerson2Name,
     contactPerson2Mobile: partner.contactPerson2Mobile,
+    addressLine: partner.addressLine,
+    area: partner.area,
+    pincode: partner.pincode,
+    latitude: partner.latitude,
+    longitude: partner.longitude,
+    governmentIdType: partner.governmentIdType as "AADHAAR" | "PASSPORT" | null,
+    governmentIdNumber: partner.governmentIdNumber,
   };
 }
 
@@ -47,11 +59,17 @@ export async function upsertPartnerProfile(
     type: string;
     city: string;
     description?: string;
-    aadhaarNumber?: string;
     contactPerson1Name?: string;
     contactPerson1Mobile?: string;
     contactPerson2Name?: string;
     contactPerson2Mobile?: string;
+    addressLine?: string;
+    area?: string;
+    pincode?: string;
+    latitude?: number;
+    longitude?: number;
+    governmentIdType?: string;
+    governmentIdNumber?: string;
   },
 ) {
   const shared = {
@@ -59,11 +77,17 @@ export async function upsertPartnerProfile(
     type: data.type as any,
     city: data.city,
     description: data.description,
-    aadhaarNumber: data.aadhaarNumber,
     contactPerson1Name: data.contactPerson1Name,
     contactPerson1Mobile: data.contactPerson1Mobile,
     contactPerson2Name: data.contactPerson2Name,
     contactPerson2Mobile: data.contactPerson2Mobile,
+    addressLine: data.addressLine,
+    area: data.area,
+    pincode: data.pincode,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    governmentIdType: data.governmentIdType as any,
+    governmentIdNumber: data.governmentIdNumber,
   };
   const partner = await prisma.partner.upsert({
     where: { userId },
@@ -113,4 +137,54 @@ export async function findPartnersByCityForDispatch(
     },
     take,
   });
+}
+
+const EARTH_RADIUS_METERS = 6_371_000;
+
+function haversineDistanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return EARTH_RADIUS_METERS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/**
+ * Public "find a service provider near me" (ADR-036) — plain in-app Haversine over verified
+ * partners with a set map pin, not PostGIS. Partner volume is small enough (unlike the
+ * high-write `rider_location` table, which does use PostGIS via `ST_DWithin`) that fetching
+ * every geotagged partner and filtering/sorting in JS is simpler and fine for v1; revisit only
+ * if partner counts grow enough to matter.
+ */
+export async function findPartnersNearPoint(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  options: { type?: string; take?: number } = {},
+) {
+  const partners = await prisma.partner.findMany({
+    where: {
+      latitude: { not: null },
+      longitude: { not: null },
+      isVerified: true,
+      ...(options.type ? { type: options.type as any } : {}),
+    },
+    select: { id: true, businessName: true, type: true, city: true, latitude: true, longitude: true },
+  });
+
+  return partners
+    .filter((p): p is typeof p & { latitude: number; longitude: number } => p.latitude !== null && p.longitude !== null)
+    .map((p) => ({
+      id: p.id,
+      businessName: p.businessName,
+      type: p.type,
+      city: p.city,
+      latitude: p.latitude,
+      longitude: p.longitude,
+      distanceMeters: haversineDistanceMeters(latitude, longitude, p.latitude, p.longitude),
+    }))
+    .filter((p) => p.distanceMeters <= radiusMeters)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters)
+    .slice(0, options.take ?? 25);
 }

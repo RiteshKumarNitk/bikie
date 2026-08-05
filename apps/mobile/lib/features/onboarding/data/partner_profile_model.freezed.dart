@@ -25,11 +25,18 @@ mixin _$PartnerProfileInput {
   String get type => throw _privateConstructorUsedError;
   String get city => throw _privateConstructorUsedError;
   String? get description => throw _privateConstructorUsedError;
-  String? get aadhaarNumber => throw _privateConstructorUsedError;
   String? get contactPerson1Name => throw _privateConstructorUsedError;
   String? get contactPerson1Mobile => throw _privateConstructorUsedError;
   String? get contactPerson2Name => throw _privateConstructorUsedError;
   String? get contactPerson2Mobile => throw _privateConstructorUsedError;
+  String? get addressLine => throw _privateConstructorUsedError;
+  String? get area => throw _privateConstructorUsedError;
+  String? get pincode => throw _privateConstructorUsedError;
+  double? get latitude => throw _privateConstructorUsedError;
+  double? get longitude => throw _privateConstructorUsedError;
+  String? get governmentIdType =>
+      throw _privateConstructorUsedError; // "AADHAAR" | "PASSPORT"
+  String? get governmentIdNumber => throw _privateConstructorUsedError;
 
   /// Serializes this PartnerProfileInput to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -53,11 +60,17 @@ abstract class $PartnerProfileInputCopyWith<$Res> {
     String type,
     String city,
     String? description,
-    String? aadhaarNumber,
     String? contactPerson1Name,
     String? contactPerson1Mobile,
     String? contactPerson2Name,
     String? contactPerson2Mobile,
+    String? addressLine,
+    String? area,
+    String? pincode,
+    double? latitude,
+    double? longitude,
+    String? governmentIdType,
+    String? governmentIdNumber,
   });
 }
 
@@ -80,11 +93,17 @@ class _$PartnerProfileInputCopyWithImpl<$Res, $Val extends PartnerProfileInput>
     Object? type = null,
     Object? city = null,
     Object? description = freezed,
-    Object? aadhaarNumber = freezed,
     Object? contactPerson1Name = freezed,
     Object? contactPerson1Mobile = freezed,
     Object? contactPerson2Name = freezed,
     Object? contactPerson2Mobile = freezed,
+    Object? addressLine = freezed,
+    Object? area = freezed,
+    Object? pincode = freezed,
+    Object? latitude = freezed,
+    Object? longitude = freezed,
+    Object? governmentIdType = freezed,
+    Object? governmentIdNumber = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -104,10 +123,6 @@ class _$PartnerProfileInputCopyWithImpl<$Res, $Val extends PartnerProfileInput>
                 ? _value.description
                 : description // ignore: cast_nullable_to_non_nullable
                       as String?,
-            aadhaarNumber: freezed == aadhaarNumber
-                ? _value.aadhaarNumber
-                : aadhaarNumber // ignore: cast_nullable_to_non_nullable
-                      as String?,
             contactPerson1Name: freezed == contactPerson1Name
                 ? _value.contactPerson1Name
                 : contactPerson1Name // ignore: cast_nullable_to_non_nullable
@@ -123,6 +138,34 @@ class _$PartnerProfileInputCopyWithImpl<$Res, $Val extends PartnerProfileInput>
             contactPerson2Mobile: freezed == contactPerson2Mobile
                 ? _value.contactPerson2Mobile
                 : contactPerson2Mobile // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            addressLine: freezed == addressLine
+                ? _value.addressLine
+                : addressLine // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            area: freezed == area
+                ? _value.area
+                : area // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            pincode: freezed == pincode
+                ? _value.pincode
+                : pincode // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            latitude: freezed == latitude
+                ? _value.latitude
+                : latitude // ignore: cast_nullable_to_non_nullable
+                      as double?,
+            longitude: freezed == longitude
+                ? _value.longitude
+                : longitude // ignore: cast_nullable_to_non_nullable
+                      as double?,
+            governmentIdType: freezed == governmentIdType
+                ? _value.governmentIdType
+                : governmentIdType // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            governmentIdNumber: freezed == governmentIdNumber
+                ? _value.governmentIdNumber
+                : governmentIdNumber // ignore: cast_nullable_to_non_nullable
                       as String?,
           )
           as $Val,
@@ -144,11 +187,17 @@ abstract class _$$PartnerProfileInputImplCopyWith<$Res>
     String type,
     String city,
     String? description,
-    String? aadhaarNumber,
     String? contactPerson1Name,
     String? contactPerson1Mobile,
     String? contactPerson2Name,
     String? contactPerson2Mobile,
+    String? addressLine,
+    String? area,
+    String? pincode,
+    double? latitude,
+    double? longitude,
+    String? governmentIdType,
+    String? governmentIdNumber,
   });
 }
 
@@ -170,11 +219,17 @@ class __$$PartnerProfileInputImplCopyWithImpl<$Res>
     Object? type = null,
     Object? city = null,
     Object? description = freezed,
-    Object? aadhaarNumber = freezed,
     Object? contactPerson1Name = freezed,
     Object? contactPerson1Mobile = freezed,
     Object? contactPerson2Name = freezed,
     Object? contactPerson2Mobile = freezed,
+    Object? addressLine = freezed,
+    Object? area = freezed,
+    Object? pincode = freezed,
+    Object? latitude = freezed,
+    Object? longitude = freezed,
+    Object? governmentIdType = freezed,
+    Object? governmentIdNumber = freezed,
   }) {
     return _then(
       _$PartnerProfileInputImpl(
@@ -194,10 +249,6 @@ class __$$PartnerProfileInputImplCopyWithImpl<$Res>
             ? _value.description
             : description // ignore: cast_nullable_to_non_nullable
                   as String?,
-        aadhaarNumber: freezed == aadhaarNumber
-            ? _value.aadhaarNumber
-            : aadhaarNumber // ignore: cast_nullable_to_non_nullable
-                  as String?,
         contactPerson1Name: freezed == contactPerson1Name
             ? _value.contactPerson1Name
             : contactPerson1Name // ignore: cast_nullable_to_non_nullable
@@ -214,6 +265,34 @@ class __$$PartnerProfileInputImplCopyWithImpl<$Res>
             ? _value.contactPerson2Mobile
             : contactPerson2Mobile // ignore: cast_nullable_to_non_nullable
                   as String?,
+        addressLine: freezed == addressLine
+            ? _value.addressLine
+            : addressLine // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        area: freezed == area
+            ? _value.area
+            : area // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        pincode: freezed == pincode
+            ? _value.pincode
+            : pincode // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        latitude: freezed == latitude
+            ? _value.latitude
+            : latitude // ignore: cast_nullable_to_non_nullable
+                  as double?,
+        longitude: freezed == longitude
+            ? _value.longitude
+            : longitude // ignore: cast_nullable_to_non_nullable
+                  as double?,
+        governmentIdType: freezed == governmentIdType
+            ? _value.governmentIdType
+            : governmentIdType // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        governmentIdNumber: freezed == governmentIdNumber
+            ? _value.governmentIdNumber
+            : governmentIdNumber // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -227,11 +306,17 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
     required this.type,
     required this.city,
     this.description,
-    this.aadhaarNumber,
     this.contactPerson1Name,
     this.contactPerson1Mobile,
     this.contactPerson2Name,
     this.contactPerson2Mobile,
+    this.addressLine,
+    this.area,
+    this.pincode,
+    this.latitude,
+    this.longitude,
+    this.governmentIdType,
+    this.governmentIdNumber,
   });
 
   factory _$PartnerProfileInputImpl.fromJson(Map<String, dynamic> json) =>
@@ -246,8 +331,6 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
   @override
   final String? description;
   @override
-  final String? aadhaarNumber;
-  @override
   final String? contactPerson1Name;
   @override
   final String? contactPerson1Mobile;
@@ -255,10 +338,25 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
   final String? contactPerson2Name;
   @override
   final String? contactPerson2Mobile;
+  @override
+  final String? addressLine;
+  @override
+  final String? area;
+  @override
+  final String? pincode;
+  @override
+  final double? latitude;
+  @override
+  final double? longitude;
+  @override
+  final String? governmentIdType;
+  // "AADHAAR" | "PASSPORT"
+  @override
+  final String? governmentIdNumber;
 
   @override
   String toString() {
-    return 'PartnerProfileInput(businessName: $businessName, type: $type, city: $city, description: $description, aadhaarNumber: $aadhaarNumber, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile)';
+    return 'PartnerProfileInput(businessName: $businessName, type: $type, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber)';
   }
 
   @override
@@ -272,8 +370,6 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
             (identical(other.city, city) || other.city == city) &&
             (identical(other.description, description) ||
                 other.description == description) &&
-            (identical(other.aadhaarNumber, aadhaarNumber) ||
-                other.aadhaarNumber == aadhaarNumber) &&
             (identical(other.contactPerson1Name, contactPerson1Name) ||
                 other.contactPerson1Name == contactPerson1Name) &&
             (identical(other.contactPerson1Mobile, contactPerson1Mobile) ||
@@ -281,7 +377,19 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
             (identical(other.contactPerson2Name, contactPerson2Name) ||
                 other.contactPerson2Name == contactPerson2Name) &&
             (identical(other.contactPerson2Mobile, contactPerson2Mobile) ||
-                other.contactPerson2Mobile == contactPerson2Mobile));
+                other.contactPerson2Mobile == contactPerson2Mobile) &&
+            (identical(other.addressLine, addressLine) ||
+                other.addressLine == addressLine) &&
+            (identical(other.area, area) || other.area == area) &&
+            (identical(other.pincode, pincode) || other.pincode == pincode) &&
+            (identical(other.latitude, latitude) ||
+                other.latitude == latitude) &&
+            (identical(other.longitude, longitude) ||
+                other.longitude == longitude) &&
+            (identical(other.governmentIdType, governmentIdType) ||
+                other.governmentIdType == governmentIdType) &&
+            (identical(other.governmentIdNumber, governmentIdNumber) ||
+                other.governmentIdNumber == governmentIdNumber));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -292,11 +400,17 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
     type,
     city,
     description,
-    aadhaarNumber,
     contactPerson1Name,
     contactPerson1Mobile,
     contactPerson2Name,
     contactPerson2Mobile,
+    addressLine,
+    area,
+    pincode,
+    latitude,
+    longitude,
+    governmentIdType,
+    governmentIdNumber,
   );
 
   /// Create a copy of PartnerProfileInput
@@ -322,11 +436,17 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
     required final String type,
     required final String city,
     final String? description,
-    final String? aadhaarNumber,
     final String? contactPerson1Name,
     final String? contactPerson1Mobile,
     final String? contactPerson2Name,
     final String? contactPerson2Mobile,
+    final String? addressLine,
+    final String? area,
+    final String? pincode,
+    final double? latitude,
+    final double? longitude,
+    final String? governmentIdType,
+    final String? governmentIdNumber,
   }) = _$PartnerProfileInputImpl;
 
   factory _PartnerProfileInput.fromJson(Map<String, dynamic> json) =
@@ -341,8 +461,6 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
   @override
   String? get description;
   @override
-  String? get aadhaarNumber;
-  @override
   String? get contactPerson1Name;
   @override
   String? get contactPerson1Mobile;
@@ -350,6 +468,20 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
   String? get contactPerson2Name;
   @override
   String? get contactPerson2Mobile;
+  @override
+  String? get addressLine;
+  @override
+  String? get area;
+  @override
+  String? get pincode;
+  @override
+  double? get latitude;
+  @override
+  double? get longitude;
+  @override
+  String? get governmentIdType; // "AADHAAR" | "PASSPORT"
+  @override
+  String? get governmentIdNumber;
 
   /// Create a copy of PartnerProfileInput
   /// with the given fields replaced by the non-null parameter values.

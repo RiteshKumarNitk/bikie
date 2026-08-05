@@ -15,6 +15,7 @@ import '../../features/membership/presentation/membership_screen.dart';
 import '../../features/messaging/presentation/conversation_thread_screen.dart';
 import '../../features/messaging/presentation/conversations_list_screen.dart';
 import '../../features/nearby_riders/presentation/nearby_riders_screen.dart';
+import '../../features/partners/presentation/partners_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/onboarding/presentation/intro_screen.dart';
 import '../../features/onboarding/presentation/partner_onboarding_screen.dart';
@@ -109,6 +110,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/wishlist', builder: (context, state) => const WishlistScreen()),
       GoRoute(path: '/sos', builder: (context, state) => const SosScreen()),
       GoRoute(path: '/sos/nearby-riders', builder: (context, state) => const NearbyRidersScreen()),
+      GoRoute(path: '/partners', builder: (context, state) => const PartnersScreen()),
       GoRoute(path: '/sos/history', builder: (context, state) => const SosHistoryScreen()),
       GoRoute(
         path: '/sos/:id',

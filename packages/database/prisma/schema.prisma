@@ -519,14 +519,22 @@ model Partner {
   ratingAvg    Decimal     @default(0) @db.Decimal(2, 1)
   ratingCount  Int         @default(0)
   // --- Added in ADR-014 (client-provided onboarding field list) ---
-  aadhaarNumber        String?
   contactPerson1Name   String?
   contactPerson1Mobile String?
   contactPerson2Name   String?
   contactPerson2Mobile String?
+  // --- Added in ADR-036 (shop location + typed government ID, superseding aadhaarNumber) ---
+  addressLine       String?
+  area              String?
+  pincode           String?
+  latitude          Float?
+  longitude         Float?
+  governmentIdType  GovernmentIdType?
+  governmentIdNumber String?
   createdAt    DateTime    @default(now())
 
   @@index([city])
+  @@index([latitude, longitude])
 }
 
 // --- Bookings & reviews ---

@@ -19,6 +19,10 @@ const isDev = process.env.NODE_ENV === "development";
 // list tightened/corrected to match reality rather than guesswork.
 const msg91WidgetScriptSrc = "https://verify.msg91.com https://verify.phone91.com https://hcaptcha.com https://*.hcaptcha.com";
 const msg91WidgetConnectSrc = "https://verify.msg91.com https://verify.phone91.com https://control.msg91.com https://hcaptcha.com https://*.hcaptcha.com";
+// LocationPicker.tsx/PartnersMap.tsx (ADR-036) use Leaflet (npm-bundled, served from our own
+// origin) + raw OpenStreetMap raster tiles instead of Google Maps JS SDK — no API key, no
+// billing account. No script-src/connect-src additions needed: Leaflet ships no external script,
+// and tile/marker-icon images already fall under the broad `img-src https:` below.
 
 const cspHeader = `
   default-src 'self';
