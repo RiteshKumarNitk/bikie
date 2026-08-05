@@ -8,6 +8,7 @@ import '../domain/auth_controller.dart';
 import '../domain/role_provider.dart';
 import 'widgets/dev_otp_banner.dart';
 import 'widgets/phone_number_field.dart';
+import 'widgets/resend_countdown.dart';
 
 const _noAccountError = 'NO_ACCOUNT';
 
@@ -22,11 +23,10 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownMixin<LoginScreen> {
   String _mode = 'phone'; // 'phone' | 'email'
   String _step = 'phone'; // 'phone' | 'otp'
 
-  String _countryCode = kDefaultCountryCode;
   String _localNumber = '';
   String _phoneNumber = '';
   final _otpController = TextEditingController();
@@ -56,7 +56,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   Future<void> _sendCode() async {
     setState(() => _error = null);
-    final normalized = composePhoneNumber(_countryCode, _localNumber);
+    final normalized = composePhoneNumber(_localNumber);
     if (normalized == null) {
       setState(() => _error = 'Enter a 10-digit phone number.');
       return;
@@ -77,6 +77,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         _phoneNumber = normalized;
         _step = 'otp';
       });
+      startResendCountdown();
       _fetchDevOtp(normalized);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -86,9 +87,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _resend() async {
+    if (!canResend) return;
     setState(() => _sendingOtp = true);
     try {
       await ref.read(authRepositoryProvider).sendOtp(_phoneNumber);
+      startResendCountdown();
       _fetchDevOtp(_phoneNumber);
     } finally {
       if (mounted) setState(() => _sendingOtp = false);
@@ -168,8 +171,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   PhoneNumberField(
-                    countryCode: _countryCode,
-                    onCountryCodeChanged: (v) => setState(() => _countryCode = v),
                     onLocalNumberChanged: (v) => _localNumber = v,
                   ),
                   const SizedBox(height: 16),
@@ -269,8 +270,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton(
-                      onPressed: _sendingOtp ? null : _resend,
-                      child: const Text('Resend'),
+                      onPressed: (_sendingOtp || !canResend) ? null : _resend,
+                      child: Text(canResend ? 'Resend' : 'Resend in ${resendRemaining}s'),
                     ),
                   ),
                   if (_error != null) ...[

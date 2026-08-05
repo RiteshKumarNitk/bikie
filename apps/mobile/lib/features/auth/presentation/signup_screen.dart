@@ -8,6 +8,7 @@ import '../domain/auth_controller.dart';
 import '../domain/role_provider.dart';
 import 'widgets/dev_otp_banner.dart';
 import 'widgets/phone_number_field.dart';
+import 'widgets/resend_countdown.dart';
 
 /// `/signup` — phone + OTP, mirroring the web (ADR-013/ADR-015). Name and
 /// the fuller rider-profile onboarding form are collected later on web
@@ -22,10 +23,9 @@ class SignupScreen extends ConsumerStatefulWidget {
   ConsumerState<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _SignupScreenState extends ConsumerState<SignupScreen> {
+class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdownMixin<SignupScreen> {
   String _step = 'phone'; // 'phone' | 'otp'
 
-  String _countryCode = kDefaultCountryCode;
   String _localNumber = '';
   String _phoneNumber = '';
   bool? _exists;
@@ -49,7 +49,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
 
   Future<void> _sendCode() async {
     setState(() => _error = null);
-    final normalized = composePhoneNumber(_countryCode, _localNumber);
+    final normalized = composePhoneNumber(_localNumber);
     if (normalized == null) {
       setState(() => _error = 'Enter a 10-digit phone number.');
       return;
@@ -64,6 +64,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
         _exists = result.exists;
         _step = 'otp';
       });
+      startResendCountdown();
       _fetchDevOtp(normalized);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -73,9 +74,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   }
 
   Future<void> _resend() async {
+    if (!canResend) return;
     setState(() => _sendingOtp = true);
     try {
       await ref.read(authRepositoryProvider).sendOtp(_phoneNumber);
+      startResendCountdown();
       _fetchDevOtp(_phoneNumber);
     } finally {
       if (mounted) setState(() => _sendingOtp = false);
@@ -135,8 +138,6 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 const SizedBox(height: 24),
                 if (_step == 'phone') ...[
                   PhoneNumberField(
-                    countryCode: _countryCode,
-                    onCountryCodeChanged: (v) => setState(() => _countryCode = v),
                     onLocalNumberChanged: (v) => _localNumber = v,
                   ),
                   const SizedBox(height: 6),
@@ -184,7 +185,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   ),
                   Align(
                     alignment: Alignment.centerRight,
-                    child: TextButton(onPressed: _sendingOtp ? null : _resend, child: const Text('Resend code')),
+                    child: TextButton(
+                      onPressed: (_sendingOtp || !canResend) ? null : _resend,
+                      child: Text(canResend ? 'Resend code' : 'Resend code in ${resendRemaining}s'),
+                    ),
                   ),
                   if (_error != null) ...[
                     Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
