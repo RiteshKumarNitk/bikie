@@ -20,8 +20,8 @@ export const metadata: Metadata = {
     (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "http://localhost:4000")
   ),
   title: {
-    default: "BIKIE — Find Your Next Ride",
-    template: "%s | BIKIE",
+    default: "bikie",
+    template: "%s | bikie",
   },
   description: "India's premium motorcycle travel platform. Rent premium motorcycles anywhere.",
 };
