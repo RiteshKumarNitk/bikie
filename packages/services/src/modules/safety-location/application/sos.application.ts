@@ -41,6 +41,20 @@ export function createSosApplication(ports: SafetyLocationPorts) {
 
       await ports.sosAlerts.resolveAlert(alertId, userId);
       await ports.sosTimeline.record({ alertId, type: "SOS_RESOLVED", actorId: userId });
+
+      // Notify whichever party didn't do the resolving — the one who did already knows.
+      // An admin override notifies both.
+      const recipients = new Set<string>();
+      if (!isOwner || isAdmin) recipients.add(alert.userId);
+      if (alert.assignedHelperId && (!isAssignedHelper || isAdmin)) recipients.add(alert.assignedHelperId);
+      await Promise.all(
+        [...recipients].map((recipientId) =>
+          ports.notifications
+            .notify(recipientId, "SOS_ALERT", "SOS closed", "This SOS alert has been marked resolved.", "sos_alert", alertId)
+            .catch(console.error),
+        ),
+      );
+
       return { ok: true as const };
     },
 
@@ -64,7 +78,7 @@ export function createSosApplication(ports: SafetyLocationPorts) {
       const stale = await ports.sosAlerts.autoResolveStaleAlerts(minutes);
       if (stale.length === 0) return;
 
-      for (const { id: alertId } of stale) {
+      for (const { id: alertId, userId, assignedHelperId } of stale) {
         const session = await ports.sosSessions.getActiveSessionForAlert(alertId).catch(() => null);
         if (session) {
           await ports.sosSessions
@@ -72,6 +86,22 @@ export function createSosApplication(ports: SafetyLocationPorts) {
             .catch(() => undefined);
         }
         await ports.sosTimeline.record({ alertId, type: "SOS_RESOLVED", metadata: { reason: "auto-resolve-timeout" } });
+
+        const recipients = assignedHelperId ? [userId, assignedHelperId] : [userId];
+        await Promise.all(
+          recipients.map((recipientId) =>
+            ports.notifications
+              .notify(
+                recipientId,
+                "SOS_ALERT",
+                "SOS closed",
+                "This SOS alert was automatically closed after 2 hours of inactivity.",
+                "sos_alert",
+                alertId,
+              )
+              .catch(console.error),
+          ),
+        );
       }
 
       await ports.sosAlerts.bulkResolve(stale.map((a) => a.id));

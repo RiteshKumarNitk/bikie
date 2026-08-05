@@ -121,7 +121,7 @@ export function createRideRoomApplication(ports: RidesCommunityPorts) {
         "New ride announcement",
         content.slice(0, 140),
         "Trip",
-        access.tripId,
+        slug,
       );
 
       return { ok: true, data: dto };

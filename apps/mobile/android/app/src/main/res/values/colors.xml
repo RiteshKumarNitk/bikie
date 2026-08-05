@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches `AppColors.darkAccent`/`lightAccent` (#3B3A91, ADR-009) — the small-icon tint
+         Android applies to FCM notifications in the system tray. -->
+    <color name="notification_accent">#3B3A91</color>
+</resources>

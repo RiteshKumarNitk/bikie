@@ -3,6 +3,7 @@ import {
   createAccountStatusAdapter,
   createMessageCryptoAdapter,
   createMessageStoreAdapter,
+  createMessagingNotificationAdapter,
   createMessagingRealtimeAdapter,
 } from "./infrastructure/adapters";
 import type { MessagingPorts } from "./ports";
@@ -20,6 +21,7 @@ export function createMessagingModule(overrides: MessagingDeps = {}): MessagingM
     crypto: overrides.crypto ?? createMessageCryptoAdapter(),
     realtime: overrides.realtime ?? createMessagingRealtimeAdapter(),
     accountStatus: overrides.accountStatus ?? createAccountStatusAdapter(),
+    notifications: overrides.notifications ?? createMessagingNotificationAdapter(),
   };
 
   return {

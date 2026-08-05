@@ -1,5 +1,27 @@
 # Changelog
 
+## Change — Android push notifications (FCM), reusing the existing pipeline (ADR-035)
+- Native FCM for `apps/mobile` Android only (iOS explicitly out of scope): `firebase_core`/
+  `firebase_messaging`/`flutter_local_notifications`/`device_info_plus`/`package_info_plus`,
+  new `lib/core/push/*` (bootstrap, Android notification channels, a shared deep-link resolver,
+  device token repository, registration service wired into `AuthController`'s login/logout).
+- Backend reuses `NotificationService.notify()` as the single delivery pipeline — no new
+  notification system. `PushSubscription` gains additive `platform`/`deviceId`/`deviceName`/
+  `appVersion`/`notificationsEnabled` columns (migration written, not yet applied live); the
+  existing `PUT/DELETE /api/notifications/push-token` route now accepts (optional) device
+  metadata instead of a new route. FCM sends now carry an Android `channelId`/`priority` derived
+  from the notification type.
+- Fixed two pre-existing gaps found while wiring this up: SOS resolve/auto-resolve never
+  notified anyone, and chat `sendMessage` never notified anyone at all (`NEW_MESSAGE` was an
+  unused enum value). Also fixed a shared web+mobile deep-link bug: ride notifications stored
+  the trip's id as `entityId` instead of its slug, 404ing every "View Trip" tap since they
+  shipped — `trip.application.ts`/`ride-room.application.ts`'s four `notify()` call sites now
+  pass the slug.
+- Going live needs two one-time, account-side steps not run automatically: applying the
+  additive migration to the live database, and registering the Android app in Firebase console
+  for a real `android/app/google-services.json` (the Gradle plugin is applied conditionally so
+  the app keeps building without it in the meantime). See ADR-035 in `.docs/DECISIONS.md`.
+
 ## Change — MSG91 becomes the OTP system of record, superseding ADR-032 (ADR-034)
 - Better Auth's `phoneNumber()` plugin now delegates verification to a `verifyOTP` hook
   (`packages/auth/src/server.ts`) that asks MSG91 instead of comparing its own generated code —

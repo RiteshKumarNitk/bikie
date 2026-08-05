@@ -2,6 +2,10 @@
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
+    <!-- Android 13+ (API 33) requires this runtime-requested permission before any
+         notification — including FCM push — can be shown (ADR-035). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <uses-permission android:name="android.permission.VIBRATE"/>
     <application
         android:label="BIKIE"
         android:name="${applicationName}"
@@ -33,6 +37,22 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- FCM (ADR-035). Fallback channel/icon/color for a background/terminated push that
+             somehow arrives without our own channelId override (push_channel.ts always sets
+             one, but this is Android's own required fallback if that were ever missing) — all
+             four real channels (`sos_channel`/`ride_channel`/`chat_channel`/`general_channel`)
+             are created client-side at app startup (`push_channels.dart`) before this could
+             matter in practice. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="general_channel" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/launcher_icon" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

@@ -137,6 +137,10 @@ export function createMessagesApplication(ports: MessagingPorts) {
       const dto = toDTO(ports, row);
       const otherIds = await ports.store.getOtherParticipantIds(conversationId, senderId);
       await ports.realtime.publishToUsers(otherIds, "new_message", dto);
+      const preview = dto.content ? dto.content.slice(0, 140) : "Sent an attachment";
+      await ports.notifications
+        .notifyMany(otherIds, "NEW_MESSAGE", "New message", preview, "conversation", conversationId)
+        .catch(console.error);
       return { ok: true as const, message: dto };
     },
 

@@ -41,9 +41,21 @@ export interface MessageStorePort {
   removeReaction: typeof import("@bikie/database").messageRepository.removeReaction;
 }
 
+export interface InAppNotificationPort {
+  notifyMany(
+    userIds: string[],
+    type: "NEW_MESSAGE",
+    title: string,
+    body: string,
+    entity?: string,
+    entityId?: string,
+  ): Promise<void>;
+}
+
 export interface MessagingPorts {
   store: MessageStorePort;
   crypto: MessageCryptoPort;
   realtime: MessagingRealtimePort;
   accountStatus: AccountStatusPort;
+  notifications: InAppNotificationPort;
 }

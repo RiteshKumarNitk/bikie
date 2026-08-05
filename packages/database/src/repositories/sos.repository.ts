@@ -135,7 +135,7 @@ export async function autoResolveStaleAlerts(minutes: number) {
   const cutoff = new Date(Date.now() - minutes * 60_000);
   return prisma.sOSAlert.findMany({
     where: { status: "ACTIVE", createdAt: { lte: cutoff } },
-    select: { id: true },
+    select: { id: true, userId: true, assignedHelperId: true },
   });
 }
 

@@ -1,12 +1,13 @@
 import { getCommunicationsPorts } from "./modules/communications/public";
+import type { RegisterPushTokenInput } from "./modules/communications/ports";
 
 /**
  * Compatibility facade — FCM details live in the push adapter.
  */
 export const PushService = {
-  async registerToken(userId: string, token: string): Promise<void> {
+  async registerToken(input: RegisterPushTokenInput): Promise<void> {
     const ports = getCommunicationsPorts();
-    if (ports.push.registerToken) await ports.push.registerToken(userId, token);
+    if (ports.push.registerToken) await ports.push.registerToken(input);
   },
 
   async unregisterToken(token: string): Promise<void> {

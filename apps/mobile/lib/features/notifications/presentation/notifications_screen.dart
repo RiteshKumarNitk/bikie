@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/push/notification_deep_link.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -69,11 +70,13 @@ class _NotificationCard extends ConsumerWidget {
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(kCardRadius),
-        onTap: () {
+        onTap: () async {
           if (isUnread) ref.read(notificationsProvider.notifier).markRead(notification.id);
-          if (notification.entity == 'Trip' && notification.entityId != null) {
-            context.push('/trips/${notification.entityId}');
-          }
+          final path = await ref.read(notificationDeepLinkResolverProvider).resolve(
+                entity: notification.entity,
+                entityId: notification.entityId,
+              );
+          if (path != '/notifications' && context.mounted) context.push(path);
         },
         child: Padding(
           padding: const EdgeInsets.all(14),

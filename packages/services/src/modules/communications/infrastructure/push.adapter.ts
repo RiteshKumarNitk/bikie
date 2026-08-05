@@ -1,6 +1,7 @@
 import { pushSubscriptionRepository } from "@bikie/database";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
+import { androidPriorityForNotificationType, channelIdForNotificationType } from "../domain/push-channel";
 import type { PushMessage, PushPort } from "../ports";
 
 let configured = false;
@@ -23,8 +24,8 @@ function ensureApp(): boolean {
 /** Firebase FCM adapter with DEV console fallback. */
 export function createPushAdapter(): PushPort {
   return {
-    async registerToken(userId: string, token: string): Promise<void> {
-      await pushSubscriptionRepository.upsertToken(userId, token);
+    async registerToken(input): Promise<void> {
+      await pushSubscriptionRepository.upsertToken(input);
     },
 
     async unregisterToken(token: string): Promise<void> {
@@ -41,10 +42,21 @@ export function createPushAdapter(): PushPort {
       const tokens = subscriptions.map((s: { token: string }) => s.token);
       if (tokens.length === 0) return;
 
+      // `android`/`webpush`/`apns` are per-platform override blocks — FCM applies only the
+      // block matching each token's own registered platform, so one multicast call safely
+      // covers a user's mixed web+Android devices. The channelId only matters for the
+      // background/terminated case (the OS auto-displays `notification` there); the
+      // foreground case is handled entirely client-side (`onMessage` + flutter_local_notifications
+      // choosing the same channel from `data.type` — see `push-channel.ts`'s doc comment).
+      const type = payload.data?.type ?? "SYSTEM";
       const res = await getMessaging().sendEachForMulticast({
         tokens,
         notification: { title: payload.title, body: payload.body },
         data: payload.data,
+        android: {
+          priority: androidPriorityForNotificationType(type),
+          notification: { channelId: channelIdForNotificationType(type) },
+        },
       });
 
       await Promise.all(

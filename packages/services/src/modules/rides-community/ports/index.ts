@@ -23,6 +23,7 @@ export type ApproveAtomicResult =
       ok: true;
       conversationId: string;
       tripId: string;
+      tripSlug: string;
       tripTitle: string;
       organizerName: string;
       userId: string;
@@ -37,6 +38,7 @@ export type ParticipantWithTrip = {
   status: string;
   message: string | null;
   trip: {
+    slug: string;
     organizerId: string;
     title: string;
     organizer: { name: string };

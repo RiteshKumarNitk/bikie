@@ -158,7 +158,7 @@ export function createTripApplication(ports: RidesCommunityPorts) {
         "New ride request",
         `Someone requested to join "${trip!.title}".`,
         "Trip",
-        trip!.id,
+        slug,
       );
       return { ok: true };
     },
@@ -208,7 +208,7 @@ export function createTripApplication(ports: RidesCommunityPorts) {
           "Ride request declined",
           `Your request to join "${participant!.trip.title}" was declined.`,
           "Trip",
-          participant!.tripId,
+          participant!.trip.slug,
         );
         return { ok: true };
       }
@@ -228,7 +228,7 @@ export function createTripApplication(ports: RidesCommunityPorts) {
         "Ride request approved",
         `You're in! Your request to join "${approved.tripTitle}" was approved.`,
         "Trip",
-        approved.tripId,
+        approved.tripSlug,
       );
 
       return { ok: true };

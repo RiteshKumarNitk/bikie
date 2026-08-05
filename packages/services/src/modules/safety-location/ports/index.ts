@@ -40,7 +40,9 @@ export interface SosAlertRepositoryPort {
   >;
   /** Returns the alerts that are now stale, so the caller (application layer) can cascade
    * timeline/session cleanup before writing RESOLVED — not a raw bulk update itself. */
-  autoResolveStaleAlerts(minutes: number): Promise<Array<{ id: string }>>;
+  autoResolveStaleAlerts(
+    minutes: number,
+  ): Promise<Array<{ id: string; userId: string; assignedHelperId: string | null }>>;
   bulkResolve(alertIds: string[]): Promise<void>;
   /** Cron-poll query key for GET /api/cron/sos-escalate. */
   findAlertsDueForEscalation(before: Date, take?: number): Promise<SOSAlertDTO[]>;

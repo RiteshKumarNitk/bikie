@@ -189,6 +189,7 @@ describe("approve application", () => {
       ok: true as const,
       conversationId: "c1",
       tripId: "t1",
+      tripSlug: "goa-ride",
       tripTitle: "Goa Ride",
       organizerName: "Org",
       userId: "u2",
@@ -217,7 +218,7 @@ describe("approve application", () => {
       "Ride request approved",
       expect.stringContaining("Goa Ride"),
       "Trip",
-      "t1",
+      "goa-ride",
     );
   });
 

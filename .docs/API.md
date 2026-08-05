@@ -168,12 +168,28 @@ here during the Milestone 8.8 mobile-parity pass (the route was added alongside 
 | `/api/notifications` | GET | `{ notifications: NotificationDTO[] }` for the current user, newest first. |
 | `/api/notifications` | POST | `{ id }` marks one notification read, or `{ action: "MARK_ALL_READ" }` marks all read. `{ ok: true }`. |
 
-## Push Notifications (ADR-016)
+`entity`/`entityId` deep-link conventions: `"Trip"` → the trip's **slug** (fixed in ADR-035;
+previously stored the trip's id, which 404'd against the slug-keyed `/trips/[slug]` route on
+both platforms — web's `NotificationsTab.tsx` and mobile both build the link straight from
+`entityId`), `"sos_alert"` → alert id (`/sos/[id]`), `"sos_session"` → session id (mobile's
+`NotificationDeepLinkResolver` resolves this to its `alertId` via `GET /api/sos/sessions/[id]`
+before navigating, since there is no session-keyed route — web doesn't deep-link SOS at all,
+it links to the SOS dashboard generically), `"conversation"` → conversation id, new in ADR-035
+for `NEW_MESSAGE` (mobile links to `/messages/[id]`; web's `NotificationsTab.tsx` has no tap
+handler for this entity yet — falls back to no link, same as any other unmapped entity).
+
+## Push Notifications (ADR-016 web, ADR-035 Android)
 
 | Route | Method | Notes |
 |---|---|---|
-| `/api/notifications/push-token` | PUT/DELETE | `{ token }`. Registers/removes an FCM web push token for the current session. |
+| `/api/notifications/push-token` | PUT/DELETE | `{ token, platform?, deviceId?, deviceName?, appVersion? }` — `platform`/device fields are optional and additive (ADR-035); the existing web caller still sends bare `{ token }` and defaults to `platform: WEB`. PUT upserts by `token` (multi-device support falls out of this for free — one row per device per user) and flips `notificationsEnabled` back to `true`. DELETE removes by `token`. |
 | `/api/firebase-config` | GET | Public Firebase Web SDK config, fetched by `public/firebase-messaging-sw.js` at load time (static files can't read `NEXT_PUBLIC_*` env vars). |
+
+Android FCM (ADR-035) reuses this same route and `NotificationService.notify()` choke point —
+no separate mobile push API. The `android.notification.channelId`/`priority` FCM fields are set
+server-side per `NotificationType` (`communications/domain/push-channel.ts`) so a
+background/terminated push lands in the right Android notification channel; the Flutter app
+mirrors the same mapping client-side for the foreground case (`push_channels.dart`).
 
 ## Membership (auth required)
 

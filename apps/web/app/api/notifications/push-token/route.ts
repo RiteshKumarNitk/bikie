@@ -12,7 +12,7 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  await PushService.registerToken(session.user.id, parsed.data.token);
+  await PushService.registerToken({ userId: session.user.id, ...parsed.data });
   return NextResponse.json({ success: true });
 }
 

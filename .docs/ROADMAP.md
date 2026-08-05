@@ -1,5 +1,17 @@
 # BIKIE — Roadmap
 
+## Android Push Notifications (2026-08-05, ADR-035)
+Native FCM for the Flutter Android app, reusing the existing `NotificationService.notify()`
+pipeline (no parallel notification system) and the existing web push-token route (extended, not
+duplicated, with device metadata). Covers SOS lifecycle, ride community, and chat notifications
+automatically — every type already routed through `notify()` reaches Android once a device
+registers. Two pre-existing gaps (SOS resolve, and chat messages) fixed in the shared backend
+along the way; found and fixed a shared web+mobile deep-link bug (Trip notifications stored an
+id instead of a slug). Code-complete on both ends; going live needs two account-side steps not
+run automatically: applying the additive migration to the live DB, and registering the Android
+app in Firebase console for a real `google-services.json`. iOS explicitly out of scope. See
+ADR-035 and `.docs/TASKS.md` for the full breakdown.
+
 ## Milestone 1 — Scaffold + Homepage ✅ Completed
 Monorepo, Prisma schema (core content models), Better Auth wired to Neon, polished animated homepage.
 

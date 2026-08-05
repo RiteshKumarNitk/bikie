@@ -2,6 +2,30 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Android push notifications (FCM) (2026-08-05, ADR-035)
+
+Backend: code-complete, migration written but not applied. Mobile: code-complete, needs a real
+`google-services.json` + an on-device test to go live. iOS explicitly out of scope.
+
+| Task | Status |
+|---|---|
+| `PushSubscription` schema: `platform`/`deviceId`/`deviceName`/`appVersion`/`notificationsEnabled` (additive), new `PushPlatform` enum | Completed — migration `20260805100000_push_device_metadata` written, `prisma generate` run, **not yet applied to the live DB** |
+| `push-token` route + `PushPort`/adapter/service widened for device metadata (same route, not duplicated) | Completed |
+| Android `channelId`/`priority` targeting on FCM send (`channelIdForNotificationType`) | Completed |
+| Fixed: SOS resolve/auto-resolve never notified anyone | Completed |
+| Fixed: chat `sendMessage` never notified anyone (`NEW_MESSAGE`, new `"conversation"` entity) | Completed |
+| Fixed: Trip notifications stored id instead of slug as `entityId` (404 on tap, both platforms, pre-existing) | Completed |
+| Flutter: `firebase_core`/`firebase_messaging`/`flutter_local_notifications`/`device_info_plus`/`package_info_plus`, `lib/core/push/*` (bootstrap, channels, deep-link resolver, token repository, registration service) | Completed |
+| Flutter: wired into `AuthController` (register on login/signup/OTP/bootstrap, unregister on logout) and `main.dart` (tap → route, never Home first) | Completed |
+| Flutter: in-app `/notifications` list rewired onto the same `NotificationDeepLinkResolver` (was Trip-only inline logic) | Completed |
+| Android Gradle: `google-services` plugin applied conditionally on `google-services.json` existing, so the app keeps building without it | Completed |
+| `flutter analyze`: 0 issues. `flutter test`: 75/75. Backend: 9/9 packages typecheck clean, 116/116 vitest passing | Completed |
+| Apply the pending migration to the live DB | **Not done** — needs explicit user go-ahead, not run automatically against shared state |
+| Register the Android app in Firebase console, add real `android/app/google-services.json` | **Not done** — account-side step, not code |
+| Real on-device foreground/background/terminated verification | **Not done** — needs the two steps above first |
+| Custom monochrome small notification icon (falls back to the launcher icon today) | Backlog — cosmetic |
+| iOS push | Backlog — explicitly out of scope for this pass |
+
 ## MSG91 becomes OTP system of record, superseding ADR-032 (2026-08-05, ADR-034)
 
 Code-complete. Live SMS delivery is blocked on account-side MSG91 setup only user can do (see

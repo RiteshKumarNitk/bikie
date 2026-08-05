@@ -478,6 +478,7 @@ export async function approveParticipantAtomically(participantId: string, organi
       ok: true as const,
       conversationId,
       tripId: participant.tripId,
+      tripSlug: participant.trip.slug,
       tripTitle: participant.trip.title,
       organizerName: participant.trip.organizer.name,
       userId: participant.userId,

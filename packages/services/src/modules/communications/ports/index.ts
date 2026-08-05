@@ -22,6 +22,17 @@ export type PushMessage = {
   data?: Record<string, string>;
 };
 
+export type PushPlatform = "WEB" | "ANDROID" | "IOS";
+
+export type RegisterPushTokenInput = {
+  userId: string;
+  token: string;
+  platform?: PushPlatform;
+  deviceId?: string;
+  deviceName?: string;
+  appVersion?: string;
+};
+
 export type WhatsAppLocation = {
   latitude: number;
   longitude: number;
@@ -53,7 +64,7 @@ export interface WhatsAppPort extends ChannelCapability {
 
 export interface PushPort {
   sendToUser(userId: string, payload: PushMessage): Promise<void>;
-  registerToken?(userId: string, token: string): Promise<void>;
+  registerToken?(input: RegisterPushTokenInput): Promise<void>;
   unregisterToken?(token: string): Promise<void>;
 }
 

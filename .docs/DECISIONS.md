@@ -982,3 +982,106 @@ changes:
   (`verify.msg91.com`/`verify.phone91.com`/`control.msg91.com`) to be captured from the Network
   tab and tightened on first live test, not guessed-and-shipped as final.
 
+## ADR-035: Android push notifications (FCM) — reuse the existing pipeline, no separate mobile system; iOS explicitly out of scope
+
+- **Context.** ADR-016 shipped push for web only; native Flutter push (`firebase_messaging` +
+  real FCM device tokens, not the Web SDK/VAPID/service-worker path) was explicitly deferred.
+  Requested now for Android only — riders and service providers need SOS/ride/chat pushes to
+  reach them even with the app backgrounded or fully closed.
+- **Decision — extend, don't duplicate.** `NotificationService.notify()` stays the single choke
+  point every notification type already passes through (bookings, SOS, rides, chat, moderation)
+  — Android is a new *delivery leg* inside the existing `PushPort`/`push.adapter.ts`, not a
+  parallel system, and registers against the **same** `PUT/DELETE /api/notifications/push-token`
+  route the web client has always used.
+  - **Schema (additive).** `PushSubscription` gains `platform` (`PushPlatform: WEB | ANDROID |
+    IOS`, default `WEB` — existing rows keep working unchanged), `deviceId`/`deviceName`/
+    `appVersion` (nullable — meaningless for a browser), `notificationsEnabled` (default `true`).
+    One row per physical device per user, keyed by `token` as before — multi-device support
+    falls out of that for free, no separate "device" model needed. Migration
+    `20260805100000_push_device_metadata` is hand-authored (`CREATE TYPE` + additive
+    `ALTER TABLE`), matching the precedent set by ADR-016/ADR-033's PostGIS/enum migrations —
+    **not yet applied to the live database**, pending the user running `pnpm db:migrate`
+    (or equivalent `prisma migrate deploy`) themselves; `prisma generate` (local codegen only,
+    no DB write) was run so the rest of the stack typechecks against the new fields already.
+  - **`push.adapter.ts`'s `sendEachForMulticast` gains a per-platform `android` override block**
+    (`priority`, `notification.channelId`) computed from the notification's `NotificationType`
+    via a new pure domain helper, `channelIdForNotificationType`
+    (`communications/domain/push-channel.ts`). FCM applies platform-specific blocks (`android`/
+    `webpush`/`apns`) only to tokens actually registered on that platform, so one multicast call
+    safely covers a user's mixed web+Android devices — no branching in the adapter itself. The
+    Flutter app mirrors the identical type→channel mapping client-side (`push_channels.dart`,
+    for the foreground case, which the OS doesn't auto-display) — the two can't share code
+    across TS/Dart, kept in sync by a doc comment on both sides pointing at each other.
+  - **Two real gaps found and fixed while wiring this up**, both pre-existing and unrelated to
+    Android specifically (they'd have been silently broken for web push too):
+    1. `POST /api/sos/alerts/[id]/resolve` never notified anyone — resolving an alert (by the
+       reporter, the assigned helper, or an admin override) now notifies whichever party didn't
+       do the resolving; the cron auto-resolve path (`GET /api/cron/sos-resolve`) now notifies
+       both. Reuses the existing `SOS_ALERT` notification type (no new enum value) — SOS
+       notifications have always been differentiated by title/body text, not by type.
+    2. `MessageService.sendMessage` never called `NotificationService.notify` at all — a
+       `Notification` row (and therefore a push) was never created for a new chat message,
+       including Ride Room chat (the same `Message`/`Conversation` models, per ADR-011/ADR-010).
+       Fixed by adding a `notifications: InAppNotificationPort` to `MessagingPorts` (same
+       adapter-to-`NotificationService` pattern as `safety-location`'s own notification port),
+       wired into `sendMessage` with the existing `NEW_MESSAGE` enum value (already present in
+       schema, unused until now) and a new `"conversation"` entity convention.
+  - **Deep-link bug fixed at the source, not patched around on the client.** Ride notifications
+    (`RIDE_REQUEST_RECEIVED`/`APPROVED`/`REJECTED`/`RIDE_ANNOUNCEMENT`) stored the trip's `id` as
+    `entityId`, but `/trips/[slug]` is slug-keyed — every "View Trip" link (web) and mobile
+    equivalent has 404'd since these notifications shipped. `trip.application.ts`/
+    `ride-room.application.ts`'s four `notify()` call sites now pass the trip's `slug` (already
+    in scope at each call site, or added as `tripSlug` to `ApproveAtomicResult`/
+    `ParticipantWithTrip` — no new query, `include: { trip: {...} }` already fetches it).
+    Discovered because Android's tap-to-navigate depends on `entityId` actually resolving.
+  - **`sos_session`-entity notifications need a resolve hop.** Several SOS lifecycle
+    notifications (`HELPER_ARRIVED`/`ASSISTANCE_STARTED`/etc., `session.application.ts`) carry a
+    *session* id as `entityId`, but the only SOS route is alert-keyed (`/sos/[id]`). Rather than
+    changing what the notification stores (the web dashboard's SOS page doesn't need a specific
+    session's alert id — it links to the SOS list generically), the mobile
+    `NotificationDeepLinkResolver` resolves session → alert via the existing
+    `GET /api/sos/sessions/[id]` route before navigating. One extra network hop, only on tap, not
+    a new endpoint.
+- **Android client (`apps/mobile`).** `firebase_core`/`firebase_messaging`/
+  `flutter_local_notifications`/`device_info_plus`/`package_info_plus`, new
+  `lib/core/push/` module:
+  - `push_bootstrap.dart` — Firebase init, the required top-level background message handler,
+    local-notification channel creation, and the three listeners (foreground/background-tap/
+    terminated-launch) that normalize every path into one `notificationTapController` stream.
+    Deliberately has zero Riverpod dependency, because the isolate FCM spawns to run the
+    background handler for a killed app has no `ProviderContainer` at all.
+  - `notification_deep_link.dart` — `NotificationDeepLinkResolver` (the `entity`/`entityId` → route
+    map above) shared by *both* the push-tap path and the existing in-app `/notifications` list
+    (`notifications_screen.dart` was rewired to call it too, replacing its own narrower
+    Trip-only inline logic) — one routing table, not two that could drift apart.
+  - `push_registration_service.dart` — requests the Android 13+ `POST_NOTIFICATIONS` runtime
+    permission, obtains/registers the FCM token (with device id/name/app version), re-registers
+    on `onTokenRefresh`, and unregisters + deletes the local token on logout. Wired into
+    `AuthController` (sign-in/sign-up/OTP-verify/bootstrap → register; sign-out/forced-logout →
+    unregister) — the same lifecycle points that already own session state, not a separate
+    "enable push" screen/toggle. Every method no-ops on non-Android platforms and swallows its
+    own errors — push registration must never be able to break login.
+  - `google-services.json` **is not committed and does not exist yet** — the Android app isn't
+    registered in Firebase console. The Gradle plugin (`android/app/build.gradle.kts`) is applied
+    **conditionally** (`if (file("google-services.json").exists())`), not via the normal
+    `plugins {}` block, specifically so the app keeps building and running exactly as before for
+    anyone who hasn't added that file yet — the plugin throws a hard build error otherwise.
+    Dropping the real file in at that exact path is the only remaining step to go live; no further
+    Gradle changes needed.
+  - **No custom monochrome notification icon.** Android notifications want a white-silhouette
+    small icon; none exists in the asset set. Falls back to `@mipmap/launcher_icon` (functional —
+    renders as a colored square/box on the notification, not the ideal look). Flagged as a known
+    polish item, not fabricated.
+- **iOS is explicitly out of scope for this pass**, per the request — every push code path above
+  is Android-only (`Platform.isAndroid` guards in the Dart registration service; no APNs
+  entitlements/certs touched). Extending to iOS later is additive (the backend's `PushPlatform`
+  enum already has an `IOS` value reserved) but needs its own APNs setup, not assumed to fall out
+  of this work for free.
+- **Consequences.** Every notification type already flowing through `NotificationService.notify()`
+  reaches Android automatically once a device registers — no per-feature push code to write
+  going forward. `channelIdForNotificationType`'s mapping must be kept in sync manually across
+  `push-channel.ts` and `push_channels.dart` if a new `NotificationType` is ever added. The
+  Android app cannot actually deliver a push until (1) the pending migration is applied and (2)
+  a real `google-services.json` is added — both are one-time, user-side setup steps, not code
+  gaps.
+

@@ -1033,15 +1033,30 @@ model RiderLocation {
   @@map("rider_location")
 }
 
-// --- Push notifications (ADR-016) — Firebase Cloud Messaging, web only for now ---
+// --- Push notifications (ADR-016 web, ADR-035 Android) — Firebase Cloud Messaging ---
+
+enum PushPlatform {
+  WEB
+  ANDROID
+  IOS
+}
 
 model PushSubscription {
-  id         String   @id @default(cuid())
-  userId     String
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token      String   @unique
-  createdAt  DateTime @default(now())
-  lastSeenAt DateTime @updatedAt
+  id                  String       @id @default(cuid())
+  userId              String
+  user                User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token               String       @unique
+  platform            PushPlatform @default(WEB)
+  // Native-device fields — null for WEB rows (a browser has no stable device id and no
+  // installed "app version"). One row per physical device per user, keyed by `token` (a
+  // user can hold many rows — multi-device support falls out of that for free, no separate
+  // "device" concept needed).
+  deviceId            String?
+  deviceName          String?
+  appVersion          String?
+  notificationsEnabled Boolean     @default(true)
+  createdAt           DateTime     @default(now())
+  lastSeenAt          DateTime     @updatedAt
 
   @@index([userId])
   @@map("push_subscription")
