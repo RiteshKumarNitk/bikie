@@ -1,3 +1,4 @@
+import { NextResponse } from "next/server";
 import { auth } from "@bikie/auth";
 import { toNextJsHandler } from "better-auth/next-js";
 import { enforceRateLimit } from "@/lib/rate-limit";
@@ -23,77 +24,48 @@ async function readPhoneNumber(request: Request): Promise<string | null> {
 }
 
 /**
- * Phone-OTP send/verify get a rate-limit + logging gate in front of Better Auth's own handler.
- * Better Auth's `/phone-number/send-otp` endpoint always returns 200 once the request body is
- * valid, regardless of what the `sendOTP` callback does (see
- * better-auth/dist/plugins/phone-number/routes.mjs — it awaits the callback but there's no
- * built-in way for that callback to turn into a 429/400 response), so rejecting abusive
- * requests has to happen here, before Better Auth's handler runs at all. Phone-number format
- * validation itself stays in Better Auth's own `phoneNumberValidator` option
- * (packages/auth/src/server.ts) since that already produces a correctly-shaped client error.
+ * Phone-OTP verify gets a rate-limit + logging gate in front of Better Auth's own handler.
+ * `/phone-number/send-otp` is disabled entirely (ADR-034) — MSG91 owns OTP delivery on both
+ * platforms now (its Widget SDK on web, native API via /api/otp/mobile/send on mobile), so
+ * Better Auth's own send-otp endpoint would otherwise be a live, unused-but-reachable second OTP
+ * system. Blocking it here, ahead of any rate-limit check, is belt-and-suspenders alongside the
+ * `sendOTP` trip-wire in packages/auth/src/server.ts. Verify-side rate limiting stays: Better
+ * Auth's `/phone-number/verify` endpoint always returns 200 once the request body is valid
+ * regardless of what its `verifyOTP` hook decides (see
+ * better-auth/dist/plugins/phone-number/routes.mjs), so rejecting abusive requests has to happen
+ * here, before Better Auth's handler runs at all.
  */
 export async function POST(request: Request) {
   const pathname = new URL(request.url).pathname;
-  const isSend = pathname === SEND_OTP_PATH;
-  const isVerify = pathname === VERIFY_OTP_PATH;
 
-  if (!isSend && !isVerify) return handlers.POST(request);
+  if (pathname === SEND_OTP_PATH) {
+    return NextResponse.json({ error: "This endpoint has moved" }, { status: 410 });
+  }
+
+  if (pathname !== VERIFY_OTP_PATH) return handlers.POST(request);
 
   const phoneNumber = await readPhoneNumber(request);
   const ip = clientIp(request);
 
-  if (isSend && phoneNumber) {
-    // Resend cooldown also doubles as "no duplicate OTP while one is still active" — a fresh
-    // send is blocked for the first 60s of the 5-minute OTP validity window either way.
-    const cooldown = await enforceRateLimit("otp-send-cooldown", phoneNumber, {
-      requests: 1,
-      windowSeconds: 60,
-    });
-    if (cooldown) {
-      console.log(`[OTP][SEND][REJECTED] reason=cooldown phone=${phoneNumber} ip=${ip}`);
-      return cooldown;
-    }
-
-    const perPhone = await enforceRateLimit("otp-send-phone", phoneNumber, {
-      requests: 3,
+  const perIp = await enforceRateLimit("otp-verify-ip", ip, { requests: 20, windowSeconds: 600 });
+  if (perIp) {
+    console.log(`[OTP][VERIFY][REJECTED] reason=ip-window ip=${ip}`);
+    return perIp;
+  }
+  if (phoneNumber) {
+    const perPhone = await enforceRateLimit("otp-verify-phone", phoneNumber, {
+      requests: 10,
       windowSeconds: 600,
     });
     if (perPhone) {
-      console.log(`[OTP][SEND][REJECTED] reason=phone-window phone=${phoneNumber} ip=${ip}`);
+      console.log(`[OTP][VERIFY][REJECTED] reason=phone-window phone=${phoneNumber} ip=${ip}`);
       return perPhone;
-    }
-
-    const perIp = await enforceRateLimit("otp-send-ip", ip, { requests: 10, windowSeconds: 600 });
-    if (perIp) {
-      console.log(`[OTP][SEND][REJECTED] reason=ip-window phone=${phoneNumber} ip=${ip}`);
-      return perIp;
-    }
-  }
-
-  if (isVerify) {
-    const perIp = await enforceRateLimit("otp-verify-ip", ip, { requests: 20, windowSeconds: 600 });
-    if (perIp) {
-      console.log(`[OTP][VERIFY][REJECTED] reason=ip-window ip=${ip}`);
-      return perIp;
-    }
-    if (phoneNumber) {
-      const perPhone = await enforceRateLimit("otp-verify-phone", phoneNumber, {
-        requests: 10,
-        windowSeconds: 600,
-      });
-      if (perPhone) {
-        console.log(`[OTP][VERIFY][REJECTED] reason=phone-window phone=${phoneNumber} ip=${ip}`);
-        return perPhone;
-      }
     }
   }
 
   const response = await handlers.POST(request);
   // Never log `code`/`otp` from the request body here — only phone number, IP, and the
-  // resulting HTTP status. Actual SMS delivery success/failure is logged separately by the
-  // MSG91 adapter (packages/services/.../sms.adapter.ts).
-  console.log(
-    `[OTP][${isSend ? "SEND" : "VERIFY"}] phone=${phoneNumber ?? "unknown"} ip=${ip} status=${response.status}`,
-  );
+  // resulting HTTP status.
+  console.log(`[OTP][VERIFY] phone=${phoneNumber ?? "unknown"} ip=${ip} status=${response.status}`);
   return response;
 }

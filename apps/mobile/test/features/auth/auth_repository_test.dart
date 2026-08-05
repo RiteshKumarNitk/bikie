@@ -203,19 +203,19 @@ void main() {
   });
 
   group('AuthRepository.sendOtp', () {
-    test('posts phoneNumber to the phone-number/send-otp endpoint', () async {
+    test('posts phoneNumber to the MSG91-backed otp/mobile/send endpoint (ADR-034)', () async {
       when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
         (_) async => Response(
-          requestOptions: RequestOptions(path: '/api/auth/phone-number/send-otp'),
+          requestOptions: RequestOptions(path: '/api/otp/mobile/send'),
           statusCode: 200,
-          data: {'message': 'code sent'},
+          data: {'success': true},
         ),
       );
 
       await repository.sendOtp('+919876543210');
 
       verify(
-        () => dio.post('/api/auth/phone-number/send-otp', data: {'phoneNumber': '+919876543210'}),
+        () => dio.post('/api/otp/mobile/send', data: {'phoneNumber': '+919876543210'}),
       ).called(1);
     });
   });

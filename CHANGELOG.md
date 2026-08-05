@@ -1,5 +1,30 @@
 # Changelog
 
+## Change — MSG91 becomes the OTP system of record, superseding ADR-032 (ADR-034)
+- Better Auth's `phoneNumber()` plugin now delegates verification to a `verifyOTP` hook
+  (`packages/auth/src/server.ts`) that asks MSG91 instead of comparing its own generated code —
+  MSG91 is now the sole OTP generator on both platforms; Better Auth still owns account/session
+  issuance (find-or-create user, mark phone verified, cookie/bearer token) unchanged.
+- **Web:** MSG91's Widget SDK (`apps/web/lib/use-msg91-widget.ts`, `exposeMethods: true`) drives
+  the existing PhoneNumberInput/OTP form — same UI, new wiring. The widget's access token is
+  passed as `code` to the unchanged `authClient.phoneNumber.verify` call, then re-verified
+  server-side via MSG91's `verifyAccessToken` before any session is issued.
+- **Mobile:** new `POST /api/otp/mobile/send` calls MSG91's native OTP API directly (Flutter has
+  no equivalent to the browser-only widget). Verify stays on the same unchanged
+  `POST /api/auth/phone-number/verify` endpoint web uses — one shared verify pipeline for both
+  platforms. `apps/mobile/lib/features/auth/data/auth_repository.dart`'s `sendOtp` now targets the
+  new endpoint; `verifyOtp` needed zero changes.
+- The old `/api/auth/phone-number/send-otp` path now returns 410, and Better Auth's own `sendOTP`
+  callback is a hard-fail trip-wire — belt-and-suspenders so nothing can silently run a second OTP
+  system. `identity-access`'s old `otp.application.ts`/`domain/otp-message.ts` were deleted (fully
+  dead once `sendOTP` stopped calling them).
+- New env vars: `MSG91_OTP_TEMPLATE_ID` (server-only, distinct from the SOS-scoped
+  `MSG91_TEMPLATE_ID`), `NEXT_PUBLIC_MSG91_WIDGET_ID`/`NEXT_PUBLIC_MSG91_WIDGET_TOKEN_AUTH`
+  (client-exposed by design). CSP (`apps/web/next.config.ts`) allows MSG91's widget domains.
+- Known gaps carried forward, not yet live-verified: MSG91 wallet balance, OTP template DLT
+  registration, `verifyAccessToken`'s exact response schema, and the widget's real CSP network
+  origins — see ADR-034's consequences section.
+
 ## Change — SOS redesign Phases B–D: web UI, Flutter parity, reputation + community tier (ADR-033)
 - **Web (Phase B):** panic categories regrouped into 🔴 Emergency / 🟠 Assistance with the new
   types; new `/dashboard/sos/[id]` session detail page (offers, accept/reject, I'm Coming/Cannot

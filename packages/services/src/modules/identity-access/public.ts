@@ -1,32 +1,33 @@
-import { getCommunicationsPorts, type CommunicationsPorts } from "../communications/public";
 import { createAccessApplication } from "./application/access.application";
-import { createOtpApplication } from "./application/otp.application";
+import { createOtpSendApplication } from "./application/otp-send.application";
+import { createOtpVerifyApplication } from "./application/otp-verify.application";
 import { createMembershipAdapter } from "./infrastructure/membership.adapter";
 import { createOtpEchoAdapter } from "./infrastructure/otp-echo.adapter";
+import { createMsg91NativeOtpAdapter } from "./infrastructure/msg91-native-otp.adapter";
+import { createMsg91WidgetVerifyAdapter } from "./infrastructure/msg91-widget-verify.adapter";
 import type { IdentityAccessPorts } from "./ports";
 
 export type IdentityAccessModule = {
   ports: IdentityAccessPorts;
   access: ReturnType<typeof createAccessApplication>;
-  otp: ReturnType<typeof createOtpApplication>;
+  otp: ReturnType<typeof createOtpSendApplication> & ReturnType<typeof createOtpVerifyApplication>;
 };
 
-export type IdentityAccessDeps = Partial<IdentityAccessPorts> & {
-  communications?: CommunicationsPorts;
-};
+export type IdentityAccessDeps = Partial<IdentityAccessPorts>;
 
-/** Composition root for identity-access — membership lookup, OTP delivery, dev echo. */
+/** Composition root for identity-access — membership lookup, OTP send/verify (ADR-034), dev echo. */
 export function createIdentityAccessModule(overrides: IdentityAccessDeps = {}): IdentityAccessModule {
   const ports: IdentityAccessPorts = {
     membership: overrides.membership ?? createMembershipAdapter(),
     otpEcho: overrides.otpEcho ?? createOtpEchoAdapter(),
-    sms: overrides.sms ?? overrides.communications?.sms ?? getCommunicationsPorts().sms,
+    msg91NativeOtp: overrides.msg91NativeOtp ?? createMsg91NativeOtpAdapter(),
+    msg91WidgetVerify: overrides.msg91WidgetVerify ?? createMsg91WidgetVerifyAdapter(),
   };
 
   return {
     ports,
     access: createAccessApplication(ports),
-    otp: createOtpApplication(ports),
+    otp: { ...createOtpSendApplication(ports), ...createOtpVerifyApplication(ports) },
   };
 }
 
@@ -43,11 +44,17 @@ export function setIdentityAccessModuleForTests(module: IdentityAccessModule | n
   defaultModule = module;
 }
 
-export type { IdentityAccessPorts, MembershipPort, OtpEchoStorePort, SessionSnapshot } from "./ports";
+export type {
+  IdentityAccessPorts,
+  MembershipPort,
+  OtpEchoStorePort,
+  Msg91NativeOtpPort,
+  Msg91WidgetVerifyPort,
+  SessionSnapshot,
+} from "./ports";
 export type { AccessDecision, AccessDenialReason } from "./domain/access-decision";
 export type { Permission } from "./domain/permissions";
 export type { Role } from "./domain/roles";
 export { hasPermission, permissionsForRole } from "./domain/permissions";
 export { hasRole, isAdmin, ROLES } from "./domain/roles";
 export { isAccountRestricted } from "./domain/account-status";
-export { buildOtpMessage } from "./domain/otp-message";

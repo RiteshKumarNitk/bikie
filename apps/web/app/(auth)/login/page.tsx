@@ -11,8 +11,8 @@ import {
 } from "@/components/auth/PartnerBusinessFields";
 import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
+import { useMsg91Widget } from "@/lib/use-msg91-widget";
 import { LogoMark } from "@/components/layout/LogoMark";
-import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
 
 const inputClassName =
@@ -26,7 +26,6 @@ function readSelectedRoleCookie(): "RIDER" | "PARTNER" {
 }
 
 export default function LoginPage() {
-  const { addToast } = useToast();
   // "phone" covers riders/partners created via OTP (the normal path). "email" is a fallback
   // for accounts that predate phone login or were never given a phone number — the seeded
   // admin account in particular has no phoneNumber at all, so without this there'd be no way
@@ -56,18 +55,7 @@ export default function LoginPage() {
   const [upgrading, setUpgrading] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const resendTimer = useResendCountdown(60);
-
-  async function fetchDevOtp(phone: string) {
-    try {
-      const res = await fetch(`/api/dev/otp?phone=${encodeURIComponent(phone)}`);
-      const data: { code?: string | null } = await res.json();
-      if (data.code) {
-        addToast(`Your verification code: ${data.code}`, "info");
-      }
-    } catch {
-      // silently ignore
-    }
-  }
+  const widget = useMsg91Widget();
 
   async function handleSendCode() {
     setServerError(null);
@@ -88,17 +76,12 @@ export default function LoginPage() {
         return;
       }
 
-      const { error } = await authClient.phoneNumber.sendOtp({ phoneNumber: normalized });
-      if (error) {
-        setServerError(error.message ?? "Could not send the verification code. Please try again.");
-        return;
-      }
+      await widget.sendOtp(normalized);
       setPhoneNumber(normalized);
       setStep("otp");
       resendTimer.start();
-      fetchDevOtp(normalized);
-    } catch {
-      setServerError("Could not send the verification code. Please try again.");
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Could not send the verification code. Please try again.");
     } finally {
       setSendingOtp(false);
     }
@@ -109,13 +92,10 @@ export default function LoginPage() {
     setServerError(null);
     setSendingOtp(true);
     try {
-      const { error } = await authClient.phoneNumber.sendOtp({ phoneNumber });
-      if (error) {
-        setServerError(error.message ?? "Could not resend the verification code. Please try again.");
-        return;
-      }
+      await widget.retryOtp();
       resendTimer.start();
-      fetchDevOtp(phoneNumber);
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Could not resend the verification code. Please try again.");
     } finally {
       setSendingOtp(false);
     }
@@ -126,7 +106,11 @@ export default function LoginPage() {
     setServerError(null);
     setVerifying(true);
     try {
-      const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: otpCode });
+      // The widget verifies the code directly against MSG91 in-browser and hands back an
+      // opaque access token — our backend re-verifies that token server-side (never trusts the
+      // client's mere claim of success) before Better Auth issues a session (ADR-034).
+      const widgetResult = await widget.verifyOtp(otpCode);
+      const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: widgetResult.message });
       if (error) {
         setServerError(error.message ?? "Invalid or expired code. Please try again.");
         return;
@@ -145,8 +129,8 @@ export default function LoginPage() {
 
       // Every other case: preserve the pre-existing behavior of this page (always "/").
       window.location.href = "/";
-    } catch {
-      setServerError("Something went wrong. Please try again.");
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Invalid or expired code. Please try again.");
     } finally {
       setVerifying(false);
     }

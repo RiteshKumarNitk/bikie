@@ -900,3 +900,85 @@ changes:
   - Final state: 9/9 packages typecheck clean, 102/102 vitest passing, 73/73 flutter tests
     passing, `flutter analyze` clean. Not done: a full authenticated browser click-through — typecheck/build/compile-verified only, real interactive testing needs a browser session.
 
+## ADR-034: MSG91 becomes the OTP system of record, superseding ADR-032
+
+- **Supersedes ADR-032** ("Phone-OTP hardening stays on Better Auth, not MSG91's OTP API").
+  ADR-032 explicitly rejected switching to Better Auth's `verifyOTP` override, reasoning that it
+  would "discard Better Auth's already-correct atomic attempt counting in favor of trusting
+  MSG91's own OTP product as a second, untested source of truth," while noting: *"Revisit only if
+  a hard requirement emerges to keep OTP state on MSG91's side."* That requirement has now
+  emerged: MSG91's Widget SDK (browser-only, already configured in the MSG91 dashboard) for web,
+  for the bot/fraud-signal properties it provides over a self-rolled code; and, since the widget
+  has no Flutter equivalent, MSG91's native server-to-server OTP API for mobile. This ADR
+  resolves ADR-032's core fear directly: MSG91 becomes the **sole** OTP generator on **both**
+  platforms — Better Auth never generates a code again, so there is exactly one source of truth
+  per verification, not two running concurrently.
+- **Decision.** Better Auth's `phoneNumber()` plugin exposes a documented extension point,
+  `verifyOTP?: (data: {phoneNumber, code}) => Awaitable<boolean>` — "useful when using SMS
+  providers that handle their own OTP generation and verification." Confirmed directly in
+  `better-auth/dist/plugins/phone-number/routes.mjs`: when set, it replaces Better Auth's internal
+  code comparison, but the rest of the pipeline (find-or-create user via `signUpOnVerification`,
+  mark `phoneNumberVerified: true`, run `callbackOnVerification`, create the session, mint the
+  mobile `set-auth-token` header via `bearer()`) runs completely unchanged. `packages/auth/src/server.ts`
+  now wires `verifyOTP` to `identity-access`'s `verifyLoginOtp`, which asks MSG91 instead of
+  comparing against a Better-Auth-generated code — Better Auth still owns every account/session
+  decision, it just no longer decides *whether a code was right*.
+  - **Web:** the widget (`apps/web/lib/use-msg91-widget.ts`, `exposeMethods: true`) drives our
+    existing PhoneNumberInput/OTP form — no new UI, only new wiring. `window.sendOtp`/`retryOtp`
+    (explicit `channel: 'text'`, since MSG91's own default for that call is a voice call) talk to
+    MSG91 directly from the browser; our backend never sees that leg. `window.verifyOtp` returns
+    an opaque access token, which is then sent through the **unchanged**
+    `authClient.phoneNumber.verify({phoneNumber, code: accessToken})` call — `code` here is the
+    token, not a 6-digit OTP.
+  - **Mobile:** a new backend-only endpoint, `POST /api/otp/mobile/send`
+    (`apps/web/app/api/otp/mobile/send/route.ts`), calls MSG91's native OTP API
+    (`POST/GET https://control.msg91.com/api/v5/otp{,/verify}`, `otp_length=6` to match existing
+    UI copy everywhere). Verify stays on the exact same unchanged
+    `POST /api/auth/phone-number/verify` endpoint web uses — this is the entire point: one shared
+    verify path, one session-issuance pipeline, for both platforms.
+  - **Discriminator.** The verify endpoint's body is fixed to `{phoneNumber, code}` with no room
+    for a third "which transport" field, so `verifyLoginOtp`
+    (`packages/services/src/modules/identity-access/application/otp-verify.application.ts`)
+    decides by shape: `/^\d{4,9}$/` → MSG91's native OTP (mobile), otherwise → widget access token
+    (web), re-verified server-side via `POST .../widget/verifyAccessToken` and cross-checked
+    against the claimed phone number when MSG91's response includes one. This is a heuristic, not
+    a cryptographic proof — MSG91's own APIs remain the actual trust boundary; a client's claim of
+    widget success is never trusted alone.
+  - **`sendOTP` is required-but-neutralized, not deleted.** `PhoneNumberOptions.sendOTP` has no
+    `?` — it can't be omitted — so it's now a hard-fail trip-wire (`throw`) instead of generating
+    a code. Belt-and-suspenders alongside `apps/web/app/api/auth/[...all]/route.ts` returning
+    **410** on `/phone-number/send-otp` itself: both exist so nothing can silently run a second
+    OTP system, whether reached via HTTP or a future internal call.
+  - **Dead configuration, accepted.** The moment `verifyOTP` is set, Better Auth's own
+    `otpLength`/`expiresIn`/`allowedAttempts` stop doing anything — the internal attempt-counting
+    branch that reads them simply never runs (confirmed in `routes.mjs`). Left in place as
+    documentation of intended shape, not because they're functional. Brute-force protection on
+    verify now rests on MSG91's own (undocumented) limits plus the existing
+    `otp-verify-phone`/`otp-verify-ip` route-level rate limits — sized as a coarse abuse guard
+    originally, not a precise per-OTP attempt cap. Accepted gap, not a silent regression.
+  - **Dev workflow, mobile-only now.** `SHOW_OTP_TOAST`'s local-code bypass
+    (`sendNativeLoginOtp`/`verifyLoginOtp` checking `DevOtpStore` first) only exists for mobile's
+    custom send endpoint, which we fully control. Web's widget talks to MSG91 directly from the
+    browser, bypassing our backend for the send leg entirely — there's no interception point left
+    to fake a code, so local web dev now needs a real MSG91 send. Accepted regression, not fixed
+    with a second, web-specific simulation path.
+  - **Env vars.** New: `MSG91_OTP_TEMPLATE_ID` (server-only — a DLT-approved template for OTP
+    content specifically, distinct from `MSG91_TEMPLATE_ID` which stays scoped to SOS alert SMS),
+    `NEXT_PUBLIC_MSG91_WIDGET_ID`/`NEXT_PUBLIC_MSG91_WIDGET_TOKEN_AUTH` (client-exposed **by
+    design** — the widget is a browser `<script>` tag, so these are visible in page source; MSG91
+    scopes/restricts the widget by domain in its own dashboard, not by keeping this value hidden,
+    unlike `MSG91_AUTH_KEY` which stays server-only).
+  - **Dead code removed.** `identity-access`'s old `otp.application.ts`
+    (`sendLoginOtp`)/`domain/otp-message.ts` (`buildOtpMessage`) had exactly one caller — Better
+    Auth's old `sendOTP` callback — and zero remaining callers once it's neutralized; deleted
+    rather than left as an unused second OTP-message code path.
+- **Consequences.** Exactly one OTP authority (MSG91) per platform, exactly one verify pipeline
+  (Better Auth's, unchanged endpoint/session/bearer-token logic) for both. Known gaps, not yet
+  load-bearing until live-verified: MSG91 wallet balance (last confirmed 0 — blocks real delivery
+  regardless of which system is used), `MSG91_OTP_TEMPLATE_ID` still needs DLT registration in the
+  MSG91 dashboard, the exact `verifyAccessToken` success-response schema (does it always echo a
+  phone number?) wasn't confirmed from renderable MSG91 docs at implementation time, and the
+  widget's real CSP network origins (`apps/web/next.config.ts`) are a starting allow-list
+  (`verify.msg91.com`/`verify.phone91.com`/`control.msg91.com`) to be captured from the Network
+  tab and tightened on first live test, not guessed-and-shipped as final.
+

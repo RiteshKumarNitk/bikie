@@ -1,11 +1,10 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@bikie/database", () => ({
   membershipRepository: { getActiveMembership: vi.fn(async () => null) },
 }));
 
 import { isAccountRestricted } from "./domain/account-status";
-import { buildOtpMessage } from "./domain/otp-message";
 import { hasPermission, permissionsForRole } from "./domain/permissions";
 import { hasRole, isAdmin } from "./domain/roles";
 import { createIdentityAccessModule } from "./public";
@@ -15,8 +14,14 @@ import type { IdentityAccessPorts, SessionSnapshot } from "./ports";
 function fakePorts(overrides: Partial<IdentityAccessPorts> = {}): IdentityAccessPorts {
   return {
     membership: { hasActiveMembership: vi.fn(async () => false) },
-    otpEcho: { remember: vi.fn(async () => undefined) },
-    sms: { send: vi.fn(async (): Promise<ChannelResult> => ({ ok: true, provider: "twilio" })) },
+    otpEcho: { remember: vi.fn(async () => undefined), recall: vi.fn(async () => null) },
+    msg91NativeOtp: {
+      send: vi.fn(async (): Promise<ChannelResult> => ({ ok: true, provider: "msg91" })),
+      verify: vi.fn(async () => true),
+    },
+    msg91WidgetVerify: {
+      verifyAccessToken: vi.fn(async () => ({ verified: true, phoneNumber: null })),
+    },
     ...overrides,
   };
 }
@@ -161,39 +166,120 @@ describe("access application", () => {
   });
 });
 
-describe("otp application", () => {
-  it("keeps the existing SMS copy", () => {
-    expect(buildOtpMessage("123456", 300)).toBe(
-      "Your BIKIE verification code is 123456. It expires in 5 minutes.",
-    );
+describe("otp send/verify applications (ADR-034)", () => {
+  const originalShowOtpToast = process.env.SHOW_OTP_TOAST;
+
+  afterEach(() => {
+    if (originalShowOtpToast === undefined) delete process.env.SHOW_OTP_TOAST;
+    else process.env.SHOW_OTP_TOAST = originalShowOtpToast;
   });
 
-  it("writes the dev echo before sending and returns the channel result", async () => {
-    const calls: string[] = [];
-    const remember = vi.fn(async () => {
-      calls.push("echo");
-    });
-    const send = vi.fn(async (): Promise<ChannelResult> => {
-      calls.push("sms");
-      return { ok: false, provider: "dev", error: "Twilio credentials not configured" };
-    });
+  describe("sendNativeLoginOtp", () => {
+    it("calls MSG91's native send API with otpLength=6 when the dev bypass is off", async () => {
+      delete process.env.SHOW_OTP_TOAST;
+      const send = vi.fn(async (): Promise<ChannelResult> => ({ ok: true, provider: "msg91" }));
+      const remember = vi.fn(async () => undefined);
+      const { otp } = createIdentityAccessModule(
+        fakePorts({ msg91NativeOtp: { send, verify: vi.fn() }, otpEcho: { remember, recall: vi.fn() } }),
+      );
 
-    const { otp } = createIdentityAccessModule(
-      fakePorts({ otpEcho: { remember }, sms: { send } }),
-    );
+      const result = await otp.sendNativeLoginOtp({ phoneNumber: "+919876543210" });
 
-    const result = await otp.sendLoginOtp({
-      phoneNumber: "+919876543210",
-      code: "123456",
-      expiresInSeconds: 300,
+      expect(send).toHaveBeenCalledWith("+919876543210", { otpLength: 6, expirySeconds: 300 });
+      expect(remember).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: true, provider: "msg91" });
     });
 
-    expect(calls).toEqual(["echo", "sms"]);
-    expect(remember).toHaveBeenCalledWith("+919876543210", "123456", 300);
-    expect(send).toHaveBeenCalledWith(
-      "+919876543210",
-      "Your BIKIE verification code is 123456. It expires in 5 minutes.",
-    );
-    expect(result).toEqual({ ok: false, provider: "dev", error: "Twilio credentials not configured" });
+    it("skips MSG91 entirely and remembers a local code when the dev bypass is on", async () => {
+      process.env.SHOW_OTP_TOAST = "true";
+      const send = vi.fn(async (): Promise<ChannelResult> => ({ ok: true, provider: "msg91" }));
+      const remember = vi.fn(async (_phone: string, _code: string, _ttl: number) => undefined);
+      const { otp } = createIdentityAccessModule(
+        fakePorts({ msg91NativeOtp: { send, verify: vi.fn() }, otpEcho: { remember, recall: vi.fn() } }),
+      );
+
+      const result = await otp.sendNativeLoginOtp({ phoneNumber: "+919876543210" });
+
+      expect(send).not.toHaveBeenCalled();
+      expect(remember).toHaveBeenCalledTimes(1);
+      const [phone, code, ttl] = remember.mock.calls[0]!;
+      expect(phone).toBe("+919876543210");
+      expect(code).toMatch(/^\d{6}$/);
+      expect(ttl).toBe(300);
+      expect(result).toEqual({ ok: true, provider: "dev-bypass" });
+    });
+  });
+
+  describe("verifyLoginOtp", () => {
+    it("trusts a recalled dev-bypass code exclusively, without calling MSG91", async () => {
+      const recall = vi.fn(async () => "654321");
+      const nativeVerify = vi.fn(async () => true);
+      const widgetVerify = vi.fn(async () => ({ verified: true, phoneNumber: null }));
+      const { otp } = createIdentityAccessModule(
+        fakePorts({
+          otpEcho: { remember: vi.fn(), recall },
+          msg91NativeOtp: { send: vi.fn(), verify: nativeVerify },
+          msg91WidgetVerify: { verifyAccessToken: widgetVerify },
+        }),
+      );
+
+      await expect(otp.verifyLoginOtp({ phoneNumber: "+919876543210", code: "654321" })).resolves.toBe(true);
+      await expect(otp.verifyLoginOtp({ phoneNumber: "+919876543210", code: "000000" })).resolves.toBe(false);
+      expect(nativeVerify).not.toHaveBeenCalled();
+      expect(widgetVerify).not.toHaveBeenCalled();
+    });
+
+    it("routes short numeric codes to MSG91's native verify (mobile)", async () => {
+      const nativeVerify = vi.fn(async () => true);
+      const { otp } = createIdentityAccessModule(
+        fakePorts({ msg91NativeOtp: { send: vi.fn(), verify: nativeVerify } }),
+      );
+
+      const result = await otp.verifyLoginOtp({ phoneNumber: "+919876543210", code: "123456" });
+
+      expect(nativeVerify).toHaveBeenCalledWith("+919876543210", "123456");
+      expect(result).toBe(true);
+    });
+
+    it("routes opaque non-numeric codes to MSG91's widget verifyAccessToken (web)", async () => {
+      const widgetVerify = vi.fn(async () => ({ verified: true, phoneNumber: null }));
+      const { otp } = createIdentityAccessModule(
+        fakePorts({ msg91WidgetVerify: { verifyAccessToken: widgetVerify } }),
+      );
+
+      const result = await otp.verifyLoginOtp({
+        phoneNumber: "+919876543210",
+        code: "opaque-widget-token-abc123",
+      });
+
+      expect(widgetVerify).toHaveBeenCalledWith("opaque-widget-token-abc123");
+      expect(result).toBe(true);
+    });
+
+    it("rejects a widget token verified for a different phone number than claimed", async () => {
+      const { otp } = createIdentityAccessModule(
+        fakePorts({
+          msg91WidgetVerify: {
+            verifyAccessToken: vi.fn(async () => ({ verified: true, phoneNumber: "+919999999999" })),
+          },
+        }),
+      );
+
+      const result = await otp.verifyLoginOtp({ phoneNumber: "+919876543210", code: "opaque-token" });
+
+      expect(result).toBe(false);
+    });
+
+    it("rejects when the widget itself reports the token as unverified", async () => {
+      const { otp } = createIdentityAccessModule(
+        fakePorts({
+          msg91WidgetVerify: { verifyAccessToken: vi.fn(async () => ({ verified: false, phoneNumber: null })) },
+        }),
+      );
+
+      const result = await otp.verifyLoginOtp({ phoneNumber: "+919876543210", code: "opaque-token" });
+
+      expect(result).toBe(false);
+    });
   });
 });

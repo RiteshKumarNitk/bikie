@@ -2,6 +2,25 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## MSG91 becomes OTP system of record, superseding ADR-032 (2026-08-05, ADR-034)
+
+Code-complete. Live SMS delivery is blocked on account-side MSG91 setup only user can do (see
+"Not done" row).
+
+| Task | Status |
+|---|---|
+| `verifyOTP` hook wired into Better Auth (`packages/auth/src/server.ts`), `sendOTP` neutralized to a trip-wire | Completed |
+| `identity-access` module: `Msg91NativeOtpPort`/`Msg91WidgetVerifyPort` + adapters, `otpEcho.recall`, `otp-send`/`otp-verify` applications, dev-bypass (mobile-only) | Completed |
+| Deleted dead `otp.application.ts`/`domain/otp-message.ts` (zero remaining callers) | Completed |
+| `POST /api/auth/phone-number/send-otp` now returns 410; rate-limit logic moved to new `POST /api/otp/mobile/send` | Completed |
+| Web: MSG91 Widget SDK (`use-msg91-widget.ts`, `exposeMethods: true`) wired into login/signup, dev-OTP-toast removed (no longer reachable) | Completed |
+| Mobile: `auth_repository.dart`'s `sendOtp` retargeted to `/api/otp/mobile/send`; `verifyOtp` unchanged | Completed |
+| CSP updated for MSG91 widget domains (`apps/web/next.config.ts`) | Completed |
+| Env vars added: `MSG91_OTP_TEMPLATE_ID`, `NEXT_PUBLIC_MSG91_WIDGET_ID`, `NEXT_PUBLIC_MSG91_WIDGET_TOKEN_AUTH` | Completed |
+| Tests: `identity-access.test.ts` send/verify discrimination + dev-bypass, new `msg91-otp-adapters.test.ts` | Completed |
+| ADR-034 (supersedes ADR-032), API.md, PRODUCTION_INTEGRATIONS.md, CHANGELOG.md updated | Completed |
+| Live send+verify round-trip on both widget (web) and native API (mobile), confirming `verifyAccessToken`'s real response shape and the widget's actual CSP network origins | **Not done** — blocked on the user funding the MSG91 wallet (balance confirmed 0) and registering `MSG91_OTP_TEMPLATE_ID` in the MSG91 dashboard; both are account-side tasks, not code |
+
 ## SOS → Community Emergency Response System (2026-08-04/05, ADR-033)
 
 Full redesign, phased. All four phases (A–D) are complete.

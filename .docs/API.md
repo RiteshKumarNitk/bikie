@@ -14,6 +14,25 @@ breaking change with a consumer migration window.
 
 `ALL /api/auth/[...all]` — Better Auth catch-all (signup, login, session, signout).
 
+### Phone OTP (ADR-034)
+
+MSG91 is the OTP authority on both platforms — Better Auth only verifies by asking MSG91, then
+issues the session/account as usual (find-or-create user, mark phone verified, `set-auth-token`
+for mobile). The verify endpoint is shared by both platforms unchanged.
+
+- **Web** sends/resends OTPs via the MSG91 Widget SDK directly from the browser (our backend
+  never sees that leg) — see `apps/web/lib/use-msg91-widget.ts`. The widget's `verifyOtp` returns
+  an opaque access token, sent as `code` below.
+- **Mobile** sends via `POST /api/otp/mobile/send` — `{ phoneNumber }` (E.164, Indian numbers
+  only). Rate-limited (60s per-phone cooldown, 3/10min per-phone, 10/10min per-IP). Returns
+  `{ success: true }` or a 4xx/5xx/429 with `{ error }`.
+- **Both** verify via `POST /api/auth/phone-number/verify` — `{ phoneNumber, code }`, where `code`
+  is either MSG91's native OTP (mobile) or the widget's access token (web); Better Auth's
+  `verifyOTP` hook discriminates by shape. Same response shape as before ADR-034 — a `token` field
+  in the JSON body for mobile, a `set-auth-token`-equivalent session cookie for web.
+- `POST /api/auth/phone-number/send-otp` — Better Auth's own built-in send endpoint — returns
+  **410**, deliberately disabled (superseded by the two send paths above).
+
 ### Mobile / Bearer Auth
 
 The web app authenticates via Better Auth's HTTP-only session cookie. Non-browser clients

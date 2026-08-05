@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-04T17:20:53.281Z",
-  "count": 117,
+  "generatedAt": "2026-08-05T02:57:55.411Z",
+  "count": 118,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -526,6 +526,14 @@
       ],
       "auth": "public-or-unclassified",
       "file": "apps/web/app/api/openapi/route.ts"
+    },
+    {
+      "path": "/api/otp/mobile/send",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/otp/mobile/send/route.ts"
     },
     {
       "path": "/api/partner/bikes",

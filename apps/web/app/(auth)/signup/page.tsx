@@ -6,8 +6,8 @@ import { authClient } from "@/lib/auth-client";
 import { SELECTED_ROLE_COOKIE, selectedRoleToDbRole } from "@/lib/role";
 import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
+import { useMsg91Widget } from "@/lib/use-msg91-widget";
 import { LogoMark } from "@/components/layout/LogoMark";
-import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
 
 const inputClassName =
@@ -27,7 +27,6 @@ function dashboardHrefForRole(role: string | undefined) {
 }
 
 export default function SignUpPage() {
-  const { addToast } = useToast();
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<"RIDER" | "PARTNER">("RIDER");
@@ -41,18 +40,7 @@ export default function SignUpPage() {
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const resendTimer = useResendCountdown(60);
-
-  async function fetchDevOtp(phone: string) {
-    try {
-      const res = await fetch(`/api/dev/otp?phone=${encodeURIComponent(phone)}`);
-      const data: { code?: string | null } = await res.json();
-      if (data.code) {
-        addToast(`Your verification code: ${data.code}`, "info");
-      }
-    } catch {
-      // silently ignore
-    }
-  }
+  const widget = useMsg91Widget();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -77,20 +65,15 @@ export default function SignUpPage() {
     }
     setSendingOtp(true);
     try {
-      const { error } = await authClient.phoneNumber.sendOtp({ phoneNumber: normalized });
-      if (error) {
-        setServerError(error.message ?? "Could not send the verification code. Please try again.");
-        return;
-      }
+      await widget.sendOtp(normalized);
       const existsRes = await fetch(`/api/auth-helpers/phone-exists?phone=${encodeURIComponent(normalized)}`);
       const existsData: { exists: boolean; hasRealName: boolean } = await existsRes.json();
       setPhoneNumber(normalized);
       setExists(existsData.exists);
       setStep("otp");
       resendTimer.start();
-      fetchDevOtp(normalized);
-    } catch {
-      setServerError("Could not send the verification code. Please try again.");
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Could not send the verification code. Please try again.");
     } finally {
       setSendingOtp(false);
     }
@@ -101,13 +84,10 @@ export default function SignUpPage() {
     setServerError(null);
     setSendingOtp(true);
     try {
-      const { error } = await authClient.phoneNumber.sendOtp({ phoneNumber });
-      if (error) {
-        setServerError(error.message ?? "Could not resend the verification code. Please try again.");
-        return;
-      }
+      await widget.retryOtp();
       resendTimer.start();
-      fetchDevOtp(phoneNumber);
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Could not resend the verification code. Please try again.");
     } finally {
       setSendingOtp(false);
     }
@@ -119,7 +99,11 @@ export default function SignUpPage() {
 
     setVerifying(true);
     try {
-      const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: otpCode });
+      // The widget verifies the code directly against MSG91 in-browser and hands back an
+      // opaque access token — our backend re-verifies that token server-side before Better Auth
+      // issues a session (ADR-034).
+      const widgetResult = await widget.verifyOtp(otpCode);
+      const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: widgetResult.message });
       if (error) {
         setServerError(error.message ?? "Invalid or expired code. Please try again.");
         return;
@@ -147,8 +131,8 @@ export default function SignUpPage() {
       // This phone number already had an account — verify() just logged them into it.
       const { data: sessionData } = await authClient.getSession();
       window.location.href = dashboardHrefForRole(sessionData?.user.role);
-    } catch {
-      setServerError("Something went wrong. Please try again.");
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Invalid or expired code. Please try again.");
     } finally {
       setVerifying(false);
     }

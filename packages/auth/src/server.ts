@@ -110,11 +110,21 @@ export const auth = betterAuth({
   // Cookie sessions remain the primary mechanism for the web app; bearer()
   // additionally lets non-browser clients (the Flutter app) authenticate via
   // `Authorization: Bearer <token>` using the same session/getSession machinery.
-  // phoneNumber() adds mobile-number + OTP sign-up/sign-in (ADR-013). Delivery goes through
-  // the identity-access module's OTP use case, which composes the communications SmsPort
-  // (dev-safe console fallback when MSG91 isn't configured) with the opt-in dev echo store.
+  // phoneNumber() adds mobile-number + OTP sign-up/sign-in (ADR-013). As of ADR-034, MSG91 is
+  // the sole OTP generator on both platforms (its Widget SDK on web, its native OTP API on
+  // mobile) — Better Auth verifies by asking identity-access's `verifyLoginOtp`, which in turn
+  // asks MSG91, instead of comparing against a Better-Auth-generated code. This supersedes
+  // ADR-032's "Better Auth stays the OTP system of record" decision; see ADR-034 for why.
+  //
+  // `otpLength`/`expiresIn`/`allowedAttempts` below are now INERT — confirmed in
+  // better-auth/dist/plugins/phone-number/routes.mjs, setting `verifyOTP` replaces the internal
+  // comparison entirely, so the attempt-counting branch that reads these never runs. Left in
+  // place as documentation of the intended shape (and so they're not silently wrong if
+  // `verifyOTP` is ever removed again), not because they still do anything.
+  //
   // Send/verify rate limiting (phone + IP + resend cooldown) lives in front of this plugin's
-  // HTTP endpoints instead — see apps/web/app/api/auth/[...all]/route.ts (ADR-031 update).
+  // HTTP endpoints — see apps/web/app/api/auth/[...all]/route.ts and
+  // apps/web/app/api/otp/mobile/send/route.ts.
   plugins: [
     bearer(),
     phoneNumber({
@@ -122,13 +132,18 @@ export const auth = betterAuth({
       expiresIn: OTP_EXPIRES_IN_SECONDS,
       allowedAttempts: 5,
       phoneNumberValidator: (phone) => isValidIndianMobile(phone),
-      sendOTP: async ({ phoneNumber, code }) => {
-        await getIdentityAccessModule().otp.sendLoginOtp({
-          phoneNumber,
-          code,
-          expiresInSeconds: OTP_EXPIRES_IN_SECONDS,
-        });
+      // `sendOTP` is a required option of PhoneNumberOptions (can't be omitted), but nothing
+      // should ever call it: web sends via the MSG91 widget (browser talks to MSG91 directly),
+      // mobile sends via POST /api/otp/mobile/send. Both bypass Better Auth's own send-otp
+      // endpoint entirely, and that endpoint itself returns 410 at the route-gate layer
+      // (apps/web/app/api/auth/[...all]/route.ts) — this throw is belt-and-suspenders against
+      // any other caller reaching this callback and silently running a second OTP system.
+      sendOTP: async () => {
+        throw new Error(
+          "Better Auth's phone-number send-otp is disabled (ADR-034) — MSG91 owns OTP delivery on both platforms.",
+        );
       },
+      verifyOTP: async ({ phoneNumber, code }) => getIdentityAccessModule().otp.verifyLoginOtp({ phoneNumber, code }),
       signUpOnVerification: {
         getTempEmail: tempEmailForPhone,
         getTempName: (phoneNumber) => phoneNumber,

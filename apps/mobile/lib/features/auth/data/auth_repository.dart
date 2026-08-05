@@ -40,19 +40,23 @@ class AuthRepository {
     });
   }
 
-  /// Better Auth's `phoneNumber` plugin (ADR-013 in `.docs/DECISIONS.md`),
-  /// mirroring `authClient.phoneNumber.sendOtp` — no Dart client exists for
-  /// this plugin, so this calls the raw REST endpoint directly.
+  /// MSG91's native OTP API, called via our backend (ADR-034) — mobile has no
+  /// equivalent to MSG91's browser-only Widget SDK, which web uses instead.
+  /// Better Auth never generates a code; this is deliberately not a Better
+  /// Auth endpoint.
   Future<void> sendOtp(String phoneNumber) {
     return apiGuard(() async {
-      await _dio.post('/api/auth/phone-number/send-otp', data: {'phoneNumber': phoneNumber});
+      await _dio.post('/api/otp/mobile/send', data: {'phoneNumber': phoneNumber});
     });
   }
 
-  /// Mirrors `authClient.phoneNumber.verify`. Unlike the email routes, the
-  /// session token comes back in the JSON body's `token` field (Better
-  /// Auth's own documented response shape for this endpoint), not the
-  /// `set-auth-token` header — read from there instead.
+  /// Mirrors `authClient.phoneNumber.verify` — unchanged by ADR-034, still
+  /// the one shared verify path for both platforms (Better Auth's
+  /// `verifyOTP` hook asks MSG91 instead of comparing its own code, but the
+  /// endpoint and response shape are identical). The session token comes
+  /// back in the JSON body's `token` field (Better Auth's own documented
+  /// response shape for this endpoint), not the `set-auth-token` header —
+  /// read from there instead.
   Future<UserModel> verifyOtp({required String phoneNumber, required String code}) {
     return apiGuard(() async {
       final res = await _dio.post(

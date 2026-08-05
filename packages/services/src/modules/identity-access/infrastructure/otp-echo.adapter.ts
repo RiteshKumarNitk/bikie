@@ -7,5 +7,8 @@ export function createOtpEchoAdapter(): OtpEchoStorePort {
     remember(phoneNumber, code, ttlSeconds) {
       return DevOtpStore.set(phoneNumber, code, ttlSeconds);
     },
+    recall(phoneNumber) {
+      return DevOtpStore.get(phoneNumber);
+    },
   };
 }

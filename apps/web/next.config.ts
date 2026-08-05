@@ -11,13 +11,22 @@ const isDev = process.env.NODE_ENV === "development";
 // Images come from Cloudinary (uploads, see /api/upload) plus a handful of stock-photo hosts
 // already allow-listed in `images.remotePatterns` below, some of which are referenced via
 // plain <img> tags (not next/image) — https: is kept broad in img-src for that reason.
+// MSG91 Widget SDK (ADR-034, web OTP) loads a script from verify.msg91.com (falling back to
+// verify.phone91.com) and makes its own send/verify calls directly from the browser to MSG91 —
+// our backend never sees that leg. Domains here are a starting allow-list based on the vendor's
+// documented script URLs; the widget's exact runtime network origins weren't confirmed from
+// renderable docs and need to be captured from the Network tab on first live test, then this
+// list tightened/corrected to match reality rather than guesswork.
+const msg91WidgetScriptSrc = "https://verify.msg91.com https://verify.phone91.com";
+const msg91WidgetConnectSrc = "https://verify.msg91.com https://verify.phone91.com https://control.msg91.com";
+
 const cspHeader = `
   default-src 'self';
-  script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""};
+  script-src 'self' 'unsafe-inline' ${msg91WidgetScriptSrc}${isDev ? " 'unsafe-eval'" : ""};
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: blob: https:;
   font-src 'self' data:;
-  connect-src 'self' https://res.cloudinary.com https://api.cloudinary.com;
+  connect-src 'self' https://res.cloudinary.com https://api.cloudinary.com ${msg91WidgetConnectSrc};
   object-src 'none';
   base-uri 'self';
   form-action 'self';

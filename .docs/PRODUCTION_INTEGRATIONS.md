@@ -20,9 +20,10 @@ Alternatives are noted where useful.
 | # | Product capability | What we integrate | Primary vendor / service | Type | Open source? | Env vars / what you need | E2E test focus |
 |---|---|---|---|---|---|---|---|
 | 1 | Database | Postgres (+ PostGIS for nearby riders) | **Neon** | Freemium → Paid | No (managed). OSS alt: Postgres + PostGIS | `DATABASE_URL`, `DIRECT_URL` | Migrate, seed, SOS nearby radius, bookings |
-| 2 | Auth sessions + OTP | Better Auth (in-repo) + SMS for OTP | **Better Auth** (OSS lib) + Twilio SMS | OSS lib + Paid SMS | Better Auth: **yes**; Twilio: no | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL`, Twilio vars | Phone OTP login/signup, cookie + bearer session |
+| 2 | Auth sessions | Better Auth (in-repo) — session/account issuance only, OTP verification delegated to MSG91 (ADR-034) | **Better Auth** (OSS lib) | OSS lib | Better Auth: **yes** | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `NEXT_PUBLIC_APP_URL` | Phone OTP login/signup (via MSG91, see row 4b), cookie + bearer session |
 | 3 | Google login | OAuth social provider | **Google Cloud** OAuth client | Free (quota) | No | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` + authorized redirect URIs | Continue with Google on login/signup |
-| 4 | SMS (OTP + SOS) | MSG91 SMS API (v2 sendsms) | **MSG91** | Paid | No | `MSG91_AUTH_KEY`, `MSG91_SENDER_ID`, `MSG91_ROUTE`, `MSG91_TEMPLATE_ID` (DLT template — see ADR-031) | OTP SMS; SOS SMS to contacts / nearby / partners |
+| 4 | SMS (SOS only) | MSG91 SMS API (v2 sendsms) | **MSG91** | Paid | No | `MSG91_AUTH_KEY`, `MSG91_SENDER_ID`, `MSG91_ROUTE`, `MSG91_TEMPLATE_ID` (DLT template — see ADR-031) | SOS SMS to contacts / nearby / partners |
+| 4b | OTP (login/signup) | MSG91 Widget SDK (web) + native OTP API (mobile) | **MSG91** | Paid | No | `MSG91_AUTH_KEY` (shared with row 4), `MSG91_OTP_TEMPLATE_ID`, `NEXT_PUBLIC_MSG91_WIDGET_ID`, `NEXT_PUBLIC_MSG91_WIDGET_TOKEN_AUTH` (see ADR-034) | Phone OTP send/verify on web (widget) and mobile (native API) |
 | 5 | WhatsApp (SOS) | WhatsApp Cloud API | **Meta** (Facebook Developers) | Freemium / Paid business | No | `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_API_VERSION`, approved `WHATSAPP_TEMPLATE_NAME` + lang | SOS WhatsApp text + location card; template outside 24h window |
 | 5b | WhatsApp fallback | Twilio WhatsApp sender | **Twilio** | Paid | No | `TWILIO_WHATSAPP_FROM` (e.g. `whatsapp:+…`) | Same as above if Meta unset |
 | 6 | Email (SOS + admin) | SMTP primary | **Any SMTP** (Gmail App Password, SES, etc.) | Free / Paid | Protocol open; providers vary | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `EMAIL_FROM` | Reporter receipt + recipient SOS emails |
@@ -85,7 +86,11 @@ Do in order:
 1. **Neon** — create project, enable PostGIS if not already, set `DATABASE_URL` + `DIRECT_URL`, run migrations.
 2. **Secrets** — generate `BETTER_AUTH_SECRET`, `CRON_SECRET`, `MESSAGE_ENCRYPTION_KEY`.
 3. **Public URLs** — set `BETTER_AUTH_URL` and `NEXT_PUBLIC_APP_URL` to the real HTTPS origin (Docker compose currently forces `:3001` for local container).
-4. **MSG91** — verify sender ID / DLT template registration; send test OTP SMS.
+4. **MSG91** — verify sender ID / DLT template registration for SOS SMS (`MSG91_TEMPLATE_ID`);
+   register a separate DLT template for OTP content and set `MSG91_OTP_TEMPLATE_ID`; configure the
+   OTP Widget in the MSG91 dashboard and set `NEXT_PUBLIC_MSG91_WIDGET_ID`/
+   `NEXT_PUBLIC_MSG91_WIDGET_TOKEN_AUTH` (ADR-034); send a test OTP on both web (widget) and
+   mobile (native API via `/api/otp/mobile/send`).
 5. **Meta WhatsApp** — create app, add WhatsApp product, get token + phone number ID, submit template for production numbers.
 6. **SMTP** (or Resend) — send a test SOS email.
 7. **Upstash** — Redis REST URL + token (strongly recommended; without it limits/idempotency degrade per ADR-029).
@@ -95,7 +100,9 @@ Do in order:
 11. **Cron** — schedule both cron routes with `Authorization: Bearer <CRON_SECRET>`.
 12. **Smoke** — `GET /api/openapi`, login, one booking read, one SOS in a controlled test city.
 
-`SHOW_OTP_TOAST` must stay **false** in production.
+`SHOW_OTP_TOAST` must stay **false** in production. As of ADR-034 it only affects mobile's dev
+bypass (`/api/otp/mobile/send`) — web's OTP flow goes through the MSG91 widget directly and has
+no equivalent dev-toast path.
 
 ---
 
