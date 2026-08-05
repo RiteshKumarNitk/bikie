@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'push_channels.dart';
@@ -35,7 +36,14 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Riverpod `Ref`: Firebase itself, the background handler, the local-notification channels,
 /// and the three listeners that turn an incoming/tapped push into a `notificationTapController`
 /// event (foreground display, background-tap, and terminated-launch respectively).
+///
+/// Android-only (ADR-035) — a no-op everywhere else. This matters in practice: `flutter run`
+/// with no device attached falls back to Chrome, and `Firebase.initializeApp()` on web needs
+/// explicit `FirebaseOptions` we don't provide (there is no `google-services.json` equivalent
+/// auto-loaded on web) — calling it unconditionally crashes the app on launch there.
 Future<void> bootstrapPushNotifications() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
+
   await Firebase.initializeApp();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 

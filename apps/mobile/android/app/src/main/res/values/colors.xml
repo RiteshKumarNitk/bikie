@@ -3,4 +3,8 @@
     <!-- Matches `AppColors.darkAccent`/`lightAccent` (#3B3A91, ADR-009) — the small-icon tint
          Android applies to FCM notifications in the system tray. -->
     <color name="notification_accent">#3B3A91</color>
+    <!-- Matches `AppColors.darkBackground` (#26258F) — the native launch screen's background,
+         shown instantly at process start before the Flutter engine (and its own branded
+         `SplashScreen` widget) can draw a frame. -->
+    <color name="splash_background">#26258F</color>
 </resources>
