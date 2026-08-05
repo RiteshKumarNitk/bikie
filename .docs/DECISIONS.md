@@ -715,3 +715,188 @@ changes:
   actionably instead of showing a false success. `escalatedToAdmins > 0` in logs is the signal
   that recipient coverage — not the delivery code — is what needs attention.
 
+## ADR-031: SMS provider switched from Twilio to MSG91
+
+- **Context.** Per explicit product decision, Twilio is replaced as the SMS provider. ADR-018's
+  ports/adapters design (`SmsPort`) meant the swap is contained entirely to
+  `packages/services/src/modules/communications/infrastructure/sms.adapter.ts` — every caller
+  (`SMSService`, the identity-access OTP flow, SOS fan-out) goes through `SmsPort.send(to, message)`
+  and is provider-agnostic already.
+- **Decision.** `createSmsAdapter()` now calls MSG91's v2 `sendsms` API
+  (`POST https://api.msg91.com/api/v2/sendsms`, `authkey` header) instead of Twilio's REST API.
+  New env vars: `MSG91_AUTH_KEY`, `MSG91_SENDER_ID`, `MSG91_ROUTE` (default `4`, transactional),
+  `MSG91_TEMPLATE_ID`. `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_MESSAGING_SERVICE_SID`/
+  `TWILIO_FROM_NUMBER`/`TWILIO_PHONE_NUMBER` are no longer read for SMS. `isConfigured()` still
+  gates SOS channel selection (ADR-029) the same way, just against MSG91 credentials.
+- **Known gap.** OTP and SOS-alert bodies are built as free text in TypeScript
+  (`buildOtpMessage`, `SMSService.sendSOSAlert`), but India's TRAI DLT rules require the SMS body
+  sent through MSG91 to match a pre-registered template per sender ID. `MSG91_TEMPLATE_ID` is a
+  single env var today; if OTP and SOS need different registered templates, this will need to
+  become per-message-type config, not a single shared ID. Not yet load-bearing until real DLT
+  templates are registered and delivery is tested end-to-end.
+- **Consequences.** `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN` are still read by
+  `whatsapp.adapter.ts`'s Twilio-WhatsApp fallback (separate from this change, ADR-018) — if that
+  fallback is ever activated, its credentials need to be reintroduced independently of the SMS vars
+  removed here.
+
+## ADR-032: Phone-OTP hardening stays on Better Auth, not MSG91's OTP API
+
+- **Context.** A request came in to "integrate MSG91's OTP API" with production-grade OTP
+  security (rate limits, resend cooldown, attempt caps, logging). Before building anything, the
+  existing `phoneNumber()` plugin (`better-auth/plugins/phone-number`) was checked directly against
+  its shipped source: it already does race-safe OTP generation, storage, and wrong-attempt
+  counting (`verifyPhoneNumberOTP` in `routes.mjs` — an atomic consume-then-recreate pattern), and
+  its default 5-minute expiry already matched the requested spec exactly. There was no dummy/mock
+  OTP logic anywhere in `identity-access` to replace.
+- **Decision.** Better Auth remains the OTP system of record (generation, expiry, wrong-attempt
+  counting via its built-in `allowedAttempts`, bumped 3→5). MSG91 stays a pure SMS-delivery
+  channel behind `SmsPort` (ADR-031) — the plugin's `verifyOTP` override (built for "SMS providers
+  that handle their own OTP generation and verification") was deliberately **not** used, since
+  switching to it would discard Better Auth's already-correct atomic attempt counting in favor of
+  trusting MSG91's own OTP product as a second, untested source of truth for the same state.
+  Everything the spec asked for that Better Auth doesn't already do — resend cooldown, per-window
+  send caps, phone+IP rate limiting, structured logging, Indian-number validation — is layered on
+  top instead:
+  - `phoneNumberValidator: isValidIndianMobile` (new, `communications/domain/phone.ts`) rejects
+    non-Indian/malformed numbers before Better Auth even generates a code.
+  - `apps/web/app/api/auth/[...all]/route.ts` gates `/phone-number/send-otp` and
+    `/phone-number/verify` before delegating to Better Auth's handler: a 60s per-phone resend
+    cooldown (also covers "no duplicate OTP while one is active"), a 3-per-10-minute per-phone
+    send cap, a 10-per-10-minute per-IP send cap, and a 20-per-10-minute per-IP verify cap, all via
+    the existing `RateLimitService`/`enforceRateLimit` (ADR-027/029) — no new rate-limit mechanism.
+    This had to happen at the route layer, not inside the `sendOTP` callback, because Better Auth's
+    `send-otp` endpoint always returns 200 once the request body is valid regardless of what that
+    callback does (it awaits it, but there's no built-in path from callback failure to an HTTP
+    error status).
+  - Every send/verify request is logged with phone number, IP, and outcome/status — never the OTP
+    code itself (SMS delivery success/failure is already logged separately by the MSG91 adapter).
+  - `apps/web/lib/use-resend-countdown.ts` drives the resend button's 60s countdown client-side on
+    both `/login` and `/signup`, so the server-side cooldown is a backstop, not the primary UX.
+- **Consequences.** OTP state lives in exactly one place (Better Auth's `verification` table), so
+  there's no cross-system drift to reason about. The tradeoff: MSG91's own OTP-specific dashboard
+  analytics (if any) won't reflect this flow, since MSG91 only ever sees an SMS send request, not
+  an OTP verification. Revisit only if a hard requirement emerges to keep OTP state on MSG91's side.
+
+## ADR-033: SOS becomes a staged Community Emergency Response System (Phase A — backend core)
+
+- **Context.** The SOS module was Phase 1: `POST /api/sos/alerts` fanned out to nearby riders,
+  same-city partners, and emergency contacts **all at once**, with no accept/assignment flow —
+  the only responder action was a dashboard "I'm Nearby" button that wrote one
+  `SOSAlertResponse` row and never notified the reporter. A full redesign was requested toward
+  "the community responds first, providers are secondary," with staged escalation, mutual
+  helper/rider confirmation, a live session, and a real audit timeline. Before writing any code,
+  the existing implementation was audited directly against its source (schema, `fan-out.application.ts`,
+  routes, UI, Flutter) — see the current-implementation analysis delivered ahead of this ADR.
+  Four scope questions were confirmed with the client up front: (1) auth stays OTP-only for
+  Riders/Partners, Admin keeps email+password — out of scope here; (2) implementation proceeds in
+  phases, backend core first; (3) ETA uses a straight-line-distance + assumed-average-speed
+  estimate, not a paid routing API; (4) reputation ships minimal (counters + rating) in a later
+  phase, no badges/trust-tier yet.
+- **Decision — extend `modules/safety-location`, don't replace it.** Per ARCHITECTURE.md's
+  Strangler-fig convention, every change below extends the existing ports/adapters module rather
+  than standing up a parallel system.
+  - **Schema (additive only).** `SOSAlert` gains `severity` (server-derived from `type`, never
+    client-trusted — prevents a reporter jumping tiers by mislabeling a case),
+    `assignedHelperId`, `escalationTier`, `currentRadiusMeters` (default 5000, was a hardcoded
+    10000 in `fan-out.application.ts`), `nextEscalationAt`. `SOSAlertType` gains
+    `LIFE_THREATENING`/`FLAT_TYRE`/`BATTERY_ISSUE` (existing values untouched — no backfill on
+    historical rows). `SOSAlertResponse.status` moves from a free-text `String` (100% of existing
+    rows literally `"RESPONDING"`) to a real `SOSResponseStatus` enum — this **required a
+    hand-written migration** (`prisma migrate dev`'s shadow-DB step hung indefinitely against
+    this project's Neon instance, so the migration was hand-authored matching Prisma's exact
+    naming conventions and applied via `prisma migrate deploy`, verified zero-drift afterward via
+    `prisma migrate status`). New `SOSSession` (rider, helper, offer, status, `conversationId`
+    reusing the Community Platform's existing `Conversation`/`Message` — no new chat system) and
+    `SOSTimelineEvent` (deliberately separate from the moderation-only `AuditLog`) models.
+    `SOSEscalationTier` includes `NEARBY_RIDERS_COMMUNITY` — reserved now, unused until the
+    community-prioritization phase, so that phase needs no further migration.
+  - **Duplicate-assignment prevention (client's explicit "use database transactions"
+    requirement).** `sos-session.repository.ts`'s `acceptOffer` is one `prisma.$transaction`:
+    `UPDATE sos_alert SET assignedHelperId=? WHERE id=? AND assignedHelperId IS NULL` is the
+    guard, embedded in the mutating statement itself, not a separate read-then-write. Under
+    Postgres's default Read Committed isolation, concurrent accept transactions serialize on the
+    row lock; the loser's conditional update genuinely affects 0 rows once the winner commits —
+    no Serializable isolation needed. A thrown `AlreadyAssignedError`/`OfferNotAvailableError`
+    rolls back the whole transaction, so no partial assignment can persist; routes map these to
+    409.
+  - **Staged escalation, not simultaneous fan-out.** `dispatch.application.ts` is the new
+    orchestrator: on alert creation it runs the "always fire" leg (emergency contacts, optional
+    `SOS_EMERGENCY_SERVICES_*`, reporter confirmation/receipt — unchanged in spirit, now in
+    `fan-out.application.ts`) together with `escalation.application.ts`'s `seedEscalation` (tier-1
+    nearby riders, 5km). If nearby riders/providers don't respond, `GET /api/cron/sos-escalate`
+    (same `Bearer CRON_SECRET` pattern as the existing `sos-resolve` cron, polled ~1min) drives
+    `tickEscalation`: widen radius in `SOS_RADIUS_STEP_KM` steps up to `SOS_RADIUS_MAX_KM` (only
+    notifying newly-in-range riders, de-duped via the `Notification` table's existing
+    `entity='sos_alert'` rows — no new join table), then advance tier
+    `NEARBY_RIDERS_GENERAL → SERVICE_PROVIDERS → ADMIN`. `SERVICE_PROVIDERS` now uses
+    `Partner.type`/`isVerified` to target relevant, verified partners first (a breakdown pages
+    `MECHANIC`s, not every partner type in the city — the fan-out never did this before),
+    broadening to any partner if the strict search is empty. `ADMIN` is terminal, matching
+    ADR-030's original behavior. A cron-poll ticker was chosen over precise per-alert scheduling
+    (e.g. Upstash QStash) because it needs zero new vendor dependency and matches the existing
+    `sos-resolve` precedent — QStash is a clearly-scoped, additive follow-up behind the same
+    `tickEscalation` interface if poll-interval latency ever becomes a real problem.
+  - **ADR-030's zero-recipient escalation is preserved, not silently weakened, but its trigger
+    changed shape.** Previously the immediate-admin-escalation check spanned all four legs
+    (riders+providers+contacts+services) synchronously in one request. Providers are no longer
+    resolved synchronously (`SERVICE_PROVIDERS` is tier 2, reached later), so
+    `dispatch.application.ts` now escalates to admin **immediately** only when contacts +
+    emergency-services + tier-1 nearby riders are *all* empty (the rider's personal safety net
+    plus the first responder search both come up empty) — otherwise the staged engine still
+    reaches `ADMIN` as its terminal tier if nothing else works out. This is a deliberate,
+    documented behavior change, not an oversight: the degenerate "reaches literally nobody" case
+    still pings admins synchronously; a merely-slow case now waits for tier timeouts instead of
+    firing an admin ping the same second SOS_ALERT is fired.
+  - **Helper-acceptance flow.** New routes: `POST .../offer` ("I'm Coming" — replaces `/respond`,
+    which becomes a thin deprecated alias per ADR-028, no facade deletion without zero-use proof),
+    `.../offer/withdraw`, `GET .../offers` (reporter/admin only — **helper phone stays hidden
+    until their specific offer is `ACCEPTED`**, symmetric with the reporter's own contact info
+    already being hidden from non-city-matching members), `.../offers/[id]/accept`,
+    `.../offers/[id]/reject`. Accepting creates the `SOSSession` and expires every other open
+    offer on that alert.
+  - **Session status ownership** (flagged to the client as a product call, not purely
+    architectural, then implemented with the sensible default): helper drives
+    `HELPER_ARRIVED`/`ASSISTANCE_IN_PROGRESS` (they're the one physically there to say so), rider
+    drives `COMPLETED` (confirming the emergency is actually over), either drives `CANCELLED`,
+    admin always overrides. Cancelling releases `assignedHelperId` so the alert re-opens.
+  - **Security fix shipped independently of the rest:** `POST /api/sos/alerts/[id]/resolve` used
+    `requireSession()` with **zero ownership check anywhere in the chain** — confirmed by reading
+    both the route and `sos.repository.ts`'s `resolveAlert` directly — meaning any authenticated
+    user could resolve *any* SOS alert, not just their own. Fixed to `requireMembership()` +
+    reporter/assigned-helper/admin check, enforced in the application layer (not just the route)
+    so Flutter can't bypass it either.
+  - **ETA** is `domain/eta.ts`'s `estimateEtaMinutes(distanceMeters, avgSpeedKmph=25)` — pure,
+    synchronous, no external call. A future Google Distance Matrix implementation is a drop-in
+    replacement behind the same signature.
+  - **Deliberately deferred, hooks only:** `CommunityMembershipPort.findSharedGroupMemberIds` is
+    fully implemented against `GroupMember` but not yet wired into `seedEscalation`'s tier
+    selection — that's the community-prioritization phase. `SOSSession.rating`/`ratingComment`
+    columns exist so something can capture a rating now, but nothing aggregates them into
+    `User.emergencyResponseCount`/`helperRatingAvg` until the reputation phase (deliberately
+    minimal per the client's call — no badges/trust-tier).
+- **Consequences.** OTP-style ports/adapters discipline held throughout — no route imports
+  Prisma, no application method imports a repository directly. Test coverage added at the
+  application layer (offer/accept/reject ownership, `AlreadyAssignedError` mapping, radius
+  widening only notifying fresh riders, tier advancement, resolve-route ownership) rather than
+  only at the route layer, since Flutter exercises the same application methods through the same
+  routes — no duplicate API surface.
+- **Update (Phases B–D, same pass).** All three remaining phases shipped:
+  - **B (web UI):** new `/dashboard/sos/[id]` session page. Found two more real gaps while
+    building it — `acceptOffer` never created the session's `Conversation` (chat had nothing to
+    attach to) and `createOffer` didn't handle the `[alertId,responderId]` unique constraint (a
+    duplicate offer attempt would 500) — both fixed as part of Phase A's own files.
+  - **C (Flutter):** full parity, same routes. Found two *more* pre-existing bugs while porting —
+    `getActive()` was called with no `city` param (the API requires one for non-admins), and
+    `getHistory()` force-parsed the history response as a full `SOSAlertDTO` even though that
+    endpoint returns a smaller, different shape (would throw on every required-field mismatch);
+    fixed with a dedicated `SOSHistoryEntry` model. Chat needed zero new code — the existing
+    `ConversationThreadBody` widget is already fully self-contained and was just embedded
+    directly, mirroring the web's `ChatArea` reuse.
+  - **D (reputation + community):** minimal counters only, as scoped (no badges/trust-tier).
+    Community/Club members among the nearby-rider pool get first crack via a
+    `NEARBY_RIDERS_COMMUNITY` tier (shorter timeout) using the port reserved in Phase A, then the
+    tier advances to the full general pool with already-notified riders excluded via the same
+    `Notification`-table de-dup radius-widening already used — no new dedup mechanism needed.
+  - Final state: 9/9 packages typecheck clean, 102/102 vitest passing, 73/73 flutter tests
+    passing, `flutter analyze` clean. Not done: a full authenticated browser click-through — typecheck/build/compile-verified only, real interactive testing needs a browser session.
+

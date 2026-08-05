@@ -8,3 +8,14 @@ export function toE164Phone(phone: string): string {
   if (trimmed.startsWith("+")) return `+${digits}`;
   return digits ? `+${digits}` : trimmed;
 }
+
+/**
+ * Indian mobile numbers: 10 digits starting 6-9, optionally prefixed with country code 91
+ * or a leading +. Rejects landlines (don't start 6-9) and anything the wrong length — used to
+ * gate OTP send so MSG91 (and SMS spend) never sees a malformed or non-Indian number.
+ */
+export function isValidIndianMobile(phone: string): boolean {
+  const digits = phone.trim().replace(/\D/g, "");
+  const local = digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
+  return /^[6-9]\d{9}$/.test(local);
+}

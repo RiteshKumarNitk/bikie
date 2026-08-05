@@ -10,6 +10,10 @@ export interface SOSAlertDTO {
   longitude: number;
   city: string;
   status: string;
+  severity: string;
+  escalationTier: string;
+  currentRadiusMeters: number;
+  assignedHelperId: string | null;
   resolvedAt: string | null;
   createdAt: string;
 }
@@ -20,4 +24,44 @@ export interface SOSAlertCreateInput {
   latitude: number;
   longitude: number;
   city: string;
+}
+
+export interface SOSOfferDTO {
+  id: string;
+  alertId: string;
+  responderId: string;
+  responderName: string;
+  responderPhone: string | null;
+  status: string;
+  distanceMeters: number | null;
+  etaMinutes: number | null;
+  message: string | null;
+  createdAt: string;
+}
+
+export interface SOSSessionDTO {
+  id: string;
+  alertId: string;
+  helperId: string;
+  riderId: string;
+  status: string;
+  conversationId: string | null;
+  startedAt: string;
+  helperArrivedAt: string | null;
+  assistanceStartedAt: string | null;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  rating: number | null;
+  ratingComment: string | null;
+}
+
+export interface SOSTimelineEventDTO {
+  id: string;
+  alertId: string;
+  sessionId: string | null;
+  type: string;
+  actorId: string | null;
+  actorName: string | null;
+  createdAt: string;
 }

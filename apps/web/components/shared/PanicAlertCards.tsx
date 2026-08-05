@@ -3,7 +3,16 @@
 import { useState } from "react";
 import Link from "next/link";
 
-type SOSType = "ACCIDENT" | "BIKE_BREAKDOWN" | "FUEL_EMPTY" | "MEDICAL" | "LOST" | "OTHER";
+type SOSType =
+  | "ACCIDENT"
+  | "BIKE_BREAKDOWN"
+  | "FUEL_EMPTY"
+  | "MEDICAL"
+  | "LOST"
+  | "OTHER"
+  | "LIFE_THREATENING"
+  | "FLAT_TYRE"
+  | "BATTERY_ISSUE";
 export type AlertKind = "RED" | "AMBER";
 
 interface Category {
@@ -12,20 +21,20 @@ interface Category {
   icon: string;
 }
 
-// The backend's SOSAlertType enum has no dedicated "puncture" or "fire/hazard" value —
-// Puncture maps onto BIKE_BREAKDOWN and Fire/Hazard onto OTHER, with the specific label
-// preserved in the alert's free-text description so responders still see exactly what was
-// picked even though the stored `type` collapses two labels together.
+// Every category maps to its own real SOSAlertType value now (ADR-033) — no more collapsing
+// distinct issues onto a shared backend value with the label preserved only in free text.
 const RED_CATEGORIES: Category[] = [
   { label: "Accident", type: "ACCIDENT", icon: "🚨" },
   { label: "Medical Emergency", type: "MEDICAL", icon: "🏥" },
-  { label: "Fire / Hazard", type: "OTHER", icon: "🔥" },
+  { label: "Life Threatening", type: "LIFE_THREATENING", icon: "🔥" },
 ];
 const AMBER_CATEGORIES: Category[] = [
   { label: "Bike Breakdown", type: "BIKE_BREAKDOWN", icon: "🔧" },
-  { label: "Puncture", type: "BIKE_BREAKDOWN", icon: "🔩" },
-  { label: "Empty Fuel", type: "FUEL_EMPTY", icon: "⛽" },
-  { label: "Medical Assistance", type: "MEDICAL", icon: "🏥" },
+  { label: "Flat Tyre", type: "FLAT_TYRE", icon: "🔩" },
+  { label: "Fuel Required", type: "FUEL_EMPTY", icon: "⛽" },
+  { label: "Battery Issue", type: "BATTERY_ISSUE", icon: "🔋" },
+  { label: "Lost", type: "LOST", icon: "🗺️" },
+  { label: "Other", type: "OTHER", icon: "❗" },
 ];
 
 /** Mirror of the server's `SOSDispatchSummary` fields this screen reports on (ADR-030). */

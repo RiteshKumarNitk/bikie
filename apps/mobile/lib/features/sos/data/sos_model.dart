@@ -3,7 +3,7 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 part 'sos_model.freezed.dart';
 part 'sos_model.g.dart';
 
-/// Mirrors `packages/types/src/sos.ts` `SOSAlertDTO`.
+/// Mirrors `packages/types/src/sos.ts` `SOSAlertDTO` (ADR-033).
 @freezed
 class SOSAlert with _$SOSAlert {
   const factory SOSAlert({
@@ -18,9 +18,139 @@ class SOSAlert with _$SOSAlert {
     required num longitude,
     required String city,
     required String status,
+    required String severity,
+    required String escalationTier,
+    required int currentRadiusMeters,
+    String? assignedHelperId,
     String? resolvedAt,
     required String createdAt,
   }) = _SOSAlert;
 
   factory SOSAlert.fromJson(Map<String, dynamic> json) => _$SOSAlertFromJson(json);
+}
+
+/// The caller's own alert history has a different (smaller) shape than
+/// `SOSAlert` — no reporter fields, since the caller already knows who they
+/// are. Was previously force-parsed as a full `SOSAlert`, which would throw
+/// on every required-field mismatch (a pre-existing bug, fixed here).
+@freezed
+class SOSHistoryEntry with _$SOSHistoryEntry {
+  const factory SOSHistoryEntry({
+    required String id,
+    required String type,
+    String? description,
+    required String city,
+    required String status,
+    required String severity,
+    required String escalationTier,
+    String? assignedHelperId,
+    String? resolvedAt,
+    required String createdAt,
+    @Default([]) List<SOSHistoryResponse> responses,
+  }) = _SOSHistoryEntry;
+
+  factory SOSHistoryEntry.fromJson(Map<String, dynamic> json) => _$SOSHistoryEntryFromJson(json);
+}
+
+@freezed
+class SOSHistoryResponse with _$SOSHistoryResponse {
+  const factory SOSHistoryResponse({
+    required String id,
+    required String responderName,
+    String? message,
+    required String createdAt,
+  }) = _SOSHistoryResponse;
+
+  factory SOSHistoryResponse.fromJson(Map<String, dynamic> json) => _$SOSHistoryResponseFromJson(json);
+}
+
+/// Mirrors `SOSOfferDTO`.
+@freezed
+class SOSOffer with _$SOSOffer {
+  const factory SOSOffer({
+    required String id,
+    required String alertId,
+    required String responderId,
+    required String responderName,
+    String? responderPhone,
+    required String status,
+    num? distanceMeters,
+    int? etaMinutes,
+    String? message,
+    required String createdAt,
+  }) = _SOSOffer;
+
+  factory SOSOffer.fromJson(Map<String, dynamic> json) => _$SOSOfferFromJson(json);
+}
+
+@freezed
+class SOSParticipant with _$SOSParticipant {
+  const factory SOSParticipant({
+    required String id,
+    required String name,
+    String? phone,
+    required String email,
+  }) = _SOSParticipant;
+
+  factory SOSParticipant.fromJson(Map<String, dynamic> json) => _$SOSParticipantFromJson(json);
+}
+
+/// Mirrors `SOSSessionDTO` plus the `helper`/`rider` participant objects the
+/// detail routes attach (`GET /api/sos/alerts/[id]`, `GET /api/sos/sessions/[id]`).
+@freezed
+class SOSSessionDetail with _$SOSSessionDetail {
+  const factory SOSSessionDetail({
+    required String id,
+    required String status,
+    String? conversationId,
+    int? rating,
+    required SOSParticipant helper,
+    required SOSParticipant rider,
+  }) = _SOSSessionDetail;
+
+  factory SOSSessionDetail.fromJson(Map<String, dynamic> json) => _$SOSSessionDetailFromJson(json);
+}
+
+/// Mirrors `SOSTimelineEventDTO`.
+@freezed
+class SOSTimelineEvent with _$SOSTimelineEvent {
+  const factory SOSTimelineEvent({
+    required String id,
+    required String type,
+    String? actorName,
+    required String createdAt,
+  }) = _SOSTimelineEvent;
+
+  factory SOSTimelineEvent.fromJson(Map<String, dynamic> json) => _$SOSTimelineEventFromJson(json);
+}
+
+/// `GET /api/sos/alerts/[id]` response — the alert, its full timeline, and
+/// (if the caller is a participant or admin) the active session.
+@freezed
+class SOSAlertDetail with _$SOSAlertDetail {
+  const factory SOSAlertDetail({
+    required SOSAlert alert,
+    @Default([]) List<SOSTimelineEvent> timeline,
+    SOSSessionDetail? session,
+  }) = _SOSAlertDetail;
+
+  factory SOSAlertDetail.fromJson(Map<String, dynamic> json) => _$SOSAlertDetailFromJson(json);
+}
+
+/// `GET /api/sos/partners` — backs "Share Mechanic" / "Share Fuel Contact". Plain class (not
+/// freezed) since it just flattens one nested `user.phone` field from the API response.
+class SOSPartner {
+  const SOSPartner({required this.userId, required this.businessName, this.userPhone, this.contactPerson1Mobile});
+
+  final String userId;
+  final String businessName;
+  final String? userPhone;
+  final String? contactPerson1Mobile;
+
+  factory SOSPartner.fromJson(Map<String, dynamic> json) => SOSPartner(
+        userId: json['userId'] as String,
+        businessName: json['businessName'] as String,
+        userPhone: (json['user'] as Map<String, dynamic>?)?['phone'] as String?,
+        contactPerson1Mobile: json['contactPerson1Mobile'] as String?,
+      );
 }

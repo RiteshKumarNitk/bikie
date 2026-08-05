@@ -1,5 +1,80 @@
 # Changelog
 
+## Change — SOS redesign Phases B–D: web UI, Flutter parity, reputation + community tier (ADR-033)
+- **Web (Phase B):** panic categories regrouped into 🔴 Emergency / 🟠 Assistance with the new
+  types; new `/dashboard/sos/[id]` session detail page (offers, accept/reject, I'm Coming/Cannot
+  Help/Share Mechanic/Share Fuel/Call/Navigate, status buttons, rating, timeline, chat reusing
+  the existing `ChatArea` component). Found and fixed two backend gaps while building this:
+  `acceptOffer` never created the session's `Conversation`, and `createOffer` had no handling for
+  the `[alertId,responderId]` unique constraint (would 500 on a duplicate offer — new
+  `AlreadyOfferedError` end-to-end).
+- **Flutter (Phase C):** full parity on the same API routes, no duplicate endpoints. Fixed two
+  pre-existing bugs found while rebuilding: `getActive()` was called with no `city` param
+  (required for non-admins), and `getHistory()` force-parsed the history response as a full
+  `SOSAlert` despite it having a different (smaller) shape — new `SOSHistoryEntry` model matches
+  reality. New session screen, timeline, and — reusing the existing `ConversationThreadBody`
+  directly — chat with zero new chat code. New `nearby_riders` feature (didn't exist on mobile at
+  all before). `flutter analyze`: clean. `flutter test`: 73/73.
+- **Reputation + community tier (Phase D):** minimal counters (`emergencyResponseCount`,
+  `helperRatingAvg`, `helperRatingCount`) in a new small `modules/reputation`, wired into session
+  completion and rating submission. Community/Club members among the nearby-rider pool now get
+  a `NEARBY_RIDERS_COMMUNITY` tier with a shorter timeout before the full `NEARBY_RIDERS_GENERAL`
+  pool is notified (de-duped, no double-texting the same rider). Badges/trusted-rider tier remain
+  explicitly out of scope.
+- Repo-wide: 9/9 packages typecheck clean, 102/102 vitest passing, 73/73 flutter tests passing.
+
+## Change — SOS becomes a staged Community Emergency Response System, Phase A/backend (ADR-033)
+- **Security fix, independent of the rest:** `POST /api/sos/alerts/[id]/resolve` had no ownership
+  check at all — any authenticated user could resolve any alert. Now `requireMembership()` +
+  reporter/assigned-helper/admin only, enforced in the application layer.
+- Fan-out no longer blasts nearby riders + all same-city partners simultaneously. New staged
+  escalation: tier-1 nearby riders (5km) on creation → radius widens in steps up to a max, only
+  notifying newly-in-range riders → advances to `SERVICE_PROVIDERS` (now targets `Partner.type`
+  + `isVerified` relevant to the alert type, not every partner in the city) → terminal `ADMIN`
+  tier. Driven by a new `GET /api/cron/sos-escalate` ticker (same cron-bearer pattern as the
+  existing `sos-resolve` cron).
+- New helper-acceptance flow: `POST /api/sos/alerts/[id]/offer` ("I'm Coming"), `.../offer/withdraw`,
+  `GET .../offers` (reporter/admin, helper phone hidden until accepted), `.../offers/[id]/accept`,
+  `.../offers/[id]/reject`. Accepting is a single DB transaction — `WHERE assignedHelperId IS
+  NULL` embedded in the update — so two helpers can never both be assigned; the loser gets 409.
+- New `SOSSession` (reuses the existing Community Platform chat, not a new one; not a Trip) and
+  `SOSTimelineEvent` (full audit trail, separate from the moderation-only `AuditLog`) models.
+  Session status routes: `POST /api/sos/sessions/[id]/status`, `.../rating`.
+- New categories: `LIFE_THREATENING`, `FLAT_TYRE`, `BATTERY_ISSUE`. Severity (`EMERGENCY`/
+  `ASSISTANCE`) is now a real column, always server-derived from `type` — never client input.
+- `GET /api/sos/partners?city=&type=` backs new "Share Mechanic"/"Share Fuel Contact" actions.
+- ADR-030's zero-recipient admin escalation is preserved but its trigger changed shape — see
+  ADR-033's "Consequences" for the exact (deliberate) behavior difference.
+- Deferred to later phases (see `.docs/TASKS.md`): web UI rebuild, Flutter parity (plus fixing a
+  pre-existing bug where mobile's `getActive()` omits the required `city` param), community/club
+  prioritization, and reputation (counters + rating only, no badges — client's explicit call).
+
+## Change — Phone-OTP hardening: validation, rate limits, resend cooldown (ADR-032)
+- Added `isValidIndianMobile` (`packages/services/.../communications/domain/phone.ts`) and wired
+  it into Better Auth's `phoneNumberValidator`, rejecting non-Indian/malformed numbers before any
+  OTP is generated.
+- `allowedAttempts` bumped 3→5 for wrong-code verification (Better Auth's existing atomic
+  attempt-counter, unchanged otherwise).
+- `apps/web/app/api/auth/[...all]/route.ts` now gates `/phone-number/send-otp` and
+  `/phone-number/verify` with `RateLimitService`: 60s per-phone resend cooldown, 3 sends per 10
+  minutes per phone, 10 sends per 10 minutes per IP, 20 verifies per 10 minutes per IP. Every
+  send/verify is logged with phone + IP + outcome — never the OTP code.
+- `/login` and `/signup` now show a live "Resend in Xs" countdown (`use-resend-countdown.ts`)
+  instead of an always-enabled Resend button.
+- No changes to where OTPs are generated/stored/verified — that stays Better Auth, per ADR-032
+  (MSG91 remains SMS-delivery-only, not a second OTP state store).
+
+## Change — SMS provider switched from Twilio to MSG91 (ADR-031)
+- `createSmsAdapter()` now sends via MSG91's v2 `sendsms` API instead of Twilio's REST API. No
+  caller changes — `SmsPort.send(to, message)` is unchanged, so OTP delivery and SOS SMS fan-out
+  work identically from the app's point of view.
+- New env vars: `MSG91_AUTH_KEY`, `MSG91_SENDER_ID`, `MSG91_ROUTE`, `MSG91_TEMPLATE_ID`. Old
+  `TWILIO_ACCOUNT_SID`/`TWILIO_AUTH_TOKEN`/`TWILIO_MESSAGING_SERVICE_SID`/`TWILIO_FROM_NUMBER`/
+  `TWILIO_PHONE_NUMBER` are no longer read for SMS (Twilio-WhatsApp fallback in
+  `whatsapp.adapter.ts` is unaffected and still reads its own Twilio vars).
+- Real delivery still needs an approved MSG91 sender ID and DLT template registration — see the
+  "Known gap" note in ADR-031.
+
 ## Fix — SOS reports what it actually delivered; zero-recipient escalation (ADR-030)
 - The SOS success screen no longer claims "GPS shared via SMS, WhatsApp, and email" regardless of
   outcome. It reports real recipient counts, per-channel `sent/attempted`, which channels are

@@ -102,15 +102,26 @@ reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md
 | `/api/partner/profile` | GET/PUT | Partner business profile (`businessName`, `type`, `city`, `description`) |
 | `/api/partner/reviews` | GET | See Reviews above |
 
-## SOS Emergency (membership required — admins bypass)
+## SOS Emergency (membership required — admins bypass) — ADR-033 staged Community Emergency Response System
 
 | Route | Method | Notes |
 |---|---|---|
-| `/api/sos/alerts` | GET/POST | List active alerts / send a new one. `SOSAlertDTO` includes `userEmail`, `userPhone`, `latitude`/`longitude` for full reporter info. `requireMembership()` returns `403 { error: "MEMBERSHIP_REQUIRED", message }` if the caller has no active membership. **POST** also runs `SOSDispatchService.fanOut` — SMS + WhatsApp + email (+ in-app `SOS_ALERT`) to nearby riders (PostGIS radius), same-city partners, and the reporter's emergency contacts. Response includes `dispatch` summary counts. Channels log `[SMS\|WHATSAPP\|EMAIL][DEV]` when live credentials are unset. Per ADR-030, `dispatch` also carries `channels` (which providers were live) and `escalatedToAdmins` (non-zero when the alert resolved to no recipients and was escalated to `ADMIN` users); the reporter always receives an in-app `SOS_ALERT` notice. Clients should render these instead of assuming delivery. |
+| `/api/sos/alerts` | GET/POST | List active alerts / send a new one. `SOSAlertDTO` now also includes `severity` (server-derived from `type`, never client input), `escalationTier`, `currentRadiusMeters`, `assignedHelperId`. `requireMembership()` returns `403 { error: "MEMBERSHIP_REQUIRED", message }` if the caller has no active membership. **POST** runs `SOSDispatchService.fanOut`, which now only immediately covers emergency contacts + optional `SOS_EMERGENCY_SERVICES_*` + tier-1 nearby riders (5km) — same-city partners are reached later, as the `SERVICE_PROVIDERS` escalation tier, not on every create. Response `dispatch` still carries `channels`/`escalatedToAdmins` (ADR-030's zero-recipient guarantee, preserved — see ADR-033 for the exact trigger-shape change) and per-channel counts. |
+| `/api/sos/alerts/[id]` | GET | Alert detail + full timeline (`SOSTimelineEvent[]`). |
 | `/api/sos/alerts/history` | GET | Auth required (no membership gate). Caller's past alerts, including resolved. |
-| `/api/sos/alerts/[id]/respond` | POST | Notify the reporter you're nearby. |
-| `/api/sos/alerts/[id]/resolve` | POST | Mark an alert resolved. |
-| `/api/cron/sos-resolve` | GET | Cron-only. Requires `Authorization: Bearer <CRON_SECRET>`. Auto-resolves alerts inactive for 120+ minutes. |
+| `/api/sos/alerts/[id]/offer` | POST | Helper taps "I'm Coming." Optional `{latitude, longitude, message}` — distance/ETA computed straight-line if location given. Replaces `/respond`. |
+| `/api/sos/alerts/[id]/offers` | GET | Reporter or admin only. Helper name/distance/ETA/status; **phone withheld until that offer is `ACCEPTED`**. |
+| `/api/sos/alerts/[id]/offers/[offerId]/withdraw` | POST | Helper taps "Cannot Help" on their own offer. |
+| `/api/sos/alerts/[id]/offers/[offerId]/accept` | POST | Reporter or admin. The transactional assignment — `409` if another offer was already accepted (race-safe, not a silent overwrite). Creates the `SOSSession`. |
+| `/api/sos/alerts/[id]/offers/[offerId]/reject` | POST | Reporter or admin declines a specific offer without assigning them. |
+| `/api/sos/alerts/[id]/respond` | POST | **Deprecated alias** for `/offer` — kept for older clients (ADR-028). |
+| `/api/sos/alerts/[id]/resolve` | POST | Mark an alert resolved. **Ownership-checked**: reporter, assigned helper, or admin only (fixed a real gap — previously any authenticated user could resolve any alert). |
+| `/api/sos/sessions/[id]` | GET | Session detail — participants (helper/rider) or admin only. |
+| `/api/sos/sessions/[id]/status` | POST | `{status: "HELPER_ARRIVED"\|"ASSISTANCE_IN_PROGRESS"\|"COMPLETED"\|"CANCELLED", cancelReason?}`. Helper drives ARRIVED/IN_PROGRESS, rider drives COMPLETED, either can CANCEL, admin overrides. |
+| `/api/sos/sessions/[id]/rating` | POST | `{rating: 1-5, comment?}`. Rider only, post-COMPLETED, once. |
+| `/api/sos/partners` | GET | `?city=&type=`. Backs "Share Mechanic"/"Share Fuel Contact" — verified partners of the given type, city-scoped (Partner has no lat/lng today). |
+| `/api/cron/sos-resolve` | GET | Cron-only. Requires `Authorization: Bearer <CRON_SECRET>`. Auto-resolves alerts inactive for 120+ minutes, cascade-cancelling any dangling active session first. |
+| `/api/cron/sos-escalate` | GET | Cron-only. Requires `Authorization: Bearer <CRON_SECRET>`. The staged-escalation ticker — widens radius / advances tier for alerts whose `nextEscalationAt` has passed. Schedule alongside `sos-resolve`. |
 
 ## Nearby Riders (membership required, ADR-016)
 

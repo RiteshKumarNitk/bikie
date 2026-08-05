@@ -3,7 +3,7 @@ import { bearer, phoneNumber } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { Redis } from "@upstash/redis";
 import { prisma, userRepository } from "@bikie/database";
-import { getIdentityAccessModule } from "@bikie/services";
+import { getIdentityAccessModule, isValidIndianMobile } from "@bikie/services";
 
 // Rate limiting needs shared state across serverless function instances (Vercel), so
 // Better Auth's default "memory" storage (per-instance, in-process) can't actually enforce
@@ -112,13 +112,16 @@ export const auth = betterAuth({
   // `Authorization: Bearer <token>` using the same session/getSession machinery.
   // phoneNumber() adds mobile-number + OTP sign-up/sign-in (ADR-013). Delivery goes through
   // the identity-access module's OTP use case, which composes the communications SmsPort
-  // (dev-safe console fallback when Twilio isn't configured) with the opt-in dev echo store.
+  // (dev-safe console fallback when MSG91 isn't configured) with the opt-in dev echo store.
+  // Send/verify rate limiting (phone + IP + resend cooldown) lives in front of this plugin's
+  // HTTP endpoints instead — see apps/web/app/api/auth/[...all]/route.ts (ADR-031 update).
   plugins: [
     bearer(),
     phoneNumber({
       otpLength: 6,
       expiresIn: OTP_EXPIRES_IN_SECONDS,
-      allowedAttempts: 3,
+      allowedAttempts: 5,
+      phoneNumberValidator: (phone) => isValidIndianMobile(phone),
       sendOTP: async ({ phoneNumber, code }) => {
         await getIdentityAccessModule().otp.sendLoginOtp({
           phoneNumber,

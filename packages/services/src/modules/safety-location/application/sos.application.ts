@@ -1,20 +1,52 @@
 import type { SOSAlertCreateInput, SOSAlertDTO } from "@bikie/types";
+import { deriveSeverity } from "../domain/severity";
 import type { SafetyLocationPorts } from "../ports";
+
+const INITIAL_RADIUS_METERS = 5000;
 
 export function createSosApplication(ports: SafetyLocationPorts) {
   return {
     createAlert(userId: string, data: SOSAlertCreateInput): Promise<SOSAlertDTO> {
-      return ports.sosAlerts.createAlert({ userId, ...data });
+      return ports.sosAlerts.createAlert({
+        userId,
+        ...data,
+        severity: deriveSeverity(data.type),
+        currentRadiusMeters: INITIAL_RADIUS_METERS,
+        // Set to the real value by escalation.seedEscalation() right after creation — the
+        // repository just needs a non-throwing value at insert time.
+        nextEscalationAt: null,
+      });
     },
 
     getActiveAlerts(city?: string): Promise<SOSAlertDTO[]> {
       return ports.sosAlerts.getActiveAlerts(city);
     },
 
-    resolveAlert(alertId: string, userId: string) {
-      return ports.sosAlerts.resolveAlert(alertId, userId);
+    getAlertById(alertId: string) {
+      return ports.sosAlerts.getAlertById(alertId);
     },
 
+    /**
+     * Only the reporter, the assigned helper, or an admin may resolve an alert — resolving is
+     * a claim that the emergency is over, and a bystander marking someone else's alert resolved
+     * would hide it from responders. Checked here (not just at the route) so Flutter, which
+     * calls through the same application method, can't bypass it either.
+     */
+    async resolveAlert(alertId: string, userId: string, isAdmin: boolean) {
+      const alert = await ports.sosAlerts.getAlertById(alertId);
+      if (!alert) return { ok: false as const, reason: "NOT_FOUND" as const };
+      const isOwner = alert.userId === userId;
+      const isAssignedHelper = alert.assignedHelperId === userId;
+      if (!isOwner && !isAssignedHelper && !isAdmin) return { ok: false as const, reason: "FORBIDDEN" as const };
+
+      await ports.sosAlerts.resolveAlert(alertId, userId);
+      await ports.sosTimeline.record({ alertId, type: "SOS_RESOLVED", actorId: userId });
+      return { ok: true as const };
+    },
+
+    /** Deprecated alias target — kept only for the old /respond route (ADR-028: no facade
+     * deletion without zero-use proof). New callers should use the session application's
+     * offerHelp instead. */
     respondToAlert(alertId: string, responderId: string, message?: string) {
       return ports.sosAlerts.respondToAlert(alertId, responderId, message);
     },
@@ -23,8 +55,26 @@ export function createSosApplication(ports: SafetyLocationPorts) {
       return ports.sosAlerts.getAlertHistory(userId);
     },
 
-    autoResolveStaleAlerts(minutes: number) {
-      return ports.sosAlerts.autoResolveStaleAlerts(minutes);
+    /**
+     * Cascades cleanup for stale alerts instead of a raw bulk update, so the timeline actually
+     * captures why each one closed and any dangling active session doesn't linger assigned to
+     * a helper who never followed through.
+     */
+    async autoResolveStaleAlerts(minutes: number): Promise<void> {
+      const stale = await ports.sosAlerts.autoResolveStaleAlerts(minutes);
+      if (stale.length === 0) return;
+
+      for (const { id: alertId } of stale) {
+        const session = await ports.sosSessions.getActiveSessionForAlert(alertId).catch(() => null);
+        if (session) {
+          await ports.sosSessions
+            .updateSessionStatus(session.id, "CANCELLED", "SOS auto-resolved (timed out)")
+            .catch(() => undefined);
+        }
+        await ports.sosTimeline.record({ alertId, type: "SOS_RESOLVED", metadata: { reason: "auto-resolve-timeout" } });
+      }
+
+      await ports.sosAlerts.bulkResolve(stale.map((a) => a.id));
     },
 
     /**

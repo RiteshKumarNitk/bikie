@@ -32,8 +32,26 @@ void main() {
         'longitude': 77.5946,
         'city': 'Bengaluru',
         'status': status,
+        'severity': 'ASSISTANCE',
+        'escalationTier': 'NEARBY_RIDERS_GENERAL',
+        'currentRadiusMeters': 5000,
+        'assignedHelperId': null,
         'resolvedAt': null,
         'createdAt': '2026-07-14T00:00:00.000Z',
+      };
+
+  Map<String, dynamic> buildHistoryJson({String status = 'RESOLVED'}) => {
+        'id': 'alert-1',
+        'type': 'BREAKDOWN',
+        'description': 'Bike stalled on the highway',
+        'city': 'Bengaluru',
+        'status': status,
+        'severity': 'ASSISTANCE',
+        'escalationTier': 'NEARBY_RIDERS_GENERAL',
+        'assignedHelperId': null,
+        'resolvedAt': null,
+        'createdAt': '2026-07-14T00:00:00.000Z',
+        'responses': [],
       };
 
   group('SosRepository.create', () {
@@ -172,7 +190,7 @@ void main() {
           requestOptions: RequestOptions(path: '/api/sos/alerts/history'),
           statusCode: 200,
           data: {
-            'alerts': [buildAlertJson(status: 'RESOLVED')],
+            'alerts': [buildHistoryJson(status: 'RESOLVED')],
           },
         ),
       );

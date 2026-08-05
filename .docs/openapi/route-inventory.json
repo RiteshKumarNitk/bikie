@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-01T19:27:56.333Z",
-  "count": 106,
+  "generatedAt": "2026-08-04T17:20:53.281Z",
+  "count": 117,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -396,6 +396,14 @@
       "file": "apps/web/app/api/cron/rider-location-cleanup/route.ts"
     },
     {
+      "path": "/api/cron/sos-escalate",
+      "methods": [
+        "GET"
+      ],
+      "auth": "cron",
+      "file": "apps/web/app/api/cron/sos-escalate/route.ts"
+    },
+    {
       "path": "/api/cron/sos-resolve",
       "methods": [
         "GET"
@@ -651,11 +659,51 @@
       "file": "apps/web/app/api/riders/nearby/route.ts"
     },
     {
+      "path": "/api/sos/alerts/{id}/offer",
+      "methods": [
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/[id]/offer/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/{id}/offers/{offerId}/accept",
+      "methods": [
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/[id]/offers/[offerId]/accept/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/{id}/offers/{offerId}/reject",
+      "methods": [
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/[id]/offers/[offerId]/reject/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/{id}/offers/{offerId}/withdraw",
+      "methods": [
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/[id]/offers/[offerId]/withdraw/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/{id}/offers",
+      "methods": [
+        "GET"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/[id]/offers/route.ts"
+    },
+    {
       "path": "/api/sos/alerts/{id}/resolve",
       "methods": [
         "POST"
       ],
-      "auth": "session",
+      "auth": "membership",
       "file": "apps/web/app/api/sos/alerts/[id]/resolve/route.ts"
     },
     {
@@ -665,6 +713,14 @@
       ],
       "auth": "membership",
       "file": "apps/web/app/api/sos/alerts/[id]/respond/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/{id}",
+      "methods": [
+        "GET"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/[id]/route.ts"
     },
     {
       "path": "/api/sos/alerts/history",
@@ -682,6 +738,38 @@
       ],
       "auth": "membership",
       "file": "apps/web/app/api/sos/alerts/route.ts"
+    },
+    {
+      "path": "/api/sos/partners",
+      "methods": [
+        "GET"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/partners/route.ts"
+    },
+    {
+      "path": "/api/sos/sessions/{id}/rating",
+      "methods": [
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/sessions/[id]/rating/route.ts"
+    },
+    {
+      "path": "/api/sos/sessions/{id}",
+      "methods": [
+        "GET"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/sessions/[id]/route.ts"
+    },
+    {
+      "path": "/api/sos/sessions/{id}/status",
+      "methods": [
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/sessions/[id]/status/route.ts"
     },
     {
       "path": "/api/sse",

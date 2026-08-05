@@ -2,6 +2,63 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SOS → Community Emergency Response System (2026-08-04/05, ADR-033)
+
+Full redesign, phased. All four phases (A–D) are complete.
+
+| Task | Status |
+|---|---|
+| **Phase A — backend core** | |
+| Resolve-route ownership security fix (`requireMembership` + reporter/helper/admin check) | Completed |
+| Schema: severity/assignedHelperId/escalationTier/radius/nextEscalationAt on `SOSAlert`; `SOSResponseStatus` enum on `SOSAlertResponse` (hand-migrated backfill); new `SOSSession`/`SOSTimelineEvent` models; new alert types | Completed |
+| Transactional helper-accept (`sos-session.repository.ts`, `WHERE assignedHelperId IS NULL` guard) | Completed |
+| Staged escalation engine (`escalation.application.ts`) + `GET /api/cron/sos-escalate` ticker | Completed |
+| Dispatch orchestrator merging contacts leg + tier-1 riders, preserving ADR-030's zero-recipient admin escalation | Completed |
+| Helper offer/accept/reject/withdraw routes + session status/rating routes | Completed |
+| `Partner.type`/`isVerified`-aware SERVICE_PROVIDERS tier (`GET /api/sos/partners` for Share Mechanic/Fuel) | Completed |
+| `CommunityMembershipPort` (fully implemented, not yet wired into tier selection) | Completed |
+| Application-layer test coverage (offer/accept/reject, tier advancement, resolve ownership) | Completed |
+| OpenAPI inventory regenerated (117 routes) | Completed |
+| **Phase B — web UI rebuild** | Completed |
+| Regroup panic categories into 🔴 Emergency / 🟠 Assistance with new types | Completed |
+| Backend gap found + fixed mid-phase: `acceptOffer` never created the `Conversation` a session needs for chat; `createOffer` had no handling for the `[alertId,responderId]` unique constraint (would 500 on a duplicate offer) | Completed |
+| New session detail page (`/dashboard/sos/[id]`): offers list, accept/reject, I'm Coming/Cannot Help/Share Mechanic/Share Fuel/Call/Navigate | Completed |
+| Session chat (`SOSSessionChat.tsx` — thin wrapper on the existing Community Platform `ChatArea`, not a new component) | Completed |
+| Timeline stepper component (`SOSTimeline.tsx`) | Completed |
+| Active Alerts tab + admin feed: severity/tier/assigned-helper badges, link into session detail | Completed |
+| Full-browser authenticated click-through (offer → accept → chat → status → rating) | **Not done** — typecheck/build/compile verified, but real interactive testing needs a browser session, not curl |
+| **Phase C — Flutter parity** | Completed |
+| Fixed pre-existing bug: `sos_repository.dart`'s `getActive()` called without required `city` param | Completed |
+| Second pre-existing bug found + fixed: `getHistory()` force-parsed the history response as a full `SOSAlert` (missing required fields) — new `SOSHistoryEntry` model matches the actual response shape | Completed |
+| Mirrored offer/session/timeline DTOs + repository calls (same API routes, no duplicate endpoints) | Completed |
+| Session screen (`sos_detail_screen.dart`), helper-offer card, timeline view — chat reuses the existing `ConversationThreadBody` directly, no new chat code | Completed |
+| `send_sos_sheet.dart` regrouped into 🔴 Emergency / 🟠 Assistance matching web | Completed |
+| Nearby-riders mobile feature (`features/nearby_riders/`) — didn't exist at all before; sharing toggle, radius chips, live list | Completed |
+| `flutter analyze`: 0 issues. `flutter test`: 73/73 passing | Completed |
+| **Phase D — reputation (minimal) + community prioritization** | Completed |
+| `User.emergencyResponseCount`/`helperRatingAvg`/`helperRatingCount` + small `modules/reputation` (hand-migrated, applied to Neon) | Completed |
+| Wired `CommunityMembershipPort` into `escalation.seedEscalation`/`tickEscalation`: shared-Group nearby riders get a `NEARBY_RIDERS_COMMUNITY` tier with a shorter timeout before falling through to the full `NEARBY_RIDERS_GENERAL` pool (de-duped, no double-texting) | Completed |
+| `reputation.recordAssist`/`recordRating` wired into session COMPLETED transition + rating submission | Completed |
+| Badges / trusted-rider tier — still explicitly out of scope, needs a dedicated design pass | Backlog |
+| **Repo-wide final state** | 9/9 packages typecheck clean, 102/102 vitest passing, 73/73 flutter tests passing, `flutter analyze` clean |
+
+## SMS provider swap + phone-OTP hardening (2026-08-03, ADR-031/ADR-032)
+
+Twilio → MSG91 for SMS delivery, then production-hardened the phone-OTP flow (Better Auth stays
+the OTP system of record — see ADR-032 for why MSG91's own OTP API was deliberately not used).
+
+| Task | Status |
+|---|---|
+| `sms.adapter.ts` rewritten against MSG91 v2 `sendsms`; `MSG91_*` env vars replace `TWILIO_*` for SMS | Completed |
+| Live credential + delivery verification against MSG91's API (auth key, sender ID, IP-whitelist gotcha found and resolved) | Completed |
+| Firebase push client config switched to `bikie-b9459` project (unrelated side request, same session) | Completed |
+| `isValidIndianMobile` validator wired into Better Auth's `phoneNumberValidator` | Completed |
+| `allowedAttempts` 3→5 for wrong-code verification | Completed |
+| Rate-limit gate in `apps/web/app/api/auth/[...all]/route.ts`: 60s resend cooldown, 3/10min per-phone send cap, 10/10min per-IP send cap, 20/10min per-IP verify cap | Completed |
+| OTP send/verify logging (phone + IP + outcome, never the code) | Completed |
+| Resend countdown UI (`use-resend-countdown.ts`) on `/login` + `/signup` | Completed |
+| DLT template registration for OTP/SOS message text — still needed for guaranteed real-world delivery, not yet done by the user | Blocked |
+
 ## Modular Monolith Migration (2026-08-01, ADR-021)
 
 Audit-first Strangler migration toward module ports/adapters without breaking `/api/*`.

@@ -12,6 +12,9 @@ export * as adminRepository from "./repositories/admin.repository";
 export * as messageRepository from "./repositories/message.repository";
 export * as membershipRepository from "./repositories/membership.repository";
 export * as sosRepository from "./repositories/sos.repository";
+export * as sosSessionRepository from "./repositories/sos-session.repository";
+export * as sosTimelineRepository from "./repositories/sos-timeline.repository";
+export * as communityRepository from "./repositories/community.repository";
 export * as auditRepository from "./repositories/audit.repository";
 export * as referralRepository from "./repositories/referral.repository";
 export * as notificationRepository from "./repositories/notification.repository";
@@ -22,3 +25,4 @@ export * as riderProfileRepository from "./repositories/rider-profile.repository
 export * as userRepository from "./repositories/user.repository";
 export * as riderLocationRepository from "./repositories/rider-location.repository";
 export * as pushSubscriptionRepository from "./repositories/push-subscription.repository";
+export * as reputationRepository from "./repositories/reputation.repository";

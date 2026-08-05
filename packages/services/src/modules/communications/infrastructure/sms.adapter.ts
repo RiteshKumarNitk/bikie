@@ -1,55 +1,60 @@
 import type { ChannelResult, SmsPort } from "../ports";
 import { fetchWithTimeout } from "./http";
 
-function twilioSmsCredentials() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID?.trim();
-  const authToken = process.env.TWILIO_AUTH_TOKEN?.trim();
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID?.trim();
-  // TWILIO_PHONE_NUMBER is the name used by existing deployments' env files.
-  const from = process.env.TWILIO_FROM_NUMBER?.trim() || process.env.TWILIO_PHONE_NUMBER?.trim();
-  if (!accountSid || !authToken || (!messagingServiceSid && !from)) return null;
-  return { accountSid, authToken, messagingServiceSid, from };
+function msg91Credentials() {
+  const authKey = process.env.MSG91_AUTH_KEY?.trim();
+  const senderId = process.env.MSG91_SENDER_ID?.trim();
+  if (!authKey || !senderId) return null;
+  const route = process.env.MSG91_ROUTE?.trim() || "4";
+  // DLT template ID — required by Indian carriers' content firewall for transactional SMS.
+  // Optional here because MSG91 will reject at send time (not at config-check time) if your
+  // sender ID's DLT registration requires it and it's missing.
+  const templateId = process.env.MSG91_TEMPLATE_ID?.trim();
+  return { authKey, senderId, route, templateId };
 }
 
-/** Twilio SMS adapter with DEV fallback — preserves legacy SMSService behavior. */
+/** MSG91 SMS adapter (v2 sendsms) with DEV fallback — preserves legacy SMSService behavior. */
 export function createSmsAdapter(): SmsPort {
   return {
     isConfigured() {
-      return twilioSmsCredentials() !== null;
+      return msg91Credentials() !== null;
     },
 
     async send(to: string, message: string): Promise<ChannelResult> {
-      const credentials = twilioSmsCredentials();
+      const credentials = msg91Credentials();
       if (!credentials) {
         console.log(`[SMS][DEV] To: ${to} | Message: ${message}`);
-        return { ok: false, provider: "dev", error: "Twilio credentials not configured" };
+        return { ok: false, provider: "dev", error: "MSG91 credentials not configured" };
       }
 
-      const { accountSid, authToken, messagingServiceSid, from } = credentials;
-      const params: Record<string, string> = { To: to, Body: message };
-      if (messagingServiceSid) params.MessagingServiceSid = messagingServiceSid;
-      else params.From = from!;
+      const { authKey, senderId, route, templateId } = credentials;
+      const mobile = to.replace(/^\+/, "");
+      const smsEntry: Record<string, unknown> = { message, to: [mobile] };
+      if (templateId) smsEntry.DLT_TE_ID = templateId;
 
-      const res = await fetchWithTimeout(
-        `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString("base64")}`,
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: new URLSearchParams(params),
+      const res = await fetchWithTimeout("https://api.msg91.com/api/v2/sendsms", {
+        method: "POST",
+        headers: {
+          authkey: authKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-      );
+        body: JSON.stringify({
+          sender: senderId,
+          route,
+          country: "91",
+          sms: [smsEntry],
+        }),
+      });
 
-      if (!res.ok) {
-        const body = await res.text();
+      const body = await res.text();
+      if (!res.ok || body.includes('"type":"error"')) {
         console.error(`[SMS] Failed to ${to}: ${body}`);
-        return { ok: false, provider: "twilio", error: body };
+        return { ok: false, provider: "msg91", error: body };
       }
 
-      console.log(`[SMS][TWILIO] Sent to ${to}`);
-      return { ok: true, provider: "twilio" };
+      console.log(`[SMS][MSG91] Sent to ${to}`);
+      return { ok: true, provider: "msg91" };
     },
   };
 }
