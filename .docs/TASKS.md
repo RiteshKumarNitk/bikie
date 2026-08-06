@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SOS reverse-geocoded address (2026-08-06, ADR-038)
+
+| Task | Status |
+|---|---|
+| `SOSAlert` gains `placeName`/`area`/`formattedAddress` (additive, nullable) | Completed — migration `20260806100000_sos_reverse_geocoded_address` written, not yet applied to the live DB |
+| `ReverseGeocodingPort` + Nominatim adapter (free, no API key, Redis-cached, 4s bounded timeout, catch-and-null on failure) | Completed |
+| Wired into `SOSService.createAlert` — resolved once, stored on the alert, read by every downstream caller | Completed |
+| `describeLocation()`/`describeSosLocation()` fallback chain (formattedAddress → placeName/area/city → city), used by SMS/WhatsApp/email text, nearby-rider in-app/push text, and both platforms' alert screens | Completed |
+| Web: alert list + detail pages show the address, "view on map" kept as a separate link | Completed |
+| Mobile: `SOSAlert` model + alert list/detail screens updated to match | Completed |
+| Backend: 9/9 packages typecheck clean, 123/123 vitest passing (7 new). Mobile: `flutter analyze` 0 issues, 94/94 tests passing (4 new) | Completed |
+| Apply the pending migration to the live DB | **Not done** — needs explicit user go-ahead, not run automatically against shared state |
+
 ## Ride creation: free-text destination, meeting-point map pin, mobile cover upload (2026-08-06, ADR-037)
 
 | Task | Status |

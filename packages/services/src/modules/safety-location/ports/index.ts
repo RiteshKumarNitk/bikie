@@ -9,6 +9,9 @@ export type SosAlertCreateData = SOSAlertCreateInput & {
   severity: string;
   currentRadiusMeters: number;
   nextEscalationAt: Date | null;
+  placeName?: string | null;
+  area?: string | null;
+  formattedAddress?: string | null;
 };
 
 export interface SosAlertRepositoryPort {
@@ -244,6 +247,23 @@ export interface PlacesPort {
   findNearby(lat: number, lng: number, type: PlaceType, radiusMeters?: number): Promise<NearbyPlace[]>;
 }
 
+export interface ReverseGeocodedAddress {
+  placeName: string | null;
+  area: string | null;
+  city: string | null;
+  state: string | null;
+  country: string | null;
+  formattedAddress: string;
+}
+
+/** Turns a GPS fix into a human-readable address (ADR-038) — used once, at SOS alert creation,
+ * so every notification channel and screen can show "City Park, Malviya Nagar, Jaipur" instead
+ * of raw coordinates. Returning `null` (lookup failed/timed out) is a normal, expected outcome,
+ * not an error — every caller already has a city/coordinates fallback. */
+export interface ReverseGeocodingPort {
+  reverseGeocode(lat: number, lng: number): Promise<ReverseGeocodedAddress | null>;
+}
+
 export interface SafetyLocationPorts {
   sosAlerts: SosAlertRepositoryPort;
   sosOffers: SosOfferRepositoryPort;
@@ -256,6 +276,7 @@ export interface SafetyLocationPorts {
   userContact: UserContactPort;
   escalation: EscalationPort;
   places: PlacesPort;
+  geocoding: ReverseGeocodingPort;
   notifications: InAppNotificationPort;
   communications: CommunicationsPorts;
 }

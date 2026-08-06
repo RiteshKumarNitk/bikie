@@ -16,6 +16,9 @@ function toDTO(alert: {
   assignedHelperId: string | null;
   resolvedAt: Date | null;
   createdAt: Date;
+  placeName: string | null;
+  area: string | null;
+  formattedAddress: string | null;
 }) {
   return {
     id: alert.id,
@@ -35,6 +38,9 @@ function toDTO(alert: {
     assignedHelperId: alert.assignedHelperId,
     resolvedAt: alert.resolvedAt?.toISOString() ?? null,
     createdAt: alert.createdAt.toISOString(),
+    placeName: alert.placeName,
+    area: alert.area,
+    formattedAddress: alert.formattedAddress,
   };
 }
 
@@ -48,6 +54,9 @@ export async function createAlert(data: {
   severity: string;
   currentRadiusMeters: number;
   nextEscalationAt: Date | null;
+  placeName?: string | null;
+  area?: string | null;
+  formattedAddress?: string | null;
 }) {
   const alert = await prisma.sOSAlert.create({
     data: {
@@ -60,6 +69,9 @@ export async function createAlert(data: {
       severity: data.severity as any,
       currentRadiusMeters: data.currentRadiusMeters,
       nextEscalationAt: data.nextEscalationAt,
+      placeName: data.placeName ?? null,
+      area: data.area ?? null,
+      formattedAddress: data.formattedAddress ?? null,
     },
     include: { user: { select: { id: true, name: true, phone: true, email: true } } },
   });

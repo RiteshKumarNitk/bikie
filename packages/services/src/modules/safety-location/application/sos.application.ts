@@ -6,7 +6,12 @@ const INITIAL_RADIUS_METERS = 5000;
 
 export function createSosApplication(ports: SafetyLocationPorts) {
   return {
-    createAlert(userId: string, data: SOSAlertCreateInput): Promise<SOSAlertDTO> {
+    async createAlert(userId: string, data: SOSAlertCreateInput): Promise<SOSAlertDTO> {
+      // Best-effort (ADR-038): a failed/timed-out lookup must never block sending the alert —
+      // every downstream reader (dispatch text, UI) already falls back to city/raw coordinates
+      // when these come back null.
+      const geocoded = await ports.geocoding.reverseGeocode(data.latitude, data.longitude).catch(() => null);
+
       return ports.sosAlerts.createAlert({
         userId,
         ...data,
@@ -15,6 +20,9 @@ export function createSosApplication(ports: SafetyLocationPorts) {
         // Set to the real value by escalation.seedEscalation() right after creation — the
         // repository just needs a non-throwing value at insert time.
         nextEscalationAt: null,
+        placeName: geocoded?.placeName ?? null,
+        area: geocoded?.area ?? null,
+        formattedAddress: geocoded?.formattedAddress ?? null,
       });
     },
 

@@ -287,7 +287,15 @@ class _AlertHeader extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(alert.userName, style: Theme.of(context).textTheme.titleMedium),
-            Text(alert.city, style: Theme.of(context).textTheme.bodyMedium),
+            Text(
+              describeSosLocation(
+                formattedAddress: alert.formattedAddress,
+                placeName: alert.placeName,
+                area: alert.area,
+                city: alert.city,
+              ),
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
             if (alert.description != null) ...[
               const SizedBox(height: 4),
               Text(alert.description!),

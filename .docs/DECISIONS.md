@@ -1204,3 +1204,47 @@ changes:
   map pin — left out of scope since the ask was specifically about ride creation, not the
   already-shipped Ride Room feature.
 
+## ADR-038: SOS notifications show a reverse-geocoded address instead of raw coordinates
+
+- **Context.** Every SOS notification (SMS/WhatsApp/email/in-app/push) and the alert list/detail
+  screens on both platforms only ever showed `city` plus a bare lat/long pair or a "view on map"
+  link — accurate, but not something a human recognizes at a glance ("12.9716, 77.5946" vs. "City
+  Park, Malviya Nagar, Bengaluru"). Requested: resolve a real place name/area from the alert's
+  GPS fix and show that instead.
+- **Decision — reverse geocode once, at alert creation, store it on the alert.** Not per-recipient,
+  not per-notification-send: `SOSService.createAlert` calls a new `ReverseGeocodingPort` right
+  after receiving the GPS fix, and the result (or `null` on failure) is persisted on the
+  `SOSAlert` row itself (`placeName`, `area`, `formattedAddress` — additive, nullable columns,
+  migration `20260806100000_sos_reverse_geocoded_address`). Every subsequent reader — SMS/
+  WhatsApp/email text, in-app/push notification body, the web and mobile alert list/detail
+  screens — reads the same stored value instead of each independently calling a geocoding API
+  (which would multiply external calls per nearby-rider notified, for zero benefit — the address
+  doesn't vary by recipient).
+  - **Provider: OpenStreetMap Nominatim, not Google Geocoding.** Same reasoning as ADR-036's map
+    choice: no confirmed Google Maps Platform billing account for this project, so a paid/keyed
+    API risks silently failing (or blocking a safety-critical create path) the first time it's
+    actually needed. Nominatim needs no API key and no billing account. Its public-instance fair
+    -use policy (~1 req/sec) is well within SOS alert volume, and results are cached in the
+    existing Upstash Redis instance (~11m grid cell, 24h TTL — an address at a coordinate doesn't
+    change) to keep repeat lookups near a hotspot cheap regardless.
+  - **Bounded, non-blocking, best-effort.** The lookup runs with a 4s timeout
+    (`fetchWithTimeout`) and is wrapped in a catch that returns `null` on any failure — a slow or
+    down geocoding provider must never block or fail SOS alert creation, the one path in this
+    app that cannot be allowed to degrade. Every caller already had a `city`/raw-coordinates
+    fallback before this existed, so `null` is a normal, unremarkable outcome, not an error state
+    surfaced to the user.
+  - **New domain helper `describeLocation()`** (`dispatch-message.ts`, mirrored in Dart as
+    `describeSosLocation()` in `sos_model.dart` — can't share code across TS/Dart) is the single
+    place that decides what to show: `formattedAddress` if present, else a `placeName`/`area`/
+    `city` join, else bare `city`. Used by `buildTextBody`/`buildEmailHtml` and the nearby-rider
+    in-app notification text (`fan-out.application.ts`), plus both platforms' alert list/detail
+    screens — one fallback chain, not reimplemented per call site.
+  - **`city` is untouched and still does its own job.** The privacy-gated "same city only" active
+    -alerts filter (`GET /api/sos/alerts`) and the `SERVICE_PROVIDERS` escalation tier's
+    city-string partner matching are unrelated to this — reverse geocoding is purely a display
+    enhancement layered on top, not a replacement for how recipients/visibility are computed.
+- **Consequences.** SOS notifications and screens read like "Rider needs help near City Park,
+  Malviya Nagar, Jaipur" instead of a bare coordinate pair, on both platforms, with zero new
+  vendor cost or billing risk. A geocoding outage degrades silently back to the pre-ADR-038
+  experience (city + map link), never to a broken or blocked SOS flow.
+

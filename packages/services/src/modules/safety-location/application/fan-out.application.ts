@@ -8,7 +8,7 @@ import {
   resolveChannelAvailability,
   type ChannelAvailability,
 } from "../domain/channel-selection";
-import { buildEmailHtml, buildTextBody, type SOSRecipient } from "../domain/dispatch-message";
+import { buildEmailHtml, buildTextBody, describeLocation, type SOSRecipient } from "../domain/dispatch-message";
 import { formatDistance, mapsNavigateUrl } from "../domain/maps";
 import type { SafetyLocationPorts } from "../ports";
 
@@ -208,7 +208,7 @@ export async function dispatchToRecipient(
           recipient.userId,
           "SOS_ALERT",
           kind === "RED" ? "Red Alert nearby" : kind === "AMBER" ? "Amber Alert nearby" : "SOS Alert nearby",
-          `${alert.userName} needs help in ${alert.city}.${distanceBit} Open Maps to navigate & see your distance: ${navigate}`,
+          `${alert.userName} needs help at ${describeLocation(alert)}.${distanceBit} Open Maps to navigate & see your distance: ${navigate}`,
           "sos_alert",
           alert.id,
         )

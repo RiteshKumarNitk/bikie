@@ -16,6 +16,11 @@ export interface SOSAlertDTO {
   assignedHelperId: string | null;
   resolvedAt: string | null;
   createdAt: string;
+  /** Reverse-geocoded from latitude/longitude at creation time (ADR-038) — null if the lookup
+   * failed or timed out. Every reader falls back to `city`/raw coordinates when null. */
+  placeName: string | null;
+  area: string | null;
+  formattedAddress: string | null;
 }
 
 export interface SOSAlertCreateInput {

@@ -1,5 +1,14 @@
 # BIKIE — Roadmap
 
+## SOS Reverse-Geocoded Address (2026-08-06, ADR-038)
+SOS notifications (SMS/WhatsApp/email/in-app/push) and both platforms' alert screens now show a
+real place name/area ("City Park, Malviya Nagar, Jaipur") instead of raw coordinates, resolved
+once at alert-creation time via free OpenStreetMap Nominatim reverse geocoding (no API key/
+billing risk, consistent with ADR-036's map choice) and stored on the alert for every downstream
+reader to share. Bounded 4s timeout with a silent fallback to city/coordinates on failure — never
+blocks or breaks SOS creation. Code-complete on both platforms; the additive migration hasn't
+been applied to the live DB yet. See ADR-038 and `.docs/TASKS.md`.
+
 ## Android Push Notifications (2026-08-05, ADR-035)
 Native FCM for the Flutter Android app, reusing the existing `NotificationService.notify()`
 pipeline (no parallel notification system) and the existing web push-token route (extended, not

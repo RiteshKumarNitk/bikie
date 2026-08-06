@@ -34,7 +34,7 @@ vi.mock("../../../push.service", () => ({
 }));
 
 import { alertKind } from "./domain/alert-kind";
-import { buildEmailHtml, buildTextBody } from "./domain/dispatch-message";
+import { buildEmailHtml, buildTextBody, describeLocation } from "./domain/dispatch-message";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "./domain/maps";
 import {
   channelsForRecipient,
@@ -64,6 +64,9 @@ function sampleAlert(overrides: Partial<SOSAlertDTO> = {}): SOSAlertDTO {
     assignedHelperId: null,
     resolvedAt: null,
     createdAt: new Date().toISOString(),
+    placeName: null,
+    area: null,
+    formattedAddress: null,
     ...overrides,
   };
 }
@@ -151,6 +154,7 @@ function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partial<Safet
       findSharedGroupMemberIds: vi.fn(async () => new Set<string>()),
     },
     places: { findNearby: vi.fn(async () => []) },
+    geocoding: { reverseGeocode: vi.fn(async () => null) },
     notifications: { notify: vi.fn(async () => undefined) },
     ...overrides,
   };
@@ -196,6 +200,32 @@ describe("safety-location domain", () => {
     expect(html).toContain("Red Alert — Emergency");
     expect(html).toContain("You are listed as an emergency contact for this rider.");
     expect(html).toContain("Open in Google Maps — see distance & route");
+  });
+
+  it("describeLocation prefers the reverse-geocoded formattedAddress (ADR-038)", () => {
+    expect(
+      describeLocation(sampleAlert({ formattedAddress: "City Park, Malviya Nagar, Jaipur, Rajasthan, India" })),
+    ).toBe("City Park, Malviya Nagar, Jaipur, Rajasthan, India");
+  });
+
+  it("describeLocation falls back to placeName/area/city when formattedAddress is missing", () => {
+    expect(describeLocation(sampleAlert({ placeName: "City Park", area: "Malviya Nagar", city: "Jaipur" }))).toBe(
+      "City Park, Malviya Nagar, Jaipur",
+    );
+  });
+
+  it("describeLocation falls back to bare city when nothing was geocoded", () => {
+    expect(describeLocation(sampleAlert({ city: "Jaipur" }))).toBe("Jaipur");
+  });
+
+  it("buildTextBody/buildEmailHtml include the geocoded address, not just city", () => {
+    const alert = sampleAlert({ formattedAddress: "City Park, Malviya Nagar, Jaipur, Rajasthan, India" });
+    expect(buildTextBody(alert, { role: "NEARBY_RIDER", name: "Helper" })).toContain(
+      "Location: City Park, Malviya Nagar, Jaipur, Rajasthan, India",
+    );
+    expect(buildEmailHtml(alert, { role: "NEARBY_RIDER", name: "Helper" })).toContain(
+      "City Park, Malviya Nagar, Jaipur, Rajasthan, India",
+    );
   });
 });
 
@@ -288,6 +318,76 @@ describe("sos profile warning", () => {
       communications: fakeCommunications(),
     });
     expect(await module.sos.getProfileWarning("u1")).toBeNull();
+  });
+});
+
+describe("sos createAlert reverse geocoding (ADR-038)", () => {
+  const createInput = {
+    type: "ACCIDENT",
+    description: null,
+    latitude: 26.9124,
+    longitude: 75.7873,
+    city: "Jaipur",
+  };
+
+  it("passes the geocoded address through to alert creation", async () => {
+    const createAlert = vi.fn(async (data: unknown) => ({ ...sampleAlert(), ...(data as object) }));
+    const reverseGeocode = vi.fn(async () => ({
+      placeName: "City Park",
+      area: "Malviya Nagar",
+      city: "Jaipur",
+      state: "Rajasthan",
+      country: "India",
+      formattedAddress: "City Park, Malviya Nagar, Jaipur, Rajasthan, India",
+    }));
+    const module = createSafetyLocationModule({
+      ...emptyRepos({ sosAlerts: { ...emptyRepos().sosAlerts!, createAlert }, geocoding: { reverseGeocode } }),
+      communications: fakeCommunications(),
+    });
+
+    await module.sos.createAlert("u1", createInput);
+
+    expect(reverseGeocode).toHaveBeenCalledWith(26.9124, 75.7873);
+    expect(createAlert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        placeName: "City Park",
+        area: "Malviya Nagar",
+        formattedAddress: "City Park, Malviya Nagar, Jaipur, Rajasthan, India",
+      }),
+    );
+  });
+
+  it("falls back to null address fields when geocoding returns nothing, without failing", async () => {
+    const createAlert = vi.fn(async (data: unknown) => ({ ...sampleAlert(), ...(data as object) }));
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts!, createAlert },
+        geocoding: { reverseGeocode: vi.fn(async () => null) },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    await module.sos.createAlert("u1", createInput);
+
+    expect(createAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ placeName: null, area: null, formattedAddress: null }),
+    );
+  });
+
+  it("still creates the alert if the geocoding lookup throws", async () => {
+    const createAlert = vi.fn(async (data: unknown) => ({ ...sampleAlert(), ...(data as object) }));
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts!, createAlert },
+        geocoding: { reverseGeocode: vi.fn(async () => Promise.reject(new Error("nominatim down"))) },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    await expect(module.sos.createAlert("u1", createInput)).resolves.toBeDefined();
+    expect(createAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ placeName: null, area: null, formattedAddress: null }),
+    );
   });
 });
 

@@ -9,6 +9,7 @@ import { createPlacesApplication } from "./application/places.application";
 import { createRiderLocationApplication } from "./application/rider-location.application";
 import { createSessionApplication } from "./application/session.application";
 import { createSosApplication } from "./application/sos.application";
+import { createGeocodingAdapter } from "./infrastructure/geocoding.adapter";
 import { createInAppNotificationAdapter } from "./infrastructure/notification.adapter";
 import { createPlacesAdapter } from "./infrastructure/places.adapter";
 import {
@@ -54,6 +55,7 @@ export function createSafetyLocationModule(overrides: SafetyLocationDeps = {}): 
     userContact: overrides.userContact ?? createUserContactAdapter(),
     escalation: overrides.escalation ?? createEscalationAdapter(),
     places: overrides.places ?? createPlacesAdapter(),
+    geocoding: overrides.geocoding ?? createGeocodingAdapter(),
     notifications: overrides.notifications ?? createInAppNotificationAdapter(),
     communications: overrides.communications ?? communications,
   };

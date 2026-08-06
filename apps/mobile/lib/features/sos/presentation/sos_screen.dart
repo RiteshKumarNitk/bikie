@@ -150,7 +150,15 @@ class _AlertCard extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              Text('${alert.userName} · ${alert.city}', style: Theme.of(context).textTheme.bodyMedium),
+              Text(
+                '${alert.userName} · ${describeSosLocation(
+                  formattedAddress: alert.formattedAddress,
+                  placeName: alert.placeName,
+                  area: alert.area,
+                  city: alert.city,
+                )}',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
               if (alert.description != null) ...[
                 const SizedBox(height: 4),
                 Text(alert.description!),

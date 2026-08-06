@@ -1,5 +1,25 @@
 # Changelog
 
+## Change — SOS notifications show a real address instead of raw coordinates (ADR-038)
+- SOS alerts now get reverse-geocoded once at creation time (`placeName`/`area`/
+  `formattedAddress`, additive/nullable on `SOSAlert`) via free OpenStreetMap Nominatim — no API
+  key or billing account, same reasoning as ADR-036's map choice, Redis-cached, 4s bounded
+  timeout with a silent fallback to `city`/raw coordinates on any failure so it can never block
+  or break sending an SOS.
+- Every notification channel (SMS, WhatsApp, email, in-app, push) and both platforms' alert
+  list/detail screens now read the same stored address through one shared fallback chain
+  (`describeLocation()` on web, `describeSosLocation()` on mobile) instead of a bare "City:
+  Jaipur" / lat-long pair.
+- Migration written (`20260806100000_sos_reverse_geocoded_address`), not yet applied to the live
+  database.
+
+## Change — Membership simplified to a single ₹99/365-day plan
+- Live `MembershipPlan` data updated (not deleted, to avoid orphaning existing `UserMembership`
+  rows): the old "Premium" tier renamed/repriced to "Membership" (₹99/year), "Basic" and "Pro"
+  deactivated. `GET /api/membership/plans` already filters to `isActive`, so both web and mobile
+  show exactly one plan automatically. `packages/database/prisma/seed.ts` updated to match, for
+  future fresh-database seeds.
+
 ## Change — Ride creation: free-text destination, meeting-point map pin, mobile cover upload (ADR-037)
 - Destination is no longer a dropdown limited to the curated `Destination` catalog — the organizer
   now types it freely (new `Trip.destinationName`), on both `/trips/create` (web) and the mobile

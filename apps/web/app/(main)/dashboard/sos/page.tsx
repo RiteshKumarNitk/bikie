@@ -24,6 +24,9 @@ interface SOSAlert {
   escalationTier: string;
   assignedHelperId: string | null;
   createdAt: string;
+  placeName: string | null;
+  area: string | null;
+  formattedAddress: string | null;
 }
 
 const alertTypes = [
@@ -229,16 +232,19 @@ export default function SOSPage() {
                     <div className="mt-1 space-y-0.5 text-sm text-foreground/50">
                       <p>📧 {a.userEmail}</p>
                       {a.userPhone && <p>📞 {a.userPhone}</p>}
-                      <p>🏙️ {a.city}</p>
+                      {a.formattedAddress || a.placeName ? (
+                        <p>📍 {a.formattedAddress ?? [a.placeName, a.area, a.city].filter(Boolean).join(", ")}</p>
+                      ) : (
+                        <p>🏙️ {a.city}</p>
+                      )}
                       <p>
-                        📍{" "}
                         <a
                           href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`}
                           target="_blank"
                           rel="noreferrer"
                           className="text-accent-text hover:underline"
                         >
-                          {a.latitude.toFixed(5)}, {a.longitude.toFixed(5)} — view on map
+                          View on map
                         </a>
                       </p>
                     </div>

@@ -24,9 +24,24 @@ class SOSAlert with _$SOSAlert {
     String? assignedHelperId,
     String? resolvedAt,
     required String createdAt,
+    // Reverse-geocoded from latitude/longitude at creation time (ADR-038) — null if the
+    // lookup failed/timed out; fall back to `city`/raw coordinates when null.
+    String? placeName,
+    String? area,
+    String? formattedAddress,
   }) = _SOSAlert;
 
   factory SOSAlert.fromJson(Map<String, dynamic> json) => _$SOSAlertFromJson(json);
+}
+
+/// Human-readable location for display — mirrors the web's `describeLocation()`
+/// (`dispatch-message.ts`, ADR-038): prefers the reverse-geocoded address, falls back to a
+/// placeName/area/city join, falls back to bare city. Never shows raw lat/long as the primary
+/// label — the "view on map" link stays available separately for that.
+String describeSosLocation({String? formattedAddress, String? placeName, String? area, required String city}) {
+  if (formattedAddress != null && formattedAddress.isNotEmpty) return formattedAddress;
+  final parts = [placeName, area, city].where((p) => p != null && p.isNotEmpty).toList();
+  return parts.isNotEmpty ? parts.join(', ') : city;
 }
 
 /// The caller's own alert history has a different (smaller) shape than

@@ -20,6 +20,15 @@ export interface SOSRecipient {
   distanceMeters?: number;
 }
 
+/** Human-readable location for notification text (ADR-038) — prefers the reverse-geocoded
+ * address, falls back to a placeName/area/city join, falls back to bare city. Never GPS-only;
+ * the raw coordinates stay available as a secondary line/map link for anyone who wants them. */
+export function describeLocation(alert: SOSAlertDTO): string {
+  if (alert.formattedAddress) return alert.formattedAddress;
+  const parts = [alert.placeName, alert.area, alert.city].filter((p): p is string => Boolean(p));
+  return parts.length > 0 ? parts.join(", ") : alert.city;
+}
+
 export function buildTextBody(alert: SOSAlertDTO, recipient: SOSRecipient): string {
   const kind = alertKind(alert.description);
   const label =
@@ -45,7 +54,7 @@ export function buildTextBody(alert: SOSAlertDTO, recipient: SOSRecipient): stri
     distance ? `Your distance (approx): ${distance}` : null,
     `Rider: ${alert.userName}${alert.userPhone ? ` (${alert.userPhone})` : ""}`,
     `Type: ${alert.type}${alert.description ? ` — ${alert.description}` : ""}`,
-    `City: ${alert.city}`,
+    `Location: ${describeLocation(alert)}`,
     `GPS: ${alert.latitude.toFixed(5)}, ${alert.longitude.toFixed(5)}`,
     `📍 Location pin: ${pin}`,
     `🧭 Open in Maps (shows YOUR distance & route): ${navigate}`,
@@ -80,7 +89,7 @@ export function buildEmailHtml(alert: SOSAlertDTO, recipient: SOSRecipient): str
       ${distance ? `<p style="margin:0 0 12px"><strong>Approx. distance from you:</strong> ${distance}</p>` : ""}
       <p style="margin:0 0 4px"><strong>Rider:</strong> ${alert.userName}${alert.userPhone ? ` (${alert.userPhone})` : ""}</p>
       <p style="margin:0 0 4px"><strong>Type:</strong> ${alert.type}${alert.description ? ` — ${alert.description}` : ""}</p>
-      <p style="margin:0 0 16px"><strong>City:</strong> ${alert.city}<br/>
+      <p style="margin:0 0 16px"><strong>Location:</strong> ${describeLocation(alert)}<br/>
          <strong>GPS:</strong> ${alert.latitude.toFixed(5)}, ${alert.longitude.toFixed(5)}</p>
       <p style="margin:0 0 12px">
         <a href="${navigate}" style="display:inline-block;background:#ff4d1a;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:600">

@@ -26,6 +26,9 @@ interface Alert {
   currentRadiusMeters: number;
   assignedHelperId: string | null;
   createdAt: string;
+  placeName: string | null;
+  area: string | null;
+  formattedAddress: string | null;
 }
 
 interface Offer {
@@ -305,16 +308,19 @@ export default function SOSAlertDetailPage() {
 
         <p className="mt-2 text-sm font-medium text-foreground/80">{alert.userName}</p>
         <div className="mt-1 space-y-0.5 text-sm text-foreground/50">
-          <p>🏙️ {alert.city}</p>
+          {alert.formattedAddress || alert.placeName ? (
+            <p>📍 {alert.formattedAddress ?? [alert.placeName, alert.area, alert.city].filter(Boolean).join(", ")}</p>
+          ) : (
+            <p>🏙️ {alert.city}</p>
+          )}
           <p>
-            📍{" "}
             <a
               href={`https://www.google.com/maps?q=${alert.latitude},${alert.longitude}`}
               target="_blank"
               rel="noreferrer"
               className="text-accent-text hover:underline"
             >
-              {alert.latitude.toFixed(5)}, {alert.longitude.toFixed(5)} — view on map
+              View on map
             </a>
           </p>
         </div>

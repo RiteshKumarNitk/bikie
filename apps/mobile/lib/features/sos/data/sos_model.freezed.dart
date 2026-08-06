@@ -37,7 +37,12 @@ mixin _$SOSAlert {
   int get currentRadiusMeters => throw _privateConstructorUsedError;
   String? get assignedHelperId => throw _privateConstructorUsedError;
   String? get resolvedAt => throw _privateConstructorUsedError;
-  String get createdAt => throw _privateConstructorUsedError;
+  String get createdAt =>
+      throw _privateConstructorUsedError; // Reverse-geocoded from latitude/longitude at creation time (ADR-038) — null if the
+  // lookup failed/timed out; fall back to `city`/raw coordinates when null.
+  String? get placeName => throw _privateConstructorUsedError;
+  String? get area => throw _privateConstructorUsedError;
+  String? get formattedAddress => throw _privateConstructorUsedError;
 
   /// Serializes this SOSAlert to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -72,6 +77,9 @@ abstract class $SOSAlertCopyWith<$Res> {
     String? assignedHelperId,
     String? resolvedAt,
     String createdAt,
+    String? placeName,
+    String? area,
+    String? formattedAddress,
   });
 }
 
@@ -107,6 +115,9 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
     Object? assignedHelperId = freezed,
     Object? resolvedAt = freezed,
     Object? createdAt = null,
+    Object? placeName = freezed,
+    Object? area = freezed,
+    Object? formattedAddress = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -178,6 +189,18 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
                 ? _value.createdAt
                 : createdAt // ignore: cast_nullable_to_non_nullable
                       as String,
+            placeName: freezed == placeName
+                ? _value.placeName
+                : placeName // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            area: freezed == area
+                ? _value.area
+                : area // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            formattedAddress: freezed == formattedAddress
+                ? _value.formattedAddress
+                : formattedAddress // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -211,6 +234,9 @@ abstract class _$$SOSAlertImplCopyWith<$Res>
     String? assignedHelperId,
     String? resolvedAt,
     String createdAt,
+    String? placeName,
+    String? area,
+    String? formattedAddress,
   });
 }
 
@@ -245,6 +271,9 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
     Object? assignedHelperId = freezed,
     Object? resolvedAt = freezed,
     Object? createdAt = null,
+    Object? placeName = freezed,
+    Object? area = freezed,
+    Object? formattedAddress = freezed,
   }) {
     return _then(
       _$SOSAlertImpl(
@@ -316,6 +345,18 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
             ? _value.createdAt
             : createdAt // ignore: cast_nullable_to_non_nullable
                   as String,
+        placeName: freezed == placeName
+            ? _value.placeName
+            : placeName // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        area: freezed == area
+            ? _value.area
+            : area // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        formattedAddress: freezed == formattedAddress
+            ? _value.formattedAddress
+            : formattedAddress // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -342,6 +383,9 @@ class _$SOSAlertImpl implements _SOSAlert {
     this.assignedHelperId,
     this.resolvedAt,
     required this.createdAt,
+    this.placeName,
+    this.area,
+    this.formattedAddress,
   });
 
   factory _$SOSAlertImpl.fromJson(Map<String, dynamic> json) =>
@@ -381,10 +425,18 @@ class _$SOSAlertImpl implements _SOSAlert {
   final String? resolvedAt;
   @override
   final String createdAt;
+  // Reverse-geocoded from latitude/longitude at creation time (ADR-038) — null if the
+  // lookup failed/timed out; fall back to `city`/raw coordinates when null.
+  @override
+  final String? placeName;
+  @override
+  final String? area;
+  @override
+  final String? formattedAddress;
 
   @override
   String toString() {
-    return 'SOSAlert(id: $id, userId: $userId, userName: $userName, userPhone: $userPhone, userEmail: $userEmail, type: $type, description: $description, latitude: $latitude, longitude: $longitude, city: $city, status: $status, severity: $severity, escalationTier: $escalationTier, currentRadiusMeters: $currentRadiusMeters, assignedHelperId: $assignedHelperId, resolvedAt: $resolvedAt, createdAt: $createdAt)';
+    return 'SOSAlert(id: $id, userId: $userId, userName: $userName, userPhone: $userPhone, userEmail: $userEmail, type: $type, description: $description, latitude: $latitude, longitude: $longitude, city: $city, status: $status, severity: $severity, escalationTier: $escalationTier, currentRadiusMeters: $currentRadiusMeters, assignedHelperId: $assignedHelperId, resolvedAt: $resolvedAt, createdAt: $createdAt, placeName: $placeName, area: $area, formattedAddress: $formattedAddress)';
   }
 
   @override
@@ -420,12 +472,17 @@ class _$SOSAlertImpl implements _SOSAlert {
             (identical(other.resolvedAt, resolvedAt) ||
                 other.resolvedAt == resolvedAt) &&
             (identical(other.createdAt, createdAt) ||
-                other.createdAt == createdAt));
+                other.createdAt == createdAt) &&
+            (identical(other.placeName, placeName) ||
+                other.placeName == placeName) &&
+            (identical(other.area, area) || other.area == area) &&
+            (identical(other.formattedAddress, formattedAddress) ||
+                other.formattedAddress == formattedAddress));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     runtimeType,
     id,
     userId,
@@ -444,7 +501,10 @@ class _$SOSAlertImpl implements _SOSAlert {
     assignedHelperId,
     resolvedAt,
     createdAt,
-  );
+    placeName,
+    area,
+    formattedAddress,
+  ]);
 
   /// Create a copy of SOSAlert
   /// with the given fields replaced by the non-null parameter values.
@@ -479,6 +539,9 @@ abstract class _SOSAlert implements SOSAlert {
     final String? assignedHelperId,
     final String? resolvedAt,
     required final String createdAt,
+    final String? placeName,
+    final String? area,
+    final String? formattedAddress,
   }) = _$SOSAlertImpl;
 
   factory _SOSAlert.fromJson(Map<String, dynamic> json) =
@@ -517,7 +580,14 @@ abstract class _SOSAlert implements SOSAlert {
   @override
   String? get resolvedAt;
   @override
-  String get createdAt;
+  String get createdAt; // Reverse-geocoded from latitude/longitude at creation time (ADR-038) — null if the
+  // lookup failed/timed out; fall back to `city`/raw coordinates when null.
+  @override
+  String? get placeName;
+  @override
+  String? get area;
+  @override
+  String? get formattedAddress;
 
   /// Create a copy of SOSAlert
   /// with the given fields replaced by the non-null parameter values.

@@ -25,6 +25,9 @@ _$SOSAlertImpl _$$SOSAlertImplFromJson(Map<String, dynamic> json) =>
       assignedHelperId: json['assignedHelperId'] as String?,
       resolvedAt: json['resolvedAt'] as String?,
       createdAt: json['createdAt'] as String,
+      placeName: json['placeName'] as String?,
+      area: json['area'] as String?,
+      formattedAddress: json['formattedAddress'] as String?,
     );
 
 Map<String, dynamic> _$$SOSAlertImplToJson(_$SOSAlertImpl instance) =>
@@ -46,6 +49,9 @@ Map<String, dynamic> _$$SOSAlertImplToJson(_$SOSAlertImpl instance) =>
       'assignedHelperId': instance.assignedHelperId,
       'resolvedAt': instance.resolvedAt,
       'createdAt': instance.createdAt,
+      'placeName': instance.placeName,
+      'area': instance.area,
+      'formattedAddress': instance.formattedAddress,
     };
 
 _$SOSHistoryEntryImpl _$$SOSHistoryEntryImplFromJson(

@@ -928,6 +928,13 @@ model SOSAlert {
   sessions          SOSSession[]
   timelineEvents    SOSTimelineEvent[]
 
+  // --- Reverse-geocoded address (ADR-038) — best-effort, nullable. Resolved once at creation
+  // time from `latitude`/`longitude` via Nominatim; a lookup failure/timeout leaves these null
+  // and every caller falls back to `city`/raw coordinates, same as before this existed.
+  placeName         String?
+  area              String?
+  formattedAddress  String?
+
   @@index([city, status])
   @@index([status])
   @@index([status, nextEscalationAt])
