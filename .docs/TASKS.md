@@ -2,6 +2,14 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Fixed production build failure — Leaflet loaded eagerly, crashed `/login` prerender (2026-08-06, ADR-041)
+
+| Task | Status |
+|---|---|
+| Root cause: `import L from "leaflet"` at module scope in `LocationPicker.tsx`/`PartnersMap.tsx` executes during Next's SSR prerender pass, even for `"use client"` files | Confirmed via local `pnpm --filter web build` reproducing the exact Vercel failure |
+| Fix: `leaflet` runtime import moved to a dynamic `import()` inside each component's mount `useEffect`; module-level type import kept type-only (`import type * as LeafletTypes`) | Completed |
+| Verified: local production build (`pnpm --filter web build`) now completes cleanly, `/login` prerenders static; `pnpm typecheck` (9/9) and `pnpm test` (123/123) still clean | Completed |
+
 ## Removed the web light-theme toggle (2026-08-06, ADR-040)
 
 | Task | Status |

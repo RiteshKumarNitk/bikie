@@ -1,5 +1,12 @@
 # BIKIE — Roadmap
 
+## Fixed: Production Build Was Broken (2026-08-06, ADR-041)
+A Vercel deploy failed outright — `/login` crashed while prerendering (`window is not defined`)
+because `leaflet` was imported eagerly at module scope in `LocationPicker.tsx`/`PartnersMap.tsx`
+and Next server-renders client components for their initial HTML. Fixed by making the Leaflet
+import itself a dynamic, browser-only `import()`. Verified by reproducing the failure with a
+local production build before and after the fix. See ADR-041.
+
 ## Light Theme Removed (2026-08-06, ADR-040)
 Dark is now the only theme on web — the sun/moon toggle is gone, and `ThemeProvider` uses
 `forcedTheme="dark"` so no stored preference can put anyone back in light mode. Mobile was

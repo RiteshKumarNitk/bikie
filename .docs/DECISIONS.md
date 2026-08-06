@@ -1328,3 +1328,36 @@ changes:
 - **Consequences.** No schema/API change. Purely a web UI removal; `pnpm typecheck`/`pnpm test`
   re-run clean (no other file referenced `ThemeToggle`).
 
+## ADR-041: Leaflet must be dynamically `import()`-ed inside `useEffect`, never at module top level
+
+- **Context.** A production Vercel build failed outright: `/login` — a page that never renders
+  a map — crashed while prerendering with `ReferenceError: window is not defined`, deep inside
+  `leaflet`'s own module code. Root cause: `LocationPicker.tsx` and `PartnersMap.tsx` (ADR-036)
+  both did `import L from "leaflet"` at the top of the file. Leaflet's source touches
+  `window`/`document` at *import* time (browser feature detection), not just when its APIs are
+  called. `"use client"` does not protect against this — Next still server-renders client
+  components once to produce the initial HTML, so their imports execute in Node during that
+  pass. `/login` doesn't import either map component directly, but Turbopack's chunking grouped
+  the leaflet dependency into a chunk shared broadly enough that prerendering `/login` pulled it
+  in anyway — so the blast radius of a top-level browser-only import isn't limited to the pages
+  that obviously use it.
+- **Fix.** In both files, the static `import L from "leaflet"` became `import type * as
+  LeafletTypes from "leaflet"` (type-only, erased at compile time — zero runtime cost) plus a
+  `const L = (await import("leaflet")).default` *inside* the mount `useEffect`, guarded the same
+  way the rest of the effect already was (`if (cancelled || !containerRef.current || ...)
+  return`). Everything that used to run at module scope (marker icon construction, map/tile-layer
+  setup) moved inside that same async callback so it only ever executes in the browser, after the
+  dynamic import resolves. `PartnersMap.tsx`'s second effect (redraws markers on `pins`/`center`
+  change) now reads the loaded Leaflet instance from a ref instead of the module-level binding.
+  `leaflet/dist/leaflet.css` in the root layout is unaffected — CSS has no `window` access and was
+  never the problem.
+- **Consequences.** No API/schema change. Verified by actually reproducing the failure locally
+  (`pnpm --filter web build`, which failed identically pre-fix) rather than trusting
+  `typecheck`/`test` alone — neither would have caught this, since it's a Node-runtime execution
+  bug during static prerendering, not a type or unit-test-level issue. Confirmed clean after the
+  fix (`/login` now prerenders as static content) and `pnpm test` still 123/123. **General rule
+  going forward**: any browser-only library that runs code at import time (maps, canvas/WebGL
+  libs, anything reading `navigator`/`window` outside a function body) must be loaded via dynamic
+  `import()` inside an effect/event handler in this app — never a static top-level import, even
+  inside a `"use client"` file — since Next.js still executes that import during SSR/prerender.
+

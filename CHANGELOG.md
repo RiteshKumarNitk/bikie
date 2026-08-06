@@ -1,5 +1,15 @@
 # Changelog
 
+## Fix — Production build was crashing entirely: Leaflet loaded eagerly, broke `/login` prerender (ADR-041)
+- `LocationPicker.tsx`/`PartnersMap.tsx` did `import L from "leaflet"` at module top level.
+  Leaflet touches `window` at import time; Next server-renders `"use client"` components for
+  the initial HTML, so this executed during prerendering and threw `ReferenceError: window is
+  not defined` — on `/login`, which doesn't even render a map, because Turbopack's chunking
+  pulled the dependency in anyway. This broke the entire Vercel deploy, not just those two maps.
+- Fixed by making the `leaflet` import itself a dynamic `import()` inside each component's mount
+  `useEffect` (type-only import for TS types, which is compile-time-only and safe). Verified by
+  reproducing the failure with a local `pnpm --filter web build` and confirming it's now clean.
+
 ## Change — Removed the web light-theme toggle; dark is now the only theme (ADR-040)
 - `ThemeToggle.tsx` (sun/moon button) deleted; its two call sites in `Navbar.tsx` removed.
 - `apps/web/app/layout.tsx`'s `ThemeProvider` switched from `defaultTheme="dark"` to
