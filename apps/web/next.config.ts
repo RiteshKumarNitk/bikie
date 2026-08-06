@@ -23,19 +23,27 @@ const msg91WidgetConnectSrc = "https://verify.msg91.com https://verify.phone91.c
 // origin) + raw OpenStreetMap raster tiles instead of Google Maps JS SDK — no API key, no
 // billing account. No script-src/connect-src additions needed: Leaflet ships no external script,
 // and tile/marker-icon images already fall under the broad `img-src https:` below.
+// Razorpay Checkout (ADR-043, membership purchase) — PaymentModal.tsx loads
+// checkout.razorpay.com's script only when Razorpay is actually configured server-side (dev-mode
+// simulated checkout otherwise never touches this domain at all). Domains match Razorpay's own
+// documented CSP guidance: script from checkout.razorpay.com, the payment modal itself runs in
+// an iframe from api.razorpay.com, which also fields the SDK's own network calls.
+const razorpayScriptSrc = "https://checkout.razorpay.com";
+const razorpayConnectSrc = "https://api.razorpay.com https://lumberjack.razorpay.com";
+const razorpayFrameSrc = "https://api.razorpay.com https://checkout.razorpay.com";
 
 const cspHeader = `
   default-src 'self';
-  script-src 'self' 'unsafe-inline' ${msg91WidgetScriptSrc}${isDev ? " 'unsafe-eval'" : ""};
+  script-src 'self' 'unsafe-inline' ${msg91WidgetScriptSrc} ${razorpayScriptSrc}${isDev ? " 'unsafe-eval'" : ""};
   style-src 'self' 'unsafe-inline' https://hcaptcha.com https://*.hcaptcha.com;
   img-src 'self' data: blob: https:;
   font-src 'self' data:;
-  connect-src 'self' https://res.cloudinary.com https://api.cloudinary.com ${msg91WidgetConnectSrc};
+  connect-src 'self' https://res.cloudinary.com https://api.cloudinary.com ${msg91WidgetConnectSrc} ${razorpayConnectSrc};
   object-src 'none';
   base-uri 'self';
   form-action 'self';
   frame-ancestors 'none';
-  frame-src 'self' https://hcaptcha.com https://*.hcaptcha.com;
+  frame-src 'self' https://hcaptcha.com https://*.hcaptcha.com ${razorpayFrameSrc};
   ${isDev ? "" : "upgrade-insecure-requests;"}
 `
   .replace(/\s{2,}/g, " ")

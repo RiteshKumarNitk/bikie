@@ -16,6 +16,22 @@ export async function findAllActivePlans() {
   }));
 }
 
+/** Server-side price lookup for Razorpay order creation (ADR-043) — never trust a
+ * client-supplied amount for what to charge. */
+export async function findPlanById(planId: string) {
+  const plan = await prisma.membershipPlan.findUnique({ where: { id: planId } });
+  if (!plan) return null;
+  return {
+    id: plan.id,
+    name: plan.name,
+    description: plan.description,
+    price: plan.price.toNumber(),
+    durationDays: plan.durationDays,
+    benefits: plan.benefits,
+    isActive: plan.isActive,
+  };
+}
+
 export async function getActiveMembership(userId: string) {
   const membership = await prisma.userMembership.findFirst({
     where: { userId, status: "ACTIVE", endDate: { gte: new Date() } },
@@ -49,13 +65,14 @@ export async function createMembership(
   userId: string,
   planId: string,
   paymentId?: string,
+  razorpayOrderId?: string,
 ) {
   const plan = await prisma.membershipPlan.findUniqueOrThrow({ where: { id: planId } });
   const startDate = new Date();
   const endDate = new Date(startDate.getTime() + plan.durationDays * 24 * 60 * 60 * 1000);
 
   const membership = await prisma.userMembership.create({
-    data: { userId, planId, startDate, endDate, paymentId },
+    data: { userId, planId, startDate, endDate, paymentId, razorpayOrderId },
     include: { plan: true },
   });
 

@@ -10,6 +10,7 @@ export { PartnerService } from "./partner.service";
 export { AdminService } from "./admin.service";
 export { MessageService } from "./message.service";
 export { MembershipService } from "./membership.service";
+export { RazorpayService } from "./razorpay.service";
 export { SOSService } from "./sos.service";
 export { SOSDispatchService } from "./sos-dispatch.service";
 export { SOSSessionService } from "./sos-session.service";

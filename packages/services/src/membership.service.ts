@@ -10,7 +10,16 @@ export const MembershipService = {
     return membershipRepository.getActiveMembership(userId);
   },
 
-  async purchaseMembership(userId: string, planId: string, paymentId?: string): Promise<UserMembershipDTO> {
-    return membershipRepository.createMembership(userId, planId, paymentId);
+  async getPlanById(planId: string): Promise<MembershipPlanDTO | null> {
+    return membershipRepository.findPlanById(planId);
+  },
+
+  async purchaseMembership(
+    userId: string,
+    planId: string,
+    paymentId?: string,
+    razorpayOrderId?: string,
+  ): Promise<UserMembershipDTO> {
+    return membershipRepository.createMembership(userId, planId, paymentId, razorpayOrderId);
   },
 };

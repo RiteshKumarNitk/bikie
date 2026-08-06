@@ -1,5 +1,47 @@
 # Changelog
 
+## Change — Membership payments prepared for real Razorpay; fixed active-membership display bug (ADR-043)
+- **Fixed**: `/membership` never checked whether you already had an active membership — it only
+  tracked a successful purchase in local component state, which reset on any reload or repeat
+  visit, so an already-active member kept seeing "Get Started" on every plan as if nothing had
+  ever been purchased. Now fetches `GET /api/membership/active` on load and reflects the real
+  status (disabled "✓ Active" button on your current plan, a persistent status banner), matching
+  how `/dashboard/membership` already worked correctly.
+- **Prepared for Razorpay**: membership purchase used to activate on nothing but a client-supplied
+  dummy `paymentId` string (explicitly labeled "simulated checkout — no real charge is made").
+  New `RazorpayService` creates a real, server-priced order and verifies Razorpay's payment
+  signature (`timingSafeEqual` HMAC-SHA256) server-side before a membership is ever created — the
+  purchase route never just trusts what the client claims happened. This is a server-side gate on
+  `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` being set, not a client toggle: while blank (as they are
+  in this environment — no live credentials exist here), everything behaves exactly as before,
+  zero change; the moment real keys are added, every purchase requires real verification
+  automatically.
+- Web's `PaymentModal.tsx` calls a new `POST /api/membership/checkout` first and picks the right
+  flow: the untouched simulated card form in dev mode, or Razorpay's own real Checkout modal
+  (new CSP entries for `checkout.razorpay.com`) once configured.
+- **Not done**: mobile isn't wired to real Razorpay (needs the `razorpay_flutter` native plugin,
+  out of scope this pass) — its simulated flow will start failing with a clear error once live
+  keys are configured; documented explicitly in ADR-043 and `membership_screen.dart` so it's a
+  known follow-up, not a surprise. Also not done: live end-to-end testing against a real Razorpay
+  account — no credentials exist in this environment.
+- Backend typecheck (9/9 packages) clean after `pnpm install` picked up the new `razorpay`
+  dependency.
+
+## Change — Mobile Home surfaces the location-sharing toggle, reframed around emergency visibility
+- The `rider_location.sharingEnabled` toggle only lived on the Nearby Riders screen, framed
+  entirely as "share your location to browse nearby riders — reciprocity." That's the same
+  switch SOS's nearby-rider dispatch tier depends on to find you (or for you to be found) in an
+  emergency — someone who didn't care about browsing nearby riders had no reason to ever turn it
+  on, without realizing it also meant being invisible during a real emergency.
+- New dismissible banner on Home (grouped with the SOS cards, since it's a safety feature, not
+  marketplace content), shown whenever sharing is off: "Be findable in an emergency," a plain
+  explanation of what turning it on/off actually means, an inline switch, and an explicit note
+  that it never runs in the background — it only updates when turned on or refreshed. Enabling it
+  pushes an immediate location fix too (same as the Nearby Riders screen's own toggle), so the
+  banner is fully self-sufficient. Disappears once sharing is on; dismissing without enabling
+  reappears next time Home loads, same pattern as the existing profile-completion banner.
+- `flutter analyze`: no issues. `flutter test`: all passing.
+
 ## Change — SOS "browse active alerts" now uses a GPS radius instead of same-city text matching (ADR-042)
 - `getActiveAlerts` used to match an exact, case-sensitive `city` string — both the sender's city
   (typed once when sending an alert) and the viewer's city (typed via "Set city") were free text

@@ -24,7 +24,9 @@ concrete tokens.
 
 ## Non-goals (for now)
 
-- Real payment processing (Razorpay is env-documented, not wired)
+- Real payment processing beyond membership (Razorpay is wired for membership purchase as of
+  ADR-043 — server-verified orders, dev-mode fallback while `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET`
+  stay unset; not yet extended to bookings or anything else, and not wired on mobile)
 - Real push notifications (Firebase is env-documented, not wired)
 - Real maps (Mapbox is env-documented, not wired)
 - The Flutter mobile app itself (architecture must not preclude it)

@@ -1409,3 +1409,53 @@ changes:
   delegation with the new params). Not done: live-tested with two real devices/accounts in this
   environment — worth the user's own end-to-end smoke test given this is a safety-critical path.
 
+## ADR-043: Membership payment moves from a client-trusted dummy `paymentId` to real, server-verified Razorpay orders
+
+- **Context.** `POST /api/membership/purchase` activated a membership on nothing more than a
+  client-supplied `paymentId` string — `PaymentModal.tsx` (web) and `membership_screen.dart`
+  (mobile) both ran an explicitly-labeled "simulated checkout" (fake card form, 1.4s delay,
+  `DUMMY-<uuid>`), an intentional, documented placeholder (`.docs/PROJECT.md`'s non-goals:
+  "Real payment processing (Razorpay is env-documented, not wired)"). Asked to get this properly
+  prepared for real Razorpay integration. Found and fixed in the same pass, unrelated to payments
+  directly: `/membership`'s active-plan display only ever set `successPlan` in local component
+  state right after a purchase completed — reloading the page or just revisiting it later reset
+  that to nothing, so someone who'd already paid saw "Get Started" on every plan again as if
+  nothing had ever been purchased (`/dashboard/membership`, a separate page, already fetched
+  `GET /api/membership/active` correctly — this bug was isolated to the marketing/purchase page).
+- **Two-step flow, not a single trusted callback.** `POST /api/membership/checkout` creates a
+  Razorpay order first, priced server-side from `MembershipPlan.price` (never a client-supplied
+  amount) via the new `RazorpayService.createOrder`. `POST /api/membership/purchase` then
+  requires Razorpay's own three-part callback (`razorpayOrderId`/`razorpayPaymentId`/
+  `razorpaySignature`) and verifies `HMAC-SHA256(orderId|paymentId, keySecret) === signature`
+  (Razorpay's documented algorithm, `timingSafeEqual` — not `===` — since this is exactly the
+  kind of secret comparison a short-circuiting string compare can leak through timing) before a
+  membership is ever created. The purchase route never trusts what the client *says* Razorpay
+  told it; it independently confirms the signature itself.
+- **Dev-mode fallback is a server-side gate, not a client opt-out.** `RazorpayService.isConfigured()`
+  (`RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` both set) decides which shape `/purchase` accepts — a
+  bare `paymentId` only works while Razorpay isn't configured at all. This preserves today's
+  simulated-checkout experience exactly as it already worked (this environment has no live
+  Razorpay credentials — both env vars stay blank), with zero behavior change until real keys are
+  added, but means an old/unpatched client can't keep using the dummy path once they are: the
+  moment credentials exist, every purchase requires a real verified signature, automatically, no
+  separate migration step or feature flag needed.
+- **Web wired end-to-end**: `PaymentModal.tsx` calls `/checkout` first; dev-mode
+  (`razorpayConfigured: false`) renders the pre-existing fake card form completely unchanged;
+  real mode dynamically loads `checkout.razorpay.com`'s script (new CSP script-src/connect-src/
+  frame-src entries, Razorpay's own documented domains) and opens their Checkout modal against
+  the server-created order. **Mobile is not wired to real Razorpay in this pass** — doing so
+  needs the `razorpay_flutter` plugin, a real native-dependency add (Android/iOS config, similar
+  scope to the earlier Google Maps attempt this session before it was swapped for Leaflet), out
+  of scope here. Mobile keeps using the simulated flow, which — by the server-side gate above —
+  will start failing with a clear `PAYMENT_VERIFICATION_REQUIRED` error the moment real keys are
+  configured, not silently. `membership_screen.dart`'s comment documents this explicitly so it
+  isn't a surprise later; purchase would need to move to web until mobile gets real checkout.
+- **Schema.** `UserMembership.razorpayOrderId String?` (additive, hand-written migration,
+  applied — zero drift confirmed), kept alongside the existing `paymentId` for support/
+  reconciliation once a purchase is a real, verified payment rather than a dummy string.
+- **Consequences.** Cannot be live-tested end-to-end in this environment — no real Razorpay
+  account/credentials exist here, so the actual order-creation/checkout-modal/signature-
+  verification round trip is unverified beyond code review and the dev-mode path. `.docs/PROJECT.md`'s
+  non-goal line updated. Backend typecheck (9/9) and vitest clean after `pnpm install` picked up
+  the new `razorpay` dependency.
+

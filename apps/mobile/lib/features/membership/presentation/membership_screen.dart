@@ -79,8 +79,14 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   Future<void> _purchase() async {
     setState(() => _isPurchasing = true);
     try {
-      // Mirrors `apps/web/components/membership/PaymentModal.tsx`'s simulated
-      // checkout — no real payment gateway (see .docs/PROJECT.md non-goals).
+      // Mirrors web's pre-Razorpay simulated checkout (ADR-043) — mobile has no native Razorpay
+      // integration yet (would need the `razorpay_flutter` plugin, a real native-dependency
+      // add, not done in this pass). This path only actually works while the server has no live
+      // Razorpay keys configured; once `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are set,
+      // `POST /api/membership/purchase` starts requiring a verified signature and rejects a
+      // bare `paymentId` with a clear `PAYMENT_VERIFICATION_REQUIRED` error (shown below via the
+      // normal `ApiException` message) — not a crash, but purchase must move to web until mobile
+      // gets its own real checkout.
       await Future.delayed(const Duration(milliseconds: 1400));
       final paymentId = 'DUMMY-${const Uuid().v4()}';
       await ref.read(membershipRepositoryProvider).purchase(planId: widget.plan.id, paymentId: paymentId);

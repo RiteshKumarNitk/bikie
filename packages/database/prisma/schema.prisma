@@ -887,6 +887,9 @@ model UserMembership {
   endDate   DateTime
   status    MembershipStatus @default(ACTIVE)
   paymentId String?
+  // ADR-043: Razorpay's own order id, kept alongside paymentId for support/reconciliation once
+  // a purchase is a real, signature-verified payment rather than a client-supplied dummy string.
+  razorpayOrderId String?
   createdAt DateTime         @default(now())
 
   @@index([userId])

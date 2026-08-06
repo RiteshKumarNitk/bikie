@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../bikes/domain/bike_providers.dart';
 import '../../bikes/presentation/widgets/bike_card.dart';
 import '../../destinations/domain/destination_providers.dart';
+import '../../nearby_riders/data/nearby_riders_repository.dart';
+import '../../nearby_riders/domain/nearby_riders_providers.dart';
 import '../../onboarding/domain/rider_profile_providers.dart';
 import '../../sos/presentation/send_sos_sheet.dart';
 import '../domain/home_providers.dart';
@@ -38,6 +42,7 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _SosPanicCards(onOpen: () => showSendSosSheet(context)),
             ),
+            const _LocationSharingBanner(),
             const SizedBox(height: 20),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -261,6 +266,124 @@ class _SosAlertCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Surfaces `rider_location.sharingEnabled` directly on Home, reframed around what it actually
+/// buys the rider — being findable when someone nearby sends an SOS, and having nearby riders
+/// findable when *they* need help — rather than the generic "share your location to browse
+/// nearby riders" framing this same toggle used to have (buried on the Nearby Riders screen).
+/// Someone who doesn't care about browsing nearby riders would reasonably skip that toggle
+/// without realizing it's the same switch SOS's nearby-rider dispatch tier depends on.
+/// Enabling here pushes an immediate location fix too, same as the Nearby Riders screen's own
+/// toggle, so this banner is fully self-sufficient — no detour required. Dismissal is local
+/// widget state only (mirrors `_ProfileCompletionBanner` below), so it naturally reappears next
+/// time Home is rebuilt rather than being silenced forever after one "Not now."
+class _LocationSharingBanner extends ConsumerStatefulWidget {
+  const _LocationSharingBanner();
+
+  @override
+  ConsumerState<_LocationSharingBanner> createState() => _LocationSharingBannerState();
+}
+
+class _LocationSharingBannerState extends ConsumerState<_LocationSharingBanner> {
+  bool _dismissed = false;
+  bool _busy = false;
+
+  Future<void> _toggle(bool value) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(nearbyRidersRepositoryProvider).setSharingEnabled(value);
+      if (value) await _pushLocation();
+      ref.invalidate(sharingEnabledProvider);
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _pushLocation() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission is required to turn this on.')),
+          );
+        }
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition();
+      await ref.read(nearbyRidersRepositoryProvider).updateLocation(position.latitude, position.longitude);
+    } catch (_) {
+      // Sharing is still enabled either way — a fresher fix can land next time it's refreshed;
+      // not worth blocking the toggle itself over one failed GPS read.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_dismissed) return const SizedBox.shrink();
+
+    final sharingAsync = ref.watch(sharingEnabledProvider);
+    final enabled = sharingAsync.valueOrNull ?? false;
+    if (enabled) return const SizedBox.shrink();
+
+    final accent = Theme.of(context).colorScheme.primary;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          color: accent.withValues(alpha: 0.08),
+          border: Border.all(color: accent.withValues(alpha: 0.25)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.location_on_outlined, color: accent, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Be findable in an emergency',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                if (_busy)
+                  const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  Switch(value: enabled, onChanged: _toggle),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              "Off right now — nearby riders won't be alerted if you send an SOS, and you won't "
+              "be alerted if someone near you does. It never tracks you in the background; your "
+              "location only updates when you turn this on or refresh it yourself.",
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () => setState(() => _dismissed = true),
+                child: const Text('Not now'),
+              ),
+            ),
+          ],
         ),
       ),
     );

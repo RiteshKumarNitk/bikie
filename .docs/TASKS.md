@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Membership payments: real Razorpay verification, dev-mode fallback preserved (2026-08-06, ADR-043)
+
+| Task | Status |
+|---|---|
+| Found + fixed while here: `/membership` never fetched `GET /api/membership/active` — an already-active member saw "Get Started" on every plan again after any reload or repeat visit (`/dashboard/membership` was already correct; this page wasn't) | Completed |
+| New `RazorpayService` (`packages/services`) — order creation + `timingSafeEqual` HMAC-SHA256 signature verification; `isConfigured()` gate | Completed |
+| Schema: `UserMembership.razorpayOrderId` (additive migration, applied, zero drift) | Completed |
+| Validation: `checkoutMembershipSchema`; `purchaseMembershipSchema` accepts either the legacy dummy-`paymentId` shape or the real Razorpay-callback shape, never a partial mix | Completed |
+| New `POST /api/membership/checkout` (creates a server-priced order, or reports `razorpayConfigured: false`); `POST /api/membership/purchase` now requires + verifies the real signature once Razorpay is configured — a server-side gate, not a client choice | Completed |
+| Web: `PaymentModal.tsx` — dev-mode renders the pre-existing simulated card form unchanged; real mode loads `checkout.razorpay.com` and opens Razorpay's own Checkout modal (new CSP script-src/connect-src/frame-src entries) | Completed |
+| `.env.example`: `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` moved from "future, not consumed" to "active" with dev-mode-fallback behavior documented; `.docs/PROJECT.md` non-goal line corrected | Completed |
+| Backend: 9/9 packages typecheck clean after `pnpm install` picked up the new `razorpay` dependency | Completed |
+| **Mobile is not wired to real Razorpay** — needs the `razorpay_flutter` plugin (native Android/iOS config, out of scope this pass); `membership_screen.dart`'s simulated flow will start failing with a clear `PAYMENT_VERIFICATION_REQUIRED` error the moment live keys are configured server-side | **Not done** — explicit follow-up, documented in ADR-043 so it isn't a surprise later |
+| Live end-to-end test against a real Razorpay account (order creation, Checkout modal, signature verification) | **Not done** — no Razorpay credentials exist in this environment; only the dev-mode path and code review are verified |
+
 ## SOS "browse active alerts": GPS radius replaces same-city text matching (2026-08-06, ADR-042)
 
 | Task | Status |
