@@ -2,6 +2,14 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Removed the web light-theme toggle (2026-08-06, ADR-040)
+
+| Task | Status |
+|---|---|
+| `ThemeToggle.tsx` deleted; both `Navbar.tsx` call sites removed | Completed |
+| `ThemeProvider` in `app/layout.tsx`: `defaultTheme="dark"` → `forcedTheme="dark"` | Completed |
+| `pnpm typecheck` (9/9) and `pnpm test` (123/123) re-run clean | Completed |
+
 ## Remove remaining demo content; real (multi-)image upload; partner bike-listing fix (2026-08-06, ADR-039)
 
 | Task | Status |

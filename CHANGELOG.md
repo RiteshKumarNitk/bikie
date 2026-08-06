@@ -1,5 +1,12 @@
 # Changelog
 
+## Change — Removed the web light-theme toggle; dark is now the only theme (ADR-040)
+- `ThemeToggle.tsx` (sun/moon button) deleted; its two call sites in `Navbar.tsx` removed.
+- `apps/web/app/layout.tsx`'s `ThemeProvider` switched from `defaultTheme="dark"` to
+  `forcedTheme="dark"`, so a stale `localStorage` preference from a prior toggle click can no
+  longer put a returning visitor back in light mode.
+- Mobile was already dark-only (`ThemeMode.dark` hardcoded); no change there.
+
 ## Change — Real (multi-)image upload everywhere; fixed a partner bike-listing bug (ADR-039)
 - **Fixed**: Partner Fleet's "Add Bike" was posting to the ADMIN-only `/api/admin/bikes` —
   every real partner got a 403 trying to list a bike. New `POST /api/partner/bikes` (forces

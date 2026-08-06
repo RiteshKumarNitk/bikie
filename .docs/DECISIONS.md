@@ -8,7 +8,8 @@ Flutter app needs the API to scale independently of the website.
 ## ADR-002: Dark theme is default, not just a toggle option
 The product brief calls for a premium dark aesthetic (Dark Navy / Midnight Blue /
 Deep Slate) as the primary identity, matching Linear/Notion/Tesla-style dark-first
-products. Light mode is kept as an accessibility toggle, not removed.
+products. Light mode was originally kept as an accessibility toggle; **superseded by
+ADR-040**, which removes the toggle and locks dark mode as the only theme.
 
 ## ADR-003: Dev server pinned to port 3000 (was 4000)
 Originally pinned to 4000 because port 3000 was occupied by an unrelated project on the
@@ -1302,4 +1303,28 @@ changes:
   (`api-contract.test.ts`, ADR-028) would otherwise fail on the drift. No schema migration
   needed (`gallery` already existed on both models from their original design, just unreachable
   from any client).
+
+## ADR-040: Removed the web light-theme toggle — dark is now the only theme
+
+- **Context.** ADR-002 kept light mode reachable as an accessibility toggle alongside the
+  dark-first default. User decision: BIKIE only ships one theme going forward — the toggle
+  (and any way to land in light mode) is removed, not just hidden.
+- **Web.** `apps/web/app/layout.tsx`'s `<ThemeProvider>` (a thin wrapper around `next-themes`)
+  switched from `defaultTheme="dark"` to `forcedTheme="dark"` — this overrides any stored
+  `localStorage` preference from a prior toggle click, not just new sessions, so nobody can
+  still be on light mode after this ships. `ThemeToggle.tsx` (the sun/moon button) deleted
+  outright; its two call sites in `Navbar.tsx` (desktop nav, mobile menu) removed rather than
+  disabled. `next-themes` itself stays wired (still handles the `class` attribute on `<html>`
+  cleanly with `suppressHydrationWarning`) rather than being ripped out — `forcedTheme` is the
+  documented way to lock a `next-themes` app to one theme, and no other code in the app calls
+  `useTheme()`, so there was nothing else to migrate off it.
+  `--color-*` custom properties under `:root` (globals.css, ADR-002's original light palette)
+  are now unreachable dead CSS, left in place rather than deleted — `.dark` is the only class
+  `next-themes` will ever apply, so removing `:root`'s overrides changes nothing observable.
+- **Mobile.** Already dark-only in practice (`MaterialApp.router` hardcodes
+  `themeMode: ThemeMode.dark` in `main.dart`); `AppTheme.light` in
+  `apps/mobile/lib/core/theme/app_theme.dart` was already unused dead code before this change
+  and remains so — no mobile behavior change, noted here only for completeness.
+- **Consequences.** No schema/API change. Purely a web UI removal; `pnpm typecheck`/`pnpm test`
+  re-run clean (no other file referenced `ThemeToggle`).
 

@@ -5,7 +5,6 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { authClient } from "@/lib/auth-client";
 import type { SelectedRole } from "@/lib/role";
-import { ThemeToggle } from "./ThemeToggle";
 import { LogoMark } from "./LogoMark";
 import { MegaMenu } from "./MegaMenu";
 import { NotificationBell } from "./NotificationBell";
@@ -107,7 +106,6 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
 
         <div className="hidden items-center gap-3 md:flex">
           {!isPending && session && <NotificationBell />}
-          <ThemeToggle />
           {!isPending && session ? (
             <div className="relative" ref={userMenuRef}>
               <button
@@ -254,7 +252,6 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                 ))}
               </div>
               <div className="mt-6 flex items-center gap-3 border-t border-foreground/10 pt-6">
-                <ThemeToggle />
                 {!isPending && session && <NotificationBell />}
                 {!isPending && session ? (
                   <Link

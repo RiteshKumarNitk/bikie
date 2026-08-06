@@ -1,5 +1,10 @@
 # BIKIE — Roadmap
 
+## Light Theme Removed (2026-08-06, ADR-040)
+Dark is now the only theme on web — the sun/moon toggle is gone, and `ThemeProvider` uses
+`forcedTheme="dark"` so no stored preference can put anyone back in light mode. Mobile was
+already dark-only. See ADR-040.
+
 ## Demo Content Removed; Real Multi-Image Upload; Partner Bike-Listing Fixed (2026-08-06, ADR-039)
 Categories, destinations, testimonials, and the sample ride catalog removed from both the live
 database and the seed script, joining the earlier bike/partner cleanup — all admin/user-created
