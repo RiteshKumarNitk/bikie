@@ -25,7 +25,7 @@ import { AlreadyAssignedError, AlreadyOfferedError, OfferNotAvailableError } fro
 export function createSosAlertRepositoryAdapter(): SosAlertRepositoryPort {
   return {
     createAlert: (data) => sosRepository.createAlert(data),
-    getActiveAlerts: (city) => sosRepository.getActiveAlerts(city),
+    getActiveAlerts: (location) => sosRepository.getActiveAlerts(location),
     getAlertById: (alertId) => sosRepository.getAlertById(alertId),
     resolveAlert: (alertId, userId) => sosRepository.resolveAlert(alertId, userId),
     respondToAlert: (alertId, responderId, message) =>

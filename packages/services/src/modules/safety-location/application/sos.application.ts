@@ -1,6 +1,6 @@
 import type { SOSAlertCreateInput, SOSAlertDTO } from "@bikie/types";
 import { deriveSeverity } from "../domain/severity";
-import type { SafetyLocationPorts } from "../ports";
+import type { SafetyLocationPorts, SosLocationFilter } from "../ports";
 
 const INITIAL_RADIUS_METERS = 5000;
 
@@ -26,8 +26,8 @@ export function createSosApplication(ports: SafetyLocationPorts) {
       });
     },
 
-    getActiveAlerts(city?: string): Promise<SOSAlertDTO[]> {
-      return ports.sosAlerts.getActiveAlerts(city);
+    getActiveAlerts(location?: SosLocationFilter): Promise<SOSAlertDTO[]> {
+      return ports.sosAlerts.getActiveAlerts(location);
     },
 
     getAlertById(alertId: string) {

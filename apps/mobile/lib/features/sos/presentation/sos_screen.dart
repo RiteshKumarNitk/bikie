@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -14,16 +15,16 @@ class SosScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final alerts = ref.watch(activeSosAlertsProvider);
-    final city = ref.watch(sosActiveAlertsCityProvider);
+    final location = ref.watch(sosActiveAlertsLocationProvider);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('SOS Emergency'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.location_city_outlined),
-            tooltip: 'Set city',
-            onPressed: () => _promptCity(context, ref),
+            icon: const Icon(Icons.my_location_outlined),
+            tooltip: 'Share my location',
+            onPressed: () => _shareLocation(context, ref),
           ),
           IconButton(
             icon: const Icon(Icons.near_me_outlined),
@@ -49,8 +50,8 @@ class SosScreen extends ConsumerWidget {
             return EmptyState(
               icon: Icons.shield_outlined,
               title: 'No active alerts',
-              message: city == null
-                  ? 'Set your city to see nearby alerts, or tap "Send SOS" if you need help.'
+              message: location == null
+                  ? 'Share your location to see nearby alerts, or tap "Send SOS" if you need help.'
                   : 'All clear right now.',
             );
           }
@@ -66,13 +67,13 @@ class SosScreen extends ConsumerWidget {
         },
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (error, _) {
-          if (error is ApiException && error.errorCode == 'CITY_REQUIRED') {
+          if (error is ApiException && error.errorCode == 'LOCATION_REQUIRED') {
             return EmptyState(
-              icon: Icons.location_city_outlined,
-              title: 'Share your city',
-              message: 'For everyone\'s privacy, SOS alerts are only shown to riders in the same city.',
-              actionLabel: 'Set city',
-              onAction: () => _promptCity(context, ref),
+              icon: Icons.my_location_outlined,
+              title: 'Share your location',
+              message: "For everyone's privacy, SOS alerts are only shown to riders near you.",
+              actionLabel: 'Share my location',
+              onAction: () => _shareLocation(context, ref),
             );
           }
           if (error is ApiException && error.isMembershipRequired) {
@@ -96,21 +97,33 @@ class SosScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _promptCity(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController(text: ref.read(sosActiveAlertsCityProvider) ?? '');
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Your city'),
-        content: TextField(controller: controller, decoration: const InputDecoration(hintText: 'e.g. Goa, Manali')),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(context, controller.text.trim()), child: const Text('Save')),
-        ],
-      ),
-    );
-    if (result != null && result.isNotEmpty) {
-      ref.read(sosActiveAlertsCityProvider.notifier).state = result;
+  /// ADR-042: a one-shot GPS fix, same permission flow as sending an alert
+  /// (`SendSosSheet._captureLocation`) — replaces the old "type your city" prompt, which
+  /// silently hid otherwise-nearby alerts whenever sender and viewer typed their city
+  /// differently.
+  Future<void> _shareLocation(BuildContext context, WidgetRef ref) async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Couldn't get your location — check your location permission and try again.")),
+          );
+        }
+        return;
+      }
+      final position = await Geolocator.getCurrentPosition();
+      ref.read(sosActiveAlertsLocationProvider.notifier).state =
+          (latitude: position.latitude, longitude: position.longitude);
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Couldn't get your location. Please try again.")),
+        );
+      }
     }
   }
 }

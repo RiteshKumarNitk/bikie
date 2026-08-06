@@ -14,14 +14,14 @@ class SosRepository {
 
   final Dio _dio;
 
-  /// `city` mirrors the web client's behavior: non-admin callers get a
-  /// `400 CITY_REQUIRED` without one (privacy — see `.docs/API.md`). Fixes a
-  /// pre-existing bug where this was always called with no city at all.
-  Future<List<SOSAlert>> getActive({String? city}) {
+  /// ADR-042: a GPS radius around the caller, not a same-city text match — mirrors the web
+  /// client. Non-admin callers get a `400 LOCATION_REQUIRED` without `lat`/`lng` (privacy —
+  /// see `.docs/API.md`).
+  Future<List<SOSAlert>> getActive({double? latitude, double? longitude}) {
     return apiGuard(() async {
       final res = await _dio.get(
         '/api/sos/alerts',
-        queryParameters: city != null && city.isNotEmpty ? {'city': city} : null,
+        queryParameters: latitude != null && longitude != null ? {'lat': latitude, 'lng': longitude} : null,
       );
       return (res.data['alerts'] as List).map((e) => SOSAlert.fromJson(e as Map<String, dynamic>)).toList();
     });

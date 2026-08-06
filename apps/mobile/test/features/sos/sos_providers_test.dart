@@ -47,13 +47,14 @@ void main() {
   });
 
   test('activeSosAlertsProvider delegates to SosRepository.getActive', () async {
-    when(() => repository.getActive(city: any(named: 'city'))).thenAnswer((_) async => [_alert()]);
+    when(() => repository.getActive(latitude: any(named: 'latitude'), longitude: any(named: 'longitude')))
+        .thenAnswer((_) async => [_alert()]);
 
     final result = await container.read(activeSosAlertsProvider.future);
 
     expect(result, hasLength(1));
     expect(result.single.status, 'ACTIVE');
-    verify(() => repository.getActive(city: null)).called(1);
+    verify(() => repository.getActive(latitude: null, longitude: null)).called(1);
   });
 
   test('sosHistoryProvider delegates to SosRepository.getHistory', () async {
@@ -67,7 +68,7 @@ void main() {
   });
 
   test('activeSosAlertsProvider surfaces an ApiException as an AsyncError rather than throwing synchronously', () async {
-    when(() => repository.getActive(city: any(named: 'city')))
+    when(() => repository.getActive(latitude: any(named: 'latitude'), longitude: any(named: 'longitude')))
         .thenThrow(ApiException(statusCode: 500, message: 'Something went wrong'));
 
     await expectLater(

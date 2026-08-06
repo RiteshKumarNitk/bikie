@@ -1,4 +1,5 @@
 import { getSafetyLocationModule } from "./modules/safety-location/public";
+import type { SosLocationFilter } from "./modules/safety-location/ports";
 import type { SOSAlertDTO, SOSAlertCreateInput } from "@bikie/types";
 
 /** Compatibility facade — routes keep importing SOSService. */
@@ -7,8 +8,8 @@ export const SOSService = {
     return getSafetyLocationModule().sos.createAlert(userId, data);
   },
 
-  async getActiveAlerts(city?: string): Promise<SOSAlertDTO[]> {
-    return getSafetyLocationModule().sos.getActiveAlerts(city);
+  async getActiveAlerts(location?: SosLocationFilter): Promise<SOSAlertDTO[]> {
+    return getSafetyLocationModule().sos.getActiveAlerts(location);
   },
 
   async getAlertById(alertId: string): Promise<SOSAlertDTO | null> {

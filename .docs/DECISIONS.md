@@ -1361,3 +1361,51 @@ changes:
   `import()` inside an effect/event handler in this app — never a static top-level import, even
   inside a `"use client"` file — since Next.js still executes that import during SSR/prerender.
 
+## ADR-042: SOS "browse active alerts" switches from same-city text matching to a GPS radius around the viewer
+
+- **Context.** `GET /api/sos/alerts` decided who could see an active alert with an exact,
+  case-sensitive match on a freely-typed `city` string — both the sender's city (typed once when
+  sending an alert) and the viewer's city (typed via "Set city") had nothing forcing them to agree
+  on spelling or capitalization. "Jaipur" vs "jaipur" (or a stray trailing space) silently excluded
+  an otherwise-matching alert, with no error anywhere to explain why — reported live: an alert sent
+  from one account wasn't visible browsing from another. A same-turn fix trimmed and
+  case-insensitive-matched the comparison, which closes the exact-casing bug but not the deeper
+  problem: this was the only place in the whole SOS surface still relying on manual city text at
+  all. SOS *dispatch* (notifying nearby riders when an alert is created,
+  `findNearbyAroundPoint`, real PostGIS) and `/api/partners/nearby` (ADR-036, plain Haversine)
+  already do real GPS-radius matching — asked to bring "browse active alerts" in line with those
+  instead of continuing to patch the city-text approach.
+- **Replaced with a GPS radius, not a city dropdown.** Considered picking a city from a dropdown
+  (still city-based, just not free text) but a same-city match still doesn't mean "nearby" — a
+  rider near a city border, or someone visiting, could be a few km from an active alert in the
+  neighboring city and never see it, or two riders 400km apart in the same enormous city's
+  metro area would both see each other's alerts. Radius matches what "nearby" actually means.
+- **Plain Haversine, not PostGIS**, matching `/api/partners/nearby`'s reasoning exactly — active
+  alert volume is small enough that fetching every `ACTIVE` alert and filtering/sorting in JS
+  (new shared `packages/database/src/lib/geo.ts` `haversineDistanceMeters`, extracted from
+  `partner.repository.ts`'s local copy since this is now a genuine second use) is simpler than a
+  PostGIS column, unlike the high-write `rider_location` table. 25km radius, same as
+  `/api/partners/nearby`.
+- **One-shot GPS fix, not the opt-in `rider_location` continuous-sharing table.** Tying "browse
+  alerts" to `rider_location` would require the viewer to have previously turned on live location
+  sharing (a separate, unrelated opt-in feature) just to see nearby SOS alerts — plausibly
+  reproducing the exact "not visible" symptom for anyone who hadn't. A one-shot fix (same
+  permission prompt already required to *send* an SOS) has no such dependency.
+- **`city` itself is untouched** — still required at alert creation (`sosAlertCreateSchema`, now
+  also server-side-trimmed so a stored value can't itself carry stray whitespace), still stored,
+  still the display fallback everywhere a human-readable location is shown (SMS/WhatsApp/email
+  text, both platforms' alert cards). Only *who gets to see the alert while browsing* changed.
+- **API.** `GET /api/sos/alerts?lat=&lng=` replaces `?city=`; `400 { error: "LOCATION_REQUIRED" }`
+  replaces `CITY_REQUIRED` for non-admin callers missing either. ADMIN behavior is unchanged —
+  still sees every active alert network-wide with no location filter at all.
+- **Web**: `/dashboard/sos`'s "Active Alerts" tab gate switched from a city text input to a
+  "Share my location" button (`navigator.geolocation`, same pattern as `NearbyPartnersPanel.tsx`).
+  **Mobile**: the app-bar "Set city" dialog became a "Share my location" action using the same
+  `Geolocator` permission flow `SendSosSheet._captureLocation` already uses to send an alert;
+  `sosActiveAlertsCityProvider` (`String?`) replaced by `sosActiveAlertsLocationProvider`
+  (`({double latitude, double longitude})?`).
+- **Consequences.** Backend typecheck (9/9 packages) and vitest (123/123) clean; `flutter analyze`
+  clean, `flutter test` all passing (2 new: repository lat/lng query-param encoding, provider
+  delegation with the new params). Not done: live-tested with two real devices/accounts in this
+  environment — worth the user's own end-to-end smoke test given this is a safety-critical path.
+

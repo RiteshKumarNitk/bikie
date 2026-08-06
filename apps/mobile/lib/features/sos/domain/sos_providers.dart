@@ -5,13 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/sos_model.dart';
 import '../data/sos_repository.dart';
 
-/// City the caller last entered for the active-alerts list — mirrors the web's per-city
-/// privacy gate (`.docs/API.md`: non-admin callers get `400 CITY_REQUIRED` without one).
-final sosActiveAlertsCityProvider = StateProvider<String?>((ref) => null);
+/// GPS fix the caller last shared for the active-alerts list (ADR-042) — mirrors the web
+/// client's location gate (`.docs/API.md`: non-admin callers get `400 LOCATION_REQUIRED`
+/// without `lat`/`lng`). Replaced a free-text city field: sender and viewer typing their city
+/// differently ("Jaipur" vs "jaipur") used to silently hide otherwise-nearby alerts.
+final sosActiveAlertsLocationProvider = StateProvider<({double latitude, double longitude})?>((ref) => null);
 
 final activeSosAlertsProvider = FutureProvider.autoDispose<List<SOSAlert>>((ref) {
-  final city = ref.watch(sosActiveAlertsCityProvider);
-  return ref.watch(sosRepositoryProvider).getActive(city: city);
+  final location = ref.watch(sosActiveAlertsLocationProvider);
+  return ref.watch(sosRepositoryProvider).getActive(latitude: location?.latitude, longitude: location?.longitude);
 });
 
 final sosHistoryProvider = FutureProvider.autoDispose<List<SOSHistoryEntry>>((ref) {

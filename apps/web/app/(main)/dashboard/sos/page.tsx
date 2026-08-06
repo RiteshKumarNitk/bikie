@@ -67,10 +67,26 @@ export default function SOSPage() {
   const [checkingMembership, setCheckingMembership] = useState(true);
   const [isMember, setIsMember] = useState(false);
   const [activeTab, setActiveTab] = useState<"new" | "alerts" | "help">("new");
-  const [city, setCity] = useState("");
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
   const [activeAlerts, setActiveAlerts] = useState<SOSAlert[]>([]);
   const [alertSent, setAlertSent] = useState(false);
   const [profileWarning, setProfileWarning] = useState<string | null>(null);
+
+  // ADR-042: a GPS radius around the viewer, not a same-city text match — replaces the old
+  // "type your city" gate, which silently hid alerts whenever sender and viewer typed their city
+  // even slightly differently.
+  function shareLocation() {
+    setLocationError(null);
+    if (!navigator.geolocation) {
+      setLocationError("Geolocation isn't supported on this device.");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => setLocation({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
+      () => setLocationError("Couldn't get your location. Please allow location access and try again."),
+    );
+  }
 
   useEffect(() => {
     if (!session) return;
@@ -86,15 +102,15 @@ export default function SOSPage() {
   }, [session]);
 
   useEffect(() => {
-    // Regular members only see alerts from riders in the same city (the API 400s without one,
-    // admins are exempt) — so there's nothing to fetch here until a city is provided, same
-    // field used by the "New Alert" form above.
+    // Regular members only see alerts within range of their own location (the API 400s without
+    // one, admins are exempt) — so there's nothing to fetch here until location is shared.
     if (!isMember) return;
-    if (session?.user.role !== "ADMIN" && !city.trim()) return;
-    fetch(`/api/sos/alerts${city.trim() ? `?city=${encodeURIComponent(city.trim())}` : ""}`)
+    if (session?.user.role !== "ADMIN" && !location) return;
+    const query = location ? `?lat=${location.latitude}&lng=${location.longitude}` : "";
+    fetch(`/api/sos/alerts${query}`)
       .then((r) => r.json())
       .then((data) => setActiveAlerts(data.alerts ?? []));
-  }, [isMember, city, session?.user.role]);
+  }, [isMember, location, session?.user.role]);
 
   function handleAlertSent(warning: string | null) {
     setAlertSent(true);
@@ -183,22 +199,21 @@ export default function SOSPage() {
 
       {activeTab === "alerts" && (
         <div className="mt-4 space-y-3">
-          {session?.user.role !== "ADMIN" && !city.trim() ? (
+          {session?.user.role !== "ADMIN" && !location ? (
             <div className="rounded-2xl border border-foreground/10 bg-card p-8 text-center">
-              <p className="font-semibold">Share your city to see nearby alerts</p>
+              <p className="font-semibold">Share your location to see nearby alerts</p>
               <p className="mx-auto mt-1 max-w-sm text-sm text-foreground/50">
                 For everyone&apos;s privacy, SOS alerts (including reporter contact info and
-                exact location) are only shown to riders in the same city.
+                exact location) are only shown to riders near you.
               </p>
-              <div className="mx-auto mt-4 max-w-sm">
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="e.g. Goa, Manali"
-                  className="w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30"
-                />
-              </div>
+              <button
+                type="button"
+                onClick={shareLocation}
+                className="mt-4 inline-flex rounded-xl bg-accent px-6 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-accent-hover"
+              >
+                Share my location
+              </button>
+              {locationError && <p className="mt-3 text-sm text-red-400">{locationError}</p>}
             </div>
           ) : activeAlerts.length === 0 ? (
             <EmptyState icon="✅" title="No active alerts" description="All clear right now." />

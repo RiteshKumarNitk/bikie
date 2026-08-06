@@ -25,6 +25,16 @@ export const sosAlertCreateSchema = z.object({
 
 export type SOSAlertCreateSchemaInput = z.infer<typeof sosAlertCreateSchema>;
 
+/** `GET /api/sos/alerts` query params (ADR-042) — a GPS radius around the viewer, replacing the
+ * old free-text `city` filter. Non-admins must supply both; the route enforces that (ADMIN sees
+ * every active alert network-wide, unfiltered). */
+export const sosActiveAlertsQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90).optional(),
+  lng: z.coerce.number().min(-180).max(180).optional(),
+});
+
+export type SosActiveAlertsQueryInput = z.infer<typeof sosActiveAlertsQuerySchema>;
+
 export const sosOfferCreateSchema = z.object({
   latitude: z.coerce.number().min(-90).max(90).optional(),
   longitude: z.coerce.number().min(-180).max(180).optional(),

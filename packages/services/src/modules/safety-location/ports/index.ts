@@ -14,9 +14,15 @@ export type SosAlertCreateData = SOSAlertCreateInput & {
   formattedAddress?: string | null;
 };
 
+/** GPS radius around the viewer's own location — replaces the old free-text `city` match
+ * (ADR-042: exact case-sensitive string matching silently hid otherwise-nearby alerts whenever
+ * sender and viewer typed their city differently). `undefined` (ADMIN only, enforced by the
+ * route) returns every active alert network-wide, unfiltered. */
+export type SosLocationFilter = { latitude: number; longitude: number; radiusMeters: number };
+
 export interface SosAlertRepositoryPort {
   createAlert(data: SosAlertCreateData): Promise<SOSAlertDTO>;
-  getActiveAlerts(city?: string): Promise<SOSAlertDTO[]>;
+  getActiveAlerts(location?: SosLocationFilter): Promise<SOSAlertDTO[]>;
   getAlertById(alertId: string): Promise<SOSAlertDTO | null>;
   resolveAlert(alertId: string, userId: string): Promise<void>;
   /** Deprecated alias target for the old /respond route — new callers use SosOfferRepositoryPort. */

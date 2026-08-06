@@ -1,4 +1,5 @@
 import { prisma } from "../client";
+import { haversineDistanceMeters } from "../lib/geo";
 
 function toDTO(alert: {
   id: string;
@@ -78,23 +79,37 @@ export async function createAlert(data: {
   return toDTO(alert);
 }
 
-export async function getActiveAlerts(city?: string) {
-  const where: any = { status: "ACTIVE" };
-  // Both sides of this comparison are freely typed by hand (the sender's city at alert
-  // creation, the viewer's city via "Set city") with no shared picker forcing them to agree on
-  // spelling/casing — an exact, case-sensitive match ("Jaipur" vs "jaipur"/"jaipur ") silently
-  // hid otherwise-matching alerts from riders in the same city with no error anywhere to signal
-  // why. Case-insensitive + trimmed closes the realistic mismatch without needing a real
-  // geocoded-city system.
-  if (city) where.city = { equals: city.trim(), mode: "insensitive" };
-
+/**
+ * Which active alerts a rider gets to see. Used to be an exact, case-sensitive match on a
+ * freely-typed `city` string — the sender's city at alert creation and the viewer's city via
+ * "Set city" had nothing forcing them to agree on spelling/casing, so "Jaipur" vs "jaipur"
+ * silently hid otherwise-nearby alerts with no error anywhere to explain why. Replaced with a
+ * plain in-app Haversine radius around the viewer's own GPS fix — the same approach already used
+ * for `/api/partners/nearby` (ADR-036) and consistent with how SOS *dispatch* already finds
+ * nearby riders to notify (`findNearbyAroundPoint`, real PostGIS). `city` itself is untouched —
+ * still stored and still used for display text everywhere (SMS/WhatsApp/email, dispatch
+ * summaries) — this only changes how the *browse* list is filtered.
+ *
+ * No `location` (ADMIN only, enforced by the route) returns every active alert network-wide,
+ * unfiltered — matches the existing "admins monitor the whole network" behavior.
+ */
+export async function getActiveAlerts(location?: { latitude: number; longitude: number; radiusMeters: number }) {
   const alerts = await prisma.sOSAlert.findMany({
-    where,
+    where: { status: "ACTIVE" },
     orderBy: { createdAt: "desc" },
     include: { user: { select: { id: true, name: true, phone: true, email: true } } },
   });
 
-  return alerts.map(toDTO);
+  if (!location) return alerts.map(toDTO);
+
+  return alerts
+    .map((alert) => ({
+      alert,
+      distanceMeters: haversineDistanceMeters(location.latitude, location.longitude, alert.latitude, alert.longitude),
+    }))
+    .filter((a) => a.distanceMeters <= location.radiusMeters)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters)
+    .map((a) => toDTO(a.alert));
 }
 
 export async function getAlertById(alertId: string) {

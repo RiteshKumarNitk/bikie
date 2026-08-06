@@ -1,19 +1,32 @@
 # Changelog
 
-## Fix — SOS alerts could be invisible to riders in the same city over a plain casing mismatch
-- `getActiveAlerts` matched `city` with an exact, case-sensitive string comparison — both the
-  sender's city (typed once when sending an alert) and the viewer's city (typed via "Set city")
-  are free text with nothing forcing them to agree on spelling or capitalization, so "Jaipur" vs
-  "jaipur" (or a stray trailing space) silently excluded an otherwise-matching alert, with no
-  error anywhere to explain why. Now a trimmed, case-insensitive match — also trimmed at
-  creation time (`sosAlertCreateSchema`) so a stored city can't itself carry stray whitespace.
-  Applied the same trim to `findPartnersByCityForDispatch` (SOS partner fan-out), which already
-  had the case-insensitive half of this fix but not the trim.
+## Change — SOS "browse active alerts" now uses a GPS radius instead of same-city text matching (ADR-042)
+- `getActiveAlerts` used to match an exact, case-sensitive `city` string — both the sender's city
+  (typed once when sending an alert) and the viewer's city (typed via "Set city") were free text
+  with nothing forcing them to agree on spelling, so "Jaipur" vs "jaipur" silently hid an
+  otherwise-matching alert with no error anywhere to explain why (reported live: an alert sent
+  from one account wasn't visible browsing from another). A first pass trimmed + case-insensitive
+  matched the comparison; reconsidered as a patch over the deeper issue and replaced instead:
+  this was the only part of the whole SOS surface still relying on manual city text at all — SOS
+  *dispatch* (nearby-rider notification when an alert is created) and `/api/partners/nearby`
+  already do real GPS-radius matching.
+- Now a 25km Haversine radius around the viewer's own one-shot GPS fix — new shared
+  `packages/database/src/lib/geo.ts` (`haversineDistanceMeters`, extracted from
+  `partner.repository.ts`'s local copy, now a genuine second use). `GET /api/sos/alerts?lat=&lng=`
+  replaces `?city=`; `400 LOCATION_REQUIRED` replaces `CITY_REQUIRED` for non-admins missing
+  either (ADMIN behavior unchanged — still sees every active alert network-wide). `city` itself
+  is untouched: still required at creation, still stored, still the display fallback everywhere
+  a human-readable location is shown — only *who gets to see the alert while browsing* changed.
+- Web: `/dashboard/sos`'s city text input became a "Share my location" button. Mobile: the
+  app-bar "Set city" dialog became "Share my location", using the same `Geolocator` permission
+  flow already used to send an alert.
 - Also found and fixed while here: the generated Prisma client was stale relative to
   `schema.prisma` (missing the `placeName`/`area`/`formattedAddress` columns from the SOS
   reverse-geocoding work), which broke `packages/database`'s typecheck outright — `prisma
   generate` re-run. The live database itself was already up to date (`migrate status` confirmed
   zero drift); only the local generated client needed refreshing.
+- Backend typecheck (9/9) and vitest (123/123) clean; `flutter analyze` clean, `flutter test` all
+  passing (2 new).
 
 ## Change — Mobile: profile name/photo updates now show up immediately; Rider Details opens read-only with an Edit action; no more Skip
 - **Name/photo not reflecting after save**: `AuthRepository.updateUser()` updates the account

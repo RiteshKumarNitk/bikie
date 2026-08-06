@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SOS "browse active alerts": GPS radius replaces same-city text matching (2026-08-06, ADR-042)
+
+| Task | Status |
+|---|---|
+| Same-turn fix (trim + case-insensitive `city` match) landed first, then reconsidered as a patch over the deeper problem — this replaces it, not layers on top | Completed |
+| New shared `packages/database/src/lib/geo.ts` (`haversineDistanceMeters`), extracted from `partner.repository.ts`'s local copy now that it's a genuine second use | Completed |
+| `sos.repository.ts`: `getActiveAlerts` takes `{latitude, longitude, radiusMeters}` instead of `city`; `undefined` (ADMIN only) still returns every active alert, unfiltered | Completed |
+| Ports/application/facade threaded through (`SosLocationFilter` type, `packages/services`) | Completed |
+| Validation: `sosActiveAlertsQuerySchema` (`lat`/`lng`); `sosAlertCreateSchema.city` now server-side-trimmed too (stored value, not just the query side) | Completed |
+| `GET /api/sos/alerts` — `?lat=&lng=` replaces `?city=`; `400 LOCATION_REQUIRED` replaces `CITY_REQUIRED` | Completed |
+| Web: `/dashboard/sos` "Active Alerts" tab — city text input replaced with a "Share my location" button (`navigator.geolocation`) | Completed |
+| Mobile: app-bar "Set city" dialog replaced with "Share my location" (same `Geolocator` flow `SendSosSheet` already uses to send); `sosActiveAlertsCityProvider` → `sosActiveAlertsLocationProvider` | Completed |
+| Backend: 9/9 packages typecheck clean, 123/123 vitest passing. Mobile: `flutter analyze` 0 issues, all tests passing (2 new) | Completed |
+| Live end-to-end test with two real devices/accounts | **Not done** — not verified in this environment; worth the user's own smoke test given this is a safety-critical path |
+
 ## Fixed production build failure — Leaflet loaded eagerly, crashed `/login` prerender (2026-08-06, ADR-041)
 
 | Task | Status |

@@ -234,6 +234,20 @@ void main() {
       verify(() => dio.get('/api/sos/alerts')).called(1);
     });
 
+    test('getActive() sends lat/lng as query params when a location is given (ADR-042)', () async {
+      when(() => dio.get(any(), queryParameters: any(named: 'queryParameters'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/sos/alerts'),
+          statusCode: 200,
+          data: {'alerts': []},
+        ),
+      );
+
+      await repository.getActive(latitude: 12.9716, longitude: 77.5946);
+
+      verify(() => dio.get('/api/sos/alerts', queryParameters: {'lat': 12.9716, 'lng': 77.5946})).called(1);
+    });
+
     test('getHistory() gets /api/sos/alerts/history and parses the alerts list', () async {
       when(() => dio.get(any())).thenAnswer(
         (_) async => Response(
