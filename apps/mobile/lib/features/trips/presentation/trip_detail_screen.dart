@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
@@ -57,8 +59,8 @@ class TripDetailScreen extends ConsumerWidget {
                         ],
                       ),
                       const SizedBox(height: 16),
-                      if (trip.destination != null) ...[
-                        _InfoRow(icon: Icons.place_outlined, label: trip.destination!.name),
+                      if ((trip.destinationName != null && trip.destinationName!.isNotEmpty) || trip.destination != null) ...[
+                        _InfoRow(icon: Icons.place_outlined, label: trip.destinationName ?? trip.destination!.name),
                         const SizedBox(height: 8),
                       ],
                       _InfoRow(
@@ -68,6 +70,36 @@ class TripDetailScreen extends ConsumerWidget {
                       if (trip.meetingPoint != null && trip.meetingPoint!.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         _InfoRow(icon: Icons.pin_drop_outlined, label: trip.meetingPoint!),
+                      ],
+                      if (trip.meetingLat != null && trip.meetingLng != null) ...[
+                        const SizedBox(height: 8),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            height: 160,
+                            child: FlutterMap(
+                              options: MapOptions(
+                                initialCenter: LatLng(trip.meetingLat!, trip.meetingLng!),
+                                initialZoom: 14,
+                              ),
+                              children: [
+                                TileLayer(
+                                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                                  userAgentPackageName: 'com.bikie.mobile',
+                                ),
+                                MarkerLayer(markers: [
+                                  Marker(
+                                    point: LatLng(trip.meetingLat!, trip.meetingLng!),
+                                    width: 40,
+                                    height: 40,
+                                    child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                                  ),
+                                ]),
+                                const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+                              ],
+                            ),
+                          ),
+                        ),
                       ],
                       const SizedBox(height: 16),
                       Text(trip.description, style: Theme.of(context).textTheme.bodyMedium),

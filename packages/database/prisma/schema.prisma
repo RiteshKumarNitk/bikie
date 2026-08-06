@@ -598,6 +598,10 @@ model Trip {
   status        TripStatus        @default(UPCOMING)
   organizerId   String
   organizer     User              @relation("TripOrganizer", fields: [organizerId], references: [id])
+  // ADR-037: the organizer types a destination name freely instead of picking from the curated
+  // `Destination` catalog below — `destinationId` stays for the (now unused-at-creation) curated
+  // link, `destinationName` is what's actually shown. See ADR-037 in .docs/DECISIONS.md.
+  destinationName String?
   destinationId String?
   destination   Destination?      @relation(fields: [destinationId], references: [id])
   participants  TripParticipant[]

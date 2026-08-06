@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -40,9 +42,11 @@ class TripRepository {
     num price = 0,
     required int seatsTotal,
     String? meetingPoint,
+    double? meetingLat,
+    double? meetingLng,
     required DateTime startDate,
     required DateTime endDate,
-    String? destinationId,
+    String? destinationName,
     String? imageUrl,
   }) {
     return apiGuard(() async {
@@ -56,13 +60,25 @@ class TripRepository {
           'price': price,
           'seatsTotal': seatsTotal,
           if (meetingPoint != null && meetingPoint.trim().isNotEmpty) 'meetingPoint': meetingPoint.trim(),
+          if (meetingLat != null) 'meetingLat': meetingLat,
+          if (meetingLng != null) 'meetingLng': meetingLng,
           'startDate': startDate.toUtc().toIso8601String(),
           'endDate': endDate.toUtc().toIso8601String(),
-          if (destinationId != null) 'destinationId': destinationId,
+          if (destinationName != null && destinationName.trim().isNotEmpty) 'destinationName': destinationName.trim(),
           if (imageUrl != null && imageUrl.trim().isNotEmpty) 'imageUrl': imageUrl.trim(),
         },
       );
       return TripSummary.fromJson(res.data['trip'] as Map<String, dynamic>);
+    });
+  }
+
+  /// `POST /api/upload` — the same Cloudinary upload endpoint
+  /// `RiderProfileRepository.uploadPhoto` uses, for the ride cover image.
+  Future<String> uploadCoverImage(File file) {
+    return apiGuard(() async {
+      final data = FormData.fromMap({'file': await MultipartFile.fromFile(file.path)});
+      final res = await _dio.post('/api/upload', data: data);
+      return res.data['url'] as String;
     });
   }
 

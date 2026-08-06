@@ -103,9 +103,12 @@ export function createTripApplication(ports: RidesCommunityPorts) {
         price: input.price,
         seatsTotal: input.seatsTotal,
         meetingPoint: input.meetingPoint,
+        meetingLat: input.meetingLat,
+        meetingLng: input.meetingLng,
         startDate: new Date(input.startDate),
         endDate: new Date(input.endDate),
         organizerId,
+        destinationName: input.destinationName,
         destinationId: input.destinationId,
       });
     },
@@ -124,8 +127,11 @@ export function createTripApplication(ports: RidesCommunityPorts) {
         price: input.price,
         seatsTotal: input.seatsTotal,
         meetingPoint: input.meetingPoint,
+        meetingLat: input.meetingLat,
+        meetingLng: input.meetingLng,
         startDate: input.startDate ? new Date(input.startDate) : undefined,
         endDate: input.endDate ? new Date(input.endDate) : undefined,
+        destinationName: input.destinationName,
         destinationId: input.destinationId,
       });
 

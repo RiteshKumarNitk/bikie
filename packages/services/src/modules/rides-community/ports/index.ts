@@ -72,9 +72,12 @@ export interface TripRepositoryPort {
     price: number;
     seatsTotal: number;
     meetingPoint?: string;
+    meetingLat?: number;
+    meetingLng?: number;
     startDate: Date;
     endDate: Date;
     organizerId: string;
+    destinationName?: string;
     destinationId?: string;
   }): Promise<TripSummaryDTO>;
   updateTrip(slug: string, data: Record<string, unknown>): Promise<TripSummaryDTO>;

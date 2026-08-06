@@ -30,7 +30,7 @@ export function TripCard({ trip }: { trip: TripSummaryDTO }) {
         <div>
           <Link href={`/trips/${trip.slug}`} className="font-semibold text-lg hover:underline block truncate">{trip.title}</Link>
           <p className="text-sm text-foreground/60 mt-1">
-            {trip.destination?.name ?? "Multiple stops"} • {dateRange}
+            {trip.destinationName ?? trip.destination?.name ?? "Multiple stops"} • {dateRange}
           </p>
         </div>
 

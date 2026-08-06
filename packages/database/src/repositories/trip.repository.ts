@@ -16,6 +16,7 @@ function toSummary(trip: {
   endDate: Date;
   status: string;
   destination: { name: string; slug: string } | null;
+  destinationName: string | null;
 }) {
   return {
     id: trip.id,
@@ -31,6 +32,7 @@ function toSummary(trip: {
     endDate: trip.endDate.toISOString(),
     status: trip.status,
     destination: trip.destination ? { name: trip.destination.name, slug: trip.destination.slug } : null,
+    destinationName: trip.destinationName,
   };
 }
 
@@ -102,6 +104,8 @@ export async function findTripBySlug(slug: string) {
     description: trip.description,
     gallery: trip.gallery,
     meetingPoint: trip.meetingPoint,
+    meetingLat: trip.meetingLat,
+    meetingLng: trip.meetingLng,
     organizer: { id: trip.organizer.id, name: trip.organizer.name, image: trip.organizer.image },
     members: trip.participants.map(p => ({
       id: p.user.id,
@@ -202,9 +206,12 @@ export async function createTrip(data: {
   price: number;
   seatsTotal: number;
   meetingPoint?: string;
+  meetingLat?: number;
+  meetingLng?: number;
   startDate: Date;
   endDate: Date;
   organizerId: string;
+  destinationName?: string;
   destinationId?: string;
 }) {
   const base = slugify(data.title);
@@ -228,9 +235,12 @@ export async function createTrip(data: {
           seatsTotal: data.seatsTotal,
           seatsLeft: data.seatsTotal,
           meetingPoint: data.meetingPoint,
+          meetingLat: data.meetingLat,
+          meetingLng: data.meetingLng,
           startDate: data.startDate,
           endDate: data.endDate,
           organizerId: data.organizerId,
+          destinationName: data.destinationName,
           destinationId: data.destinationId,
         },
         include: { destination: true },

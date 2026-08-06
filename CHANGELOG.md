@@ -1,5 +1,26 @@
 # Changelog
 
+## Change — Ride creation: free-text destination, meeting-point map pin, mobile cover upload (ADR-037)
+- Destination is no longer a dropdown limited to the curated `Destination` catalog — the organizer
+  now types it freely (new `Trip.destinationName`), on both `/trips/create` (web) and the mobile
+  create-ride screen. Everywhere a ride's destination is shown (trip cards, the homepage's
+  Upcoming Rides, the dashboard calendar, the trip detail page, both mobile screens) now prefers
+  this free-text name, falling back to the old curated link for older trips.
+- Meeting point gets a real map pin at creation time, reusing the same picker built for Partner
+  shop locations (ADR-036) — `LocationPicker.tsx` on web, `LocationPickerField` on mobile — writing
+  into the `meetingLat`/`meetingLng` columns that existed already but were previously only ever
+  set later via the separate Ride Room editor. The trip detail page on both platforms now shows a
+  read-only map with the pin whenever it's set, so anyone viewing the ride can see the meeting
+  point, not just read an address string.
+- Mobile's cover-image field was a raw "paste a URL" text box; it now picks from the gallery and
+  uploads to the same Cloudinary endpoint (`POST /api/upload`) the web form already used, via a
+  new `TripRepository.uploadCoverImage`.
+- Found and fixed in passing: the web edit form's destination dropdown read `t.destination.id` off
+  a response that never actually included an `id` — it could never preselect the trip's existing
+  destination even before this change.
+- Migration applied (additive-only, `Trip.destinationName`), zero drift confirmed. Typecheck (all
+  touched packages + web), vitest (116/116), `flutter analyze` and `flutter test` all clean.
+
 ## Fix — Mobile app could get stuck on the splash screen forever
 - Root cause: `AuthController.bootstrap()` (runs once, before `main.dart` ever shows anything but
   `SplashScreen`, and before `app_router.dart`'s `redirect` will navigate anywhere — it explicitly

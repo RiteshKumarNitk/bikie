@@ -6,6 +6,7 @@ import { getJson } from "@/lib/api";
 import { formatCurrency } from "@bikie/utils";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { RideActionsPanel } from "@/components/trips/RideActionsPanel";
+import { PartnersMap } from "@/components/shared/PartnersMap";
 
 async function getTrip(slug: string) {
   try {
@@ -49,7 +50,7 @@ export default async function TripDetailPage({ params }: { params: Promise<{ slu
           <div className="lg:col-span-2">
             <h1 className="text-3xl font-semibold">{trip.title}</h1>
             <p className="mt-1 text-foreground/60">
-              {trip.destination?.name ?? "Multiple stops"} · {dateRange}
+              {trip.destinationName ?? trip.destination?.name ?? "Multiple stops"} · {dateRange}
             </p>
             <p className="mt-6 text-foreground/70">{trip.description}</p>
 
@@ -78,6 +79,14 @@ export default async function TripDetailPage({ params }: { params: Promise<{ slu
               <div className="mt-6 rounded-2xl bg-card p-4">
                 <p className="text-xs text-foreground/50">Meeting Point</p>
                 <p className="mt-1 font-medium">{trip.meetingPoint}</p>
+                {trip.meetingLat != null && trip.meetingLng != null && (
+                  <div className="mt-3">
+                    <PartnersMap
+                      pins={[{ id: trip.slug, name: trip.meetingPoint, latitude: trip.meetingLat, longitude: trip.meetingLng }]}
+                      height="12rem"
+                    />
+                  </div>
+                )}
               </div>
             )}
           </div>

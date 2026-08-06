@@ -571,6 +571,7 @@ mixin _$TripSummary {
   String get endDate => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
   TripDestinationRef? get destination => throw _privateConstructorUsedError;
+  String? get destinationName => throw _privateConstructorUsedError;
   int? get unreadMessages => throw _privateConstructorUsedError;
   int? get pendingRequests => throw _privateConstructorUsedError;
   int? get membersCount => throw _privateConstructorUsedError;
@@ -606,6 +607,7 @@ abstract class $TripSummaryCopyWith<$Res> {
     String endDate,
     String status,
     TripDestinationRef? destination,
+    String? destinationName,
     int? unreadMessages,
     int? pendingRequests,
     int? membersCount,
@@ -642,6 +644,7 @@ class _$TripSummaryCopyWithImpl<$Res, $Val extends TripSummary>
     Object? endDate = null,
     Object? status = null,
     Object? destination = freezed,
+    Object? destinationName = freezed,
     Object? unreadMessages = freezed,
     Object? pendingRequests = freezed,
     Object? membersCount = freezed,
@@ -700,6 +703,10 @@ class _$TripSummaryCopyWithImpl<$Res, $Val extends TripSummary>
                 ? _value.destination
                 : destination // ignore: cast_nullable_to_non_nullable
                       as TripDestinationRef?,
+            destinationName: freezed == destinationName
+                ? _value.destinationName
+                : destinationName // ignore: cast_nullable_to_non_nullable
+                      as String?,
             unreadMessages: freezed == unreadMessages
                 ? _value.unreadMessages
                 : unreadMessages // ignore: cast_nullable_to_non_nullable
@@ -755,6 +762,7 @@ abstract class _$$TripSummaryImplCopyWith<$Res>
     String endDate,
     String status,
     TripDestinationRef? destination,
+    String? destinationName,
     int? unreadMessages,
     int? pendingRequests,
     int? membersCount,
@@ -791,6 +799,7 @@ class __$$TripSummaryImplCopyWithImpl<$Res>
     Object? endDate = null,
     Object? status = null,
     Object? destination = freezed,
+    Object? destinationName = freezed,
     Object? unreadMessages = freezed,
     Object? pendingRequests = freezed,
     Object? membersCount = freezed,
@@ -849,6 +858,10 @@ class __$$TripSummaryImplCopyWithImpl<$Res>
             ? _value.destination
             : destination // ignore: cast_nullable_to_non_nullable
                   as TripDestinationRef?,
+        destinationName: freezed == destinationName
+            ? _value.destinationName
+            : destinationName // ignore: cast_nullable_to_non_nullable
+                  as String?,
         unreadMessages: freezed == unreadMessages
             ? _value.unreadMessages
             : unreadMessages // ignore: cast_nullable_to_non_nullable
@@ -883,6 +896,7 @@ class _$TripSummaryImpl implements _TripSummary {
     required this.endDate,
     required this.status,
     this.destination,
+    this.destinationName,
     this.unreadMessages,
     this.pendingRequests,
     this.membersCount,
@@ -918,6 +932,8 @@ class _$TripSummaryImpl implements _TripSummary {
   @override
   final TripDestinationRef? destination;
   @override
+  final String? destinationName;
+  @override
   final int? unreadMessages;
   @override
   final int? pendingRequests;
@@ -926,7 +942,7 @@ class _$TripSummaryImpl implements _TripSummary {
 
   @override
   String toString() {
-    return 'TripSummary(id: $id, slug: $slug, title: $title, imageUrl: $imageUrl, type: $type, difficulty: $difficulty, price: $price, seatsTotal: $seatsTotal, seatsLeft: $seatsLeft, startDate: $startDate, endDate: $endDate, status: $status, destination: $destination, unreadMessages: $unreadMessages, pendingRequests: $pendingRequests, membersCount: $membersCount)';
+    return 'TripSummary(id: $id, slug: $slug, title: $title, imageUrl: $imageUrl, type: $type, difficulty: $difficulty, price: $price, seatsTotal: $seatsTotal, seatsLeft: $seatsLeft, startDate: $startDate, endDate: $endDate, status: $status, destination: $destination, destinationName: $destinationName, unreadMessages: $unreadMessages, pendingRequests: $pendingRequests, membersCount: $membersCount)';
   }
 
   @override
@@ -953,6 +969,8 @@ class _$TripSummaryImpl implements _TripSummary {
             (identical(other.status, status) || other.status == status) &&
             (identical(other.destination, destination) ||
                 other.destination == destination) &&
+            (identical(other.destinationName, destinationName) ||
+                other.destinationName == destinationName) &&
             (identical(other.unreadMessages, unreadMessages) ||
                 other.unreadMessages == unreadMessages) &&
             (identical(other.pendingRequests, pendingRequests) ||
@@ -978,6 +996,7 @@ class _$TripSummaryImpl implements _TripSummary {
     endDate,
     status,
     destination,
+    destinationName,
     unreadMessages,
     pendingRequests,
     membersCount,
@@ -1012,6 +1031,7 @@ abstract class _TripSummary implements TripSummary {
     required final String endDate,
     required final String status,
     final TripDestinationRef? destination,
+    final String? destinationName,
     final int? unreadMessages,
     final int? pendingRequests,
     final int? membersCount,
@@ -1047,6 +1067,8 @@ abstract class _TripSummary implements TripSummary {
   @override
   TripDestinationRef? get destination;
   @override
+  String? get destinationName;
+  @override
   int? get unreadMessages;
   @override
   int? get pendingRequests;
@@ -1080,9 +1102,12 @@ mixin _$TripDetail {
   String get endDate => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
   TripDestinationRef? get destination => throw _privateConstructorUsedError;
+  String? get destinationName => throw _privateConstructorUsedError;
   String get description => throw _privateConstructorUsedError;
   List<String> get gallery => throw _privateConstructorUsedError;
   String? get meetingPoint => throw _privateConstructorUsedError;
+  double? get meetingLat => throw _privateConstructorUsedError;
+  double? get meetingLng => throw _privateConstructorUsedError;
   TripOrganizer get organizer => throw _privateConstructorUsedError;
   List<TripMember>? get members => throw _privateConstructorUsedError;
 
@@ -1117,9 +1142,12 @@ abstract class $TripDetailCopyWith<$Res> {
     String endDate,
     String status,
     TripDestinationRef? destination,
+    String? destinationName,
     String description,
     List<String> gallery,
     String? meetingPoint,
+    double? meetingLat,
+    double? meetingLng,
     TripOrganizer organizer,
     List<TripMember>? members,
   });
@@ -1156,9 +1184,12 @@ class _$TripDetailCopyWithImpl<$Res, $Val extends TripDetail>
     Object? endDate = null,
     Object? status = null,
     Object? destination = freezed,
+    Object? destinationName = freezed,
     Object? description = null,
     Object? gallery = null,
     Object? meetingPoint = freezed,
+    Object? meetingLat = freezed,
+    Object? meetingLng = freezed,
     Object? organizer = null,
     Object? members = freezed,
   }) {
@@ -1216,6 +1247,10 @@ class _$TripDetailCopyWithImpl<$Res, $Val extends TripDetail>
                 ? _value.destination
                 : destination // ignore: cast_nullable_to_non_nullable
                       as TripDestinationRef?,
+            destinationName: freezed == destinationName
+                ? _value.destinationName
+                : destinationName // ignore: cast_nullable_to_non_nullable
+                      as String?,
             description: null == description
                 ? _value.description
                 : description // ignore: cast_nullable_to_non_nullable
@@ -1228,6 +1263,14 @@ class _$TripDetailCopyWithImpl<$Res, $Val extends TripDetail>
                 ? _value.meetingPoint
                 : meetingPoint // ignore: cast_nullable_to_non_nullable
                       as String?,
+            meetingLat: freezed == meetingLat
+                ? _value.meetingLat
+                : meetingLat // ignore: cast_nullable_to_non_nullable
+                      as double?,
+            meetingLng: freezed == meetingLng
+                ? _value.meetingLng
+                : meetingLng // ignore: cast_nullable_to_non_nullable
+                      as double?,
             organizer: null == organizer
                 ? _value.organizer
                 : organizer // ignore: cast_nullable_to_non_nullable
@@ -1289,9 +1332,12 @@ abstract class _$$TripDetailImplCopyWith<$Res>
     String endDate,
     String status,
     TripDestinationRef? destination,
+    String? destinationName,
     String description,
     List<String> gallery,
     String? meetingPoint,
+    double? meetingLat,
+    double? meetingLng,
     TripOrganizer organizer,
     List<TripMember>? members,
   });
@@ -1329,9 +1375,12 @@ class __$$TripDetailImplCopyWithImpl<$Res>
     Object? endDate = null,
     Object? status = null,
     Object? destination = freezed,
+    Object? destinationName = freezed,
     Object? description = null,
     Object? gallery = null,
     Object? meetingPoint = freezed,
+    Object? meetingLat = freezed,
+    Object? meetingLng = freezed,
     Object? organizer = null,
     Object? members = freezed,
   }) {
@@ -1389,6 +1438,10 @@ class __$$TripDetailImplCopyWithImpl<$Res>
             ? _value.destination
             : destination // ignore: cast_nullable_to_non_nullable
                   as TripDestinationRef?,
+        destinationName: freezed == destinationName
+            ? _value.destinationName
+            : destinationName // ignore: cast_nullable_to_non_nullable
+                  as String?,
         description: null == description
             ? _value.description
             : description // ignore: cast_nullable_to_non_nullable
@@ -1401,6 +1454,14 @@ class __$$TripDetailImplCopyWithImpl<$Res>
             ? _value.meetingPoint
             : meetingPoint // ignore: cast_nullable_to_non_nullable
                   as String?,
+        meetingLat: freezed == meetingLat
+            ? _value.meetingLat
+            : meetingLat // ignore: cast_nullable_to_non_nullable
+                  as double?,
+        meetingLng: freezed == meetingLng
+            ? _value.meetingLng
+            : meetingLng // ignore: cast_nullable_to_non_nullable
+                  as double?,
         organizer: null == organizer
             ? _value.organizer
             : organizer // ignore: cast_nullable_to_non_nullable
@@ -1431,9 +1492,12 @@ class _$TripDetailImpl implements _TripDetail {
     required this.endDate,
     required this.status,
     this.destination,
+    this.destinationName,
     required this.description,
     required final List<String> gallery,
     this.meetingPoint,
+    this.meetingLat,
+    this.meetingLng,
     required this.organizer,
     final List<TripMember>? members,
   }) : _gallery = gallery,
@@ -1469,6 +1533,8 @@ class _$TripDetailImpl implements _TripDetail {
   @override
   final TripDestinationRef? destination;
   @override
+  final String? destinationName;
+  @override
   final String description;
   final List<String> _gallery;
   @override
@@ -1480,6 +1546,10 @@ class _$TripDetailImpl implements _TripDetail {
 
   @override
   final String? meetingPoint;
+  @override
+  final double? meetingLat;
+  @override
+  final double? meetingLng;
   @override
   final TripOrganizer organizer;
   final List<TripMember>? _members;
@@ -1494,7 +1564,7 @@ class _$TripDetailImpl implements _TripDetail {
 
   @override
   String toString() {
-    return 'TripDetail(id: $id, slug: $slug, title: $title, imageUrl: $imageUrl, type: $type, difficulty: $difficulty, price: $price, seatsTotal: $seatsTotal, seatsLeft: $seatsLeft, startDate: $startDate, endDate: $endDate, status: $status, destination: $destination, description: $description, gallery: $gallery, meetingPoint: $meetingPoint, organizer: $organizer, members: $members)';
+    return 'TripDetail(id: $id, slug: $slug, title: $title, imageUrl: $imageUrl, type: $type, difficulty: $difficulty, price: $price, seatsTotal: $seatsTotal, seatsLeft: $seatsLeft, startDate: $startDate, endDate: $endDate, status: $status, destination: $destination, destinationName: $destinationName, description: $description, gallery: $gallery, meetingPoint: $meetingPoint, meetingLat: $meetingLat, meetingLng: $meetingLng, organizer: $organizer, members: $members)';
   }
 
   @override
@@ -1521,11 +1591,17 @@ class _$TripDetailImpl implements _TripDetail {
             (identical(other.status, status) || other.status == status) &&
             (identical(other.destination, destination) ||
                 other.destination == destination) &&
+            (identical(other.destinationName, destinationName) ||
+                other.destinationName == destinationName) &&
             (identical(other.description, description) ||
                 other.description == description) &&
             const DeepCollectionEquality().equals(other._gallery, _gallery) &&
             (identical(other.meetingPoint, meetingPoint) ||
                 other.meetingPoint == meetingPoint) &&
+            (identical(other.meetingLat, meetingLat) ||
+                other.meetingLat == meetingLat) &&
+            (identical(other.meetingLng, meetingLng) ||
+                other.meetingLng == meetingLng) &&
             (identical(other.organizer, organizer) ||
                 other.organizer == organizer) &&
             const DeepCollectionEquality().equals(other._members, _members));
@@ -1533,7 +1609,7 @@ class _$TripDetailImpl implements _TripDetail {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     runtimeType,
     id,
     slug,
@@ -1548,12 +1624,15 @@ class _$TripDetailImpl implements _TripDetail {
     endDate,
     status,
     destination,
+    destinationName,
     description,
     const DeepCollectionEquality().hash(_gallery),
     meetingPoint,
+    meetingLat,
+    meetingLng,
     organizer,
     const DeepCollectionEquality().hash(_members),
-  );
+  ]);
 
   /// Create a copy of TripDetail
   /// with the given fields replaced by the non-null parameter values.
@@ -1584,9 +1663,12 @@ abstract class _TripDetail implements TripDetail {
     required final String endDate,
     required final String status,
     final TripDestinationRef? destination,
+    final String? destinationName,
     required final String description,
     required final List<String> gallery,
     final String? meetingPoint,
+    final double? meetingLat,
+    final double? meetingLng,
     required final TripOrganizer organizer,
     final List<TripMember>? members,
   }) = _$TripDetailImpl;
@@ -1621,11 +1703,17 @@ abstract class _TripDetail implements TripDetail {
   @override
   TripDestinationRef? get destination;
   @override
+  String? get destinationName;
+  @override
   String get description;
   @override
   List<String> get gallery;
   @override
   String? get meetingPoint;
+  @override
+  double? get meetingLat;
+  @override
+  double? get meetingLng;
   @override
   TripOrganizer get organizer;
   @override

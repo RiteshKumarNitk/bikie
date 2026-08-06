@@ -1,9 +1,13 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_exception.dart';
-import '../../destinations/domain/destination_providers.dart';
+import '../../onboarding/presentation/location_picker_field.dart';
 import '../data/trip_repository.dart';
 import '../domain/trip_providers.dart';
 
@@ -25,15 +29,19 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   final _seatsController = TextEditingController(text: '4');
   final _priceController = TextEditingController(text: '0');
   final _meetingPointController = TextEditingController();
-  final _imageUrlController = TextEditingController();
+  final _destinationNameController = TextEditingController();
 
   String _type = rideCreationTypes.first;
   String _difficulty = 'MODERATE';
-  String? _destinationId;
+  LatLng? _meetingLocation;
   DateTime? _startDate;
   DateTime? _endDate;
   bool _isSubmitting = false;
   String? _error;
+
+  File? _coverImageFile;
+  String? _coverImageUrl;
+  bool _uploadingCover = false;
 
   @override
   void dispose() {
@@ -42,8 +50,27 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
     _seatsController.dispose();
     _priceController.dispose();
     _meetingPointController.dispose();
-    _imageUrlController.dispose();
+    _destinationNameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickCoverImage() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (picked == null) return;
+
+    setState(() {
+      _coverImageFile = File(picked.path);
+      _uploadingCover = true;
+      _error = null;
+    });
+    try {
+      final url = await ref.read(tripRepositoryProvider).uploadCoverImage(_coverImageFile!);
+      if (mounted) setState(() => _coverImageUrl = url);
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = "Couldn't upload that image: ${e.message}");
+    } finally {
+      if (mounted) setState(() => _uploadingCover = false);
+    }
   }
 
   Future<void> _pickDate({required bool isStart}) async {
@@ -86,10 +113,12 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             price: num.tryParse(_priceController.text.trim()) ?? 0,
             seatsTotal: int.parse(_seatsController.text.trim()),
             meetingPoint: _meetingPointController.text,
+            meetingLat: _meetingLocation?.latitude,
+            meetingLng: _meetingLocation?.longitude,
             startDate: _startDate!,
             endDate: _endDate!,
-            destinationId: _destinationId,
-            imageUrl: _imageUrlController.text,
+            destinationName: _destinationNameController.text,
+            imageUrl: _coverImageUrl,
           );
       ref.invalidate(tripsProvider);
       ref.invalidate(myRidesProvider);
@@ -110,8 +139,6 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final destinations = ref.watch(allDestinationsProvider);
-
     return Scaffold(
       appBar: AppBar(title: const Text('Create a Ride')),
       body: Form(
@@ -152,18 +179,12 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               onChanged: (v) => setState(() => _difficulty = v!),
             ),
             const SizedBox(height: 16),
-            destinations.when(
-              data: (list) => DropdownButtonFormField<String?>(
-                initialValue: _destinationId,
-                decoration: const InputDecoration(labelText: 'Destination (optional)'),
-                items: [
-                  const DropdownMenuItem<String?>(value: null, child: Text('None')),
-                  ...list.map((d) => DropdownMenuItem<String?>(value: d.id, child: Text(d.name))),
-                ],
-                onChanged: (v) => setState(() => _destinationId = v),
+            TextFormField(
+              controller: _destinationNameController,
+              decoration: const InputDecoration(
+                labelText: 'Destination (optional)',
+                hintText: 'Mount Abu, Rajasthan',
               ),
-              loading: () => const LinearProgressIndicator(),
-              error: (_, __) => const SizedBox.shrink(),
             ),
             const SizedBox(height: 16),
             Row(
@@ -213,10 +234,35 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
               controller: _meetingPointController,
               decoration: const InputDecoration(labelText: 'Meeting point (optional)'),
             ),
+            const SizedBox(height: 12),
+            LocationPickerField(
+              value: _meetingLocation,
+              onChanged: (latlng) => setState(() => _meetingLocation = latlng),
+            ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _imageUrlController,
-              decoration: const InputDecoration(labelText: 'Cover image URL (optional)'),
+            Text('Cover image', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                if (_coverImageFile != null)
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.file(_coverImageFile!, height: 64, width: 96, fit: BoxFit.cover),
+                  ),
+                if (_coverImageFile != null) const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _uploadingCover ? null : _pickCoverImage,
+                    child: _uploadingCover
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text(_coverImageUrl != null ? 'Change cover image' : 'Upload cover image'),
+                  ),
+                ),
+              ],
             ),
             if (_error != null) ...[
               const SizedBox(height: 16),

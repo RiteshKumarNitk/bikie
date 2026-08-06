@@ -12,6 +12,9 @@ export interface TripSummaryDTO {
   endDate: string;
   status: string;
   destination: { name: string; slug: string } | null;
+  // ADR-037: freeform, organizer-typed destination name — shown in place of `destination?.name`
+  // when set, since ride creation no longer requires picking from the curated catalog above.
+  destinationName: string | null;
   unreadMessages?: number;
   pendingRequests?: number;
   membersCount?: number;
@@ -21,6 +24,8 @@ export interface TripDetailDTO extends TripSummaryDTO {
   description: string;
   gallery: string[];
   meetingPoint: string | null;
+  meetingLat: number | null;
+  meetingLng: number | null;
   organizer: { id: string; name: string; image: string | null };
   members?: { id: string; name: string; image: string | null }[];
 }

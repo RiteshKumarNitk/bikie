@@ -64,6 +64,7 @@ _$TripSummaryImpl _$$TripSummaryImplFromJson(Map<String, dynamic> json) =>
           : TripDestinationRef.fromJson(
               json['destination'] as Map<String, dynamic>,
             ),
+      destinationName: json['destinationName'] as String?,
       unreadMessages: (json['unreadMessages'] as num?)?.toInt(),
       pendingRequests: (json['pendingRequests'] as num?)?.toInt(),
       membersCount: (json['membersCount'] as num?)?.toInt(),
@@ -84,6 +85,7 @@ Map<String, dynamic> _$$TripSummaryImplToJson(_$TripSummaryImpl instance) =>
       'endDate': instance.endDate,
       'status': instance.status,
       'destination': instance.destination,
+      'destinationName': instance.destinationName,
       'unreadMessages': instance.unreadMessages,
       'pendingRequests': instance.pendingRequests,
       'membersCount': instance.membersCount,
@@ -109,9 +111,12 @@ _$TripDetailImpl _$$TripDetailImplFromJson(
       : TripDestinationRef.fromJson(
           json['destination'] as Map<String, dynamic>,
         ),
+  destinationName: json['destinationName'] as String?,
   description: json['description'] as String,
   gallery: (json['gallery'] as List<dynamic>).map((e) => e as String).toList(),
   meetingPoint: json['meetingPoint'] as String?,
+  meetingLat: (json['meetingLat'] as num?)?.toDouble(),
+  meetingLng: (json['meetingLng'] as num?)?.toDouble(),
   organizer: TripOrganizer.fromJson(json['organizer'] as Map<String, dynamic>),
   members: (json['members'] as List<dynamic>?)
       ?.map((e) => TripMember.fromJson(e as Map<String, dynamic>))
@@ -133,9 +138,12 @@ Map<String, dynamic> _$$TripDetailImplToJson(_$TripDetailImpl instance) =>
       'endDate': instance.endDate,
       'status': instance.status,
       'destination': instance.destination,
+      'destinationName': instance.destinationName,
       'description': instance.description,
       'gallery': instance.gallery,
       'meetingPoint': instance.meetingPoint,
+      'meetingLat': instance.meetingLat,
+      'meetingLng': instance.meetingLng,
       'organizer': instance.organizer,
       'members': instance.members,
     };

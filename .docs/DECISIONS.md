@@ -1147,3 +1147,60 @@ changes:
   platforms before relying on it, but there's no credential/billing step blocking that test the
   way there would have been with Google Maps.
 
+## ADR-037: Ride creation drops the destination dropdown for free text; meeting point gets a map pin; cover image upload reaches mobile
+
+- **Context.** `/trips/create` (web) and its mobile equivalent forced the organizer to pick a
+  destination from the curated `Destination` catalog (a `<select>`/`DropdownButtonFormField` bound
+  to `destinationId`) — no way to name a destination that isn't in that catalog. Meeting point was
+  plain text only, with no way for anyone viewing the ride to see it on a map, even though
+  `Trip.meetingLat`/`meetingLng` already existed in the schema (added for the separate Ride Room
+  "edit meeting point" feature, but never populated at creation, and with no picker UI on either
+  platform). Cover image upload was already wired to Cloudinary on web
+  (`apps/web/app/api/upload/route.ts` → `UploadService`, ADR predates this one) but mobile's
+  create-ride form only had a raw "Cover image URL" text field — no actual picker/upload.
+- **Destination becomes free text.** New `Trip.destinationName String?` column, decoupled from the
+  curated `Destination` catalog — the organizer types it however riders will recognize it (`"Mount
+  Abu, Rajasthan"`), same shape as `meetingPoint`. `destinationId`/the `Destination` relation stay
+  in the schema (nothing consuming them elsewhere breaks — the destination browse page, homepage
+  Popular Destinations, and the `/trips?destination=` catalog filter are unrelated features and are
+  untouched), just no longer exposed as a picker on the create/edit forms. Every place that renders
+  a trip's destination (`TripCard.tsx`, `UpcomingRides.tsx`, the dashboard calendar, the trip detail
+  page, and both mobile screens) now prefers `destinationName`, falling back to `destination?.name`
+  for older trips that only ever had the curated link.
+- **Meeting point gets a map pin at creation time**, reusing the same address-text-plus-pin pattern
+  as Partner shop location (ADR-036): the existing web `LocationPicker`/mobile `LocationPickerField`
+  components are reused as-is (no new map code) on both the create and edit forms, writing into the
+  `meetingLat`/`meetingLng` columns that already existed but were previously only ever set later,
+  post-creation, via the separate Ride Room meeting-point editor (`PATCH .../room/meeting-point`,
+  untouched by this change). The trip detail page (both platforms) now renders a read-only map pin
+  (`PartnersMap.tsx` web, a plain non-interactive `flutter_map` mobile) whenever a meeting point pin
+  is set, so anyone viewing the ride — not just the organizer — can see it, not just read an address
+  string.
+- **Validation.** `createTripSchema`/`updateTripSchema` (`packages/validation/src/trip.schema.ts`)
+  gained `destinationName` (optional string) and `meetingLat`/`meetingLng` (optional numbers, paired
+  via `.superRefine` — same both-present-or-both-absent rule as Partner's lat/lng pairing in
+  ADR-036: a pin without both coordinates is a bug, not a valid partial state). The two schemas now
+  share a `tripFields` object plus a `refineMeetingPin` function rather than deriving
+  `updateTripSchema` from `createTripSchema` via `.partial()` — Zod 4's `.superRefine()` result
+  isn't a plain `ZodObject` anymore, so the old `createTripSchema.partial()` pattern (still valid
+  before this change, since `createTripSchema` was a bare `z.object(...)`) no longer typechecks once
+  a refinement is added; sharing the base field set sidesteps the issue instead of relying on
+  version-specific `ZodEffects` unwrapping APIs.
+- **Cover image upload reaches mobile.** `TripRepository.uploadCoverImage` — the same four-line
+  `POST /api/upload` multipart call `RiderProfileRepository.uploadPhoto` already used for the
+  onboarding rider photo, now with a second caller. Kept as two small, separately-scoped copies
+  rather than factored into a shared upload repository — there's nothing else to share between them
+  beyond the four lines themselves.
+- **Found and fixed in passing:** the web edit form's destination prefill logic
+  (`apps/web/app/(main)/trips/[slug]/edit/page.tsx`) was reading `t.destination.id` off a `GET
+  /api/trips/[slug]` response whose `destination` field is `{name, slug} | null` — no `id` ever
+  present — so the dropdown could never actually preselect the trip's existing destination even
+  before this change. Moot now that destination is free text (prefilled straight from
+  `destinationName`), but worth noting as a real, previously-silent bug this pass incidentally
+  closed.
+- **Consequences.** No new dependencies, no new migration risk beyond the single `destinationName`
+  column (hand-written, additive-only). Not done: the Ride Room's separate meeting-point editor
+  (`ride_room_screen.dart` / the web equivalent) still only edits the text `meetingPoint`, not the
+  map pin — left out of scope since the ask was specifically about ride creation, not the
+  already-shipped Ride Room feature.
+

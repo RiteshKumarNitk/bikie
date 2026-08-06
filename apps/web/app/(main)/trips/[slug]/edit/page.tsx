@@ -2,15 +2,9 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-
-interface DestinationOption {
-  id: string;
-  name: string;
-  state: string;
-}
+import { LocationPicker, type LocationPickerValue } from "@/components/shared/LocationPicker";
 
 const RIDE_TYPES = [
   { value: "WEEKEND", label: "Weekend Ride" },
@@ -30,7 +24,6 @@ export default function EditRidePage({ params }: { params: Promise<{ slug: strin
   const resolvedParams = use(params);
   const router = useRouter();
   const { data: session, isPending } = authClient.useSession();
-  const [destinations, setDestinations] = useState<DestinationOption[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
 
   const [title, setTitle] = useState("");
@@ -39,7 +32,8 @@ export default function EditRidePage({ params }: { params: Promise<{ slug: strin
   const [difficulty, setDifficulty] = useState("EASY");
   const [seatsTotal, setSeatsTotal] = useState("6");
   const [meetingPoint, setMeetingPoint] = useState("");
-  const [destinationId, setDestinationId] = useState("");
+  const [meetingLocation, setMeetingLocation] = useState<LocationPickerValue | null>(null);
+  const [destinationName, setDestinationName] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [imageUrl, setImageUrl] = useState("");
@@ -47,12 +41,6 @@ export default function EditRidePage({ params }: { params: Promise<{ slug: strin
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/destinations")
-      .then((r) => r.json())
-      .then((data) => setDestinations(data.destinations ?? []));
-  }, []);
 
   useEffect(() => {
     if (isPending) return;
@@ -76,8 +64,10 @@ export default function EditRidePage({ params }: { params: Promise<{ slug: strin
           setDifficulty(t.difficulty);
           setSeatsTotal(t.seatsTotal.toString());
           setMeetingPoint(t.meetingPoint || "");
-          if (t.destination) setDestinationId(t.destination.id || ""); // Need id if possible, wait, getBySlug only has summary fields?
-          // Fallback if destination id isn't populated exactly:
+          if (t.meetingLat != null && t.meetingLng != null) {
+            setMeetingLocation({ latitude: t.meetingLat, longitude: t.meetingLng });
+          }
+          setDestinationName(t.destinationName || "");
           setStartDate(new Date(t.startDate).toISOString().slice(0, 16));
           setEndDate(new Date(t.endDate).toISOString().slice(0, 16));
           setImageUrl(t.imageUrl || "");
@@ -110,7 +100,9 @@ export default function EditRidePage({ params }: { params: Promise<{ slug: strin
           seatsTotal: Number(seatsTotal),
           price: Number(price),
           meetingPoint: meetingPoint || undefined,
-          destinationId: destinationId || undefined,
+          meetingLat: meetingLocation?.latitude,
+          meetingLng: meetingLocation?.longitude,
+          destinationName: destinationName || undefined,
           startDate: new Date(startDate).toISOString(),
           endDate: new Date(endDate).toISOString(),
           imageUrl,
@@ -203,18 +195,12 @@ export default function EditRidePage({ params }: { params: Promise<{ slug: strin
 
           <div>
             <label className="text-sm font-medium">Destination (optional)</label>
-            <select
-              value={destinationId}
-              onChange={(e) => setDestinationId(e.target.value)}
+            <input
+              value={destinationName}
+              onChange={(e) => setDestinationName(e.target.value)}
+              placeholder="Mount Abu, Rajasthan"
               className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent"
-            >
-              <option value="">No specific destination</option>
-              {destinations.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}, {d.state}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div>
@@ -224,6 +210,9 @@ export default function EditRidePage({ params }: { params: Promise<{ slug: strin
               onChange={(e) => setMeetingPoint(e.target.value)}
               className="mt-1 w-full rounded-xl border border-foreground/10 bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent"
             />
+            <div className="mt-3">
+              <LocationPicker value={meetingLocation} onChange={setMeetingLocation} />
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

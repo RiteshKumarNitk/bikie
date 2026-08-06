@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Ride creation: free-text destination, meeting-point map pin, mobile cover upload (2026-08-06, ADR-037)
+
+| Task | Status |
+|---|---|
+| Schema: `Trip.destinationName String?` (hand-written migration, additive-only) | Completed |
+| Validation: `createTripSchema`/`updateTripSchema` gain `destinationName`, `meetingLat`/`meetingLng` (paired via `.superRefine`) | Completed |
+| Types/repo/ports/application: `TripSummaryDTO.destinationName`, `TripDetailDTO.meetingLat`/`meetingLng` threaded through `createTrip`/`updateTrip`/`toSummary`/`findBySlug` | Completed |
+| Web: `/trips/create` and `/trips/[slug]/edit` — destination dropdown replaced with free text; `LocationPicker` (reused from ADR-036) added for the meeting point pin; cover image upload confirmed already Cloudinary-backed (`/api/upload`) | Completed |
+| Web: trip detail page + `TripCard`/`UpcomingRides`/dashboard calendar now prefer `destinationName`; detail page renders `PartnersMap` for the meeting-point pin when set | Completed |
+| Bug found + fixed: the edit form's destination prefill read `t.destination.id`, which `GET /api/trips/[slug]` never actually returns — the dropdown could never preselect the existing destination even before this change | Completed |
+| Mobile: `create_ride_screen.dart` — destination dropdown replaced with free text; `LocationPickerField` (reused from ADR-036) for the meeting point; real Cloudinary cover-image upload via `image_picker` + new `TripRepository.uploadCoverImage` (mirrors `RiderProfileRepository.uploadPhoto`), replacing the old raw "image URL" text field | Completed |
+| Mobile: trip detail screen shows `destinationName` and a read-only `flutter_map` pin for the meeting point | Completed |
+| `prisma migrate deploy` + `migrate status` (zero drift), `pnpm turbo run typecheck` (database/validation/types/services/web), `pnpm exec vitest run` (116/116), `flutter analyze` + `flutter test` | Completed |
+| Live-test the create/edit forms and meeting-point map end-to-end in a real browser/device session | **Not done** — not visually confirmed in this environment |
+
 ## Partner shop location + typed government ID + maps (2026-08-05, ADR-036)
 
 First embedded map anywhere in the app (web + mobile), using Leaflet/`flutter_map` + raw

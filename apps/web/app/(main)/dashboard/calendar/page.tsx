@@ -42,7 +42,7 @@ export default function DashboardCalendarPage() {
                 <p className="text-sm font-semibold text-accent-text">{date.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}</p>
                 <Link href={`/trips/${ride.slug}`} className="block mt-2 rounded-2xl bg-card border border-foreground/10 p-4 hover:border-accent transition-colors">
                   <p className="font-semibold">{ride.title}</p>
-                  <p className="text-sm text-foreground/60 mt-1">{ride.type} • {ride.destination?.name || "Multiple locations"}</p>
+                  <p className="text-sm text-foreground/60 mt-1">{ride.type} • {ride.destinationName || ride.destination?.name || "Multiple locations"}</p>
                 </Link>
               </div>
             );

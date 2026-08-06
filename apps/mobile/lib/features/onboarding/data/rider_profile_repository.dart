@@ -37,9 +37,10 @@ class RiderProfileRepository {
   }
 
   /// `POST /api/upload` — the general-purpose Cloudinary upload endpoint (also used on web for
-  /// bike/trip covers, chat attachments, etc.), used here for the onboarding rider photo. Only
-  /// this one caller exists on mobile today, so it lives on this repository rather than a new
-  /// shared one.
+  /// bike/trip covers, chat attachments, etc.), used here for the onboarding rider photo.
+  /// `TripRepository.uploadCoverImage` is the same four lines for the ride cover image — kept as
+  /// two small copies rather than a shared upload repository, since each caller's file is scoped
+  /// to its own feature and there's nothing else to share.
   Future<String> uploadPhoto(File file) {
     return apiGuard(() async {
       final data = FormData.fromMap({'file': await MultipartFile.fromFile(file.path)});

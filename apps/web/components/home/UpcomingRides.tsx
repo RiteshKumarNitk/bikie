@@ -35,7 +35,7 @@ function RideCard({ trip }: { trip: TripSummaryDTO }) {
       <div className="space-y-1 p-5">
         <p className="truncate font-medium">{trip.title}</p>
         <p className="text-sm text-foreground/60">
-          {trip.destination?.name ?? "Multiple stops"} ·{" "}
+          {trip.destinationName ?? trip.destination?.name ?? "Multiple stops"} ·{" "}
           <RideDateRange startDate={trip.startDate} endDate={trip.endDate} />
         </p>
         <p className="pt-2 text-sm font-semibold">
