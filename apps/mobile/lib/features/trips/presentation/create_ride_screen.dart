@@ -43,6 +43,9 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
   String? _coverImageUrl;
   bool _uploadingCover = false;
 
+  final List<String> _galleryUrls = [];
+  bool _uploadingGallery = false;
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -70,6 +73,29 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
       if (mounted) setState(() => _error = "Couldn't upload that image: ${e.message}");
     } finally {
       if (mounted) setState(() => _uploadingCover = false);
+    }
+  }
+
+  Future<void> _pickGalleryImages() async {
+    final remaining = 8 - _galleryUrls.length;
+    if (remaining <= 0) return;
+    final picked = await ImagePicker().pickMultiImage(imageQuality: 85, limit: remaining);
+    if (picked.isEmpty) return;
+
+    setState(() {
+      _uploadingGallery = true;
+      _error = null;
+    });
+    try {
+      final repo = ref.read(tripRepositoryProvider);
+      for (final image in picked) {
+        final url = await repo.uploadCoverImage(File(image.path));
+        if (mounted) setState(() => _galleryUrls.add(url));
+      }
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = "Couldn't upload gallery photos: ${e.message}");
+    } finally {
+      if (mounted) setState(() => _uploadingGallery = false);
     }
   }
 
@@ -119,6 +145,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             endDate: _endDate!,
             destinationName: _destinationNameController.text,
             imageUrl: _coverImageUrl,
+            gallery: _galleryUrls,
           );
       ref.invalidate(tripsProvider);
       ref.invalidate(myRidesProvider);
@@ -263,6 +290,46 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 16),
+            Text('Gallery (optional, up to 8)', style: Theme.of(context).textTheme.labelLarge),
+            const SizedBox(height: 8),
+            if (_galleryUrls.isNotEmpty)
+              SizedBox(
+                height: 64,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _galleryUrls.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) => Stack(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.network(_galleryUrls[index], height: 64, width: 96, fit: BoxFit.cover),
+                      ),
+                      Positioned(
+                        right: 2,
+                        top: 2,
+                        child: GestureDetector(
+                          onTap: () => setState(() => _galleryUrls.removeAt(index)),
+                          child: Container(
+                            height: 18,
+                            width: 18,
+                            decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                            child: const Icon(Icons.close, size: 12, color: Colors.white),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_galleryUrls.isNotEmpty) const SizedBox(height: 8),
+            OutlinedButton(
+              onPressed: (_uploadingGallery || _galleryUrls.length >= 8) ? null : _pickGalleryImages,
+              child: _uploadingGallery
+                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('Add gallery photos'),
             ),
             if (_error != null) ...[
               const SizedBox(height: 16),

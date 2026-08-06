@@ -4,6 +4,9 @@ const tripFields = {
   title: z.string().min(3).max(120),
   description: z.string().min(1).max(3000),
   imageUrl: z.union([z.string().url(), z.literal("")]).optional().transform(v => v === "" ? null : v),
+  // Uploaded via the existing POST /api/upload (Cloudinary) — this just carries the resulting
+  // URLs, same pattern as Bike.gallery.
+  gallery: z.array(z.string().url()).max(8).optional(),
   type: z.enum(["WEEKEND", "ADVENTURE", "ROAD_TRIP", "INTERNATIONAL", "GUIDED_TOUR"]),
   difficulty: z.enum(["EASY", "MODERATE", "HARD"]).default("MODERATE"),
   price: z.coerce.number().min(0).default(0),

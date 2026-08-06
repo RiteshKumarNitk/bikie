@@ -48,6 +48,7 @@ class TripRepository {
     required DateTime endDate,
     String? destinationName,
     String? imageUrl,
+    List<String>? gallery,
   }) {
     return apiGuard(() async {
       final res = await _dio.post(
@@ -66,6 +67,7 @@ class TripRepository {
           'endDate': endDate.toUtc().toIso8601String(),
           if (destinationName != null && destinationName.trim().isNotEmpty) 'destinationName': destinationName.trim(),
           if (imageUrl != null && imageUrl.trim().isNotEmpty) 'imageUrl': imageUrl.trim(),
+          if (gallery != null && gallery.isNotEmpty) 'gallery': gallery,
         },
       );
       return TripSummary.fromJson(res.data['trip'] as Map<String, dynamic>);
@@ -73,7 +75,8 @@ class TripRepository {
   }
 
   /// `POST /api/upload` — the same Cloudinary upload endpoint
-  /// `RiderProfileRepository.uploadPhoto` uses, for the ride cover image.
+  /// `RiderProfileRepository.uploadPhoto` uses, for the ride cover image (and, called once per
+  /// file, for gallery images too — the endpoint is single-file, there's no batch variant).
   Future<String> uploadCoverImage(File file) {
     return apiGuard(() async {
       final data = FormData.fromMap({'file': await MultipartFile.fromFile(file.path)});

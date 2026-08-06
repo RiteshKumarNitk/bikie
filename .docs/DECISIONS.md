@@ -1248,3 +1248,58 @@ changes:
   vendor cost or billing risk. A geocoding outage degrades silently back to the pre-ADR-038
   experience (city + map link), never to a broken or blocked SOS flow.
 
+## ADR-039: Removed remaining demo seed data; real image upload (incl. multi-image galleries) replaces URL text fields; partner bike listing was actually broken
+
+- **Context.** Following ADR-036/037/038's pattern of replacing seed/demo content with real
+  data, the same request extended to categories, destinations, testimonials, and the sample
+  ride catalog. Auditing what would replace them surfaced two real, unrelated gaps worth fixing
+  in the same pass rather than leaving broken: the Testimonial admin form has no avatar field
+  at all (not even a URL one — `authorAvatarUrl` has always been reachable server-side and
+  never exposed client-side), and the Partner Fleet "Add Bike" page has been posting to the
+  ADMIN-only `POST /api/admin/bikes` since it was built — a real partner clicking "Add Bike"
+  gets a 403, not a listed bike. This was already flagged as a known backlog item
+  (`.docs/TASKS.md`'s pre-existing-bugs list), but removing the dummy bike catalog (ADR-038's
+  companion cleanup) makes it load-bearing: there is now no way for a partner to list a bike at
+  all until this is fixed.
+- **Live data removed** (same non-destructive-where-possible posture as the bike/partner
+  cleanup): all 6 seed trips (cascading their `TripParticipant`/`Announcement` rows — no
+  `Conversation` had `tripId` set yet, nothing to null out), then destinations and categories
+  (Trip.destinationId has no `onDelete` clause, so trips had to go first), then testimonials
+  (always standalone). `packages/database/prisma/seed.ts`'s corresponding arrays/loops removed
+  to match — categories, destinations, testimonials, and rides are all admin/user-created now,
+  not seeded.
+- **Partner bike listing, fixed at the route, not patched over.** New
+  `POST /api/partner/bikes` (PARTNER-gated, `ownerId` always forced from the session rather
+  than trusted from the request body — the old client code fetched its own session and passed
+  `ownerId` in the POST, which was both the wrong endpoint and an unnecessary trust boundary)
+  and `DELETE /api/partner/bikes/[id]` (ownership-checked via the existing
+  `BikeService.getByOwner`, 403 if the bike isn't the caller's). Both reuse the exact same
+  `AdminService.createBike`/`deleteBike` logic the admin routes already call — the fix is which
+  route/role gates the call, not new business logic.
+- **Real upload (not a URL field) everywhere a create form remained**, all via the existing
+  `POST /api/upload` (Cloudinary, unchanged) — no new upload infrastructure:
+  - Testimonial admin form gained the avatar upload button it never had.
+  - Partner Fleet "Add Bike" modal's "Image URL" text input became a real upload button.
+  - Ride creation (web `/trips/create`, mobile `create_ride_screen.dart`) already uploaded a
+    single cover image (ADR-037) — unchanged.
+- **Multi-image galleries newly reachable**, on the two models that already had an unused
+  `gallery: String[]` column (`Bike`, `Trip`) with no path to populate it:
+  `createBikeSchema`/`updateBikeSchema`/`createTripSchema` gained an optional
+  `gallery: string[].max(8)`, threaded through each stack's port/application/repository layers
+  to the existing `prisma.*.create({ data })` calls (additive parameter only — every existing
+  caller that doesn't pass `gallery` behaves exactly as before). Partner Fleet and both ride
+  -creation forms gained a multi-file upload UI (web: `<input multiple>` + `Promise.all` over
+  `/api/upload`; mobile: `image_picker`'s `pickMultiImage` + a sequential upload loop, since
+  `/api/upload` is single-file-per-call with no batch variant) capped at 8 images, matching the
+  schema limit.
+- **Not built:** admin CRUD for Category/Destination. Confirmed during the audit that neither
+  has ever had an admin UI *or* an admin API route — `.docs/TASKS.md` already listed CMS as
+  "Testimonials only," this just re-confirms it's still true. Per explicit user decision
+  ("if required we will create that"), building that out is deferred to a future pass, not
+  silently assumed done here.
+- **Consequences.** `pnpm openapi:generate` re-run for the two new partner-bikes routes (120
+  routes now, was 119) — the committed OpenAPI/route-inventory snapshot test
+  (`api-contract.test.ts`, ADR-028) would otherwise fail on the drift. No schema migration
+  needed (`gallery` already existed on both models from their original design, just unreachable
+  from any client).
+

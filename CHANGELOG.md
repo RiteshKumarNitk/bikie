@@ -1,5 +1,40 @@
 # Changelog
 
+## Change — Real (multi-)image upload everywhere; fixed a partner bike-listing bug (ADR-039)
+- **Fixed**: Partner Fleet's "Add Bike" was posting to the ADMIN-only `/api/admin/bikes` —
+  every real partner got a 403 trying to list a bike. New `POST /api/partner/bikes` (forces
+  `ownerId` from the session, not the request body) and `DELETE /api/partner/bikes/[id]`
+  (ownership-checked), reusing the existing `AdminService.createBike`/`deleteBike` logic.
+- Testimonial admin form gained the avatar upload button it never had; Partner Fleet's "Image
+  URL" text field became a real upload — both through the existing `POST /api/upload`.
+- `Bike.gallery`/`Trip.gallery` (present in the schema, unreachable from any client until now)
+  wired through validation/application/repository layers; Partner Fleet and both ride-creation
+  forms (web + mobile) gained multi-image upload UI, capped at 8 photos.
+- Not built: admin CRUD for Category/Destination — confirmed neither has ever had an admin UI
+  or API route; deferred per explicit user decision.
+
+## Change — Removed dummy categories, destinations, testimonials, and trip seed data
+- Live data: deleted all 6 seed trips (cascaded their `TripParticipant`/`Announcement` rows;
+  the 2 existing `Conversation`s had no `tripId` set, so nothing to null out), then the 6
+  destinations and 9 categories that no longer had anything referencing them, then the 6
+  testimonials (always standalone). Deletion had to run in that order — `Trip.destinationId`
+  has no `onDelete` clause, so deleting a still-referenced `Destination` would have failed.
+- `packages/database/prisma/seed.ts`: removed the `categories`/`destinations`/`testimonials`/
+  `tripsSeed` arrays and their seeding loops entirely, along with the `now`/`day` constants and
+  demo trip-participant seeding that only existed to support them. All four are created for
+  real through the admin panel (or real ride creation) going forward, not seeded.
+
+## Change — Removed dummy bike catalog and seeded service-provider profile
+- Live data: deleted all 12 seed bikes and everything that referenced them (20 bookings, 10
+  reviews, 3 wishlist entries — `Bike` has no soft-delete flag, so removing it meant deleting
+  dependents first in a transaction), plus the one seeded Partner business profile ("Arjun
+  Rentals"). `partner@bikie.app`'s login/role is untouched — it now has no Partner row, so
+  logging in hits real partner onboarding, same as a brand-new partner signup.
+- `packages/database/prisma/seed.ts` updated to match: the dummy `bikes`/`bikeSpecs` arrays,
+  the bike-seeding loop, the demo bookings/reviews/wishlist that depended on it, and the
+  "Arjun Rentals" `Partner.upsert` are all removed. Categories, destinations, testimonials, and
+  the community-ride (`Trip`) seed data are untouched — real content/taxonomy, not demo filler.
+
 ## Change — SOS notifications show a real address instead of raw coordinates (ADR-038)
 - SOS alerts now get reverse-geocoded once at creation time (`placeName`/`area`/
   `formattedAddress`, additive/nullable on `SOSAlert`) via free OpenStreetMap Nominatim — no API

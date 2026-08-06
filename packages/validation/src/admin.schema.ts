@@ -10,6 +10,9 @@ export const createBikeSchema = z.object({
   city: z.string().min(1).max(100),
   pricePerDay: z.coerce.number().min(0),
   imageUrl: z.string().url(),
+  // Uploaded via the existing POST /api/upload (Cloudinary) — this just carries the resulting
+  // URLs, same shape as Trip.gallery.
+  gallery: z.array(z.string().url()).max(8).optional(),
   ownerId: z.string().min(1).optional(),
   description: z.string().max(3000).optional(),
 });
@@ -24,6 +27,7 @@ export const updateBikeSchema = z.object({
   city: z.string().min(1).max(100).optional(),
   pricePerDay: z.coerce.number().min(0).optional(),
   imageUrl: z.string().url().optional(),
+  gallery: z.array(z.string().url()).max(8).optional(),
   description: z.string().max(3000).optional(),
 });
 

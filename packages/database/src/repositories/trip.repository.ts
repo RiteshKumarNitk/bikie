@@ -201,6 +201,7 @@ export async function createTrip(data: {
   title: string;
   description: string;
   imageUrl: string;
+  gallery?: string[];
   type: string;
   difficulty: string;
   price: number;
@@ -229,6 +230,7 @@ export async function createTrip(data: {
           title: data.title,
           description: data.description,
           imageUrl: data.imageUrl,
+          gallery: data.gallery ?? [],
           type: data.type as never,
           difficulty: data.difficulty as never,
           price: data.price,

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-05T16:44:08.731Z",
-  "count": 119,
+  "generatedAt": "2026-08-06T09:31:50.421Z",
+  "count": 120,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -536,9 +536,18 @@
       "file": "apps/web/app/api/otp/mobile/send/route.ts"
     },
     {
+      "path": "/api/partner/bikes/{id}",
+      "methods": [
+        "DELETE"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/bikes/[id]/route.ts"
+    },
+    {
       "path": "/api/partner/bikes",
       "methods": [
-        "GET"
+        "GET",
+        "POST"
       ],
       "auth": "partner",
       "file": "apps/web/app/api/partner/bikes/route.ts"

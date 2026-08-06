@@ -324,7 +324,6 @@ describe("sos profile warning", () => {
 describe("sos createAlert reverse geocoding (ADR-038)", () => {
   const createInput = {
     type: "ACCIDENT",
-    description: null,
     latitude: 26.9124,
     longitude: 75.7873,
     city: "Jaipur",

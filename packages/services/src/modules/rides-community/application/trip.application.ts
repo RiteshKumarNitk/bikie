@@ -98,6 +98,7 @@ export function createTripApplication(ports: RidesCommunityPorts) {
         title: input.title,
         description: input.description,
         imageUrl: input.imageUrl ?? DEFAULT_TRIP_IMAGE,
+        gallery: input.gallery,
         type: input.type,
         difficulty: input.difficulty,
         price: input.price,

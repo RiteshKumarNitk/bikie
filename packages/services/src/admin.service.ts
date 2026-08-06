@@ -38,6 +38,7 @@ export const AdminService = {
     slug: string;
     brand: string;
     categoryId: string;
+    gallery?: string[];
     city: string;
     pricePerDay: number;
     imageUrl: string;

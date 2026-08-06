@@ -69,6 +69,27 @@ void main() {
       expect(captured['startDate'], start.toIso8601String());
       expect(captured.containsKey('meetingPoint'), isFalse);
       expect(captured.containsKey('destinationId'), isFalse);
+      expect(captured.containsKey('gallery'), isFalse);
+    });
+
+    test('includes gallery URLs when provided, omits the key when empty', () async {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => okResponse('/api/trips', {'trip': buildTripSummaryJson()}),
+      );
+
+      await repository.create(
+        title: 'Himalayan Run',
+        description: 'A great ride',
+        type: 'ADVENTURE',
+        seatsTotal: 10,
+        startDate: DateTime.utc(2026, 9, 1),
+        endDate: DateTime.utc(2026, 9, 5),
+        gallery: ['https://example.com/1.jpg', 'https://example.com/2.jpg'],
+      );
+
+      final captured =
+          verify(() => dio.post('/api/trips', data: captureAny(named: 'data'))).captured.single as Map<String, dynamic>;
+      expect(captured['gallery'], ['https://example.com/1.jpg', 'https://example.com/2.jpg']);
     });
 
     test('surfaces a 403 MEMBERSHIP_REQUIRED error as a typed ApiException', () async {

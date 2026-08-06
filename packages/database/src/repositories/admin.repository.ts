@@ -142,6 +142,7 @@ export async function createBike(data: {
   city: string;
   pricePerDay: number;
   imageUrl: string;
+  gallery?: string[];
   ownerId?: string;
   description?: string;
 }) {

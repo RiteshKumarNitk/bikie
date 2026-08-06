@@ -31,10 +31,13 @@ export default function PartnerFleetPage() {
   const [categories, setCategories] = useState<Category[]>([]);
   const [form, setForm] = useState({
     name: "", brand: "", slug: "", categoryId: "", city: "",
-    pricePerDay: "", imageUrl: "", description: "",
+    pricePerDay: "", imageUrl: "", gallery: [] as string[], description: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -47,28 +50,57 @@ export default function PartnerFleetPage() {
     });
   }, []);
 
+  async function uploadFile(file: File): Promise<string | null> {
+    setUploadError(null);
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload", { method: "POST", body: formData });
+    if (!res.ok) {
+      setUploadError("Couldn't upload that image. Please try again.");
+      return null;
+    }
+    const { url } = await res.json();
+    return url as string;
+  }
+
+  async function handleCoverUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingCover(true);
+    const url = await uploadFile(file);
+    if (url) setForm((f) => ({ ...f, imageUrl: url }));
+    setUploadingCover(false);
+    e.target.value = "";
+  }
+
+  async function handleGalleryUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    if (files.length === 0) return;
+    setUploadingGallery(true);
+    const urls = (await Promise.all(files.map(uploadFile))).filter((u): u is string => Boolean(u));
+    setForm((f) => ({ ...f, gallery: [...f.gallery, ...urls].slice(0, 8) }));
+    setUploadingGallery(false);
+    e.target.value = "";
+  }
+
   async function handleAdd() {
     setSubmitting(true);
-    const res = await fetch("/api/admin/bikes", {
+    const res = await fetch("/api/partner/bikes", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...form,
-        pricePerDay: Number(form.pricePerDay),
-        ownerId: (await fetch("/api/auth/get-session").then((r) => r.json())).user?.id,
-      }),
+      body: JSON.stringify({ ...form, pricePerDay: Number(form.pricePerDay) }),
     });
     setSubmitting(false);
     if (res.ok) {
       setShowAdd(false);
-      setForm({ name: "", brand: "", slug: "", categoryId: "", city: "", pricePerDay: "", imageUrl: "", description: "" });
+      setForm({ name: "", brand: "", slug: "", categoryId: "", city: "", pricePerDay: "", imageUrl: "", gallery: [], description: "" });
       const data = await res.json();
       setBikes((prev) => [...prev, data.bike]);
     }
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/admin/bikes/${id}`, { method: "DELETE" });
+    await fetch(`/api/partner/bikes/${id}`, { method: "DELETE" });
     setDeletingId(null);
     setBikes((prev) => prev.filter((b) => b.id !== id));
   }
@@ -164,8 +196,53 @@ export default function PartnerFleetPage() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-medium">Image URL</label>
-                <input value={form.imageUrl} onChange={(e) => setForm({ ...form, imageUrl: e.target.value })} placeholder="https://..." className="mt-1 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent" />
+                <label className="text-xs font-medium">Cover photo</label>
+                <div className="mt-1 flex items-center gap-3">
+                  {form.imageUrl && (
+                    <div className="h-14 w-20 shrink-0 overflow-hidden rounded-lg border border-foreground/10">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={form.imageUrl} alt="Cover" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleCoverUpload}
+                    disabled={uploadingCover}
+                    className="block w-full text-xs text-foreground/60 file:mr-3 file:rounded-lg file:border-0 file:bg-foreground/10 file:px-3 file:py-2 file:text-xs file:font-medium hover:file:bg-foreground/20"
+                  />
+                </div>
+                {uploadingCover && <p className="mt-1 text-xs text-foreground/50">Uploading…</p>}
+              </div>
+              <div>
+                <label className="text-xs font-medium">Gallery photos <span className="font-normal text-foreground/40">(optional, up to 8)</span></label>
+                {form.gallery.length > 0 && (
+                  <div className="mt-1.5 flex flex-wrap gap-2">
+                    {form.gallery.map((url, i) => (
+                      <div key={url} className="relative h-14 w-20 overflow-hidden rounded-lg border border-foreground/10">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={url} alt={`Gallery ${i + 1}`} className="h-full w-full object-cover" />
+                        <button
+                          type="button"
+                          onClick={() => setForm((f) => ({ ...f, gallery: f.gallery.filter((_, idx) => idx !== i) }))}
+                          className="absolute right-0.5 top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-black/60 text-[10px] text-white"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleGalleryUpload}
+                  disabled={uploadingGallery || form.gallery.length >= 8}
+                  className="mt-2 block w-full text-xs text-foreground/60 file:mr-3 file:rounded-lg file:border-0 file:bg-foreground/10 file:px-3 file:py-2 file:text-xs file:font-medium hover:file:bg-foreground/20"
+                />
+                {uploadingGallery && <p className="mt-1 text-xs text-foreground/50">Uploading…</p>}
+                {uploadError && <p className="mt-1 text-xs text-red-400">{uploadError}</p>}
               </div>
               <div>
                 <label className="text-xs font-medium">Description</label>
@@ -175,7 +252,7 @@ export default function PartnerFleetPage() {
 
             <div className="mt-6 flex gap-3">
               <button type="button" onClick={() => setShowAdd(false)} className="flex-1 rounded-xl border border-foreground/10 px-4 py-2.5 text-sm font-medium transition-colors hover:bg-foreground/5">Cancel</button>
-              <button type="button" onClick={handleAdd} disabled={submitting || !form.name || !form.brand || !form.categoryId || !form.city || !form.pricePerDay} className="flex-1 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50">{submitting ? "Adding..." : "Add Bike"}</button>
+              <button type="button" onClick={handleAdd} disabled={submitting || !form.name || !form.brand || !form.categoryId || !form.city || !form.pricePerDay || !form.imageUrl} className="flex-1 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50">{submitting ? "Adding..." : "Add Bike"}</button>
             </div>
           </div>
         </div>

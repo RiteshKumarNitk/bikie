@@ -50,71 +50,14 @@ async function signUpViaAuthApi(account: { name: string; email: string; password
   return user;
 }
 
-const categories = [
-  { name: "Adventure", slug: "adventure", type: "ADVENTURE" as const, sortOrder: 1, imageUrl: "https://picsum.photos/seed/cat-adventure/400/400" },
-  { name: "Cruiser", slug: "cruiser", type: "CRUISER" as const, sortOrder: 2, imageUrl: "https://picsum.photos/seed/cat-cruiser/400/400" },
-  { name: "Royal Enfield", slug: "royal-enfield", type: "ROYAL_ENFIELD" as const, sortOrder: 3, imageUrl: "https://picsum.photos/seed/cat-re/400/400" },
-  { name: "Sports", slug: "sports", type: "SPORTS" as const, sortOrder: 4, imageUrl: "https://picsum.photos/seed/cat-sports/400/400" },
-  { name: "Scooter", slug: "scooter", type: "SCOOTER" as const, sortOrder: 5, imageUrl: "https://picsum.photos/seed/cat-scooter/400/400" },
-  { name: "Electric", slug: "electric", type: "ELECTRIC" as const, sortOrder: 6, imageUrl: "https://picsum.photos/seed/cat-electric/400/400" },
-  { name: "Touring", slug: "touring", type: "TOURING" as const, sortOrder: 7, imageUrl: "https://picsum.photos/seed/cat-touring/400/400" },
-  { name: "Luxury", slug: "luxury", type: "LUXURY" as const, sortOrder: 8, imageUrl: "https://picsum.photos/seed/cat-luxury/400/400" },
-  { name: "Off Road", slug: "off-road", type: "OFF_ROAD" as const, sortOrder: 9, imageUrl: "https://picsum.photos/seed/cat-offroad/400/400" },
-];
-
-const destinations = [
-  { name: "Leh Ladakh", slug: "leh-ladakh", state: "Ladakh", bikeCount: 24, imageUrl: "https://picsum.photos/seed/dest-ladakh/800/600", description: "High-altitude passes, glacial lakes, and the most iconic ride in India." },
-  { name: "Spiti Valley", slug: "spiti-valley", state: "Himachal Pradesh", bikeCount: 18, imageUrl: "https://picsum.photos/seed/dest-spiti/800/600", description: "Cold desert monasteries and switchback mountain roads." },
-  { name: "Goa", slug: "goa", state: "Goa", bikeCount: 42, imageUrl: "https://picsum.photos/seed/dest-goa/800/600", description: "Coastal highways, beach shacks, and easy scooter weekends." },
-  { name: "Coorg", slug: "coorg", state: "Karnataka", bikeCount: 15, imageUrl: "https://picsum.photos/seed/dest-coorg/800/600", description: "Misty coffee estates and winding forest roads." },
-  { name: "Rishikesh", slug: "rishikesh", state: "Uttarakhand", bikeCount: 21, imageUrl: "https://picsum.photos/seed/dest-rishikesh/800/600", description: "Himalayan foothills along the Ganges, gateway to Chopta and beyond." },
-  { name: "Munnar", slug: "munnar", state: "Kerala", bikeCount: 12, imageUrl: "https://picsum.photos/seed/dest-munnar/800/600", description: "Tea-carpeted hills and hairpin bends in the Western Ghats." },
-];
-
-const bikeSpecs = {
-  adventure: { engineCc: 452, mileageKmpl: 30, fuelTankLitres: 17, hasAbs: true, seatHeightMm: 825, luggageCapacityL: 40 },
-  "royal-enfield": { engineCc: 349, mileageKmpl: 36, fuelTankLitres: 13, hasAbs: true, seatHeightMm: 795, luggageCapacityL: 20 },
-  sports: { engineCc: 373, mileageKmpl: 28, fuelTankLitres: 13, hasAbs: true, seatHeightMm: 830, luggageCapacityL: 12 },
-  cruiser: { engineCc: 349, mileageKmpl: 35, fuelTankLitres: 15, hasAbs: true, seatHeightMm: 765, luggageCapacityL: 25 },
-  scooter: { engineCc: 109, mileageKmpl: 45, fuelTankLitres: 5, hasAbs: false, seatHeightMm: 765, luggageCapacityL: 18 },
-  electric: { engineCc: null, mileageKmpl: null, fuelTankLitres: null, hasAbs: true, seatHeightMm: 765, luggageCapacityL: 22 },
-  touring: { engineCc: 649, mileageKmpl: 22, fuelTankLitres: 21, hasAbs: true, seatHeightMm: 840, luggageCapacityL: 60 },
-  luxury: { engineCc: 955, mileageKmpl: 15, fuelTankLitres: 17, hasAbs: true, seatHeightMm: 830, luggageCapacityL: 10 },
-  "off-road": { engineCc: 199, mileageKmpl: 40, fuelTankLitres: 13, hasAbs: true, seatHeightMm: 825, luggageCapacityL: 15 },
-} as const;
-
-const bikes = [
-  { name: "Himalayan 450", brand: "Royal Enfield", category: "adventure", city: "Leh", price: 1799, image: "https://picsum.photos/seed/bike-himalayan/800/600", description: "Built for the mountains — long-travel suspension and a torquey 452cc engine make it the default choice for Ladakh." },
-  { name: "Continental GT", brand: "Royal Enfield", category: "royal-enfield", city: "Goa", price: 1499, image: "https://picsum.photos/seed/bike-continental/800/600", description: "A café-racer that's equally happy carving coastal curves as it is cruising the highway." },
-  { name: "Duke 390", brand: "KTM", category: "sports", city: "Bangalore", price: 1699, image: "https://picsum.photos/seed/bike-duke/800/600", description: "Sharp, aggressive, and quick — the Duke rewards a spirited riding style." },
-  { name: "Meteor 350", brand: "Royal Enfield", category: "cruiser", city: "Jaipur", price: 1299, image: "https://picsum.photos/seed/bike-meteor/800/600", description: "Relaxed ergonomics and a Tripper navigation pod make this an easy long-distance cruiser." },
-  { name: "Activa 6G", brand: "Honda", category: "scooter", city: "Mumbai", price: 599, image: "https://picsum.photos/seed/bike-activa/800/600", description: "The reliable city companion — light, frugal, and effortless in traffic." },
-  { name: "Ather 450X", brand: "Ather", category: "electric", city: "Chennai", price: 899, image: "https://picsum.photos/seed/bike-ather/800/600", description: "A quick, connected electric scooter for zero-emission city rides." },
-  { name: "Versys 650", brand: "Kawasaki", category: "touring", city: "Manali", price: 2499, image: "https://picsum.photos/seed/bike-versys/800/600", description: "A parallel-twin tourer with the comfort and luggage capacity for multi-week trips." },
-  { name: "Interceptor 650", brand: "Royal Enfield", category: "cruiser", city: "Rishikesh", price: 1899, image: "https://picsum.photos/seed/bike-interceptor/800/600", description: "Retro styling with a genuinely enjoyable parallel-twin engine — a modern classic." },
-  { name: "Panigale V2", brand: "Ducati", category: "luxury", city: "Delhi", price: 5999, image: "https://picsum.photos/seed/bike-panigale/800/600", description: "Race-derived performance for riders who want the full superbike experience." },
-  { name: "XPulse 200", brand: "Hero", category: "off-road", city: "Coorg", price: 999, image: "https://picsum.photos/seed/bike-xpulse/800/600", description: "Long suspension travel and switchable ABS make this the budget off-road pick." },
-  { name: "Classic 350", brand: "Royal Enfield", category: "royal-enfield", city: "Udaipur", price: 1399, image: "https://picsum.photos/seed/bike-classic350/800/600", description: "The bike that defines the segment — thumping single-cylinder charm, unmistakable silhouette." },
-  { name: "Dominar 400", brand: "Bajaj", category: "touring", city: "Spiti Valley", price: 1599, image: "https://picsum.photos/seed/bike-dominar/800/600", description: "A liquid-cooled tourer built for high-altitude passes and long days in the saddle." },
-];
-
-const testimonials = [
-  { authorName: "Aditya Rao", authorLocation: "Bangalore", rating: 5, quote: "Booked a Himalayan in ten minutes and rode Ladakh a week later. The whole experience felt effortless.", avatar: "https://i.pravatar.cc/150?img=12" },
-  { authorName: "Priya Nair", authorLocation: "Kochi", rating: 5, quote: "Way better than the usual rental shop scramble. The bike was exactly as pictured and pickup was seamless.", avatar: "https://i.pravatar.cc/150?img=32" },
-  { authorName: "Rohan Mehta", authorLocation: "Pune", rating: 4, quote: "Loved the curated destination guides — found a coastal route in Goa I'd never have discovered otherwise.", avatar: "https://i.pravatar.cc/150?img=45" },
-  { authorName: "Simran Kaur", authorLocation: "Delhi", rating: 5, quote: "Felt premium from search to pickup. This is what Indian road trips have been missing.", avatar: "https://i.pravatar.cc/150?img=47" },
-  { authorName: "Karthik Iyer", authorLocation: "Chennai", rating: 5, quote: "Instant booking, transparent pricing, and a genuinely well-maintained bike. Will use again.", avatar: "https://i.pravatar.cc/150?img=51" },
-  { authorName: "Neha Verma", authorLocation: "Jaipur", rating: 4, quote: "The Spiti Valley trip planning tips alone were worth it. Smooth rental process too.", avatar: "https://i.pravatar.cc/150?img=25" },
-];
-
-const tripsSeed = [
-  { slug: "leh-ladakh-adventure-8-day", title: "Leh–Ladakh 8-Day Adventure", type: "ADVENTURE" as const, difficulty: "HARD" as const, price: 34999, seatsTotal: 12, destinationSlug: "leh-ladakh", daysFromNow: 30, durationDays: 8, image: "https://picsum.photos/seed/trip-ladakh/900/600", description: "Khardung La, Pangong Tso, and Nubra Valley over eight unforgettable days with a support vehicle and experienced ride captain." },
-  { slug: "goa-weekend-coastal-ride", title: "Goa Weekend Coastal Ride", type: "WEEKEND" as const, difficulty: "EASY" as const, price: 6999, seatsTotal: 20, destinationSlug: "goa", daysFromNow: 12, durationDays: 2, image: "https://picsum.photos/seed/trip-goa/900/600", description: "A relaxed two-day loop through Goa's coastal highways, beach shacks, and sunset viewpoints." },
-  { slug: "spiti-valley-road-trip", title: "Spiti Valley Road Trip", type: "ROAD_TRIP" as const, difficulty: "HARD" as const, price: 27999, seatsTotal: 10, destinationSlug: "spiti-valley", daysFromNow: 45, durationDays: 7, image: "https://picsum.photos/seed/trip-spiti/900/600", description: "Cold-desert monasteries, Chandratal Lake, and some of the most dramatic mountain roads in the world." },
-  { slug: "rishikesh-himalayan-foothills", title: "Rishikesh Himalayan Foothills", type: "WEEKEND" as const, difficulty: "MODERATE" as const, price: 8999, seatsTotal: 16, destinationSlug: "rishikesh", daysFromNow: 20, durationDays: 3, image: "https://picsum.photos/seed/trip-rishikesh/900/600", description: "Riverside camping, Chopta meadows, and a gentle introduction to Himalayan riding." },
-  { slug: "coorg-misty-hills-tour", title: "Coorg Misty Hills Tour", type: "GUIDED_TOUR" as const, difficulty: "EASY" as const, price: 7499, seatsTotal: 14, destinationSlug: "coorg", daysFromNow: 15, durationDays: 3, image: "https://picsum.photos/seed/trip-coorg/900/600", description: "A guided ride through coffee estates and waterfalls with a certified local tour guide." },
-  { slug: "bhutan-international-expedition", title: "Bhutan International Expedition", type: "INTERNATIONAL" as const, difficulty: "MODERATE" as const, price: 89999, seatsTotal: 8, destinationSlug: null, daysFromNow: 75, durationDays: 10, image: "https://picsum.photos/seed/trip-bhutan/900/600", description: "Cross-border riding through the Land of the Thunder Dragon — permits, fuel, and border formalities handled for you." },
-];
+// Dummy bike catalog (`bikeSpecs`/`bikes`) removed per explicit request — real partner-listed
+// bikes replace it now. `bikeSpecs`-shaped fields (engineCc/mileageKmpl/etc.) still exist on
+// the `Bike` model for whoever lists a real one; only this seed data is gone.
+//
+// Categories, destinations, testimonials, and the community-ride (`Trip`) sample data were
+// removed the same way, per explicit request — all four are created for real through the admin
+// panel now, not seeded. Nothing else in this file depends on them: the SOS E2E fixtures below
+// only need users/membership/location, not any of this content.
 
 async function main() {
   console.log("Seeding auth accounts (requires 'pnpm dev' running on", AUTH_BASE_URL, ")...");
@@ -126,31 +69,10 @@ async function main() {
   await prisma.user.update({ where: { id: partnerUser.id }, data: { role: "PARTNER" } });
   // demoUser stays RENTER (default)
 
-  await prisma.partner.upsert({
-    where: { userId: partnerUser.id },
-    update: {
-      city: SOS_SEED_GPS.city,
-      contactPerson1Name: "Arjun Desk",
-      contactPerson1Mobile: "+919876543210",
-      contactPerson2Name: "Roadside Van",
-      contactPerson2Mobile: "+919876543211",
-    },
-    create: {
-      userId: partnerUser.id,
-      businessName: "Arjun Rentals",
-      type: "RENTAL",
-      city: SOS_SEED_GPS.city,
-      description: "Family-run motorcycle rental fleet — SOS test partner for Bangalore.",
-      logoUrl: "https://picsum.photos/seed/partner-arjun/200/200",
-      isVerified: true,
-      ratingAvg: 4.7,
-      ratingCount: 58,
-      contactPerson1Name: "Arjun Desk",
-      contactPerson1Mobile: "+919876543210",
-      contactPerson2Name: "Roadside Van",
-      contactPerson2Mobile: "+919876543211",
-    },
-  });
+  // No dummy Partner business profile is seeded — `partnerUser` has role PARTNER but no
+  // Partner row, so logging in hits the real partner-onboarding flow, same as a fresh partner
+  // signup would. Previously seeded a fake "Arjun Rentals" profile here; removed per explicit
+  // request once real data started replacing the demo dataset.
 
   await prisma.user.update({
     where: { id: partnerUser.id },
@@ -161,144 +83,8 @@ async function main() {
     data: { phone: "+919900001111", name: "Demo Rider" },
   });
 
-  const categoryRecords: Record<string, { id: string }> = {};
-  for (const c of categories) {
-    categoryRecords[c.slug] = await prisma.category.upsert({ where: { type: c.type }, update: {}, create: c });
-  }
-
-  const destinationRecords: Record<string, { id: string }> = {};
-  for (const d of destinations) {
-    destinationRecords[d.slug] = await prisma.destination.upsert({
-      where: { slug: d.slug },
-      update: {},
-      create: { name: d.name, slug: d.slug, state: d.state, bikeCount: d.bikeCount, imageUrl: d.imageUrl, description: d.description, isPopular: true },
-    });
-  }
-
-  const destinationSlugs = Object.keys(destinationRecords);
-  const bikeRecords: { id: string }[] = [];
-  for (let i = 0; i < bikes.length; i++) {
-    const b = bikes[i];
-    const destinationSlug = destinationSlugs[i % destinationSlugs.length];
-    const specs = bikeSpecs[b.category as keyof typeof bikeSpecs];
-    const slug = b.name.toLowerCase().replace(/\s+/g, "-");
-    const bikeData = {
-      name: b.name,
-      brand: b.brand,
-      categoryId: categoryRecords[b.category].id,
-      destinationId: destinationRecords[destinationSlug].id,
-      ownerId: i % 3 === 0 ? partnerUser.id : null,
-      pricePerDay: b.price,
-      securityDeposit: Math.round(b.price * 1.5),
-      city: b.city,
-      imageUrl: b.image,
-      gallery: [b.image, b.image.replace("/800/600", "/801/600"), b.image.replace("/800/600", "/802/600")],
-      ratingAvg: 4.5 + (i % 2) * 0.4,
-      ratingCount: 20 + i * 7,
-      isFeatured: i < 8,
-      description: b.description,
-      ...specs,
-    };
-    const record = await prisma.bike.upsert({
-      where: { slug },
-      update: bikeData,
-      create: { slug, ...bikeData },
-    });
-    bikeRecords.push(record);
-  }
-
-  for (const t of testimonials) {
-    const exists = await prisma.testimonial.findFirst({ where: { authorName: t.authorName } });
-    if (!exists) {
-      await prisma.testimonial.create({
-        data: { authorName: t.authorName, authorLocation: t.authorLocation, authorAvatarUrl: t.avatar, rating: t.rating, quote: t.quote, isFeatured: true },
-      });
-    }
-  }
-
-  // Bookings + reviews for the demo user
-  const now = Date.now();
-  const day = 24 * 60 * 60 * 1000;
-  const bookingSeed = [
-    { bikeIndex: 0, status: "COMPLETED" as const, startOffset: -20, days: 4, review: { rating: 5, comment: "Ran perfectly through Ladakh's passes. Would rent again." } },
-    { bikeIndex: 2, status: "COMPLETED" as const, startOffset: -8, days: 2, review: { rating: 4, comment: "Fun bike for a weekend blast, tyres could've had more grip." } },
-    { bikeIndex: 4, status: "CONFIRMED" as const, startOffset: 5, days: 3, review: null },
-    { bikeIndex: 6, status: "PENDING" as const, startOffset: 25, days: 6, review: null },
-  ];
-  for (const b of bookingSeed) {
-    const bike = bikeRecords[b.bikeIndex];
-    const startDate = new Date(now + b.startOffset * day);
-    const endDate = new Date(startDate.getTime() + b.days * day);
-    const bikeFull = await prisma.bike.findUniqueOrThrow({ where: { id: bike.id } });
-    const existingBooking = await prisma.booking.findFirst({ where: { userId: demoUser.id, bikeId: bike.id, startDate } });
-    const booking =
-      existingBooking ??
-      (await prisma.booking.create({
-        data: {
-          bikeId: bike.id,
-          userId: demoUser.id,
-          startDate,
-          endDate,
-          totalPrice: Number(bikeFull.pricePerDay) * b.days,
-          status: b.status,
-          pickupCity: bikeFull.city,
-        },
-      }));
-
-    if (b.review) {
-      const existingReview = await prisma.review.findUnique({ where: { bookingId: booking.id } });
-      if (!existingReview) {
-        await prisma.review.create({
-          data: { bikeId: bike.id, userId: demoUser.id, bookingId: booking.id, rating: b.review.rating, comment: b.review.comment },
-        });
-      }
-    }
-  }
-
-  // Wishlist for demo user
-  for (const idx of [1, 5, 9]) {
-    await prisma.wishlist.upsert({
-      where: { userId_bikeId: { userId: demoUser.id, bikeId: bikeRecords[idx].id } },
-      update: {},
-      create: { userId: demoUser.id, bikeId: bikeRecords[idx].id },
-    });
-  }
-
-  // Trips organized by the partner, demo user joins two of them
-  const tripRecords: { id: string; slug: string }[] = [];
-  for (const t of tripsSeed) {
-    const startDate = new Date(now + t.daysFromNow * day);
-    const endDate = new Date(startDate.getTime() + t.durationDays * day);
-    const trip = await prisma.trip.upsert({
-      where: { slug: t.slug },
-      update: {},
-      create: {
-        slug: t.slug,
-        title: t.title,
-        description: t.description,
-        imageUrl: t.image,
-        gallery: [t.image],
-        type: t.type,
-        difficulty: t.difficulty,
-        price: t.price,
-        seatsTotal: t.seatsTotal,
-        seatsLeft: t.seatsTotal - 3,
-        startDate,
-        endDate,
-        organizerId: partnerUser.id,
-        destinationId: t.destinationSlug ? destinationRecords[t.destinationSlug].id : null,
-      },
-    });
-    tripRecords.push(trip);
-  }
-
-  for (const trip of [tripRecords[1], tripRecords[3]]) {
-    await prisma.tripParticipant.upsert({
-      where: { tripId_userId: { tripId: trip.id, userId: demoUser.id } },
-      update: {},
-      create: { tripId: trip.id, userId: demoUser.id, status: "APPROVED", decidedAt: new Date() },
-    });
-  }
+  // No dummy Bike/Category/Destination/Testimonial/Trip content is seeded — all of it is
+  // created for real through the admin panel (and real partner listings) now, not demo filler.
 
   console.log("Seed complete.");
   // --- Seed Membership Plans ---

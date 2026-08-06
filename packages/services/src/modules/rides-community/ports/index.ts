@@ -67,6 +67,7 @@ export interface TripRepositoryPort {
     title: string;
     description: string;
     imageUrl: string;
+    gallery?: string[];
     type: string;
     difficulty: string;
     price: number;

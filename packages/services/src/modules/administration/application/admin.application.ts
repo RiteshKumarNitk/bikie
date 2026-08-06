@@ -28,6 +28,7 @@ export function createAdminApplication(ports: AdministrationPorts) {
       city: string;
       pricePerDay: number;
       imageUrl: string;
+      gallery?: string[];
       ownerId?: string;
       description?: string;
     }) => ports.admin.createBike(data),

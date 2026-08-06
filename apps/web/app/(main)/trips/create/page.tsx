@@ -36,6 +36,8 @@ export default function CreateRidePage() {
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [gallery, setGallery] = useState<string[]>([]);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
   const [price, setPrice] = useState("0");
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -80,6 +82,7 @@ export default function CreateRidePage() {
           startDate: new Date(startDate).toISOString(),
           endDate: new Date(endDate).toISOString(),
           imageUrl,
+          gallery: gallery.length > 0 ? gallery : undefined,
         }),
       });
 
@@ -286,6 +289,57 @@ export default function CreateRidePage() {
                 <p className="mt-1 text-xs text-foreground/50">Upload a cover image (JPG, PNG). Max size 5MB.</p>
               </div>
             </div>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium">
+              Gallery <span className="font-normal text-foreground/50">(optional, up to 8 more photos)</span>
+            </label>
+            {gallery.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-2">
+                {gallery.map((url, i) => (
+                  <div key={url} className="relative h-16 w-24 overflow-hidden rounded-xl border border-foreground/10">
+                    <img src={url} alt={`Gallery ${i + 1}`} className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => setGallery((g) => g.filter((_, idx) => idx !== i))}
+                      className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-xs text-white"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              disabled={uploadingGallery || gallery.length >= 8}
+              onChange={async (e) => {
+                const files = Array.from(e.target.files ?? []);
+                if (files.length === 0) return;
+                setUploadingGallery(true);
+                try {
+                  const uploaded = await Promise.all(
+                    files.map(async (file) => {
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      const res = await fetch("/api/upload", { method: "POST", body: formData });
+                      if (!res.ok) return null;
+                      const { url } = await res.json();
+                      return url as string;
+                    }),
+                  );
+                  setGallery((g) => [...g, ...uploaded.filter((u): u is string => Boolean(u))].slice(0, 8));
+                } finally {
+                  setUploadingGallery(false);
+                  e.target.value = "";
+                }
+              }}
+              className="mt-2 block w-full text-sm text-foreground/60 file:mr-4 file:rounded-xl file:border-0 file:bg-foreground/5 file:px-4 file:py-2.5 file:text-sm file:font-semibold hover:file:bg-foreground/10 focus:outline-none"
+            />
+            {uploadingGallery && <p className="mt-1 text-xs text-foreground/50">Uploading…</p>}
           </div>
 
           <label className="flex items-start gap-3">

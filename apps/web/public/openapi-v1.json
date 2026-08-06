@@ -4203,6 +4203,57 @@
         }
       }
     },
+    "/api/partner/bikes/{id}": {
+      "delete": {
+        "operationId": "delete_api_partner_bikes_id_",
+        "tags": [
+          "partner"
+        ],
+        "summary": "DELETE /api/partner/bikes/{id}",
+        "description": "Source: `apps/web/app/api/partner/bikes/[id]/route.ts`. Auth class: `partner`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "partner",
+        "x-bikie-source": "apps/web/app/api/partner/bikes/[id]/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
     "/api/partner/bikes": {
       "get": {
         "operationId": "get_api_partner_bikes",
@@ -4210,6 +4261,55 @@
           "partner"
         ],
         "summary": "GET /api/partner/bikes",
+        "description": "Source: `apps/web/app/api/partner/bikes/route.ts`. Auth class: `partner`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "partner",
+        "x-bikie-source": "apps/web/app/api/partner/bikes/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_api_partner_bikes",
+        "tags": [
+          "partner"
+        ],
+        "summary": "POST /api/partner/bikes",
         "description": "Source: `apps/web/app/api/partner/bikes/route.ts`. Auth class: `partner`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
         "security": [
           {

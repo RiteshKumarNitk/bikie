@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Remove remaining demo content; real (multi-)image upload; partner bike-listing fix (2026-08-06, ADR-039)
+
+| Task | Status |
+|---|---|
+| Live data: deleted all 6 seed trips, 6 destinations, 9 categories, 6 testimonials | Completed |
+| `seed.ts`: removed the corresponding arrays/loops — all four are admin/user-created now | Completed |
+| **Fixed pre-existing bug**: Partner Fleet "Add Bike" posted to the ADMIN-only `/api/admin/bikes` — 403'd for every real partner | Completed — new `POST/DELETE /api/partner/bikes(/[id])`, ownership-checked, reuses `AdminService.createBike/deleteBike` |
+| Testimonial admin form: added the avatar upload button it never had (`authorAvatarUrl` was already reachable server-side) | Completed |
+| Partner Fleet "Add Bike": Image URL text field replaced with real upload | Completed |
+| `Bike.gallery`/`Trip.gallery` (existed, unreachable from any client) wired through validation/port/application/repository layers | Completed |
+| Multi-image upload UI: Partner Fleet (web, `<input multiple>`), ride creation (web + mobile `pickMultiImage`) — capped at 8 images | Completed |
+| `pnpm openapi:generate` re-run for the 2 new routes (119 → 120) | Completed |
+| Backend: 9/9 packages typecheck clean, 123/123 vitest passing. Mobile: `flutter analyze` 0 issues, 94/94 tests passing (2 new) | Completed |
+| Admin CRUD for Category/Destination | **Not built** — confirmed no admin UI or API route has ever existed for either; deferred per explicit user decision ("if required we will create that") |
+
 ## SOS reverse-geocoded address (2026-08-06, ADR-038)
 
 | Task | Status |
@@ -438,7 +453,6 @@ Deferred per explicit user decision — tracked here for a future pass:
 
 | Bug | Area |
 |---|---|
-| Partner Fleet Add/Remove buttons POST/DELETE to `/api/admin/bikes` (ADMIN-only) — 403s for real partners in production | Partner dashboard |
 | No bike edit/update capability anywhere for partners | Partner dashboard |
 | Partner Bookings page is read-only, no accept/reject route exists | Partner dashboard |
 | Partner Settings/business-profile page is read-only despite a working `PUT /api/partner/profile` underneath | Partner dashboard |

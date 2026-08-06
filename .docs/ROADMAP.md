@@ -1,5 +1,17 @@
 # BIKIE — Roadmap
 
+## Demo Content Removed; Real Multi-Image Upload; Partner Bike-Listing Fixed (2026-08-06, ADR-039)
+Categories, destinations, testimonials, and the sample ride catalog removed from both the live
+database and the seed script, joining the earlier bike/partner cleanup — all admin/user-created
+from here on. Found and fixed a real, load-bearing bug while auditing what would replace them:
+Partner Fleet's "Add Bike" posted to the ADMIN-only bike route and 403'd for every real partner
+— new `POST/DELETE /api/partner/bikes(/[id])`, ownership-checked, fixes it. Every remaining
+URL-text-field image input (Testimonial admin form's avatar, Partner Fleet's bike photo) became
+a real upload through the existing Cloudinary endpoint, and `Bike`/`Trip`'s long-unreachable
+`gallery` columns are now wired end-to-end with multi-file upload UI on web and mobile (capped
+at 8 images). Admin CRUD for Category/Destination still doesn't exist — confirmed, not built,
+deferred by explicit user decision. See ADR-039 and `.docs/TASKS.md`.
+
 ## SOS Reverse-Geocoded Address (2026-08-06, ADR-038)
 SOS notifications (SMS/WhatsApp/email/in-app/push) and both platforms' alert screens now show a
 real place name/area ("City Park, Malviya Nagar, Jaipur") instead of raw coordinates, resolved
