@@ -372,11 +372,16 @@ class _ConfirmView extends StatelessWidget {
               childAspectRatio: 3.2,
               children: theme.categories.map((c) {
                 final selected = category?.label == c.label;
+                // `Theme.of(context).dividerColor` is the same literal hex as this sheet's own
+                // background in dark mode (`AppColors.darkSecondary` == `darkSurface`), so an
+                // unselected border drawn in that color was invisible — the buttons read as plain
+                // text. `onSurface` is guaranteed to contrast with the surface it sits on.
+                final onSurface = Theme.of(context).colorScheme.onSurface;
                 return OutlinedButton(
                   onPressed: () => onCategoryChanged(c),
                   style: OutlinedButton.styleFrom(
-                    backgroundColor: selected ? theme.color.withValues(alpha: 0.12) : null,
-                    side: BorderSide(color: selected ? theme.color : Theme.of(context).dividerColor),
+                    backgroundColor: selected ? theme.color.withValues(alpha: 0.12) : onSurface.withValues(alpha: 0.05),
+                    side: BorderSide(color: selected ? theme.color : onSurface.withValues(alpha: 0.28)),
                     foregroundColor: selected ? theme.color : null,
                   ),
                   child: Text('${c.icon} ${c.label}', style: const TextStyle(fontSize: 12)),
