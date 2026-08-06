@@ -17,7 +17,10 @@ export const sosAlertCreateSchema = z.object({
   description: z.string().max(1000).optional(),
   latitude: z.coerce.number().min(-90).max(90),
   longitude: z.coerce.number().min(-180).max(180),
-  city: z.string().min(1).max(100),
+  // Trimmed here, not just client-side, so a stored city with stray leading/trailing whitespace
+  // can never desync from the (also-trimmed) case-insensitive match `getActiveAlerts` does when
+  // another rider browses by city — see sos.repository.ts.
+  city: z.string().min(1).max(100).transform((v) => v.trim()),
 });
 
 export type SOSAlertCreateSchemaInput = z.infer<typeof sosAlertCreateSchema>;

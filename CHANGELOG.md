@@ -1,5 +1,75 @@
 # Changelog
 
+## Fix — SOS alerts could be invisible to riders in the same city over a plain casing mismatch
+- `getActiveAlerts` matched `city` with an exact, case-sensitive string comparison — both the
+  sender's city (typed once when sending an alert) and the viewer's city (typed via "Set city")
+  are free text with nothing forcing them to agree on spelling or capitalization, so "Jaipur" vs
+  "jaipur" (or a stray trailing space) silently excluded an otherwise-matching alert, with no
+  error anywhere to explain why. Now a trimmed, case-insensitive match — also trimmed at
+  creation time (`sosAlertCreateSchema`) so a stored city can't itself carry stray whitespace.
+  Applied the same trim to `findPartnersByCityForDispatch` (SOS partner fan-out), which already
+  had the case-insensitive half of this fix but not the trim.
+- Also found and fixed while here: the generated Prisma client was stale relative to
+  `schema.prisma` (missing the `placeName`/`area`/`formattedAddress` columns from the SOS
+  reverse-geocoding work), which broke `packages/database`'s typecheck outright — `prisma
+  generate` re-run. The live database itself was already up to date (`migrate status` confirmed
+  zero drift); only the local generated client needed refreshing.
+
+## Change — Mobile: profile name/photo updates now show up immediately; Rider Details opens read-only with an Edit action; no more Skip
+- **Name/photo not reflecting after save**: `AuthRepository.updateUser()` updates the account
+  server-side but had no way to update `AuthController`'s own cached session — screens reading
+  `authControllerProvider` (Profile's displayed name/avatar) kept showing the stale value until a
+  full app restart. New `AuthController.refreshSession()` re-fetches the session and updates
+  state; called after every `updateUser()` in both onboarding screens.
+- **Name not autofilled**: Rider Details never prefilled "Full name"/photo from the account at
+  all (only the `RiderProfile` fields were prefilled in the previous fix) — now pulled from
+  `authControllerProvider`'s current user on open, and the avatar shows the existing saved photo
+  (`NetworkImage`) when there's no freshly-picked local file yet.
+- **Edit gate**: Rider Details now opens read-only whenever there's an existing profile to show,
+  with an "Edit" action in the app bar to unlock every field; a brand-new profile (nothing to
+  review yet) still opens directly editable. Every field in `onboarding_widgets.dart`
+  (`OnboardingTextField`/`OnboardingDropdown`) gained an `enabled` flag (default `true`, so
+  `partner_onboarding_screen.dart`'s always-editable form is unaffected) plus the date pickers,
+  riding-style toggle, and add/remove-contact controls all gate the same way.
+  - Skip removed entirely — the underlying `skip()` repository method/API route are untouched,
+    just no longer reachable from this screen.
+- `flutter analyze`: no issues. `flutter test`: all passing.
+
+## Change — Mobile rider onboarding now prefills from the saved profile
+- `RiderOnboardingScreen` doubles as both first-time onboarding and "Rider Details" reached later
+  from Profile, but always opened blank — reopening it gave no way to see what was already saved,
+  and "updating later" meant retyping every field from scratch, blind. Web's equivalent
+  (`RiderDetailsSettings.tsx`) already prefills from the fetched profile; mobile never did.
+- New `RiderProfileRepository.getMine()` (`GET /api/rider-profile`) — `RiderProfileInput.fromJson`
+  doubles as the response parser since its fields already match `RiderProfileDTO` one-for-one, so
+  no new model was needed. The screen now loads this in `initState()` and prefills every field
+  (text, dropdowns, dates, emergency contacts) before the form renders — a loading spinner covers
+  the fetch so there's no window where typing into an about-to-be-overwritten field is possible.
+  Saved dates round-trip through `.toUtc()`/`.toLocal()` symmetrically so they land back on the
+  same local day regardless of the device's timezone offset.
+- New repository tests for `getMine()` (parses a real profile; returns `null` when none exists yet).
+  `flutter analyze`: no issues. `flutter test`: 97/97 passing (2 new).
+
+## Fix — Mobile rider onboarding: "Save" could fail silently with no error, no toast
+- `_save()`/`_skip()` in `rider_onboarding_screen.dart` only caught `on ApiException` — any other
+  failure (same bug class as the earlier splash-screen fix) was never shown, and `setState` after
+  the catch wasn't `mounted`-guarded either. Worse, this screen had no success feedback at all
+  (no `SnackBar`), unlike every other save flow in the app (Profile, Bookings, Membership,
+  Reviews) — so even a working save gave no visible confirmation beyond silently landing on Home.
+- Broadened both catches to show a fallback error message on any failure, and added the same
+  `ScaffoldMessenger` success `SnackBar` ("Profile saved") those other screens already use.
+  `flutter analyze`: no issues.
+
+## Fix — Mobile rider onboarding: "Invalid ISO datetime" saving driving licence expiry / date of birth
+- `rider_onboarding_screen.dart` sent `_drivingLicenceExpiry?.toIso8601String()` /
+  `_dateOfBirth?.toIso8601String()` straight from `showDatePicker`'s result. Dart's date picker
+  returns a local (non-UTC) `DateTime`, so `toIso8601String()` produced a string with no `Z`/offset
+  suffix (e.g. `2024-01-01T00:00:00.000`) — `riderProfileSchema`'s `z.string().datetime()` requires
+  a strict ISO-8601 string with a timezone marker and rejected it, surfacing as "Invalid ISO
+  datetime" on save. Every other date field in the app (trip dates, booking dates) already called
+  `.toUtc()` first; these two were the only ones missed. Fixed by adding `.toUtc()` before
+  `.toIso8601String()` on both. `flutter analyze`: no issues.
+
 ## Fix — Production build was crashing entirely: Leaflet loaded eagerly, broke `/login` prerender (ADR-041)
 - `LocationPicker.tsx`/`PartnersMap.tsx` did `import L from "leaflet"` at module top level.
   Leaflet touches `window` at import time; Next server-renders `"use client"` components for

@@ -45,6 +45,7 @@ class OnboardingTextField extends StatelessWidget {
     this.hint,
     this.maxLines = 1,
     this.keyboardType,
+    this.enabled = true,
   });
 
   final TextEditingController controller;
@@ -52,6 +53,7 @@ class OnboardingTextField extends StatelessWidget {
   final String? hint;
   final int maxLines;
   final TextInputType? keyboardType;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +63,7 @@ class OnboardingTextField extends StatelessWidget {
         controller: controller,
         maxLines: maxLines,
         keyboardType: keyboardType,
+        enabled: enabled,
         decoration: InputDecoration(labelText: label, hintText: hint),
       ),
     );
@@ -75,6 +78,7 @@ class OnboardingDropdown extends StatelessWidget {
     required this.options,
     required this.onChanged,
     this.optionLabels,
+    this.enabled = true,
   });
 
   final String label;
@@ -82,6 +86,7 @@ class OnboardingDropdown extends StatelessWidget {
   final List<String> options;
   final Map<String, String>? optionLabels;
   final ValueChanged<String?> onChanged;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -94,7 +99,7 @@ class OnboardingDropdown extends StatelessWidget {
         items: options
             .map((o) => DropdownMenuItem(value: o, child: Text(optionLabels?[o] ?? o, overflow: TextOverflow.ellipsis)))
             .toList(),
-        onChanged: onChanged,
+        onChanged: enabled ? onChanged : null,
       ),
     );
   }

@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../auth/domain/auth_controller.dart';
 import '../data/partner_profile_model.dart';
 import '../data/partner_profile_repository.dart';
 import 'location_picker_field.dart';
@@ -77,6 +78,7 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       final name = _fullName.text.trim();
       if (name.isNotEmpty) {
         await ref.read(authRepositoryProvider).updateUser(name: name);
+        await ref.read(authControllerProvider.notifier).refreshSession();
       }
       await ref.read(partnerProfileRepositoryProvider).save(PartnerProfileInput(
             businessName: _businessName.text.trim(),

@@ -22,6 +22,20 @@ class RiderProfileRepository {
     return apiGuard(() => _dio.put('/api/rider-profile', data: _toRequestJson(input)));
   }
 
+  /// The existing profile, if any — `null` for someone who's never saved one. Field names on
+  /// `RiderProfileDTO` (the `profile` key of this same response) match `RiderProfileInput`
+  /// one-for-one, so its generated `fromJson` doubles as the response parser; the DTO's extra
+  /// per-contact `id` field is simply ignored by `EmergencyContactInput.fromJson`. Used to
+  /// prefill the form when this screen is reopened later from Profile > Rider Details, rather
+  /// than showing a blank form every time as if nothing had ever been saved.
+  Future<RiderProfileInput?> getMine() {
+    return apiGuard(() async {
+      final res = await _dio.get('/api/rider-profile');
+      final profile = res.data['profile'];
+      return profile == null ? null : RiderProfileInput.fromJson(profile as Map<String, dynamic>);
+    });
+  }
+
   Future<void> skip() {
     return apiGuard(() => _dio.post('/api/rider-profile/skip'));
   }

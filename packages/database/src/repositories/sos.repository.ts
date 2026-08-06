@@ -80,7 +80,13 @@ export async function createAlert(data: {
 
 export async function getActiveAlerts(city?: string) {
   const where: any = { status: "ACTIVE" };
-  if (city) where.city = city;
+  // Both sides of this comparison are freely typed by hand (the sender's city at alert
+  // creation, the viewer's city via "Set city") with no shared picker forcing them to agree on
+  // spelling/casing — an exact, case-sensitive match ("Jaipur" vs "jaipur"/"jaipur ") silently
+  // hid otherwise-matching alerts from riders in the same city with no error anywhere to signal
+  // why. Case-insensitive + trimmed closes the realistic mismatch without needing a real
+  // geocoded-city system.
+  if (city) where.city = { equals: city.trim(), mode: "insensitive" };
 
   const alerts = await prisma.sOSAlert.findMany({
     where,

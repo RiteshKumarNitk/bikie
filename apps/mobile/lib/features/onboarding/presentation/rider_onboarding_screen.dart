@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../auth/data/auth_repository.dart';
+import '../../auth/domain/auth_controller.dart';
 import '../data/rider_profile_model.dart';
 import '../data/rider_profile_repository.dart';
 import 'onboarding_widgets.dart';
@@ -17,9 +18,10 @@ import 'onboarding_widgets.dart';
 /// route, plus full name/photo via Better Auth's `update-user` (mirrors
 /// `authClient.updateUser`). Shown once, right after a brand-new signup completes (see
 /// `signup_screen.dart`), and reachable afterward from Profile > Rider Details.
-/// Skippable (ADR-012) — nothing here blocks using the app, but the more filled in, the more
-/// useful an SOS alert is to whoever responds to it (blood group, medical history, vehicle,
-/// emergency contacts all surface on the SOS alert/session screens).
+///
+/// No skip (product decision, no longer ADR-012's skippable flow) — the form always has to be
+/// gone through. Once a profile already exists, it opens read-only with an "Edit" action in the
+/// app bar; tapping it unlocks every field for editing until the next Save.
 class RiderOnboardingScreen extends ConsumerStatefulWidget {
   const RiderOnboardingScreen({super.key});
 
@@ -80,8 +82,80 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
   final List<_ContactControllers> _contacts = [];
 
   bool _saving = false;
-  bool _skipping = false;
+  bool _loadingProfile = true;
+  // Starts true so first-time onboarding (nothing to review yet) opens directly editable;
+  // flipped to false once `_loadExisting` finds an actual saved profile to show first.
+  bool _editing = true;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadExisting();
+  }
+
+  /// This screen doubles as first-time onboarding and "Rider Details" reached later from
+  /// Profile — where showing a blank form every time made it impossible to tell whether
+  /// anything had actually been saved before, or to update just one field without retyping
+  /// everything else blind. Name/photo come from the account itself (Better Auth), independent
+  /// of whether a `RiderProfile` row exists yet, so those two prefill unconditionally.
+  Future<void> _loadExisting() async {
+    final user = ref.read(authControllerProvider).user;
+    if (user != null && mounted) {
+      setState(() {
+        _fullName.text = user.name;
+        _photoUrl = user.image;
+      });
+    }
+
+    try {
+      final profile = await ref.read(riderProfileRepositoryProvider).getMine();
+      if (!mounted || profile == null) return;
+      setState(() {
+        _drivingLicenceNumber.text = profile.drivingLicenceNumber ?? '';
+        _drivingLicenceExpiry = _parseSavedDate(profile.drivingLicenceExpiry);
+        _addressLine.text = profile.addressLine ?? '';
+        _area.text = profile.area ?? '';
+        _district.text = profile.district ?? '';
+        _pincode.text = profile.pincode ?? '';
+        _country.text = profile.country ?? 'India';
+        _fatherName.text = profile.fatherName ?? '';
+        _motherName.text = profile.motherName ?? '';
+        _dateOfBirth = _parseSavedDate(profile.dateOfBirth);
+        _gender = profile.gender;
+        _bloodGroup = profile.bloodGroup;
+        _medicalHistory.text = profile.medicalHistory ?? '';
+        _allergies.text = profile.allergies ?? '';
+        _vehicleType = profile.vehicleType;
+        _vehicleBrand.text = profile.vehicleBrand ?? '';
+        _vehicleModel.text = profile.vehicleModel ?? '';
+        _governmentIdType = profile.governmentIdType;
+        _governmentIdNumber.text = profile.governmentIdNumber ?? '';
+        _riderFrequency = profile.riderFrequency;
+        _ridingClubType = profile.ridingClubType;
+        _clubName.text = profile.clubName ?? '';
+        _contacts.addAll(profile.emergencyContacts.map(
+          (c) => _ContactControllers()
+            ..name.text = c.name
+            ..phone.text = c.phone
+            ..email.text = c.email ?? ''
+            ..relation.text = c.relation ?? '',
+        ));
+        // There's now something real to review before allowing changes.
+        _editing = false;
+      });
+    } catch (_) {
+      // Best-effort prefill only — if this fails, the form just starts blank and editable, same
+      // as before this existed. Not worth surfacing an error on a screen that's still usable.
+    } finally {
+      if (mounted) setState(() => _loadingProfile = false);
+    }
+  }
+
+  /// Saved as `.toUtc().toIso8601String()`; `.toLocal()` here exactly reverses that, so a date
+  /// picked at local midnight round-trips back to that same local midnight instead of drifting a
+  /// day either way depending on the device's timezone offset.
+  static DateTime? _parseSavedDate(String? iso) => iso == null ? null : DateTime.parse(iso).toLocal();
 
   @override
   void dispose() {
@@ -152,7 +226,7 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
   RiderProfileInput _buildInput() {
     return RiderProfileInput(
       drivingLicenceNumber: _drivingLicenceNumber.text,
-      drivingLicenceExpiry: _drivingLicenceExpiry?.toIso8601String(),
+      drivingLicenceExpiry: _drivingLicenceExpiry?.toUtc().toIso8601String(),
       addressLine: _addressLine.text,
       area: _area.text,
       district: _district.text,
@@ -160,7 +234,7 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
       country: _country.text,
       fatherName: _fatherName.text,
       motherName: _motherName.text,
-      dateOfBirth: _dateOfBirth?.toIso8601String(),
+      dateOfBirth: _dateOfBirth?.toUtc().toIso8601String(),
       gender: _gender,
       bloodGroup: _bloodGroup,
       medicalHistory: _medicalHistory.text,
@@ -185,12 +259,15 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
   }
 
   /// Mirrors web's `saveNameAndPhoto()` — replaces the phone-number placeholder name once the
-  /// user actually supplies one. Called before both Save and Skip, same as web's `handleSubmit`
-  /// / `handleSkip`, so a name/photo entered right before tapping Skip isn't silently dropped.
+  /// user actually supplies one. `updateUser` changes the account server-side but has no way to
+  /// update `AuthController`'s own cached session on its own, so `refreshSession()` is what
+  /// makes Profile's displayed name/avatar actually reflect the change instead of staying stale
+  /// until the next full app restart.
   Future<void> _saveNameAndPhoto() async {
     final name = _fullName.text.trim();
     if (name.isEmpty && _photoUrl == null) return;
     await ref.read(authRepositoryProvider).updateUser(name: name.isEmpty ? null : name, image: _photoUrl);
+    await ref.read(authControllerProvider.notifier).refreshSession();
   }
 
   Future<void> _save() async {
@@ -201,235 +278,281 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
     try {
       await _saveNameAndPhoto();
       await ref.read(riderProfileRepositoryProvider).save(_buildInput());
-      if (mounted) context.go('/');
+      if (mounted) {
+        context.go('/');
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile saved')));
+      }
     } on ApiException catch (e) {
-      setState(() => _error = e.message);
+      if (mounted) setState(() => _error = e.message);
+    } catch (e) {
+      // Anything other than ApiException (a bad response shape, a dropped connection Dio
+      // didn't wrap cleanly, etc.) used to fall through both this catch and the caller — no
+      // error shown, no navigation, "Save" just went quiet. Catch broadly so a real failure is
+      // always visible instead of indistinguishable from nothing happening at all.
+      if (mounted) setState(() => _error = "Couldn't save your profile. Please try again.");
     } finally {
       if (mounted) setState(() => _saving = false);
     }
   }
 
-  Future<void> _skip() async {
-    setState(() {
-      _error = null;
-      _skipping = true;
-    });
-    try {
-      await _saveNameAndPhoto();
-      await ref.read(riderProfileRepositoryProvider).skip();
-      if (mounted) context.go('/');
-    } on ApiException catch (e) {
-      setState(() => _error = e.message);
-    } finally {
-      if (mounted) setState(() => _skipping = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final busy = _saving || _skipping;
-
     return Scaffold(
-      appBar: AppBar(title: const Text("Let's get you ready to ride")),
+      appBar: AppBar(
+        title: const Text("Let's get you ready to ride"),
+        actions: [
+          if (!_loadingProfile && !_editing)
+            TextButton(
+              onPressed: () => setState(() => _editing = true),
+              child: const Text('Edit'),
+            ),
+        ],
+      ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                'A few details help partners and fellow riders reach you faster, and make your '
-                'SOS alerts more useful to whoever responds. Everything here is optional — you '
-                'can always fill it in later from Settings.',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 20),
-              OnboardingSection(
-                title: 'Rider profile',
-                children: [
-                  Row(
-                    children: [
-                      _PhotoAvatar(file: _photoFile, uploading: _uploadingPhoto),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: _uploadingPhoto ? null : _pickPhoto,
-                          child: Text(_photoUrl != null ? 'Change photo' : 'Upload photo'),
+        child: _loadingProfile
+            ? const Center(child: CircularProgressIndicator())
+            : SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      _editing
+                          ? 'A few details help partners and fellow riders reach you faster, and make '
+                              'your SOS alerts more useful to whoever responds.'
+                          : 'Tap Edit to update any of these.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: 20),
+                    OnboardingSection(
+                      title: 'Rider profile',
+                      children: [
+                        Row(
+                          children: [
+                            _PhotoAvatar(file: _photoFile, url: _photoUrl, uploading: _uploadingPhoto),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: (_uploadingPhoto || !_editing) ? null : _pickPhoto,
+                                child: Text(_photoUrl != null ? 'Change photo' : 'Upload photo'),
+                              ),
+                            ),
+                          ],
                         ),
+                        const SizedBox(height: 12),
+                        OnboardingTextField(
+                          controller: _fullName,
+                          label: 'Full name',
+                          hint: 'As per government ID',
+                          enabled: _editing,
+                        ),
+                      ],
+                    ),
+                    OnboardingSection(
+                      title: 'Vehicle details',
+                      children: [
+                        OnboardingDropdown(
+                          label: 'Vehicle type',
+                          value: _vehicleType,
+                          options: vehicleTypeOptions,
+                          onChanged: (v) => setState(() => _vehicleType = v),
+                          enabled: _editing,
+                        ),
+                        OnboardingTextField(
+                          controller: _vehicleBrand,
+                          label: 'Brand',
+                          hint: 'e.g. Royal Enfield',
+                          enabled: _editing,
+                        ),
+                        OnboardingTextField(
+                          controller: _vehicleModel,
+                          label: 'Model',
+                          hint: 'e.g. Classic 350',
+                          enabled: _editing,
+                        ),
+                      ],
+                    ),
+                    OnboardingSection(
+                      title: 'Personal details',
+                      children: [
+                        OnboardingTextField(controller: _fatherName, label: "Father's name", enabled: _editing),
+                        OnboardingTextField(controller: _motherName, label: "Mother's name", enabled: _editing),
+                        _DatePickerField(
+                          label: 'Date of birth',
+                          value: _dateOfBirth,
+                          onTap: _editing
+                              ? () => _pickDate(initial: _dateOfBirth, onPicked: (d) => setState(() => _dateOfBirth = d))
+                              : null,
+                        ),
+                        OnboardingDropdown(
+                          label: 'Gender',
+                          value: _gender,
+                          options: genderOptions,
+                          onChanged: (v) => setState(() => _gender = v),
+                          enabled: _editing,
+                        ),
+                        OnboardingDropdown(
+                          label: 'Blood group',
+                          value: _bloodGroup,
+                          options: bloodGroupOptions,
+                          onChanged: (v) => setState(() => _bloodGroup = v),
+                          enabled: _editing,
+                        ),
+                        OnboardingTextField(
+                          controller: _medicalHistory,
+                          label: 'Medical history (optional)',
+                          hint: 'Any conditions responders should know about in an emergency',
+                          maxLines: 3,
+                          enabled: _editing,
+                        ),
+                        OnboardingTextField(
+                          controller: _allergies,
+                          label: 'Allergies (optional)',
+                          maxLines: 2,
+                          enabled: _editing,
+                        ),
+                      ],
+                    ),
+                    OnboardingSection(
+                      title: 'Driving licence',
+                      children: [
+                        OnboardingTextField(
+                          controller: _drivingLicenceNumber,
+                          label: 'Licence number',
+                          hint: 'e.g. KA0120230012345',
+                          enabled: _editing,
+                        ),
+                        _DatePickerField(
+                          label: 'Expiry date',
+                          value: _drivingLicenceExpiry,
+                          onTap: _editing
+                              ? () => _pickDate(
+                                    initial: _drivingLicenceExpiry,
+                                    onPicked: (d) => setState(() => _drivingLicenceExpiry = d),
+                                  )
+                              : null,
+                        ),
+                      ],
+                    ),
+                    OnboardingSection(
+                      title: 'Address',
+                      children: [
+                        OnboardingTextField(
+                          controller: _addressLine,
+                          label: 'Address line',
+                          hint: 'House / street',
+                          enabled: _editing,
+                        ),
+                        OnboardingTextField(controller: _area, label: 'Area', enabled: _editing),
+                        OnboardingTextField(controller: _district, label: 'District', enabled: _editing),
+                        OnboardingTextField(
+                          controller: _pincode,
+                          label: 'Pincode',
+                          keyboardType: TextInputType.number,
+                          enabled: _editing,
+                        ),
+                        OnboardingTextField(controller: _country, label: 'Country', enabled: _editing),
+                      ],
+                    ),
+                    OnboardingSection(
+                      title: 'Emergency contacts',
+                      subtitle: 'Add up to 3 people we can reach in case of an emergency during a ride.',
+                      children: [
+                        for (var i = 0; i < _contacts.length; i++) _contactCard(i),
+                        if (_editing && _contacts.length < 3)
+                          OutlinedButton.icon(
+                            onPressed: _addContact,
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add emergency contact'),
+                          ),
+                      ],
+                    ),
+                    OnboardingSection(
+                      title: 'Government ID',
+                      subtitle: "Collected as plain text for reference only — we don't run identity verification on this.",
+                      children: [
+                        OnboardingDropdown(
+                          label: 'ID type',
+                          value: _governmentIdType,
+                          options: governmentIdTypeOptions.keys.toList(),
+                          optionLabels: governmentIdTypeOptions,
+                          onChanged: (v) => setState(() => _governmentIdType = v),
+                          enabled: _editing,
+                        ),
+                        OnboardingTextField(controller: _governmentIdNumber, label: 'ID number', enabled: _editing),
+                      ],
+                    ),
+                    OnboardingSection(
+                      title: 'Riding details',
+                      children: [
+                        OnboardingDropdown(
+                          label: 'How often do you ride?',
+                          value: _riderFrequency,
+                          options: riderFrequencyOptions.keys.toList(),
+                          optionLabels: riderFrequencyOptions,
+                          onChanged: (v) => setState(() => _riderFrequency = v),
+                          enabled: _editing,
+                        ),
+                        const SizedBox(height: 4),
+                        Text('Riding style', style: Theme.of(context).textTheme.labelLarge),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _ChoiceChipButton(
+                                label: 'Solo rider',
+                                selected: _ridingClubType == 'SOLO',
+                                onTap: _editing ? () => setState(() => _ridingClubType = 'SOLO') : null,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _ChoiceChipButton(
+                                label: 'Club member',
+                                selected: _ridingClubType == 'CLUB_MEMBER',
+                                onTap: _editing ? () => setState(() => _ridingClubType = 'CLUB_MEMBER') : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (_ridingClubType == 'CLUB_MEMBER') ...[
+                          const SizedBox(height: 12),
+                          OnboardingTextField(
+                            controller: _clubName,
+                            label: 'Club name',
+                            hint: 'e.g. Himalayan Riders Collective',
+                            enabled: _editing,
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                       ),
                     ],
-                  ),
-                  const SizedBox(height: 12),
-                  OnboardingTextField(controller: _fullName, label: 'Full name', hint: 'As per government ID'),
-                ],
-              ),
-              OnboardingSection(
-                title: 'Vehicle details',
-                children: [
-                  OnboardingDropdown(
-                    label: 'Vehicle type',
-                    value: _vehicleType,
-                    options: vehicleTypeOptions,
-                    onChanged: (v) => setState(() => _vehicleType = v),
-                  ),
-                  OnboardingTextField(controller: _vehicleBrand, label: 'Brand', hint: 'e.g. Royal Enfield'),
-                  OnboardingTextField(controller: _vehicleModel, label: 'Model', hint: 'e.g. Classic 350'),
-                ],
-              ),
-              OnboardingSection(
-                title: 'Personal details',
-                children: [
-                  OnboardingTextField(controller: _fatherName, label: "Father's name"),
-                  OnboardingTextField(controller: _motherName, label: "Mother's name"),
-                  _DatePickerField(
-                    label: 'Date of birth',
-                    value: _dateOfBirth,
-                    onTap: () => _pickDate(initial: _dateOfBirth, onPicked: (d) => setState(() => _dateOfBirth = d)),
-                  ),
-                  OnboardingDropdown(
-                    label: 'Gender',
-                    value: _gender,
-                    options: genderOptions,
-                    onChanged: (v) => setState(() => _gender = v),
-                  ),
-                  OnboardingDropdown(
-                    label: 'Blood group',
-                    value: _bloodGroup,
-                    options: bloodGroupOptions,
-                    onChanged: (v) => setState(() => _bloodGroup = v),
-                  ),
-                  OnboardingTextField(
-                    controller: _medicalHistory,
-                    label: 'Medical history (optional)',
-                    hint: 'Any conditions responders should know about in an emergency',
-                    maxLines: 3,
-                  ),
-                  OnboardingTextField(controller: _allergies, label: 'Allergies (optional)', maxLines: 2),
-                ],
-              ),
-              OnboardingSection(
-                title: 'Driving licence',
-                children: [
-                  OnboardingTextField(
-                    controller: _drivingLicenceNumber,
-                    label: 'Licence number',
-                    hint: 'e.g. KA0120230012345',
-                  ),
-                  _DatePickerField(
-                    label: 'Expiry date',
-                    value: _drivingLicenceExpiry,
-                    onTap: () => _pickDate(
-                      initial: _drivingLicenceExpiry,
-                      onPicked: (d) => setState(() => _drivingLicenceExpiry = d),
-                    ),
-                  ),
-                ],
-              ),
-              OnboardingSection(
-                title: 'Address',
-                children: [
-                  OnboardingTextField(controller: _addressLine, label: 'Address line', hint: 'House / street'),
-                  OnboardingTextField(controller: _area, label: 'Area'),
-                  OnboardingTextField(controller: _district, label: 'District'),
-                  OnboardingTextField(controller: _pincode, label: 'Pincode', keyboardType: TextInputType.number),
-                  OnboardingTextField(controller: _country, label: 'Country'),
-                ],
-              ),
-              OnboardingSection(
-                title: 'Emergency contacts',
-                subtitle: 'Add up to 3 people we can reach in case of an emergency during a ride.',
-                children: [
-                  for (var i = 0; i < _contacts.length; i++) _contactCard(i),
-                  if (_contacts.length < 3)
-                    OutlinedButton.icon(
-                      onPressed: _addContact,
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add emergency contact'),
-                    ),
-                ],
-              ),
-              OnboardingSection(
-                title: 'Government ID',
-                subtitle: "Collected as plain text for reference only — we don't run identity verification on this.",
-                children: [
-                  OnboardingDropdown(
-                    label: 'ID type',
-                    value: _governmentIdType,
-                    options: governmentIdTypeOptions.keys.toList(),
-                    optionLabels: governmentIdTypeOptions,
-                    onChanged: (v) => setState(() => _governmentIdType = v),
-                  ),
-                  OnboardingTextField(controller: _governmentIdNumber, label: 'ID number'),
-                ],
-              ),
-              OnboardingSection(
-                title: 'Riding details',
-                children: [
-                  OnboardingDropdown(
-                    label: 'How often do you ride?',
-                    value: _riderFrequency,
-                    options: riderFrequencyOptions.keys.toList(),
-                    optionLabels: riderFrequencyOptions,
-                    onChanged: (v) => setState(() => _riderFrequency = v),
-                  ),
-                  const SizedBox(height: 4),
-                  Text('Riding style', style: Theme.of(context).textTheme.labelLarge),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _ChoiceChipButton(
-                          label: 'Solo rider',
-                          selected: _ridingClubType == 'SOLO',
-                          onTap: () => setState(() => _ridingClubType = 'SOLO'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _ChoiceChipButton(
-                          label: 'Club member',
-                          selected: _ridingClubType == 'CLUB_MEMBER',
-                          onTap: () => setState(() => _ridingClubType = 'CLUB_MEMBER'),
-                        ),
+                    if (_editing) ...[
+                      const SizedBox(height: 20),
+                      ElevatedButton(
+                        onPressed: _saving ? null : _save,
+                        child: _saving
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Text('Save'),
                       ),
                     ],
-                  ),
-                  if (_ridingClubType == 'CLUB_MEMBER') ...[
-                    const SizedBox(height: 12),
-                    OnboardingTextField(
-                      controller: _clubName,
-                      label: 'Club name',
-                      hint: 'e.g. Himalayan Riders Collective',
-                    ),
                   ],
-                ],
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
                 ),
-              ],
-              const SizedBox(height: 20),
-              ElevatedButton(
-                onPressed: busy ? null : _save,
-                child: _saving
-                    ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Save & continue'),
               ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: busy ? null : _skip,
-                child: Text(_skipping ? 'Skipping…' : 'Skip for now'),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
@@ -449,17 +572,34 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
           Row(
             children: [
               Expanded(child: Text('Contact ${index + 1}', style: Theme.of(context).textTheme.labelLarge)),
-              IconButton(
-                onPressed: () => _removeContact(index),
-                icon: const Icon(Icons.close, size: 18),
-                tooltip: 'Remove',
-              ),
+              if (_editing)
+                IconButton(
+                  onPressed: () => _removeContact(index),
+                  icon: const Icon(Icons.close, size: 18),
+                  tooltip: 'Remove',
+                ),
             ],
           ),
-          OnboardingTextField(controller: c.name, label: 'Name'),
-          OnboardingTextField(controller: c.phone, label: 'Phone', keyboardType: TextInputType.phone, hint: '+91 98765 43210'),
-          OnboardingTextField(controller: c.email, label: 'Email (optional)', keyboardType: TextInputType.emailAddress),
-          OnboardingTextField(controller: c.relation, label: 'Relation (optional)', hint: 'e.g. Parent, Spouse, Friend'),
+          OnboardingTextField(controller: c.name, label: 'Name', enabled: _editing),
+          OnboardingTextField(
+            controller: c.phone,
+            label: 'Phone',
+            keyboardType: TextInputType.phone,
+            hint: '+91 98765 43210',
+            enabled: _editing,
+          ),
+          OnboardingTextField(
+            controller: c.email,
+            label: 'Email (optional)',
+            keyboardType: TextInputType.emailAddress,
+            enabled: _editing,
+          ),
+          OnboardingTextField(
+            controller: c.relation,
+            label: 'Relation (optional)',
+            hint: 'e.g. Parent, Spouse, Friend',
+            enabled: _editing,
+          ),
         ],
       ),
     );
@@ -467,9 +607,10 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
 }
 
 class _PhotoAvatar extends StatelessWidget {
-  const _PhotoAvatar({required this.file, required this.uploading});
+  const _PhotoAvatar({required this.file, required this.url, required this.uploading});
 
   final File? file;
+  final String? url;
   final bool uploading;
 
   @override
@@ -479,8 +620,8 @@ class _PhotoAvatar extends StatelessWidget {
         CircleAvatar(
           radius: 32,
           backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-          backgroundImage: file != null ? FileImage(file!) : null,
-          child: file == null ? const Icon(Icons.camera_alt_outlined) : null,
+          backgroundImage: file != null ? FileImage(file!) : (url != null ? NetworkImage(url!) : null) as ImageProvider?,
+          child: (file == null && url == null) ? const Icon(Icons.camera_alt_outlined) : null,
         ),
         if (uploading)
           Positioned.fill(
@@ -501,7 +642,7 @@ class _DatePickerField extends StatelessWidget {
 
   final String label;
   final DateTime? value;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -511,7 +652,11 @@ class _DatePickerField extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(kInputRadius),
         child: InputDecorator(
-          decoration: InputDecoration(labelText: label, suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18)),
+          decoration: InputDecoration(
+            labelText: label,
+            suffixIcon: onTap == null ? null : const Icon(Icons.calendar_today_outlined, size: 18),
+            enabled: onTap != null,
+          ),
           child: Text(
             value == null ? 'Select date' : '${value!.day}/${value!.month}/${value!.year}',
             style: value == null ? TextStyle(color: Theme.of(context).hintColor) : null,
@@ -527,7 +672,7 @@ class _ChoiceChipButton extends StatelessWidget {
 
   final String label;
   final bool selected;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {

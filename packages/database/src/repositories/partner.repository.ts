@@ -128,7 +128,7 @@ export async function findPartnersByCityForDispatch(
 ) {
   return prisma.partner.findMany({
     where: {
-      city: { equals: city, mode: "insensitive" },
+      city: { equals: city.trim(), mode: "insensitive" },
       ...(options.type ? { type: options.type as any } : {}),
       ...(options.verifiedOnly ? { isVerified: true } : {}),
     },

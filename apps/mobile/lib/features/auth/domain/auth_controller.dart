@@ -89,4 +89,15 @@ class AuthController extends StateNotifier<AuthState> {
     unawaited(_push.unregisterCurrentDevice());
     state = const AuthState.unauthenticated('Your session expired. Please sign in again.');
   }
+
+  /// Re-fetches the session and refreshes cached `state.user`. Needed after anything that
+  /// changes the user's name/photo through `AuthRepository.updateUser` directly (onboarding's
+  /// "Full name"/photo fields) — that call updates the account server-side but, unlike
+  /// `signIn`/`signUp`/`verifyOtp` above, has no way to update this controller's own state on
+  /// its own, so screens reading `authControllerProvider` (Profile's name/avatar) kept showing
+  /// the stale value until the next full app restart.
+  Future<void> refreshSession() async {
+    final user = await _repository.getSession();
+    if (user != null) state = AuthState.authenticated(user);
+  }
 }

@@ -129,4 +129,42 @@ void main() {
 
     expect(await repository.needsCompletionReminder(), isFalse);
   });
+
+  test('getMine() parses the profile field into a RiderProfileInput for prefilling the form', () async {
+    when(() => dio.get('/api/rider-profile')).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/api/rider-profile'),
+        statusCode: 200,
+        data: {
+          'profile': {
+            'drivingLicenceNumber': 'KA0120230012345',
+            'bloodGroup': 'O+',
+            'emergencyContacts': [
+              {'id': 'contact_1', 'name': 'Mom', 'phone': '9876543210', 'email': null, 'relation': 'Mother'},
+            ],
+          },
+          'needsOnboarding': false,
+          'showCompletionReminder': false,
+        },
+      ),
+    );
+
+    final profile = await repository.getMine();
+
+    expect(profile?.drivingLicenceNumber, 'KA0120230012345');
+    expect(profile?.bloodGroup, 'O+');
+    expect(profile?.emergencyContacts.single.name, 'Mom');
+  });
+
+  test('getMine() returns null when there is no saved profile yet', () async {
+    when(() => dio.get('/api/rider-profile')).thenAnswer(
+      (_) async => Response(
+        requestOptions: RequestOptions(path: '/api/rider-profile'),
+        statusCode: 200,
+        data: {'profile': null, 'needsOnboarding': true, 'showCompletionReminder': false},
+      ),
+    );
+
+    expect(await repository.getMine(), isNull);
+  });
 }
