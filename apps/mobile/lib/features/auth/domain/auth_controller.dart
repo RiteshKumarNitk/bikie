@@ -25,6 +25,15 @@ class AuthController extends StateNotifier<AuthState> {
   final AuthRepository _repository;
   final PushRegistrationService _push;
 
+  /// The very first thing that runs after `runApp()` — `main.dart` shows the branded
+  /// `SplashScreen` (and the router's `redirect` refuses to navigate anywhere) for as long as
+  /// `state` stays `AuthState.unknown()`. Catching only `ApiException` here was a real bug: any
+  /// other failure — `SecureStorage.readToken()` throwing on a corrupted Android Keystore entry
+  /// (a known flutter_secure_storage issue, especially likely right after a reinstall/sideload),
+  /// a malformed `/api/auth/get-session` response failing `UserModel.fromJson`, anything — left
+  /// `bootstrap()`'s Future to complete with an uncaught error, `state` never left `unknown`, and
+  /// the app was stuck on the splash screen forever with no way out. Catch broadly instead: this
+  /// method's entire job is to resolve *some* auth state, never to hang.
   Future<void> bootstrap() async {
     try {
       final user = await _repository.getSession();
@@ -34,7 +43,7 @@ class AuthController extends StateNotifier<AuthState> {
         state = AuthState.authenticated(user);
         unawaited(_push.registerForCurrentUser());
       }
-    } on ApiException {
+    } catch (_) {
       state = const AuthState.unauthenticated();
     }
   }

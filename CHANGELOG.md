@@ -1,5 +1,24 @@
 # Changelog
 
+## Fix — Mobile app could get stuck on the splash screen forever
+- Root cause: `AuthController.bootstrap()` (runs once, before `main.dart` ever shows anything but
+  `SplashScreen`, and before `app_router.dart`'s `redirect` will navigate anywhere — it explicitly
+  returns `null`/does nothing while auth status is `unknown`) only caught `ApiException`. Any other
+  failure — most plausibly `SecureStorage.readToken()` throwing on a corrupted Android Keystore
+  entry (a known `flutter_secure_storage` issue, especially likely right after an APK
+  reinstall/sideload) — left `bootstrap()`'s `Future` completing with an uncaught error, `state`
+  never leaving `AuthState.unknown()`, and the app parked on the splash screen with no way forward.
+- `AuthController.bootstrap()` now catches broadly (`catch (_)`), same as every other place in this
+  method's job is "always resolve some auth state, never hang."
+- `SecureStorage.readToken()` now catches its own read failure, treats it the same as "no token"
+  (safe default: falls through to the sign-in flow instead of crashing), and best-effort deletes
+  the corrupted key so it doesn't keep failing on every future launch.
+- `bootstrapPushNotifications()` (runs before `runApp()` too) gets an 8-second `.timeout()` around
+  its Firebase/local-notifications setup — closes a related risk where a *hung* (not thrown) native
+  plugin call could block `main()` from ever reaching `runApp()`, which a try/catch alone can't
+  guard against.
+- `flutter analyze`: no issues. `flutter test`: all passed.
+
 ## Change — Mobile Home leads with SOS, Red/Amber alert cards
 - Mobile Home now opens with SOS front-and-center: a new `_SosPanicCards` section (Red
   Alert/Amber Alert, mirroring web's `PanicAlertCards.tsx` — same brand colors, same category

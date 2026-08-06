@@ -47,9 +47,26 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// failing because `android/app/google-services.json` hasn't been added yet — would take the
 /// entire app down before a single frame renders, on every device, not just fail push setup.
 /// Push notifications are an enhancement; the app must always start without them.
+///
+/// A try/catch alone only guards against a *thrown* failure, not a *hung* one — a native plugin
+/// call that never resolves (e.g. a broken platform channel) would still block `main()` from
+/// ever reaching `runApp()`, with no exception for the catch below to even see. The outer
+/// `.timeout()` in `bootstrapPushNotifications()` is what actually guarantees `main()` always
+/// proceeds.
 Future<void> bootstrapPushNotifications() async {
   if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) return;
 
+  try {
+    await _bootstrapPushNotificationsInner().timeout(
+      const Duration(seconds: 8),
+      onTimeout: () => debugPrint('[Push] bootstrap timed out, continuing without push notifications'),
+    );
+  } catch (error, stackTrace) {
+    debugPrint('[Push] bootstrap failed, continuing without push notifications: $error\n$stackTrace');
+  }
+}
+
+Future<void> _bootstrapPushNotificationsInner() async {
   try {
     await Firebase.initializeApp();
     FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
