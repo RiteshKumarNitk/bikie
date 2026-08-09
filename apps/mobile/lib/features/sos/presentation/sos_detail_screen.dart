@@ -13,18 +13,6 @@ import '../data/sos_model.dart';
 import '../data/sos_repository.dart';
 import '../domain/sos_providers.dart';
 
-const _typeLabels = {
-  'ACCIDENT': '🚨 Accident',
-  'LIFE_THREATENING': '🔥 Life Threatening',
-  'MEDICAL': '🏥 Medical Emergency',
-  'BIKE_BREAKDOWN': '🔧 Bike Breakdown',
-  'FLAT_TYRE': '🔩 Flat Tyre',
-  'FUEL_EMPTY': '⛽ Fuel Required',
-  'BATTERY_ISSUE': '🔋 Battery Issue',
-  'LOST': '🗺️ Lost',
-  'OTHER': '❗ Other',
-};
-
 const _timelineLabels = {
   'SOS_CREATED': 'SOS Created',
   'RADIUS_EXPANDED': 'Search radius expanded',
@@ -282,7 +270,7 @@ class _AlertHeader extends StatelessWidget {
                       isEmergency ? Colors.red.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
                 ),
                 const SizedBox(width: 8),
-                Expanded(child: Text(_typeLabels[alert.type] ?? alert.type)),
+                Expanded(child: Text(sosTypeLabels[alert.type] ?? alert.type)),
               ],
             ),
             const SizedBox(height: 8),

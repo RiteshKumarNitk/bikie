@@ -36,7 +36,9 @@ mixin _$PartnerProfileInput {
   double? get longitude => throw _privateConstructorUsedError;
   String? get governmentIdType =>
       throw _privateConstructorUsedError; // "AADHAAR" | "PASSPORT"
-  String? get governmentIdNumber => throw _privateConstructorUsedError;
+  String? get governmentIdNumber =>
+      throw _privateConstructorUsedError; // --- ADR-044 ---
+  bool? get isGeneralResponder => throw _privateConstructorUsedError;
 
   /// Serializes this PartnerProfileInput to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -71,6 +73,7 @@ abstract class $PartnerProfileInputCopyWith<$Res> {
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    bool? isGeneralResponder,
   });
 }
 
@@ -104,6 +107,7 @@ class _$PartnerProfileInputCopyWithImpl<$Res, $Val extends PartnerProfileInput>
     Object? longitude = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
+    Object? isGeneralResponder = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -167,6 +171,10 @@ class _$PartnerProfileInputCopyWithImpl<$Res, $Val extends PartnerProfileInput>
                 ? _value.governmentIdNumber
                 : governmentIdNumber // ignore: cast_nullable_to_non_nullable
                       as String?,
+            isGeneralResponder: freezed == isGeneralResponder
+                ? _value.isGeneralResponder
+                : isGeneralResponder // ignore: cast_nullable_to_non_nullable
+                      as bool?,
           )
           as $Val,
     );
@@ -198,6 +206,7 @@ abstract class _$$PartnerProfileInputImplCopyWith<$Res>
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    bool? isGeneralResponder,
   });
 }
 
@@ -230,6 +239,7 @@ class __$$PartnerProfileInputImplCopyWithImpl<$Res>
     Object? longitude = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
+    Object? isGeneralResponder = freezed,
   }) {
     return _then(
       _$PartnerProfileInputImpl(
@@ -293,6 +303,10 @@ class __$$PartnerProfileInputImplCopyWithImpl<$Res>
             ? _value.governmentIdNumber
             : governmentIdNumber // ignore: cast_nullable_to_non_nullable
                   as String?,
+        isGeneralResponder: freezed == isGeneralResponder
+            ? _value.isGeneralResponder
+            : isGeneralResponder // ignore: cast_nullable_to_non_nullable
+                  as bool?,
       ),
     );
   }
@@ -317,6 +331,7 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
     this.longitude,
     this.governmentIdType,
     this.governmentIdNumber,
+    this.isGeneralResponder,
   });
 
   factory _$PartnerProfileInputImpl.fromJson(Map<String, dynamic> json) =>
@@ -353,10 +368,13 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
   // "AADHAAR" | "PASSPORT"
   @override
   final String? governmentIdNumber;
+  // --- ADR-044 ---
+  @override
+  final bool? isGeneralResponder;
 
   @override
   String toString() {
-    return 'PartnerProfileInput(businessName: $businessName, type: $type, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber)';
+    return 'PartnerProfileInput(businessName: $businessName, type: $type, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, isGeneralResponder: $isGeneralResponder)';
   }
 
   @override
@@ -389,7 +407,9 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
             (identical(other.governmentIdType, governmentIdType) ||
                 other.governmentIdType == governmentIdType) &&
             (identical(other.governmentIdNumber, governmentIdNumber) ||
-                other.governmentIdNumber == governmentIdNumber));
+                other.governmentIdNumber == governmentIdNumber) &&
+            (identical(other.isGeneralResponder, isGeneralResponder) ||
+                other.isGeneralResponder == isGeneralResponder));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -411,6 +431,7 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
     longitude,
     governmentIdType,
     governmentIdNumber,
+    isGeneralResponder,
   );
 
   /// Create a copy of PartnerProfileInput
@@ -447,6 +468,7 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
     final double? longitude,
     final String? governmentIdType,
     final String? governmentIdNumber,
+    final bool? isGeneralResponder,
   }) = _$PartnerProfileInputImpl;
 
   factory _PartnerProfileInput.fromJson(Map<String, dynamic> json) =
@@ -481,7 +503,9 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
   @override
   String? get governmentIdType; // "AADHAAR" | "PASSPORT"
   @override
-  String? get governmentIdNumber;
+  String? get governmentIdNumber; // --- ADR-044 ---
+  @override
+  bool? get isGeneralResponder;
 
   /// Create a copy of PartnerProfileInput
   /// with the given fields replaced by the non-null parameter values.
@@ -489,4 +513,268 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$PartnerProfileInputImplCopyWith<_$PartnerProfileInputImpl> get copyWith =>
       throw _privateConstructorUsedError;
+}
+
+PartnerProfileSummary _$PartnerProfileSummaryFromJson(
+  Map<String, dynamic> json,
+) {
+  return _PartnerProfileSummary.fromJson(json);
+}
+
+/// @nodoc
+mixin _$PartnerProfileSummary {
+  String get businessName => throw _privateConstructorUsedError;
+  String get type => throw _privateConstructorUsedError;
+  bool get isVerified => throw _privateConstructorUsedError;
+  bool get isAvailable => throw _privateConstructorUsedError;
+  bool get isGeneralResponder => throw _privateConstructorUsedError;
+
+  /// Serializes this PartnerProfileSummary to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of PartnerProfileSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $PartnerProfileSummaryCopyWith<PartnerProfileSummary> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $PartnerProfileSummaryCopyWith<$Res> {
+  factory $PartnerProfileSummaryCopyWith(
+    PartnerProfileSummary value,
+    $Res Function(PartnerProfileSummary) then,
+  ) = _$PartnerProfileSummaryCopyWithImpl<$Res, PartnerProfileSummary>;
+  @useResult
+  $Res call({
+    String businessName,
+    String type,
+    bool isVerified,
+    bool isAvailable,
+    bool isGeneralResponder,
+  });
+}
+
+/// @nodoc
+class _$PartnerProfileSummaryCopyWithImpl<
+  $Res,
+  $Val extends PartnerProfileSummary
+>
+    implements $PartnerProfileSummaryCopyWith<$Res> {
+  _$PartnerProfileSummaryCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of PartnerProfileSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? businessName = null,
+    Object? type = null,
+    Object? isVerified = null,
+    Object? isAvailable = null,
+    Object? isGeneralResponder = null,
+  }) {
+    return _then(
+      _value.copyWith(
+            businessName: null == businessName
+                ? _value.businessName
+                : businessName // ignore: cast_nullable_to_non_nullable
+                      as String,
+            type: null == type
+                ? _value.type
+                : type // ignore: cast_nullable_to_non_nullable
+                      as String,
+            isVerified: null == isVerified
+                ? _value.isVerified
+                : isVerified // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            isAvailable: null == isAvailable
+                ? _value.isAvailable
+                : isAvailable // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            isGeneralResponder: null == isGeneralResponder
+                ? _value.isGeneralResponder
+                : isGeneralResponder // ignore: cast_nullable_to_non_nullable
+                      as bool,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$PartnerProfileSummaryImplCopyWith<$Res>
+    implements $PartnerProfileSummaryCopyWith<$Res> {
+  factory _$$PartnerProfileSummaryImplCopyWith(
+    _$PartnerProfileSummaryImpl value,
+    $Res Function(_$PartnerProfileSummaryImpl) then,
+  ) = __$$PartnerProfileSummaryImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String businessName,
+    String type,
+    bool isVerified,
+    bool isAvailable,
+    bool isGeneralResponder,
+  });
+}
+
+/// @nodoc
+class __$$PartnerProfileSummaryImplCopyWithImpl<$Res>
+    extends
+        _$PartnerProfileSummaryCopyWithImpl<$Res, _$PartnerProfileSummaryImpl>
+    implements _$$PartnerProfileSummaryImplCopyWith<$Res> {
+  __$$PartnerProfileSummaryImplCopyWithImpl(
+    _$PartnerProfileSummaryImpl _value,
+    $Res Function(_$PartnerProfileSummaryImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of PartnerProfileSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? businessName = null,
+    Object? type = null,
+    Object? isVerified = null,
+    Object? isAvailable = null,
+    Object? isGeneralResponder = null,
+  }) {
+    return _then(
+      _$PartnerProfileSummaryImpl(
+        businessName: null == businessName
+            ? _value.businessName
+            : businessName // ignore: cast_nullable_to_non_nullable
+                  as String,
+        type: null == type
+            ? _value.type
+            : type // ignore: cast_nullable_to_non_nullable
+                  as String,
+        isVerified: null == isVerified
+            ? _value.isVerified
+            : isVerified // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        isAvailable: null == isAvailable
+            ? _value.isAvailable
+            : isAvailable // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        isGeneralResponder: null == isGeneralResponder
+            ? _value.isGeneralResponder
+            : isGeneralResponder // ignore: cast_nullable_to_non_nullable
+                  as bool,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
+  const _$PartnerProfileSummaryImpl({
+    required this.businessName,
+    required this.type,
+    required this.isVerified,
+    required this.isAvailable,
+    required this.isGeneralResponder,
+  });
+
+  factory _$PartnerProfileSummaryImpl.fromJson(Map<String, dynamic> json) =>
+      _$$PartnerProfileSummaryImplFromJson(json);
+
+  @override
+  final String businessName;
+  @override
+  final String type;
+  @override
+  final bool isVerified;
+  @override
+  final bool isAvailable;
+  @override
+  final bool isGeneralResponder;
+
+  @override
+  String toString() {
+    return 'PartnerProfileSummary(businessName: $businessName, type: $type, isVerified: $isVerified, isAvailable: $isAvailable, isGeneralResponder: $isGeneralResponder)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PartnerProfileSummaryImpl &&
+            (identical(other.businessName, businessName) ||
+                other.businessName == businessName) &&
+            (identical(other.type, type) || other.type == type) &&
+            (identical(other.isVerified, isVerified) ||
+                other.isVerified == isVerified) &&
+            (identical(other.isAvailable, isAvailable) ||
+                other.isAvailable == isAvailable) &&
+            (identical(other.isGeneralResponder, isGeneralResponder) ||
+                other.isGeneralResponder == isGeneralResponder));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    businessName,
+    type,
+    isVerified,
+    isAvailable,
+    isGeneralResponder,
+  );
+
+  /// Create a copy of PartnerProfileSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PartnerProfileSummaryImplCopyWith<_$PartnerProfileSummaryImpl>
+  get copyWith =>
+      __$$PartnerProfileSummaryImplCopyWithImpl<_$PartnerProfileSummaryImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$PartnerProfileSummaryImplToJson(this);
+  }
+}
+
+abstract class _PartnerProfileSummary implements PartnerProfileSummary {
+  const factory _PartnerProfileSummary({
+    required final String businessName,
+    required final String type,
+    required final bool isVerified,
+    required final bool isAvailable,
+    required final bool isGeneralResponder,
+  }) = _$PartnerProfileSummaryImpl;
+
+  factory _PartnerProfileSummary.fromJson(Map<String, dynamic> json) =
+      _$PartnerProfileSummaryImpl.fromJson;
+
+  @override
+  String get businessName;
+  @override
+  String get type;
+  @override
+  bool get isVerified;
+  @override
+  bool get isAvailable;
+  @override
+  bool get isGeneralResponder;
+
+  /// Create a copy of PartnerProfileSummary
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PartnerProfileSummaryImplCopyWith<_$PartnerProfileSummaryImpl>
+  get copyWith => throw _privateConstructorUsedError;
 }

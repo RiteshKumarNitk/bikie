@@ -1,5 +1,29 @@
 # Changelog
 
+## New — Partner Emergency Assistance Dashboard; fixed SOS eligibility bug (ADR-044)
+- **Fixed**: an SOS alert's `SERVICE_PROVIDERS` escalation tier could dispatch to *any* verified
+  partner — including one whose service type had nothing to do with the emergency (a fuel-delivery
+  partner could receive a medical emergency) — whenever the strict verified+type-matched search
+  came up empty, because the dispatch code deliberately broadened rather than notify nobody. Fixed:
+  partners are now only dispatched an alert if their service type matches it, or they've explicitly
+  opted in as a general responder; an alert still never reaches nobody, because the existing
+  `SERVICE_PROVIDERS → ADMIN` timeout escalation is unaffected by this change.
+- **New**: Partner accounts get a dedicated Emergency Assistance Dashboard on mobile instead of the
+  renter marketplace screens — a Home with live stats (active requests, today's/completed
+  assistance, rating), a Requests tab (nearby, eligible, open SOS alerts), an Active tab (sessions
+  currently being helped), and a purpose-built request screen (accept → waiting for rider
+  confirmation → assistance confirmed, with navigate/call/chat actions and a status checklist) —
+  all built on the existing offer/accept/session backend, not a new flow. A prominent
+  🟢 AVAILABLE / ⚫ OFFLINE toggle (new `Partner.isAvailable`, default off) sits above every partner
+  screen — no partner receives SOS pings until they turn it on themselves. Partner-targeted push
+  notifications now lead with `"🚨 Emergency Assistance Needed"` plus category/distance/city
+  instead of the generic rider-facing copy.
+- Backend: 9/9 packages typecheck, 124/124 tests passing (new eligibility-exclusion coverage).
+  Mobile: `flutter analyze` clean, `flutter test` passing.
+- **Not done**: a live two-account smoke test (a mechanic partner must not receive a medical alert
+  unless explicitly configured as a general responder) — worth your own end-to-end test, same
+  caveat as every prior change to SOS dispatch.
+
 ## Change — Membership payments prepared for real Razorpay; fixed active-membership display bug (ADR-043)
 - **Fixed**: `/membership` never checked whether you already had an active membership — it only
   tracked a successful purchase in local component state, which reset on any reload or repeat

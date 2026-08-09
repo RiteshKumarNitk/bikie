@@ -2,8 +2,14 @@ import { getSafetyLocationModule } from "./modules/safety-location/public";
 
 /** Compatibility facade — helper-offer/session logic lives in safety-location's session application. */
 export const SOSSessionService = {
-  offerHelp(alertId: string, responderId: string, location?: { latitude: number; longitude: number }, message?: string) {
-    return getSafetyLocationModule().session.offerHelp(alertId, responderId, location, message);
+  offerHelp(
+    alertId: string,
+    responderId: string,
+    location?: { latitude: number; longitude: number },
+    message?: string,
+    opts?: { requireAvailableAndCapacity?: boolean },
+  ) {
+    return getSafetyLocationModule().session.offerHelp(alertId, responderId, location, message, opts);
   },
   withdrawOffer(offerId: string, responderId: string) {
     return getSafetyLocationModule().session.withdrawOffer(offerId, responderId);
@@ -34,5 +40,15 @@ export const SOSSessionService = {
   },
   submitRating(sessionId: string, riderId: string, rating: number, comment?: string) {
     return getSafetyLocationModule().session.submitRating(sessionId, riderId, rating, comment);
+  },
+  // --- ADR-044: partner Emergency Assistance Dashboard ---
+  getPartnerDashboard(userId: string, location?: { latitude: number; longitude: number }) {
+    return getSafetyLocationModule().partnerDashboard.getDashboard(userId, location);
+  },
+  listNearbyOpenRequests(userId: string, location: { latitude: number; longitude: number }) {
+    return getSafetyLocationModule().partnerDashboard.listNearbyOpenRequests(userId, location);
+  },
+  listActiveAssistance(userId: string) {
+    return getSafetyLocationModule().partnerDashboard.listActiveAssistance(userId);
   },
 };

@@ -531,10 +531,18 @@ model Partner {
   longitude         Float?
   governmentIdType  GovernmentIdType?
   governmentIdNumber String?
+  // --- Added in ADR-044 (SOS emergency-assistance dashboard) ---
+  // Defaults false, not true: existing partners shouldn't start receiving live emergency pings
+  // the moment this migration runs, before they've even seen the toggle to control it.
+  isAvailable        Boolean @default(false)
+  // Explicit opt-in to be dispatched for SOS categories outside this partner's own `type` (e.g.
+  // a FUEL_DELIVERY partner receiving a MEDICAL emergency) — see partner-mapping.ts.
+  isGeneralResponder Boolean @default(false)
   createdAt    DateTime    @default(now())
 
   @@index([city])
   @@index([latitude, longitude])
+  @@index([isAvailable])
 }
 
 // --- Bookings & reviews ---

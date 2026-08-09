@@ -29,10 +29,29 @@ class SOSAlert with _$SOSAlert {
     String? placeName,
     String? area,
     String? formattedAddress,
+    // From the reporting rider's own RiderProfile (ADR-044) — most riders never fill this in.
+    String? riderVehicleType,
+    String? riderVehicleBrand,
+    String? riderVehicleModel,
   }) = _SOSAlert;
 
   factory SOSAlert.fromJson(Map<String, dynamic> json) => _$SOSAlertFromJson(json);
 }
+
+/// Emoji + label per SOS category — shared between `sos_detail_screen.dart` (rider/generic
+/// helper view) and `partner_sos_request_screen.dart` (ADR-044) so both render identical
+/// category text instead of two copies silently drifting apart.
+const sosTypeLabels = {
+  'ACCIDENT': '🚨 Accident',
+  'LIFE_THREATENING': '🔥 Life Threatening',
+  'MEDICAL': '🏥 Medical Emergency',
+  'BIKE_BREAKDOWN': '🔧 Bike Breakdown',
+  'FLAT_TYRE': '🔩 Flat Tyre',
+  'FUEL_EMPTY': '⛽ Fuel Required',
+  'BATTERY_ISSUE': '🔋 Battery Issue',
+  'LOST': '🗺️ Lost',
+  'OTHER': '❗ Other',
+};
 
 /// Human-readable location for display — mirrors the web's `describeLocation()`
 /// (`dispatch-message.ts`, ADR-038): prefers the reverse-geocoded address, falls back to a

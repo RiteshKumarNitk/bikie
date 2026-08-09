@@ -42,7 +42,11 @@ mixin _$SOSAlert {
   // lookup failed/timed out; fall back to `city`/raw coordinates when null.
   String? get placeName => throw _privateConstructorUsedError;
   String? get area => throw _privateConstructorUsedError;
-  String? get formattedAddress => throw _privateConstructorUsedError;
+  String? get formattedAddress =>
+      throw _privateConstructorUsedError; // From the reporting rider's own RiderProfile (ADR-044) — most riders never fill this in.
+  String? get riderVehicleType => throw _privateConstructorUsedError;
+  String? get riderVehicleBrand => throw _privateConstructorUsedError;
+  String? get riderVehicleModel => throw _privateConstructorUsedError;
 
   /// Serializes this SOSAlert to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -80,6 +84,9 @@ abstract class $SOSAlertCopyWith<$Res> {
     String? placeName,
     String? area,
     String? formattedAddress,
+    String? riderVehicleType,
+    String? riderVehicleBrand,
+    String? riderVehicleModel,
   });
 }
 
@@ -118,6 +125,9 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
     Object? placeName = freezed,
     Object? area = freezed,
     Object? formattedAddress = freezed,
+    Object? riderVehicleType = freezed,
+    Object? riderVehicleBrand = freezed,
+    Object? riderVehicleModel = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -201,6 +211,18 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
                 ? _value.formattedAddress
                 : formattedAddress // ignore: cast_nullable_to_non_nullable
                       as String?,
+            riderVehicleType: freezed == riderVehicleType
+                ? _value.riderVehicleType
+                : riderVehicleType // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            riderVehicleBrand: freezed == riderVehicleBrand
+                ? _value.riderVehicleBrand
+                : riderVehicleBrand // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            riderVehicleModel: freezed == riderVehicleModel
+                ? _value.riderVehicleModel
+                : riderVehicleModel // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -237,6 +259,9 @@ abstract class _$$SOSAlertImplCopyWith<$Res>
     String? placeName,
     String? area,
     String? formattedAddress,
+    String? riderVehicleType,
+    String? riderVehicleBrand,
+    String? riderVehicleModel,
   });
 }
 
@@ -274,6 +299,9 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
     Object? placeName = freezed,
     Object? area = freezed,
     Object? formattedAddress = freezed,
+    Object? riderVehicleType = freezed,
+    Object? riderVehicleBrand = freezed,
+    Object? riderVehicleModel = freezed,
   }) {
     return _then(
       _$SOSAlertImpl(
@@ -357,6 +385,18 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
             ? _value.formattedAddress
             : formattedAddress // ignore: cast_nullable_to_non_nullable
                   as String?,
+        riderVehicleType: freezed == riderVehicleType
+            ? _value.riderVehicleType
+            : riderVehicleType // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        riderVehicleBrand: freezed == riderVehicleBrand
+            ? _value.riderVehicleBrand
+            : riderVehicleBrand // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        riderVehicleModel: freezed == riderVehicleModel
+            ? _value.riderVehicleModel
+            : riderVehicleModel // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -386,6 +426,9 @@ class _$SOSAlertImpl implements _SOSAlert {
     this.placeName,
     this.area,
     this.formattedAddress,
+    this.riderVehicleType,
+    this.riderVehicleBrand,
+    this.riderVehicleModel,
   });
 
   factory _$SOSAlertImpl.fromJson(Map<String, dynamic> json) =>
@@ -433,10 +476,17 @@ class _$SOSAlertImpl implements _SOSAlert {
   final String? area;
   @override
   final String? formattedAddress;
+  // From the reporting rider's own RiderProfile (ADR-044) — most riders never fill this in.
+  @override
+  final String? riderVehicleType;
+  @override
+  final String? riderVehicleBrand;
+  @override
+  final String? riderVehicleModel;
 
   @override
   String toString() {
-    return 'SOSAlert(id: $id, userId: $userId, userName: $userName, userPhone: $userPhone, userEmail: $userEmail, type: $type, description: $description, latitude: $latitude, longitude: $longitude, city: $city, status: $status, severity: $severity, escalationTier: $escalationTier, currentRadiusMeters: $currentRadiusMeters, assignedHelperId: $assignedHelperId, resolvedAt: $resolvedAt, createdAt: $createdAt, placeName: $placeName, area: $area, formattedAddress: $formattedAddress)';
+    return 'SOSAlert(id: $id, userId: $userId, userName: $userName, userPhone: $userPhone, userEmail: $userEmail, type: $type, description: $description, latitude: $latitude, longitude: $longitude, city: $city, status: $status, severity: $severity, escalationTier: $escalationTier, currentRadiusMeters: $currentRadiusMeters, assignedHelperId: $assignedHelperId, resolvedAt: $resolvedAt, createdAt: $createdAt, placeName: $placeName, area: $area, formattedAddress: $formattedAddress, riderVehicleType: $riderVehicleType, riderVehicleBrand: $riderVehicleBrand, riderVehicleModel: $riderVehicleModel)';
   }
 
   @override
@@ -477,7 +527,13 @@ class _$SOSAlertImpl implements _SOSAlert {
                 other.placeName == placeName) &&
             (identical(other.area, area) || other.area == area) &&
             (identical(other.formattedAddress, formattedAddress) ||
-                other.formattedAddress == formattedAddress));
+                other.formattedAddress == formattedAddress) &&
+            (identical(other.riderVehicleType, riderVehicleType) ||
+                other.riderVehicleType == riderVehicleType) &&
+            (identical(other.riderVehicleBrand, riderVehicleBrand) ||
+                other.riderVehicleBrand == riderVehicleBrand) &&
+            (identical(other.riderVehicleModel, riderVehicleModel) ||
+                other.riderVehicleModel == riderVehicleModel));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -504,6 +560,9 @@ class _$SOSAlertImpl implements _SOSAlert {
     placeName,
     area,
     formattedAddress,
+    riderVehicleType,
+    riderVehicleBrand,
+    riderVehicleModel,
   ]);
 
   /// Create a copy of SOSAlert
@@ -542,6 +601,9 @@ abstract class _SOSAlert implements SOSAlert {
     final String? placeName,
     final String? area,
     final String? formattedAddress,
+    final String? riderVehicleType,
+    final String? riderVehicleBrand,
+    final String? riderVehicleModel,
   }) = _$SOSAlertImpl;
 
   factory _SOSAlert.fromJson(Map<String, dynamic> json) =
@@ -587,7 +649,13 @@ abstract class _SOSAlert implements SOSAlert {
   @override
   String? get area;
   @override
-  String? get formattedAddress;
+  String? get formattedAddress; // From the reporting rider's own RiderProfile (ADR-044) — most riders never fill this in.
+  @override
+  String? get riderVehicleType;
+  @override
+  String? get riderVehicleBrand;
+  @override
+  String? get riderVehicleModel;
 
   /// Create a copy of SOSAlert
   /// with the given fields replaced by the non-null parameter values.

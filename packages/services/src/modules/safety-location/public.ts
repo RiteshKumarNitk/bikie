@@ -5,6 +5,7 @@ import {
 } from "../communications/public";
 import { createDispatchOrchestrator } from "./application/dispatch.application";
 import { createEscalationApplication } from "./application/escalation.application";
+import { createPartnerDashboardApplication } from "./application/partner-dashboard.application";
 import { createPlacesApplication } from "./application/places.application";
 import { createRiderLocationApplication } from "./application/rider-location.application";
 import { createSessionApplication } from "./application/session.application";
@@ -34,6 +35,7 @@ export type SafetyLocationModule = {
   riderLocation: ReturnType<typeof createRiderLocationApplication>;
   places: ReturnType<typeof createPlacesApplication>;
   dispatch: ReturnType<typeof createDispatchOrchestrator>;
+  partnerDashboard: ReturnType<typeof createPartnerDashboardApplication>;
 };
 
 export type SafetyLocationDeps = Partial<SafetyLocationPorts> & {
@@ -68,6 +70,7 @@ export function createSafetyLocationModule(overrides: SafetyLocationDeps = {}): 
     riderLocation: createRiderLocationApplication(ports),
     places: createPlacesApplication(ports),
     dispatch: createDispatchOrchestrator(ports),
+    partnerDashboard: createPartnerDashboardApplication(ports),
   };
 }
 

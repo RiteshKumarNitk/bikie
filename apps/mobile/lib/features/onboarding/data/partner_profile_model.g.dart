@@ -24,6 +24,7 @@ _$PartnerProfileInputImpl _$$PartnerProfileInputImplFromJson(
   longitude: (json['longitude'] as num?)?.toDouble(),
   governmentIdType: json['governmentIdType'] as String?,
   governmentIdNumber: json['governmentIdNumber'] as String?,
+  isGeneralResponder: json['isGeneralResponder'] as bool?,
 );
 
 Map<String, dynamic> _$$PartnerProfileInputImplToJson(
@@ -44,4 +45,25 @@ Map<String, dynamic> _$$PartnerProfileInputImplToJson(
   'longitude': instance.longitude,
   'governmentIdType': instance.governmentIdType,
   'governmentIdNumber': instance.governmentIdNumber,
+  'isGeneralResponder': instance.isGeneralResponder,
+};
+
+_$PartnerProfileSummaryImpl _$$PartnerProfileSummaryImplFromJson(
+  Map<String, dynamic> json,
+) => _$PartnerProfileSummaryImpl(
+  businessName: json['businessName'] as String,
+  type: json['type'] as String,
+  isVerified: json['isVerified'] as bool,
+  isAvailable: json['isAvailable'] as bool,
+  isGeneralResponder: json['isGeneralResponder'] as bool,
+);
+
+Map<String, dynamic> _$$PartnerProfileSummaryImplToJson(
+  _$PartnerProfileSummaryImpl instance,
+) => <String, dynamic>{
+  'businessName': instance.businessName,
+  'type': instance.type,
+  'isVerified': instance.isVerified,
+  'isAvailable': instance.isAvailable,
+  'isGeneralResponder': instance.isGeneralResponder,
 };

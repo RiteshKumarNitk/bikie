@@ -43,6 +43,9 @@ export const partnerProfileSchema = z
     longitude: z.number().min(-180).max(180).optional(),
     governmentIdType: z.enum(["AADHAAR", "PASSPORT"]).optional(),
     governmentIdNumber: optionalString(30),
+    // --- ADR-044: explicit opt-in to be dispatched SOS categories outside this partner's own
+    // `type` (e.g. a FUEL_DELIVERY partner receiving a MEDICAL emergency) ---
+    isGeneralResponder: z.boolean().optional(),
   })
   .superRefine((data, ctx) => {
     // Cross-field: a map pin without both coordinates is a bug, not a valid partial state —
@@ -93,3 +96,18 @@ export const nearbyPartnersQuerySchema = z.object({
 });
 
 export type NearbyPartnersQueryInput = z.infer<typeof nearbyPartnersQuerySchema>;
+
+/** PATCH /api/partner/availability (ADR-044). */
+export const partnerAvailabilitySchema = z.object({
+  isAvailable: z.boolean(),
+});
+
+export type PartnerAvailabilityInput = z.infer<typeof partnerAvailabilitySchema>;
+
+/** GET /api/partner/sos/nearby query params (ADR-044) — mirrors nearbyPartnersQuerySchema. */
+export const partnerNearbyQuerySchema = z.object({
+  lat: z.coerce.number().min(-90).max(90),
+  lng: z.coerce.number().min(-180).max(180),
+});
+
+export type PartnerNearbyQueryInput = z.infer<typeof partnerNearbyQuerySchema>;

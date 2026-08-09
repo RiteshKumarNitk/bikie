@@ -20,6 +20,16 @@ class PartnerProfileRepository {
     return apiGuard(() => _dio.put('/api/partner/profile', data: _toRequestJson(input)));
   }
 
+  /// ADR-044 — `null` only if this account has no `Partner` row yet (shouldn't happen once past
+  /// onboarding, but the API allows it since `PartnerService.getProfile` can return `null`).
+  Future<PartnerProfileSummary?> getProfile() {
+    return apiGuard(() async {
+      final res = await _dio.get('/api/partner/profile');
+      final profile = res.data['profile'];
+      return profile == null ? null : PartnerProfileSummary.fromJson(profile as Map<String, dynamic>);
+    });
+  }
+
   Map<String, dynamic> _toRequestJson(PartnerProfileInput input) {
     return {
       'businessName': input.businessName,
@@ -37,6 +47,7 @@ class PartnerProfileRepository {
       if (input.longitude != null) 'longitude': input.longitude,
       if (_notBlank(input.governmentIdType)) 'governmentIdType': input.governmentIdType,
       if (_notBlank(input.governmentIdNumber)) 'governmentIdNumber': input.governmentIdNumber,
+      if (input.isGeneralResponder != null) 'isGeneralResponder': input.isGeneralResponder,
     };
   }
 

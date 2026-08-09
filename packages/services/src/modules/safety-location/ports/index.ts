@@ -61,6 +61,11 @@ export interface SosAlertRepositoryPort {
   ): Promise<void>;
   /** De-dup source for radius-expansion notifications. */
   findNotifiedUserIdsForAlert(alertId: string): Promise<Set<string>>;
+  /** ADR-044 — open (unassigned, ACTIVE) alerts within a radius, for a partner's own "Nearby
+   * Requests" list. Distinct from `getActiveAlerts(location)`: that one intentionally still
+   * shows already-assigned alerts to riders/admins browsing; a partner shouldn't see a request
+   * someone else already claimed. */
+  getOpenAlertsNearPoint(latitude: number, longitude: number, radiusMeters: number): Promise<SOSAlertDTO[]>;
 }
 
 export interface SosOfferRow {
@@ -125,6 +130,25 @@ export interface SosSessionRepositoryPort {
     cancelReason?: string,
   ): Promise<SosSessionRow>;
   submitRating(sessionId: string, rating: number, comment?: string): Promise<void>;
+  /** ADR-044 — the concurrency cap: which of these candidate helpers already has an open
+   * (ACTIVE/HELPER_ARRIVED/ASSISTANCE_IN_PROGRESS) session, and so shouldn't be dispatched or
+   * allowed to offer on another alert right now. */
+  findActiveHelperUserIds(userIds: string[]): Promise<Set<string>>;
+  countSessionsForHelperSince(helperId: string, since: Date): Promise<number>;
+  countActiveSessionsForHelper(helperId: string): Promise<number>;
+  listActiveSessionsForHelper(helperId: string): Promise<PartnerActiveSessionRow[]>;
+}
+
+/** Row shape for a partner's "Active Assistance" list (ADR-044) — `distanceMeters`/`etaMinutes`
+ * come from the accepted offer that produced this session, not the session itself. */
+export interface PartnerActiveSessionRow {
+  sessionId: string;
+  alertId: string;
+  status: string;
+  riderName: string;
+  alertType: string;
+  distanceMeters: number | null;
+  etaMinutes: number | null;
 }
 
 export interface SosTimelineRepositoryPort {
@@ -198,6 +222,17 @@ export interface PartnerDispatchPort {
     take?: number,
     options?: { type?: string; verifiedOnly?: boolean },
   ): Promise<PartnerDispatchRow[]>;
+  /** ADR-044 — real eligibility for SOS dispatch: verified + available + geotagged partners
+   * within a radius. Type/general-responder matching happens one layer up
+   * (`partnerMatchesAlertType`, applied by the caller) — this stays a plain geo+status query. */
+  findEligibleForAlert(params: {
+    latitude: number;
+    longitude: number;
+    radiusMeters: number;
+  }): Promise<Array<PartnerDispatchRow & { isGeneralResponder: boolean; distanceMeters: number }>>;
+  getEligibilityFields(
+    userId: string,
+  ): Promise<{ isVerified: boolean; isAvailable: boolean; isGeneralResponder: boolean; type: string } | null>;
 }
 
 export interface EmergencyContactRow {

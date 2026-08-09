@@ -1,12 +1,16 @@
 import type { SOSAlertDTO } from "@bikie/types";
 import { resolveChannelAvailability, type ChannelAvailability } from "../domain/channel-selection";
 import type { CommunicationsPorts } from "../../communications/public";
-import { partnerTypeForAlertType } from "../domain/partner-mapping";
+import { partnerMatchesAlertType } from "../domain/partner-mapping";
 import type { SOSRecipient } from "../domain/dispatch-message";
 import type { SafetyLocationPorts } from "../ports";
 import { dispatchToRecipient, emptySummary, type SOSDispatchSummary } from "./fan-out.application";
 
 const INITIAL_RADIUS_METERS = 5000;
+/** ADR-044 — real SOS-dispatch eligibility radius, matching the two existing precedents exactly
+ * (`/api/partners/nearby`, ADR-036; the SOS-browse radius, ADR-042) so "nearby" means one thing
+ * platform-wide. */
+const SOS_PARTNER_ELIGIBILITY_RADIUS_METERS = 25_000;
 const radiusStepMeters = () => Number(process.env.SOS_RADIUS_STEP_KM ?? "5") * 1000;
 const radiusMaxMeters = () => Number(process.env.SOS_RADIUS_MAX_KM ?? "20") * 1000;
 const tierTimeoutMs = () => Number(process.env.SOS_TIER_TIMEOUT_SECONDS ?? "300") * 1000;
@@ -44,27 +48,43 @@ async function resolveNearbyRiders(
   }));
 }
 
+/**
+ * Which verified, available partners get dispatched an SOS (ADR-044). Used to broaden to
+ * *every* partner type (even unverified) whenever the strict verified+type-matched search came
+ * up empty ("better to reach someone than nobody") — that's exactly why a fuel-delivery partner
+ * could receive a medical emergency. Replaced with real eligibility: a 25km radius around the
+ * alert, verified + available + geotagged (`findEligibleForAlert`), category-matched
+ * (`partnerMatchesAlertType` — an unmapped category like MEDICAL only reaches partners who've
+ * explicitly opted in as a general responder), and not already at capacity
+ * (`findActiveHelperUserIds`, the concurrency cap). No fallback that reaches an ineligible
+ * partner "better than nobody" — `tickEscalation` already advances SERVICE_PROVIDERS → ADMIN
+ * unconditionally after a timeout regardless of how many partners were found here, so the
+ * "SOS must never reach nobody" guarantee (ADR-030) holds without one.
+ */
 async function resolveServiceProviders(
-  alert: Pick<SOSAlertDTO, "city" | "type">,
+  alert: Pick<SOSAlertDTO, "latitude" | "longitude" | "type">,
   ports: SafetyLocationPorts,
 ): Promise<SOSRecipient[]> {
-  const relevantType = partnerTypeForAlertType(alert.type);
-  const verified = await ports.partnerDispatch.findByCity(alert.city, 25, {
-    type: relevantType,
-    verifiedOnly: true,
+  const candidates = await ports.partnerDispatch.findEligibleForAlert({
+    latitude: alert.latitude,
+    longitude: alert.longitude,
+    radiusMeters: SOS_PARTNER_ELIGIBILITY_RADIUS_METERS,
   });
-  // Better to reach an unverified/general-type partner than nobody — broaden if the strict
-  // (verified + type-matched) search comes up empty.
-  const pool = verified.length > 0 ? verified : await ports.partnerDispatch.findByCity(alert.city);
+  const typeMatched = candidates.filter((c) => partnerMatchesAlertType(c, alert.type));
+  if (typeMatched.length === 0) return [];
+
+  const atCapacity = await ports.sosSessions.findActiveHelperUserIds(typeMatched.map((c) => c.userId));
+  const eligible = typeMatched.filter((c) => !atCapacity.has(c.userId));
 
   const recipients: SOSRecipient[] = [];
-  for (const p of pool) {
+  for (const p of eligible) {
     recipients.push({
       role: "SERVICE_PROVIDER",
       name: p.businessName || p.user.name,
       phone: p.user.phone ?? p.contactPerson1Mobile,
       email: p.user.email,
       userId: p.userId,
+      distanceMeters: Math.round(p.distanceMeters),
     });
     if (p.contactPerson1Mobile && p.contactPerson1Mobile !== p.user.phone) {
       recipients.push({
@@ -72,6 +92,7 @@ async function resolveServiceProviders(
         name: p.contactPerson1Name ?? `${p.businessName} contact`,
         phone: p.contactPerson1Mobile,
         email: null,
+        distanceMeters: Math.round(p.distanceMeters),
       });
     }
   }

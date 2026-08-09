@@ -2,6 +2,23 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Partner Emergency Assistance Dashboard + real SOS eligibility filtering (2026-08-09, ADR-044)
+
+| Task | Status |
+|---|---|
+| **Fixed pre-existing bug**: `resolveServiceProviders` broadened to *any* verified partner when the strict verified+type-matched search came up empty — this is why a fuel-delivery partner could receive a medical emergency. Removed; `SERVICE_PROVIDERS → ADMIN` timeout advancement still guarantees an alert never reaches nobody (ADR-030) | Completed |
+| Schema: `Partner.isAvailable`/`isGeneralResponder` (both default `false`, additive migration, applied, zero drift) | Completed |
+| Domain: `partnerMatchesAlertType` (`safety-location/domain/partner-mapping.ts`) — type-mapped categories require a type match, unmapped categories (accident/medical/life-threatening/lost/other) require `isGeneralResponder` | Completed |
+| `resolveServiceProviders` rewritten: `findEligibleForAlert` (25km Haversine) → type-match filter → capacity filter (1 concurrent active session as helper) → no fallback | Completed |
+| `offerHelp` gained additive `opts.requireAvailableAndCapacity` (verified/available/type-match/capacity gate); wired on `POST /api/sos/alerts/[id]/offer` only when the caller's role is `PARTNER` | Completed |
+| Partner-role SOS push copy branch in `dispatchToRecipient` — `"🚨 Emergency Assistance Needed"` + category/distance/city body; renter/nearby-rider copy unchanged | Completed |
+| New `partner-dashboard.application.ts` + 4 routes: `PATCH /api/partner/availability`, `GET /api/partner/sos/{dashboard,nearby,active}` | Completed |
+| `PUT /api/partner/profile` accepts `isGeneralResponder`; `SOSAlertDTO` gained `riderVehicleType`/`Brand`/`Model` | Completed |
+| Mobile: `partner_dashboard/` feature folder (model/repository/providers), `PartnerHomeScreen`, `PartnerRequestsScreen`, `PartnerActiveScreen`, `PartnerSosRequestScreen` (state derived from the same `sosAlertDetailProvider`/`sosOffersProvider` `sos_detail_screen.dart` already polls — no new polling), `PartnerAvailabilityBanner` (🟢 AVAILABLE / ⚫ OFFLINE) | Completed |
+| Mobile: `app_router.dart`/`app_shell.dart` branch by role (`user?.role == 'PARTNER'`) — `/` and `/sos/:id` builders, partner tab set (Home/Requests/Active/Messages/Profile), persistent availability banner | Completed |
+| Backend: `pnpm turbo run typecheck` (9/9), `pnpm exec vitest run` (124/124, incl. a new eligibility-exclusion test); migration applied, zero drift. Mobile: `flutter analyze` 0 issues, `flutter test` passing | Completed |
+| Live two-account smoke test (a MECHANIC partner must not receive a MEDICAL alert unless `isGeneralResponder` is on) | **Not done** — not verified in this environment; worth the user's own end-to-end test, same caveat as every prior SOS-dispatch change |
+
 ## Membership payments: real Razorpay verification, dev-mode fallback preserved (2026-08-06, ADR-043)
 
 | Task | Status |

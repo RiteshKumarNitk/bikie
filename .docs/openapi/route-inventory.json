@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-06T18:32:28.126Z",
-  "count": 121,
+  "generatedAt": "2026-08-09T04:01:26.234Z",
+  "count": 125,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -544,6 +544,14 @@
       "file": "apps/web/app/api/otp/mobile/send/route.ts"
     },
     {
+      "path": "/api/partner/availability",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/availability/route.ts"
+    },
+    {
       "path": "/api/partner/bikes/{id}",
       "methods": [
         "DELETE"
@@ -592,6 +600,30 @@
       ],
       "auth": "partner",
       "file": "apps/web/app/api/partner/reviews/route.ts"
+    },
+    {
+      "path": "/api/partner/sos/active",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/sos/active/route.ts"
+    },
+    {
+      "path": "/api/partner/sos/dashboard",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/sos/dashboard/route.ts"
+    },
+    {
+      "path": "/api/partner/sos/nearby",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/sos/nearby/route.ts"
     },
     {
       "path": "/api/partners/nearby",

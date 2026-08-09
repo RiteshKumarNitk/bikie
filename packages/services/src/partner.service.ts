@@ -26,6 +26,7 @@ export const PartnerService = {
       longitude?: number;
       governmentIdType?: string;
       governmentIdNumber?: string;
+      isGeneralResponder?: boolean;
     },
   ): Promise<PartnerProfileDTO> {
     return getPartnersModule().partners.upsertProfile(userId, data);
@@ -44,5 +45,10 @@ export const PartnerService = {
     options?: { type?: string; take?: number },
   ): Promise<NearbyPartnerRow[]> {
     return getPartnersModule().partners.findNearby(latitude, longitude, radiusMeters, options);
+  },
+
+  /** ADR-044 — the SOS-availability toggle. */
+  async setAvailability(userId: string, isAvailable: boolean): Promise<{ isAvailable: boolean }> {
+    return getPartnersModule().partners.setAvailability(userId, isAvailable);
   },
 };

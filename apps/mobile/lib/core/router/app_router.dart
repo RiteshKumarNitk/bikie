@@ -21,6 +21,10 @@ import '../../features/onboarding/presentation/intro_screen.dart';
 import '../../features/onboarding/presentation/partner_onboarding_screen.dart';
 import '../../features/onboarding/presentation/rider_onboarding_screen.dart';
 import '../../features/onboarding/presentation/welcome_screen.dart';
+import '../../features/partner_dashboard/presentation/partner_active_screen.dart';
+import '../../features/partner_dashboard/presentation/partner_home_screen.dart';
+import '../../features/partner_dashboard/presentation/partner_requests_screen.dart';
+import '../../features/partner_dashboard/presentation/partner_sos_request_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/referrals/presentation/referrals_screen.dart';
 import '../../features/ride_room/presentation/ride_room_screen.dart';
@@ -46,6 +50,10 @@ const _preAuthPaths = {'/intro', '/welcome', '/login', '/signup'};
 final routerProvider = Provider<GoRouter>((ref) {
   final authStatus = ref.watch(authControllerProvider.select((s) => s.status));
   final hasSeenIntro = ref.watch(hasSeenIntroProvider);
+  // ADR-044: Partners get a purpose-built Emergency Assistance Dashboard instead of the renter
+  // marketplace Home/SOS screens — branched here rather than as a second parallel route tree, so
+  // every other route (bookings, messages, profile, …) stays reachable identically for both roles.
+  final isPartner = ref.watch(authControllerProvider.select((s) => s.user?.role == 'PARTNER'));
 
   final String initialLocation;
   if (authStatus == AuthStatus.authenticated) {
@@ -79,11 +87,13 @@ final routerProvider = Provider<GoRouter>((ref) {
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
-          GoRoute(path: '/', builder: (context, state) => const HomeScreen()),
+          GoRoute(path: '/', builder: (context, state) => isPartner ? const PartnerHomeScreen() : const HomeScreen()),
           GoRoute(path: '/trips', builder: (context, state) => const TripsListScreen()),
           GoRoute(path: '/bikes', builder: (context, state) => const BikesListScreen()),
           GoRoute(path: '/bookings', builder: (context, state) => const BookingsScreen()),
           GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
+          GoRoute(path: '/partner/requests', builder: (context, state) => const PartnerRequestsScreen()),
+          GoRoute(path: '/partner/active', builder: (context, state) => const PartnerActiveScreen()),
         ],
       ),
       GoRoute(
@@ -114,7 +124,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/sos/history', builder: (context, state) => const SosHistoryScreen()),
       GoRoute(
         path: '/sos/:id',
-        builder: (context, state) => SosDetailScreen(alertId: state.pathParameters['id']!),
+        builder: (context, state) => isPartner
+            ? PartnerSosRequestScreen(alertId: state.pathParameters['id']!)
+            : SosDetailScreen(alertId: state.pathParameters['id']!),
       ),
       GoRoute(path: '/onboarding', builder: (context, state) => const RiderOnboardingScreen()),
       GoRoute(path: '/partner-onboarding', builder: (context, state) => const PartnerOnboardingScreen()),

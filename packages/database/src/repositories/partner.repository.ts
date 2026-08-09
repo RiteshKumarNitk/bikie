@@ -23,6 +23,8 @@ function toDTO(partner: {
   longitude: number | null;
   governmentIdType: string | null;
   governmentIdNumber: string | null;
+  isAvailable: boolean;
+  isGeneralResponder: boolean;
 }) {
   return {
     id: partner.id,
@@ -45,6 +47,8 @@ function toDTO(partner: {
     longitude: partner.longitude,
     governmentIdType: partner.governmentIdType as "AADHAAR" | "PASSPORT" | null,
     governmentIdNumber: partner.governmentIdNumber,
+    isAvailable: partner.isAvailable,
+    isGeneralResponder: partner.isGeneralResponder,
   };
 }
 
@@ -71,6 +75,7 @@ export async function upsertPartnerProfile(
     longitude?: number;
     governmentIdType?: string;
     governmentIdNumber?: string;
+    isGeneralResponder?: boolean;
   },
 ) {
   const shared = {
@@ -89,6 +94,7 @@ export async function upsertPartnerProfile(
     longitude: data.longitude,
     governmentIdType: data.governmentIdType as any,
     governmentIdNumber: data.governmentIdNumber,
+    isGeneralResponder: data.isGeneralResponder,
   };
   const partner = await prisma.partner.upsert({
     where: { userId },
@@ -177,4 +183,53 @@ export async function findPartnersNearPoint(
     .filter((p) => p.distanceMeters <= radiusMeters)
     .sort((a, b) => a.distanceMeters - b.distanceMeters)
     .slice(0, options.take ?? 25);
+}
+
+export async function setAvailability(userId: string, isAvailable: boolean) {
+  const partner = await prisma.partner.update({ where: { userId }, data: { isAvailable } });
+  return { isAvailable: partner.isAvailable };
+}
+
+/** Thin select for `offerHelp`'s eligibility gate and the nearby-requests filter (ADR-044) —
+ * not the full `toDTO` shape, just what those two callers actually need. */
+export async function findPartnerEligibilityFields(userId: string) {
+  const partner = await prisma.partner.findUnique({
+    where: { userId },
+    select: { isVerified: true, isAvailable: true, isGeneralResponder: true, type: true },
+  });
+  return partner;
+}
+
+/**
+ * Real SOS-dispatch eligibility (ADR-044) — verified, available, geotagged partners within a
+ * radius, same plain-Haversine shape as `findPartnersNearPoint` (reused, not reinvented) but
+ * returning the fuller `PartnerDispatchRow`-compatible shape dispatch/offer-gating needs
+ * (contact-person fields, `user`, `isGeneralResponder`). Type/general-responder *matching*
+ * against a specific alert happens one layer up (`partnerMatchesAlertType`) — this stays a
+ * plain geo+status query, same separation `findPartnersNearPoint` already has from its callers.
+ */
+export async function findEligiblePartnersNearPoint(latitude: number, longitude: number, radiusMeters: number) {
+  const partners = await prisma.partner.findMany({
+    where: { latitude: { not: null }, longitude: { not: null }, isVerified: true, isAvailable: true },
+    include: { user: { select: { id: true, name: true, email: true, phone: true } } },
+  });
+
+  return partners
+    .filter((p): p is typeof p & { latitude: number; longitude: number } => p.latitude !== null && p.longitude !== null)
+    .map((p) => ({
+      userId: p.userId,
+      businessName: p.businessName,
+      type: p.type,
+      isGeneralResponder: p.isGeneralResponder,
+      contactPerson1Name: p.contactPerson1Name,
+      contactPerson1Mobile: p.contactPerson1Mobile,
+      contactPerson2Name: p.contactPerson2Name,
+      contactPerson2Mobile: p.contactPerson2Mobile,
+      latitude: p.latitude,
+      longitude: p.longitude,
+      user: p.user,
+      distanceMeters: haversineDistanceMeters(latitude, longitude, p.latitude, p.longitude),
+    }))
+    .filter((p) => p.distanceMeters <= radiusMeters)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters);
 }

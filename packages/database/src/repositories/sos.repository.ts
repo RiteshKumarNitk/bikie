@@ -1,10 +1,27 @@
 import { prisma } from "../client";
 import { haversineDistanceMeters } from "../lib/geo";
 
+const ALERT_USER_INCLUDE = {
+  user: {
+    select: {
+      id: true,
+      name: true,
+      phone: true,
+      email: true,
+      riderProfile: { select: { vehicleType: true, vehicleBrand: true, vehicleModel: true } },
+    },
+  },
+} as const;
+
 function toDTO(alert: {
   id: string;
   userId: string;
-  user: { name: string; phone: string | null; email: string };
+  user: {
+    name: string;
+    phone: string | null;
+    email: string;
+    riderProfile: { vehicleType: string | null; vehicleBrand: string | null; vehicleModel: string | null } | null;
+  };
   type: string;
   description: string | null;
   latitude: number;
@@ -42,6 +59,10 @@ function toDTO(alert: {
     placeName: alert.placeName,
     area: alert.area,
     formattedAddress: alert.formattedAddress,
+    // ADR-044 — most riders never fill this in, hence the fallback to null throughout.
+    riderVehicleType: alert.user.riderProfile?.vehicleType ?? null,
+    riderVehicleBrand: alert.user.riderProfile?.vehicleBrand ?? null,
+    riderVehicleModel: alert.user.riderProfile?.vehicleModel ?? null,
   };
 }
 
@@ -74,7 +95,7 @@ export async function createAlert(data: {
       area: data.area ?? null,
       formattedAddress: data.formattedAddress ?? null,
     },
-    include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+    include: ALERT_USER_INCLUDE,
   });
   return toDTO(alert);
 }
@@ -97,7 +118,7 @@ export async function getActiveAlerts(location?: { latitude: number; longitude: 
   const alerts = await prisma.sOSAlert.findMany({
     where: { status: "ACTIVE" },
     orderBy: { createdAt: "desc" },
-    include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+    include: ALERT_USER_INCLUDE,
   });
 
   if (!location) return alerts.map(toDTO);
@@ -115,10 +136,31 @@ export async function getActiveAlerts(location?: { latitude: number; longitude: 
 export async function getAlertById(alertId: string) {
   const alert = await prisma.sOSAlert.findUnique({
     where: { id: alertId },
-    include: { user: { select: { id: true, name: true, phone: true, email: true } } },
+    include: ALERT_USER_INCLUDE,
   });
   if (!alert) return null;
   return toDTO(alert);
+}
+
+/** ADR-044 — open (unassigned, ACTIVE) alerts within a radius, for a partner's own "Nearby
+ * Requests" list. See getActiveAlerts's doc comment for why this is a separate query rather
+ * than an extra filter param on it: that one intentionally still shows already-assigned alerts
+ * to riders/admins browsing. */
+export async function getOpenAlertsNearPoint(latitude: number, longitude: number, radiusMeters: number) {
+  const alerts = await prisma.sOSAlert.findMany({
+    where: { status: "ACTIVE", assignedHelperId: null },
+    orderBy: { createdAt: "desc" },
+    include: ALERT_USER_INCLUDE,
+  });
+
+  return alerts
+    .map((alert) => ({
+      alert,
+      distanceMeters: haversineDistanceMeters(latitude, longitude, alert.latitude, alert.longitude),
+    }))
+    .filter((a) => a.distanceMeters <= radiusMeters)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters)
+    .map((a) => toDTO(a.alert));
 }
 
 export async function resolveAlert(alertId: string, userId: string) {

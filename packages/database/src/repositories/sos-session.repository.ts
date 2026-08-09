@@ -189,3 +189,45 @@ export async function submitRating(sessionId: string, rating: number, comment?: 
     data: { rating, ratingComment: comment },
   });
 }
+
+/** "Open" for capacity purposes (ADR-044) — a session isn't done until COMPLETED/CANCELLED. */
+const OPEN_SESSION_STATUSES = ["ACTIVE", "HELPER_ARRIVED", "ASSISTANCE_IN_PROGRESS"] as const;
+
+export async function findActiveHelperUserIds(userIds: string[]): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const rows = await prisma.sOSSession.findMany({
+    where: { helperId: { in: userIds }, status: { in: [...OPEN_SESSION_STATUSES] } },
+    select: { helperId: true },
+    distinct: ["helperId"],
+  });
+  return new Set(rows.map((r) => r.helperId));
+}
+
+export async function countSessionsForHelperSince(helperId: string, since: Date): Promise<number> {
+  return prisma.sOSSession.count({ where: { helperId, startedAt: { gte: since } } });
+}
+
+export async function countActiveSessionsForHelper(helperId: string): Promise<number> {
+  return prisma.sOSSession.count({ where: { helperId, status: { in: [...OPEN_SESSION_STATUSES] } } });
+}
+
+export async function listActiveSessionsForHelper(helperId: string) {
+  const sessions = await prisma.sOSSession.findMany({
+    where: { helperId, status: { in: [...OPEN_SESSION_STATUSES] } },
+    orderBy: { startedAt: "desc" },
+    include: {
+      rider: { select: { name: true } },
+      alert: { select: { type: true } },
+      offer: { select: { distanceMeters: true, etaMinutes: true } },
+    },
+  });
+  return sessions.map((s) => ({
+    sessionId: s.id,
+    alertId: s.alertId,
+    status: s.status,
+    riderName: s.rider.name,
+    alertType: s.alert.type,
+    distanceMeters: s.offer.distanceMeters,
+    etaMinutes: s.offer.etaMinutes,
+  }));
+}

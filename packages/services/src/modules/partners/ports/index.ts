@@ -16,6 +16,8 @@ export type PartnerProfileInput = {
   longitude?: number;
   governmentIdType?: string;
   governmentIdNumber?: string;
+  // --- ADR-044 ---
+  isGeneralResponder?: boolean;
 };
 
 /** Public "find a service provider near me" result — a lighter shape than PartnerProfileDTO,
@@ -40,6 +42,8 @@ export interface PartnerRepositoryPort {
     radiusMeters: number,
     options?: { type?: string; take?: number },
   ): Promise<NearbyPartnerRow[]>;
+  /** ADR-044 — the SOS-availability toggle. */
+  setAvailability(userId: string, isAvailable: boolean): Promise<{ isAvailable: boolean }>;
 }
 
 export interface PartnersPorts {

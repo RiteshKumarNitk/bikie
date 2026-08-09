@@ -1,4 +1,5 @@
 import { estimateEtaMinutes, haversineDistanceMeters } from "../domain/eta";
+import { partnerMatchesAlertType } from "../domain/partner-mapping";
 import { getReputationModule, type ReputationApplication } from "../../reputation/public";
 import { AlreadyAssignedError, AlreadyOfferedError, OfferNotAvailableError, type SafetyLocationPorts } from "../ports";
 
@@ -8,18 +9,38 @@ export function createSessionApplication(ports: SafetyLocationPorts, deps: Sessi
   const reputation = deps.reputation ?? getReputationModule().reputation;
 
   return {
-    /** Helper taps "I'm Coming." */
+    /**
+     * Helper taps "I'm Coming" (or, for a partner, "ACCEPT" on a request — same underlying call,
+     * ADR-044). `opts.requireAvailableAndCapacity` is additive and opt-in: existing renter/
+     * nearby-rider callers pass nothing and are completely unaffected. Belt-and-suspenders with
+     * the dispatch-side filtering in escalation.application.ts's `resolveServiceProviders` — a
+     * partner could otherwise still offer on an alert they were never eligible to be dispatched
+     * for in the first place (e.g. by opening a deep link to an alert someone forwarded them).
+     */
     async offerHelp(
       alertId: string,
       responderId: string,
       location?: { latitude: number; longitude: number },
       message?: string,
+      opts?: { requireAvailableAndCapacity?: boolean },
     ) {
       const alert = await ports.sosAlerts.getAlertById(alertId);
       if (!alert) return { ok: false as const, reason: "NOT_FOUND" as const };
       if (alert.status !== "ACTIVE") return { ok: false as const, reason: "ALERT_NOT_ACTIVE" as const };
       if (alert.assignedHelperId) return { ok: false as const, reason: "ALREADY_ASSIGNED" as const };
       if (alert.userId === responderId) return { ok: false as const, reason: "FORBIDDEN" as const };
+
+      if (opts?.requireAvailableAndCapacity) {
+        const partner = await ports.partnerDispatch.getEligibilityFields(responderId);
+        if (!partner?.isVerified) return { ok: false as const, reason: "NOT_VERIFIED" as const };
+        if (!partner.isAvailable) return { ok: false as const, reason: "PARTNER_OFFLINE" as const };
+        if (!partnerMatchesAlertType(partner, alert.type)) {
+          return { ok: false as const, reason: "CATEGORY_MISMATCH" as const };
+        }
+        if ((await ports.sosSessions.findActiveHelperUserIds([responderId])).size > 0) {
+          return { ok: false as const, reason: "AT_CAPACITY" as const };
+        }
+      }
 
       let distanceMeters: number | undefined;
       let etaMinutes: number | undefined;

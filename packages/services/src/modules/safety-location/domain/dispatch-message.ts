@@ -23,6 +23,15 @@ export interface SOSRecipient {
 /** Human-readable location for notification text (ADR-038) — prefers the reverse-geocoded
  * address, falls back to a placeName/area/city join, falls back to bare city. Never GPS-only;
  * the raw coordinates stay available as a secondary line/map link for anyone who wants them. */
+/** "BIKE_BREAKDOWN" -> "Bike Breakdown" — used in partner push copy (ADR-044). */
+export function humanizeSosType(type: string): string {
+  return type
+    .toLowerCase()
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
 export function describeLocation(alert: SOSAlertDTO): string {
   if (alert.formattedAddress) return alert.formattedAddress;
   const parts = [alert.placeName, alert.area, alert.city].filter((p): p is string => Boolean(p));

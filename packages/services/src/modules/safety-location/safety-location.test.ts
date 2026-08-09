@@ -67,6 +67,9 @@ function sampleAlert(overrides: Partial<SOSAlertDTO> = {}): SOSAlertDTO {
     placeName: null,
     area: null,
     formattedAddress: null,
+    riderVehicleType: null,
+    riderVehicleBrand: null,
+    riderVehicleModel: null,
     ...overrides,
   };
 }
@@ -116,7 +119,11 @@ function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partial<Safet
       findNearbyAroundPoint: vi.fn(async () => []),
       autoDisableStaleSharing: vi.fn(async () => 0),
     },
-    partnerDispatch: { findByCity: vi.fn(async () => []) },
+    partnerDispatch: {
+      findByCity: vi.fn(async () => []),
+      findEligibleForAlert: vi.fn(async () => []),
+      getEligibilityFields: vi.fn(async () => null),
+    },
     emergencyContacts: { findByUserId: vi.fn(async () => []) },
     userContact: { findSosContactFields: vi.fn(async () => null) },
     escalation: { findAdminContacts: vi.fn(async () => []) },
@@ -132,6 +139,7 @@ function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partial<Safet
       findAlertsDueForEscalation: vi.fn(async () => []),
       updateEscalationState: vi.fn(async () => undefined),
       findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
+      getOpenAlertsNearPoint: vi.fn(async () => []),
     },
     sosOffers: {
       createOffer: vi.fn(),
@@ -145,6 +153,10 @@ function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partial<Safet
       getActiveSessionForAlert: vi.fn(async () => null),
       updateSessionStatus: vi.fn(),
       submitRating: vi.fn(async () => undefined),
+      findActiveHelperUserIds: vi.fn(async () => new Set<string>()),
+      countSessionsForHelperSince: vi.fn(async () => 0),
+      countActiveSessionsForHelper: vi.fn(async () => 0),
+      listActiveSessionsForHelper: vi.fn(async () => []),
     },
     sosTimeline: {
       record: vi.fn(async () => undefined),
@@ -407,6 +419,7 @@ describe("sos resolveAlert ownership", () => {
           findAlertsDueForEscalation: vi.fn(async () => []),
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
+          getOpenAlertsNearPoint: vi.fn(async () => []),
         },
       }),
       communications: fakeCommunications(),
@@ -433,6 +446,7 @@ describe("sos resolveAlert ownership", () => {
           findAlertsDueForEscalation: vi.fn(async () => []),
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
+          getOpenAlertsNearPoint: vi.fn(async () => []),
         },
       }),
       communications: fakeCommunications(),
@@ -458,6 +472,7 @@ describe("sos resolveAlert ownership", () => {
           findAlertsDueForEscalation: vi.fn(async () => []),
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
+          getOpenAlertsNearPoint: vi.fn(async () => []),
         },
       }),
       communications: fakeCommunications(),
@@ -483,6 +498,7 @@ describe("sos resolveAlert ownership", () => {
           findAlertsDueForEscalation: vi.fn(async () => []),
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
+          getOpenAlertsNearPoint: vi.fn(async () => []),
         },
       }),
       communications: fakeCommunications(),
@@ -521,6 +537,8 @@ describe("fan-out dispatch", () => {
           autoDisableStaleSharing: vi.fn(async () => 0),
         },
         partnerDispatch: {
+          findEligibleForAlert: vi.fn(async () => []),
+          getEligibilityFields: vi.fn(async () => null),
           findByCity: vi.fn(async () => [
             {
               userId: "partner-1",
@@ -956,25 +974,32 @@ describe("escalation application — tier advancement", () => {
     );
   });
 
-  it("advances to SERVICE_PROVIDERS once radius is maxed", async () => {
-    const findByCity = vi.fn(async () => [
+  it("advances to SERVICE_PROVIDERS once radius is maxed, dispatching only eligible partners (ADR-044)", async () => {
+    // sampleAlert() defaults to type "ACCIDENT", which has no natural PartnerType mapping — only
+    // a general-responder partner is eligible, exactly the case ADR-044 was written to fix
+    // (previously this would have broadened to *every* partner type via the removed fallback).
+    const findEligibleForAlert = vi.fn(async () => [
       {
         userId: "partner-1",
         businessName: "Garage",
         type: "MECHANIC",
+        isGeneralResponder: true,
         contactPerson1Name: null,
         contactPerson1Mobile: null,
         contactPerson2Name: null,
         contactPerson2Mobile: null,
-        latitude: null,
-        longitude: null,
+        latitude: 12.98,
+        longitude: 77.6,
         user: { id: "partner-1", name: "Partner", email: "p@example.com", phone: "9000000000" },
+        distanceMeters: 1200,
       },
     ]);
+    const findActiveHelperUserIds = vi.fn(async () => new Set<string>());
     const updateEscalationState = vi.fn(async () => undefined);
     const module = createSafetyLocationModule({
       ...emptyRepos({
-        partnerDispatch: { findByCity },
+        partnerDispatch: { ...emptyRepos().partnerDispatch, findEligibleForAlert } as any,
+        sosSessions: { ...emptyRepos().sosSessions, findActiveHelperUserIds } as any,
         sosAlerts: { ...emptyRepos().sosAlerts, updateEscalationState } as any,
       }),
       communications: fakeCommunications(),
@@ -984,19 +1009,55 @@ describe("escalation application — tier advancement", () => {
       sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 20000 }),
     );
 
-    expect(findByCity).toHaveBeenCalled();
+    expect(findEligibleForAlert).toHaveBeenCalled();
     expect(updateEscalationState).toHaveBeenCalledWith(
       "alert-1",
       expect.objectContaining({ escalationTier: "SERVICE_PROVIDERS" }),
     );
   });
 
+  it("excludes a partner whose type doesn't match the alert and who isn't a general responder (ADR-044)", async () => {
+    const findEligibleForAlert = vi.fn(async () => [
+      {
+        userId: "fuel-partner",
+        businessName: "Fuel Co",
+        type: "FUEL_DELIVERY",
+        isGeneralResponder: false,
+        contactPerson1Name: null,
+        contactPerson1Mobile: null,
+        contactPerson2Name: null,
+        contactPerson2Mobile: null,
+        latitude: 12.98,
+        longitude: 77.6,
+        user: { id: "fuel-partner", name: "Fuel Partner", email: "f@example.com", phone: "9000000001" },
+        distanceMeters: 900,
+      },
+    ]);
+    const notify = notifyMock();
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        partnerDispatch: { ...emptyRepos().partnerDispatch, findEligibleForAlert } as any,
+        notifications: { notify },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    // type: "ACCIDENT" (sampleAlert's default) has no natural PartnerType — a non-general-
+    // responder FUEL_DELIVERY partner must not be dispatched a medical/accident emergency.
+    await module.escalation.tickEscalation(
+      sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 20000 }),
+    );
+
+    expect(notify.mock.calls.map((c) => c[0])).not.toContain("fuel-partner");
+  });
+
   it("does nothing but clear the timer when the alert already has an assigned helper", async () => {
     const updateEscalationState = vi.fn(async () => undefined);
     const findByCity = vi.fn();
+    const findEligibleForAlert = vi.fn(async () => []);
     const module = createSafetyLocationModule({
       ...emptyRepos({
-        partnerDispatch: { findByCity },
+        partnerDispatch: { ...emptyRepos().partnerDispatch, findByCity, findEligibleForAlert } as any,
         sosAlerts: { ...emptyRepos().sosAlerts, updateEscalationState } as any,
       }),
       communications: fakeCommunications(),
@@ -1005,6 +1066,7 @@ describe("escalation application — tier advancement", () => {
     await module.escalation.tickEscalation(sampleAlert({ assignedHelperId: "helper-1" }));
 
     expect(findByCity).not.toHaveBeenCalled();
+    expect(findEligibleForAlert).not.toHaveBeenCalled();
     expect(updateEscalationState).toHaveBeenCalledWith("alert-1", { nextEscalationAt: null });
   });
 });

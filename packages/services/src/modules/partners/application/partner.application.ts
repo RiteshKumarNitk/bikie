@@ -17,6 +17,10 @@ export function createPartnerApplication(ports: PartnersPorts) {
     findNearby(latitude: number, longitude: number, radiusMeters: number, options?: { type?: string; take?: number }) {
       return ports.partners.findNearby(latitude, longitude, radiusMeters, options);
     },
+
+    setAvailability(userId: string, isAvailable: boolean) {
+      return ports.partners.setAvailability(userId, isAvailable);
+    },
   };
 }
 

@@ -21,6 +21,11 @@ export interface SOSAlertDTO {
   placeName: string | null;
   area: string | null;
   formattedAddress: string | null;
+  /** From the reporting rider's own RiderProfile (ADR-044) — most riders never fill this in, so
+   * null is the common case. Lets a responding partner see what they're riding before arriving. */
+  riderVehicleType: string | null;
+  riderVehicleBrand: string | null;
+  riderVehicleModel: string | null;
 }
 
 export interface SOSAlertCreateInput {

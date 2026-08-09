@@ -8,5 +8,6 @@ export function createPartnerRepositoryAdapter(): PartnerRepositoryPort {
     getDashboardStats: (userId) => partnerRepository.getPartnerDashboardStats(userId),
     findNearby: (latitude, longitude, radiusMeters, options) =>
       partnerRepository.findPartnersNearPoint(latitude, longitude, radiusMeters, options),
+    setAvailability: (userId, isAvailable) => partnerRepository.setAvailability(userId, isAvailable),
   };
 }

@@ -8,7 +8,13 @@ import {
   resolveChannelAvailability,
   type ChannelAvailability,
 } from "../domain/channel-selection";
-import { buildEmailHtml, buildTextBody, describeLocation, type SOSRecipient } from "../domain/dispatch-message";
+import {
+  buildEmailHtml,
+  buildTextBody,
+  describeLocation,
+  humanizeSosType,
+  type SOSRecipient,
+} from "../domain/dispatch-message";
 import { formatDistance, mapsNavigateUrl } from "../domain/maps";
 import type { SafetyLocationPorts } from "../ports";
 
@@ -200,19 +206,24 @@ export async function dispatchToRecipient(
 
   if (recipient.userId) {
     summary.inAppNotified += 1;
-    const kind = alertKind(alert.description);
-    const distanceBit = distance ? ` You are ~${distance.replace(" away", "")} away.` : "";
+    // ADR-044 — partners get purpose-built copy (category + distance + city, no generic
+    // "Red/Amber Alert" framing) since they land on the partner request-details screen, not the
+    // rider-facing alert list. Everyone else's copy is unchanged.
+    let title: string;
+    let body: string;
+    if (recipient.role === "SERVICE_PROVIDER") {
+      title = "🚨 Emergency Assistance Needed";
+      body = [`${humanizeSosType(alert.type)} reported near you`, distance ? `📍 ${distance}` : null, alert.city]
+        .filter(Boolean)
+        .join("\n");
+    } else {
+      const kind = alertKind(alert.description);
+      const distanceBit = distance ? ` You are ~${distance.replace(" away", "")} away.` : "";
+      title = kind === "RED" ? "Red Alert nearby" : kind === "AMBER" ? "Amber Alert nearby" : "SOS Alert nearby";
+      body = `${alert.userName} needs help at ${describeLocation(alert)}.${distanceBit} Open Maps to navigate & see your distance: ${navigate}`;
+    }
     tasks.push(
-      ports.notifications
-        .notify(
-          recipient.userId,
-          "SOS_ALERT",
-          kind === "RED" ? "Red Alert nearby" : kind === "AMBER" ? "Amber Alert nearby" : "SOS Alert nearby",
-          `${alert.userName} needs help at ${describeLocation(alert)}.${distanceBit} Open Maps to navigate & see your distance: ${navigate}`,
-          "sos_alert",
-          alert.id,
-        )
-        .catch(console.error),
+      ports.notifications.notify(recipient.userId, "SOS_ALERT", title, body, "sos_alert", alert.id).catch(console.error),
     );
   }
 

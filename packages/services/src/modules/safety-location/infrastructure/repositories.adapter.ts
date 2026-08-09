@@ -36,6 +36,8 @@ export function createSosAlertRepositoryAdapter(): SosAlertRepositoryPort {
     findAlertsDueForEscalation: (before, take) => sosRepository.findAlertsDueForEscalation(before, take) as any,
     updateEscalationState: (alertId, data) => sosRepository.updateEscalationState(alertId, data),
     findNotifiedUserIdsForAlert: (alertId) => sosRepository.findNotifiedUserIdsForAlert(alertId),
+    getOpenAlertsNearPoint: (latitude, longitude, radiusMeters) =>
+      sosRepository.getOpenAlertsNearPoint(latitude, longitude, radiusMeters),
   };
 }
 
@@ -85,6 +87,10 @@ export function createSosSessionRepositoryAdapter(): SosSessionRepositoryPort {
     updateSessionStatus: (sessionId, status, cancelReason) =>
       sosSessionRepository.updateSessionStatus(sessionId, status, cancelReason) as any,
     submitRating: (sessionId, rating, comment) => sosSessionRepository.submitRating(sessionId, rating, comment).then(() => undefined),
+    findActiveHelperUserIds: (userIds) => sosSessionRepository.findActiveHelperUserIds(userIds),
+    countSessionsForHelperSince: (helperId, since) => sosSessionRepository.countSessionsForHelperSince(helperId, since),
+    countActiveSessionsForHelper: (helperId) => sosSessionRepository.countActiveSessionsForHelper(helperId),
+    listActiveSessionsForHelper: (helperId) => sosSessionRepository.listActiveSessionsForHelper(helperId),
   };
 }
 
@@ -164,6 +170,9 @@ export function createPartnerDispatchAdapter(): PartnerDispatchPort {
         },
       }));
     },
+    findEligibleForAlert: ({ latitude, longitude, radiusMeters }) =>
+      partnerRepository.findEligiblePartnersNearPoint(latitude, longitude, radiusMeters),
+    getEligibilityFields: (userId) => partnerRepository.findPartnerEligibilityFields(userId),
   };
 }
 

@@ -1459,3 +1459,72 @@ changes:
   non-goal line updated. Backend typecheck (9/9) and vitest clean after `pnpm install` picked up
   the new `razorpay` dependency.
 
+## ADR-044: Partner "Emergency Assistance Dashboard" — dedicated mobile UI + real SOS eligibility filtering
+
+- **Context.** A logged-in Partner (service-provider) account saw the exact same mobile app as a
+  Renter — same 5-tab nav, same generic SOS screen. Asked to give Partners a purpose-built
+  Emergency Assistance Dashboard: richer push content, dedicated request/accept/confirm screens, a
+  Home with live stats, a role-specific bottom nav (Home/Requests/Active/Messages/Profile), and a
+  prominent Available/Offline toggle. Two things found during research reshaped scope:
+  1. The "provider accepts → waiting for rider confirmation → rider confirms → assistance
+     confirmed" handshake already exists in the backend generically (`SOSAlertResponse`
+     OFFERED→ACCEPTED, `SOSSession` ACTIVE→…→COMPLETED). This ADR adds partner-specific
+     *presentation* on top of that exact mechanism, not a new state machine.
+  2. `resolveServiceProviders()` (`escalation.application.ts`) had a real bug: when the strict
+     verified+type-matched partner search came up empty, it broadened to *any* verified partner —
+     "better to reach an unverified/general-type partner than nobody." This is exactly why a
+     fuel-delivery partner could receive a medical emergency. Removed; this is a genuine
+     production behavior fix, not just new UI.
+- **Eligibility (fixes the bug above).** `Partner` gains `isAvailable` (default `false` — opt-in,
+  no surprise pings for existing partners) and `isGeneralResponder` (default `false`, partner
+  self-service via `PUT /api/partner/profile`). New `partnerMatchesAlertType(partner, alertType)`
+  (`safety-location/domain/partner-mapping.ts`): categories with a mapped partner type
+  (`BIKE_BREAKDOWN/FLAT_TYRE/BATTERY_ISSUE→MECHANIC`, `FUEL_EMPTY→FUEL_DELIVERY`) require a
+  type match; categories with no mapping (`ACCIDENT/MEDICAL/LIFE_THREATENING/LOST/OTHER`) require
+  `isGeneralResponder`. `resolveServiceProviders` now: `findEligibleForAlert` (25km plain-Haversine,
+  same radius/approach as ADR-036/ADR-042) → filter by `partnerMatchesAlertType` → exclude anyone
+  already at capacity (1 concurrent active `SOSSession` as helper, via
+  `findActiveHelperUserIds`) → **no broaden-on-empty fallback**. `tickEscalation`'s existing
+  unconditional `SERVICE_PROVIDERS → ADMIN` timeout advancement still guarantees an alert never
+  reaches nobody (ADR-030) — removing the fallback doesn't reopen that gap, it just stops
+  papering over "nobody eligible" with "notify someone wrong instead."
+  `offerHelp` (`session.application.ts`) gained an additive `opts.requireAvailableAndCapacity`
+  flag — existing renter/nearby-rider callers pass nothing and are fully unaffected; the
+  `POST /api/sos/alerts/[id]/offer` route now passes it when `session.user.role === "PARTNER"`,
+  belt-and-suspenders against a partner's own client racing the dispatch-side filter.
+- **Push content.** `dispatchToRecipient` (`fan-out.application.ts`) branches by
+  `recipient.role === "SERVICE_PROVIDER"`: title `"🚨 Emergency Assistance Needed"`, body
+  `"<Category> reported near you\n📍 <distance> away\n<city>"` (new `humanizeSosType()`
+  Title-Case helper). Renter/nearby-rider push copy is unchanged. `resolveServiceProviders` now
+  also returns `distanceMeters` per recipient for the first time (previously unset), which is
+  what makes distance appear in the notification body.
+- **New read model, not new lifecycle.** `partner-dashboard.application.ts` (new, kept separate
+  from `session.application.ts` deliberately — this is a read model, not offer/session state):
+  `getDashboard` (active/today/completed/rating, composing the previously-unexposed
+  `emergencyResponseCount`/`helperRatingAvg`/`helperRatingCount` reputation fields),
+  `listNearbyOpenRequests` (eligible + open + unassigned alerts within 25km),
+  `listActiveAssistance` (this partner's current `SOSSession`s as helper). New routes:
+  `PATCH /api/partner/availability`, `GET /api/partner/sos/{dashboard,nearby,active}` — all
+  `requireRole("PARTNER")`.
+- **Mobile: role branch, not a parallel route tree.** `app_router.dart` watches
+  `authControllerProvider.select((s) => s.user?.role == 'PARTNER')` and branches only the `/` and
+  `/sos/:id` builders (`PartnerHomeScreen`/`PartnerSosRequestScreen` vs
+  `HomeScreen`/`SosDetailScreen`), plus two new routes (`/partner/requests`, `/partner/active`)
+  inside the existing `ShellRoute`. `app_shell.dart` picks between two tab sets and renders the
+  new `PartnerAvailabilityBanner` (🟢 AVAILABLE / ⚫ OFFLINE) persistently above the body on every
+  partner screen — deliberately not confined to Home, since offline is exactly the state where a
+  partner most needs a constant reminder they won't be paged. `partner_sos_request_screen.dart`
+  derives its Needs-response/Waiting-for-rider/Confirmed/Unavailable state entirely from the same
+  `sosAlertDetailProvider`/`sosOffersProvider` `sos_detail_screen.dart` already polls — zero new
+  polling, zero risk of drifting from what a rider/nearby-helper sees for the same alert.
+  `sos_detail_screen.dart` itself is unmodified (only its private `_typeLabels` map was hoisted
+  into `sos_model.dart`'s shared `sosTypeLabels`, reused by both screens).
+- **Consequences.** Backend: `pnpm turbo run typecheck` (9/9) and `pnpm exec vitest run`
+  (124/124, including a new test asserting a `FUEL_DELIVERY`/non-general-responder partner is
+  never dispatched a `MEDICAL`/`ACCIDENT` alert) clean; migration applied, zero drift. Mobile:
+  `flutter analyze` clean, `flutter test` passing. Not done: live two-account smoke test (a
+  MECHANIC partner should not receive a MEDICAL alert unless `isGeneralResponder` is on) — same
+  "worth the user's own end-to-end test" caveat every SOS-dispatch change this session has
+  carried. Existing partners all start `isAvailable: false` — they will receive zero SOS pings
+  until they open the app and flip the toggle on, a deliberate rollout choice, not a bug.
+
