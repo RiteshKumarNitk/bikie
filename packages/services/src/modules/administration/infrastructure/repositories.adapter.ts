@@ -1,5 +1,6 @@
 import { adminRepository } from "@bikie/database";
-import type { AdminRepositoryPort } from "../ports";
+import { NotificationService } from "../../../notification.service";
+import type { AdminNotificationPort, AdminRepositoryPort } from "../ports";
 
 export function createAdminRepositoryAdapter(): AdminRepositoryPort {
   return {
@@ -8,8 +9,9 @@ export function createAdminRepositoryAdapter(): AdminRepositoryPort {
     updateUserRole: (userId, role) => adminRepository.updateUserRole(userId, role),
     deleteUser: (userId) => adminRepository.deleteUser(userId),
     findAllPartners: () => adminRepository.findAllPartners(),
-    updatePartnerVerification: (partnerId, isVerified) =>
-      adminRepository.updatePartnerVerification(partnerId, isVerified),
+    findPartnerDetailById: (partnerId) => adminRepository.findPartnerDetailById(partnerId),
+    transitionPartnerVerification: (partnerId, action, opts) =>
+      adminRepository.transitionPartnerVerification(partnerId, action, opts),
     deletePartner: (partnerId) => adminRepository.deletePartner(partnerId),
     findAllBookingsAdmin: () => adminRepository.findAllBookingsAdmin(),
     updateBookingStatus: (bookingId, status) => adminRepository.updateBookingStatus(bookingId, status),
@@ -37,5 +39,12 @@ export function createAdminRepositoryAdapter(): AdminRepositoryPort {
     exportUsersCsvRows: (take) => adminRepository.exportUsersCsvRows(take),
     exportBookingsCsvRows: (take) => adminRepository.exportBookingsCsvRows(take),
     exportPartnersCsvRows: (take) => adminRepository.exportPartnersCsvRows(take),
+  };
+}
+
+export function createAdminNotificationAdapter(): AdminNotificationPort {
+  return {
+    notify: (userId, type, title, body, entity, entityId) =>
+      NotificationService.notify(userId, type as never, title, body, entity, entityId),
   };
 }

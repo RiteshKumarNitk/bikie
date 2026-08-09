@@ -31,4 +31,11 @@ export function setPartnersModuleForTests(module: PartnersModule | null): void {
   defaultModule = module;
 }
 
-export type { PartnersPorts, PartnerProfileInput, NearbyPartnerRow } from "./ports";
+export type {
+  PartnersPorts,
+  PartnerProfileInput,
+  NearbyPartnerRow,
+  UpsertProfileResult,
+  SubmitApplicationResult,
+  ReapplyResult,
+} from "./ports";

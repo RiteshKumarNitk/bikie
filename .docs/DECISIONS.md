@@ -1704,3 +1704,136 @@ changes:
   same caveat as every prior SOS/Partner change in this project; verify this one especially
   closely given it's precisely the flow that was reported broken.
 
+## ADR-046b: Rider ⇄ Service Provider dual capability — one account, application/verification workflow
+
+- **Context.** `User.role` was a single exclusive enum (`RENTER | PARTNER | ADMIN`).
+  `UserService.becomePartner` atomically flipped `role: RENTER → PARTNER` **and** instantly
+  granted full Partner capability in the same call, refusing outright if the account was already
+  `PARTNER`. A Rider who became a Partner stopped being a Rider — lost `/dashboard`, got bounced
+  by ADR-046's middleware gate — with no review step and no way back. Required instead: one
+  account, Rider capability always on, Service Provider capability layered on top only after
+  admin approval, switchable, never destructive of the other.
+- **Three concerns, previously conflated into one field, now separated.**
+  1. **Account tier** — `User.role` (`RENTER`/`ADMIN`), untouched, still exclusive. `PARTNER`
+     remains a valid enum value (Postgres enum values are awkward to drop and nothing needs it
+     gone) but is retired as a *meaning* — new applications never set it, and the migration
+     backfills every existing `PARTNER`-role account back to `RENTER`.
+  2. **Partner capability** — new `Partner.verificationStatus PartnerVerificationStatus` (`DRAFT
+     | PENDING_VERIFICATION | MORE_INFORMATION_REQUIRED | APPROVED | REJECTED | SUSPENDED`;
+     `NOT_APPLIED` is never stored — synthesized at the API boundary when no `Partner` row
+     exists at all). `Partner.isVerified` is kept (not replaced) and stays in sync — `true` iff
+     `verificationStatus === APPROVED`, written in the same transaction as every status change —
+     specifically so every pre-existing SOS-eligibility/nearby-partner query that already read it
+     needed **zero changes**. New `User.partnerStatus PartnerVerificationStatus?`, a denormalized
+     copy registered as a Better Auth `additionalFields` entry exactly like `role`/`accountStatus`
+     (`packages/auth/src/server.ts`), so `session.user.partnerStatus` is cheaply available to
+     every route guard and to `apps/web/middleware.ts` without a join.
+  3. **Active UI mode** — which dashboard (`/dashboard` vs `/partner`) a *capable* account
+     currently wants to see. Reused, not duplicated: web's pre-auth `selectedRole` cookie
+     (`lib/role.ts`, previously only "which forms does /signup show") now doubles as the
+     post-auth mode switch; mobile's equivalent moved from an ephemeral `StateProvider` to a
+     persisted `AppPreferences.activeMode` (`shared_preferences`, same pattern as
+     `hasSeenIntro`). **Security principle, enforced throughout:** mode is client-supplied and
+     fine for *routing* (which screen renders, where a redirect lands) but never trusted for
+     *authorization* — every real access decision re-checks server-verified `partnerStatus`.
+- **Application/verification workflow (self-service side).** `PUT /api/partner/profile`'s guard
+  changed from `requireRole("PARTNER")` to `requireSession()` — any account can start a DRAFT;
+  writable only while `DRAFT|MORE_INFORMATION_REQUIRED|REJECTED` (409
+  `NOT_EDITABLE` otherwise, via `partnerRepository.upsertPartnerProfileIfEditable`). New
+  `POST /api/partner/application/submit` (`DRAFT|MORE_INFORMATION_REQUIRED →
+  PENDING_VERIFICATION`, validates business name/type/city present) and
+  `POST /api/partner/application/reapply` (`REJECTED → DRAFT`, clears the rejection reason,
+  keeps every field as an editable starting point). New `GET /api/partner/application`
+  (session-only, works for every state including `NOT_APPLIED`) is the one read both platforms'
+  "Become a Service Provider" screens poll.
+- **Admin verification workflow.** `PATCH /api/admin/partners/[id]` replaced its old
+  `{isVerified: boolean}` toggle with `{action: "APPROVE"|"REJECT"|"REQUEST_INFO"|"SUSPEND"|
+  "RESTORE", reason?}` — `adminRepository.transitionPartnerVerification` validates the transition
+  against the current status (409 if illegal, mirroring the transactional-status-check style
+  `sos-session.repository.ts` already established), writes `verificationStatus`/`isVerified`/
+  `reviewedAt`/`reviewedByUserId`/`reviewNote` and syncs `User.partnerStatus` in one
+  transaction, fires an applicant notification (4 new `NotificationType` values —
+  `PARTNER_APPLICATION_APPROVED|REJECTED|INFO_REQUESTED|SUSPENDED` — through the existing
+  `NotificationService.notify()`, reached via a new `AdminNotificationPort`/adapter following the
+  same cross-module pattern `trust-safety`'s `TrustNotificationPort` already uses), and the route
+  still calls the existing `logAdminAction()` for the audit trail — **no new table**; `AuditLog`'s
+  freeform `action`/`metadata` already fit. New `GET /api/admin/partners/[id]` (detail: profile +
+  owning user + that `AuditLog` slice as "verification history" — `AuditLog.userId` has no FK, so
+  actor names are resolved via a small batched follow-up `User` lookup, not an `include`). New
+  `/admin/partners/[id]` page renders the state-appropriate action buttons with a reason-prompt
+  modal for every action but `APPROVE`.
+- **Authorization.** New `evaluatePartnerCapability` in `identity-access`'s
+  `access.application.ts` (`SessionSnapshot` gained `partnerStatus`), mapped by new
+  `requireApprovedPartner()` (`apps/web/lib/require-role.ts`) — replaces every
+  `requireRole("PARTNER")` under `/api/partner/**` (9 route files) and the `/partner/*` layout
+  gate. `apps/web/middleware.ts`: `/partner/*` now hard-gates on server-verified
+  `partnerStatus === "APPROVED"` (capability, not role); `/dashboard/*` redirects away only when
+  `activeMode === "PARTNER"` **and** capable (UX routing, not a security gate — a dual-capability
+  account in Rider mode is completely unaffected); entering either section while capable
+  implicitly syncs the mode cookie to match, same as the explicit "Switch Mode" control.
+  **`forbidPartner()`, added in ADR-046 to block Partners from `/api/sos/alerts`, is removed** —
+  under dual-capability there's no such thing as an account with no Rider standing, so a capable
+  Service Provider must still be able to raise/browse their own SOS as a Rider; the Partner
+  Dashboard already never links there. **Correctness fix, required, not optional:**
+  `POST /api/sos/alerts/[id]/offer`'s `opts.requireAvailableAndCapacity` gate changed from
+  `session.user.role === "PARTNER"` to `session.user.partnerStatus === "APPROVED"` — without this,
+  every backfilled ex-`PARTNER` account (now `role: RENTER`) would have silently skipped the
+  stricter verified/available/type/capacity gate the moment the migration landed, applied
+  regardless of the caller's mode preference since a capable account offering help is always held
+  to the partner-grade bar.
+- **Migration & backfill (one PR, additive + one data backfill).** New migration
+  `20260809120000_partner_capability_model`: `PartnerVerificationStatus` enum, `Partner` gains
+  `verificationStatus`/`rejectionReason`/`reviewNote`/`submittedAt`/`reviewedAt`/
+  `reviewedByUserId`/`profilePhotoUrl`/`shopPhotoUrls`/`identityDocumentUrl`/
+  `businessDocumentUrl`, `User` gains `partnerStatus`, `NotificationType` gains the 4 new values.
+  Backfill: every existing `Partner` row gets `verificationStatus = isVerified ? APPROVED :
+  PENDING_VERIFICATION`; every `PARTNER`-role `User` gets `role = RENTER` and `partnerStatus`
+  synced to match — existing partners keep full capability and their verified state, and regain
+  Rider access. **Not applied to the live database in this session** — written and reviewed only;
+  applying a migration that rewrites existing account roles/data warrants the user's own
+  go-ahead, consistent with how prior data-mutating migrations in this project were handled.
+- **Web UI.** New `/dashboard/become-provider` (single entry point, renders by `status`: intro +
+  form for `NOT_APPLIED`/`DRAFT`/`MORE_INFORMATION_REQUIRED`, read-only status for
+  `PENDING_VERIFICATION`, reason + re-apply for `REJECTED`, reason-only for `SUSPENDED`, redirects
+  to `/partner` once `APPROVED`) — reuses `PartnerBusinessFields`, the same form
+  signup/onboarding/settings already use. Linked from `dashboard/layout.tsx`'s nav and from
+  `dashboard/settings`, replacing the old `BecomeServiceProviderAction` component (deleted — it
+  called the now-retired `POST /api/user/become-partner`, a sign-out-and-reverify instant
+  upgrade). Mode switch added to `Navbar.tsx`'s user dropdown (`switchActiveMode()`, new server
+  action in `role-actions.ts`, server-verifies capability before allowing `PARTNER` mode).
+  `/welcome`→`/signup`→`/login` are otherwise unchanged mechanically — picking "Service Provider"
+  no longer calls anything that flips role, it only seeds which onboarding path the client
+  redirects to post-verify. `partner-onboarding/page.tsx` (the signup-time form) now submits for
+  verification and lands on the status page instead of redirecting straight to the
+  (now capability-gated) `/partner`. `PATCH /api/user/complete-phone-signup` dropped its
+  `becamePartner` role-upgrade branch entirely — a brand-new phone-OTP account is always
+  `RENTER`, full stop.
+- **Mobile.** New `become_provider_screen.dart` mirrors the web page's state machine, reusing
+  `PartnerOnboardingScreen` (already reusable as an edit form via `initialProfile` since ADR-046)
+  for the field-editing step; its create-mode save now routes to `/become-provider` instead of
+  Home. `profile_screen.dart`: Rider section gains a "Become a Service Provider" tile (hidden once
+  approved); a mode-switch button appears whenever `partnerStatus == 'APPROVED'`.
+  `app_router.dart`/`app_shell.dart` swap `isPartner` from `user?.role == 'PARTNER'` to
+  `resolveActiveMode(partnerStatus, storedMode) == 'PARTNER'`. New `PartnerHistoryScreen`
+  (`/partner/history`, linked from Active screen's app bar) for Completed Assistance/Assistance
+  History, backed by the new `GET /api/partner/sos/history`.
+- **Explicitly deferred, not built this pass.** Identity/business document and shop-photo
+  *uploads* — the schema/validation/DTOs accept the URLs (`profilePhotoUrl`, `shopPhotoUrls`,
+  `identityDocumentUrl`, `businessDocumentUrl`, meant to reuse the existing image-only
+  `POST /api/upload`) but neither platform's application form has upload UI wired to them yet;
+  the admin detail page already renders links for these fields whenever they're present. No new
+  mobile-side unit tests were added for the new repository methods (`getApplication`/
+  `submitApplication`/`reapply`) — covered by `flutter analyze` clean + full-suite pass, not
+  dedicated coverage.
+- **Consequences.** Backend: `pnpm turbo run typecheck` (9/9), `pnpm exec vitest run` (133/133,
+  15/15 files) clean; OpenAPI inventory regenerated (127→130 routes: +4 new
+  `/api/partner/application*`/`/api/partner/sos/history`, −1 retired `/api/user/become-partner`,
+  net +3 plus the pre-existing `GET /api/admin/partners/[id]`). Mobile: `flutter analyze` clean
+  (0 issues), `flutter test` (110/110), freezed/json codegen regenerated for `UserModel`
+  (`partnerStatus`), `PartnerProfileSummary` (full `PartnerProfileDTO` mirror), new
+  `PartnerApplication`/`PartnerHistorySession` models. **Not done**: the migration has not been
+  applied to any live database in this session (see above) — nothing in this ADR is live until
+  that happens; a full two-account walk (apply → admin approves/rejects → mode switch → confirm
+  neither capability is ever lost) on a real deployment, same caveat as every prior SOS/Partner
+  change in this project.
+

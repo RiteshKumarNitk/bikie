@@ -34,11 +34,11 @@ function linkifyBody(body: string) {
 
 export function NotificationsTab({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
-  // The generic Rider SOS dashboard is off-limits to Service Provider accounts (they get their
-  // own /partner/sos) — route the "Open SOS dashboard" link accordingly instead of dead-ending
-  // a Partner who taps an SOS notification.
+  // An approved Service Provider has their own SOS dashboard (/partner/sos) — route the "Open
+  // SOS dashboard" link there instead of the generic Rider one (ADR-046b: keyed on capability,
+  // not `role`, since a dual-capability account's role no longer indicates this).
   const { data: session } = authClient.useSession();
-  const sosDashboardHref = session?.user.role === "PARTNER" ? "/partner/sos" : "/dashboard/sos";
+  const sosDashboardHref = session?.user.partnerStatus === "APPROVED" ? "/partner/sos" : "/dashboard/sos";
 
   useEffect(() => {
     let cancelled = false;

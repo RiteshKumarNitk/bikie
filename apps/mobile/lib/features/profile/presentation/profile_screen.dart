@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../auth/domain/auth_controller.dart';
+import '../../auth/domain/role_provider.dart';
 import '../../notifications/domain/notification_providers.dart';
 import '../../onboarding/data/partner_profile_repository.dart';
 import '../data/profile_repository.dart';
@@ -18,7 +19,9 @@ class ProfileScreen extends ConsumerWidget {
 
     if (user == null) return const SizedBox.shrink();
 
-    final isPartner = user.role == 'PARTNER';
+    final isApprovedPartner = user.partnerStatus == 'APPROVED';
+    final storedMode = ref.watch(activeModeProvider);
+    final isPartnerMode = resolveActiveMode(user.partnerStatus, storedMode) == 'PARTNER';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -32,6 +35,10 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Center(child: Text(user.name, style: Theme.of(context).textTheme.titleLarge)),
           Center(child: Text(user.email, style: Theme.of(context).textTheme.bodyMedium)),
+          if (isApprovedPartner) ...[
+            const SizedBox(height: 16),
+            _ModeSwitch(isPartnerMode: isPartnerMode),
+          ],
           const SizedBox(height: 24),
           _PhoneField(initialPhone: user.phone),
           const SizedBox(height: 24),
@@ -41,7 +48,7 @@ class ProfileScreen extends ConsumerWidget {
             badgeCount: unreadNotifications,
             onTap: () => context.push('/notifications'),
           ),
-          if (isPartner) ...const [_PartnerProfileSection()] else ...const [_RiderProfileSection()],
+          if (isPartnerMode) ...const [_PartnerProfileSection()] else ...[_RiderProfileSection(isApprovedPartner: isApprovedPartner)],
           _ProfileTile(icon: Icons.chat_bubble_outline, label: 'Messages', onTap: () => context.push('/messages')),
           _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
           const SizedBox(height: 24),
@@ -56,10 +63,28 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-/// The Rider-specific tiles — unchanged from before the Partner/Rider profile split, just
-/// extracted so `ProfileScreen` can swap them out for `_PartnerProfileSection` by role.
+/// ADR-046b — shown only once the account is dual-capable (`partnerStatus == 'APPROVED'`);
+/// mirrors web's Navbar "Switch Mode" control.
+class _ModeSwitch extends ConsumerWidget {
+  const _ModeSwitch({required this.isPartnerMode});
+
+  final bool isPartnerMode;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return OutlinedButton.icon(
+      onPressed: () => switchActiveMode(ref, isPartnerMode ? 'RIDER' : 'PARTNER'),
+      icon: const Icon(Icons.swap_horiz),
+      label: Text('Switch to ${isPartnerMode ? 'Rider' : 'Service Provider'} mode'),
+    );
+  }
+}
+
+/// The Rider-specific tiles, shown whenever the account is currently in Rider mode.
 class _RiderProfileSection extends StatelessWidget {
-  const _RiderProfileSection();
+  const _RiderProfileSection({required this.isApprovedPartner});
+
+  final bool isApprovedPartner;
 
   @override
   Widget build(BuildContext context) {
@@ -70,6 +95,14 @@ class _RiderProfileSection extends StatelessWidget {
           label: 'Rider Details',
           onTap: () => context.push('/onboarding'),
         ),
+        // ADR-046b — an already-approved partner uses the mode switch above instead; this tile
+        // is for starting/resuming/checking an application.
+        if (!isApprovedPartner)
+          _ProfileTile(
+            icon: Icons.storefront_outlined,
+            label: 'Become a Service Provider',
+            onTap: () => context.push('/become-provider'),
+          ),
         _ProfileTile(
           icon: Icons.storefront_outlined,
           label: 'Service Providers',

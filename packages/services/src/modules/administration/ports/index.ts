@@ -12,7 +12,12 @@ export interface AdminRepositoryPort {
   updateUserRole(userId: string, role: string): Promise<any>;
   deleteUser(userId: string): Promise<any>;
   findAllPartners(): Promise<any[]>;
-  updatePartnerVerification(partnerId: string, isVerified: boolean): Promise<any>;
+  findPartnerDetailById(partnerId: string): Promise<any | null>;
+  transitionPartnerVerification(
+    partnerId: string,
+    action: "APPROVE" | "REJECT" | "REQUEST_INFO" | "SUSPEND" | "RESTORE",
+    opts: { reason?: string; adminUserId: string },
+  ): Promise<any>;
   deletePartner(partnerId: string): Promise<any>;
   findAllBookingsAdmin(): Promise<any[]>;
   updateBookingStatus(bookingId: string, status: string): Promise<any>;
@@ -42,8 +47,16 @@ export interface AdminRepositoryPort {
   exportPartnersCsvRows(take: number): Promise<Record<string, unknown>[]>;
 }
 
+/** ADR-046b — applicant-facing notification on a verification decision. Same shape as
+ * trust-safety's `TrustNotificationPort`, a separate interface per module rather than a shared
+ * one so each module's port surface stays independently mockable in tests. */
+export interface AdminNotificationPort {
+  notify(userId: string, type: string, title: string, body: string, entity?: string, entityId?: string): Promise<void>;
+}
+
 export interface AdministrationPorts {
   admin: AdminRepositoryPort;
+  notifications: AdminNotificationPort;
 }
 
 export type { AdminExportType };

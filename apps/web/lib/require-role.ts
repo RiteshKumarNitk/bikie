@@ -31,6 +31,14 @@ function toResponse(reason: AccessDenialReason) {
       );
     case "FORBIDDEN":
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    case "PARTNER_NOT_APPROVED":
+      return NextResponse.json(
+        {
+          error: "PARTNER_NOT_APPROVED",
+          message: "This requires an approved Service Provider application.",
+        },
+        { status: 403 },
+      );
   }
 }
 
@@ -40,6 +48,7 @@ function toSnapshot(session: NonNullable<SessionResult>): SessionSnapshot {
     role: session.user.role,
     accountStatus: session.user.accountStatus,
     accountStatusExpiresAt: session.user.accountStatusExpiresAt,
+    partnerStatus: session.user.partnerStatus,
   };
 }
 
@@ -83,6 +92,22 @@ export async function requireMembership() {
   }
 
   return { session: null, error };
+}
+
+/** ADR-046b — Service Provider capability gate for `/api/partner/**`, replacing
+ * `requireRole("PARTNER")`. Checks the server-verified `Partner.verificationStatus` (via the
+ * denormalized session field), never a client-supplied "active mode" — capability and mode are
+ * deliberately different concerns, see DECISIONS.md ADR-046b. */
+export async function requireApprovedPartner() {
+  const session = await getServerSession();
+  const { access } = getIdentityAccessModule();
+  const decision = access.evaluatePartnerCapability(session ? toSnapshot(session) : null);
+
+  if (!decision.allowed || !session) {
+    return { session: null, error: toResponse(decision.allowed ? "UNAUTHENTICATED" : decision.reason) };
+  }
+
+  return { session, error: null };
 }
 
 export async function requireRole(role: string | string[]) {

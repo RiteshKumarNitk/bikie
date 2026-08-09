@@ -6,6 +6,39 @@ import {
 } from "../domain/csv";
 import type { AdministrationPorts } from "../ports";
 
+type PartnerVerificationAction = "APPROVE" | "REJECT" | "REQUEST_INFO" | "SUSPEND" | "RESTORE";
+
+const NOTIFICATION_COPY: Record<
+  PartnerVerificationAction,
+  { type: string; title: string; body: (reason?: string) => string }
+> = {
+  APPROVE: {
+    type: "PARTNER_APPLICATION_APPROVED",
+    title: "You're now a verified Service Provider",
+    body: () => "Your Service Provider application was approved — switch to Service Provider mode to get started.",
+  },
+  REJECT: {
+    type: "PARTNER_APPLICATION_REJECTED",
+    title: "Your Service Provider application was not approved",
+    body: (reason) => reason ?? "Your Service Provider application was rejected.",
+  },
+  REQUEST_INFO: {
+    type: "PARTNER_APPLICATION_INFO_REQUESTED",
+    title: "More information needed for your Service Provider application",
+    body: (reason) => reason ?? "Please review and update your Service Provider application.",
+  },
+  SUSPEND: {
+    type: "PARTNER_APPLICATION_SUSPENDED",
+    title: "Your Service Provider account has been suspended",
+    body: (reason) => reason ?? "Your Service Provider account has been suspended.",
+  },
+  RESTORE: {
+    type: "PARTNER_APPLICATION_APPROVED",
+    title: "Your Service Provider account has been restored",
+    body: () => "Your Service Provider account is active again.",
+  },
+};
+
 export function createAdminApplication(ports: AdministrationPorts) {
   return {
     getOverviewStats: () => ports.admin.getAdminOverviewStats(),
@@ -13,8 +46,25 @@ export function createAdminApplication(ports: AdministrationPorts) {
     updateUserRole: (userId: string, role: string) => ports.admin.updateUserRole(userId, role),
     deleteUser: (userId: string) => ports.admin.deleteUser(userId),
     getAllPartners: () => ports.admin.findAllPartners(),
-    updatePartnerVerification: (partnerId: string, isVerified: boolean) =>
-      ports.admin.updatePartnerVerification(partnerId, isVerified),
+    getPartnerDetail: (partnerId: string) => ports.admin.findPartnerDetailById(partnerId),
+    /** ADR-046b — the one place every Approve/Reject/Request-info/Suspend/Restore decision goes
+     * through. The DB write is the transactional part (Partner.verificationStatus + isVerified +
+     * User.partnerStatus, atomically); notifying the applicant is a best-effort side effect that
+     * must never make an otherwise-successful decision fail. */
+    async transitionPartnerVerification(
+      partnerId: string,
+      action: "APPROVE" | "REJECT" | "REQUEST_INFO" | "SUSPEND" | "RESTORE",
+      opts: { reason?: string; adminUserId: string },
+    ) {
+      const result = await ports.admin.transitionPartnerVerification(partnerId, action, opts);
+      if (result.ok) {
+        const copy = NOTIFICATION_COPY[action];
+        await ports.notifications
+          .notify(result.userId, copy.type, copy.title, copy.body(opts.reason), "Partner", partnerId)
+          .catch((err) => console.error("[Admin][PartnerVerification] notify failed", err));
+      }
+      return result;
+    },
     deletePartner: (partnerId: string) => ports.admin.deletePartner(partnerId),
     getAllBookings: () => ports.admin.findAllBookingsAdmin(),
     updateBookingStatus: (bookingId: string, status: string) =>

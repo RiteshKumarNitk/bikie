@@ -84,9 +84,10 @@ needed, it can be extracted later by pointing new route handlers at the same
 ## Auth & roles
 
 Better Auth, backed by Neon via the Prisma adapter. `User.role` is one of
-`RENTER | PARTNER | ADMIN`. Dashboard routes are gated by role in a `proxy.ts`
-(Next.js 16 renamed `middleware` → `proxy`) plus a server-side session check in
-each dashboard's layout.
+`RENTER | PARTNER | ADMIN` — as of ADR-046b it means account **tier**, not capability:
+every non-admin account is `RENTER` (the `PARTNER` value is legacy, no longer assigned).
+Dashboard routes are gated in `middleware.ts` plus a server-side session check in each
+dashboard's layout.
 
 The web app authenticates via Better Auth's HTTP-only session cookie. The Flutter app
 (`apps/mobile`) instead uses **bearer tokens**, enabled by the `bearer()` plugin in
@@ -94,6 +95,34 @@ The web app authenticates via Better Auth's HTTP-only session cookie. The Flutte
 `auth.api.getSession({ headers })`, which every protected route calls via
 `requireSession()`/`requireRole()`/`requireMembership()`, resolves the session from
 either the cookie or an `Authorization: Bearer <token>` header with no per-route changes.
+
+### Dual capability: Rider + Service Provider (ADR-046b)
+
+One account can hold Rider capability (universal, always on) and Service Provider
+("Partner") capability at the same time — becoming a Partner no longer replaces the
+account's Rider standing or requires a second login. Three previously-conflated concerns
+are now separate:
+
+- **Account tier** — `User.role` (`RENTER`/`ADMIN`), unaffected by Partner capability.
+- **Partner capability** — `Partner.verificationStatus` (`DRAFT → PENDING_VERIFICATION →
+  APPROVED`, or `MORE_INFORMATION_REQUIRED`/`REJECTED`/`SUSPENDED`), reached through a real
+  application + admin-review workflow (`PartnerService.submitApplication`,
+  `AdminService.transitionPartnerVerification`) — never an instant self-service flip.
+  Denormalized onto `User.partnerStatus` (a Better Auth `additionalFields` entry, same
+  mechanism as `role`) so `session.user.partnerStatus` is cheaply available everywhere;
+  `Partner.isVerified` is kept in sync (`true` iff `verificationStatus === APPROVED`) so
+  every pre-existing SOS-eligibility query that reads it needed no changes.
+- **Active UI mode** — which dashboard (`/dashboard` vs `/partner`) a *capable* account
+  currently wants to see, driven by the same `selectedRole` cookie (web) / persisted device
+  preference (mobile, `AppPreferences.activeMode`) already used pre-auth for `/signup`/
+  `/login` copy — repurposed post-auth as the mode switch
+  (`switchActiveMode()`/`resolveActiveMode()`). **Never trusted for authorization** — every
+  route still gates on server-verified `partnerStatus`, the mode only decides which screen
+  renders.
+
+`requireApprovedPartner()` (`apps/web/lib/require-role.ts`) replaces
+`requireRole("PARTNER")` on every `/api/partner/**` route; the policy itself lives in
+`identity-access`'s `evaluatePartnerCapability`.
 
 ## Rides (community rides)
 

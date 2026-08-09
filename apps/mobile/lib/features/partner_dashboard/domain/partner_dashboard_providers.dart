@@ -42,3 +42,8 @@ final partnerNearbyRequestsProvider = FutureProvider.autoDispose<List<PartnerNea
 final partnerActiveSessionsProvider = FutureProvider.autoDispose<List<PartnerActiveSession>>((ref) {
   return ref.watch(partnerDashboardRepositoryProvider).getActiveAssistance();
 });
+
+/// ADR-046b — "Completed Assistance"/"Assistance History".
+final partnerHistoryProvider = FutureProvider.autoDispose<List<PartnerHistorySession>>((ref) {
+  return ref.watch(partnerDashboardRepositoryProvider).getHistory();
+});

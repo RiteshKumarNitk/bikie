@@ -18,7 +18,15 @@ class PartnerActiveScreen extends ConsumerWidget {
     final activeAsync = ref.watch(partnerActiveSessionsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Active Assistance')),
+      appBar: AppBar(
+        title: const Text('Active Assistance'),
+        actions: [
+          TextButton(
+            onPressed: () => context.push('/partner/history'),
+            child: const Text('History'),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(partnerActiveSessionsProvider),
         child: activeAsync.when(

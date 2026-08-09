@@ -33,9 +33,11 @@ class PartnerProfileInput with _$PartnerProfileInput {
   factory PartnerProfileInput.fromJson(Map<String, dynamic> json) => _$PartnerProfileInputFromJson(json);
 }
 
-/// `GET /api/partner/profile` (ADR-044) — a mirror of `PartnerProfileDTO` (`packages/types`),
-/// used both for the dashboard's stats/availability read and (as of the Profile "Business
-/// Profile" editor) to pre-fill an edit of the same fields `PartnerProfileInput` writes.
+/// Mirrors `PartnerProfileDTO` (`packages/types`) in full — used by the approved-partner
+/// dashboard/settings read (`GET /api/partner/profile`) and, since ADR-046b, by
+/// `GET /api/partner/application`'s `profile` field for every other verification state too. One
+/// shape either way; the Profile "Business Profile" editor and the "Become a Service Provider"
+/// screen both pre-fill `PartnerOnboardingScreen` from it.
 @freezed
 class PartnerProfileSummary with _$PartnerProfileSummary {
   const factory PartnerProfileSummary({
@@ -57,9 +59,32 @@ class PartnerProfileSummary with _$PartnerProfileSummary {
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    // --- ADR-046b: application/verification state ---
+    String? verificationStatus,
+    String? rejectionReason,
+    String? reviewNote,
+    String? submittedAt,
+    String? reviewedAt,
+    String? profilePhotoUrl,
+    @Default([]) List<String> shopPhotoUrls,
+    String? identityDocumentUrl,
+    String? businessDocumentUrl,
   }) = _PartnerProfileSummary;
 
   factory PartnerProfileSummary.fromJson(Map<String, dynamic> json) => _$PartnerProfileSummaryFromJson(json);
+}
+
+/// `GET /api/partner/application` (ADR-046b) — `status` is always one of the 7 conceptual
+/// `PartnerVerificationStatus` values, including `'NOT_APPLIED'` (never stored server-side,
+/// synthesized when there's no `Partner` row yet — `profile` is `null` in exactly that case).
+@freezed
+class PartnerApplication with _$PartnerApplication {
+  const factory PartnerApplication({
+    required String status,
+    PartnerProfileSummary? profile,
+  }) = _PartnerApplication;
+
+  factory PartnerApplication.fromJson(Map<String, dynamic> json) => _$PartnerApplicationFromJson(json);
 }
 
 const partnerTypes = [

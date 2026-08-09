@@ -2,6 +2,27 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Rider ⇄ Service Provider dual capability + application/verification workflow (2026-08-09, ADR-046b)
+
+| Task | Status |
+|---|---|
+| Schema: `PartnerVerificationStatus` enum, `Partner` gains verification/document fields, `User.partnerStatus` denormalized field, `NotificationType` gains 4 partner-decision values — migration `20260809120000_partner_capability_model` written, includes a data backfill (existing `PARTNER`-role accounts → `role: RENTER` + `partnerStatus` synced from `isVerified`) | Completed — **not applied to the live DB**, needs explicit go-ahead (rewrites existing account role data) |
+| `Partner.isVerified` kept and stays in sync with `verificationStatus === APPROVED` — zero changes needed to any pre-existing SOS-eligibility/nearby-partner query | Completed |
+| Better Auth: `partnerStatus` registered as an `additionalFields` entry, same mechanism as `role` | Completed |
+| `identity-access`: `evaluatePartnerCapability` + `requireApprovedPartner()`, replacing `requireRole("PARTNER")` on 9 `/api/partner/**` route files + the `/partner/*` layout gate | Completed |
+| `PUT /api/partner/profile` guard changed to session-only (creates a DRAFT); new `GET /api/partner/application`, `POST /api/partner/application/{submit,reapply}` | Completed |
+| `PATCH /api/admin/partners/[id]` rewritten from a boolean `isVerified` toggle to `{action, reason?}` (Approve/Reject/Request-info/Suspend/Restore), validated state transitions, syncs `User.partnerStatus`, notifies the applicant, audit-logs. New `GET /api/admin/partners/[id]` detail (profile + owner + `AuditLog`-backed history) | Completed |
+| New `GET /api/partner/sos/history` — Completed Assistance/Assistance History | Completed |
+| **Correctness fix**: `POST /api/sos/alerts/[id]/offer`'s stricter partner-eligibility gate switched from `role === "PARTNER"` to `partnerStatus === "APPROVED"` — without this, every backfilled ex-partner account would have silently skipped it | Completed |
+| Removed the `forbidPartner()` block added in ADR-046 (`/api/sos/alerts`) — superseded by dual-capability: every account has baseline Rider standing now | Completed |
+| Web: `middleware.ts` capability/mode-based gating (`/partner` on `partnerStatus`, `/dashboard` mode-redirect only for capable+Partner-mode accounts); `switchActiveMode()` server action; new `/dashboard/become-provider` (state-machine UI, reuses `PartnerBusinessFields`); Navbar "Switch Mode" control; `/admin/partners` list + new `/admin/partners/[id]` detail/decision page; retired the sign-out-based `BecomeServiceProviderAction`/`POST /api/user/become-partner` self-service instant-upgrade path and the `/login` upgrade mini-form | Completed |
+| Mobile: new `become_provider_screen.dart` (reuses `PartnerOnboardingScreen` as the edit step), Profile screen mode-switch + "Become a Service Provider" tile, `app_router.dart`/`app_shell.dart` swapped to `resolveActiveMode(partnerStatus, storedMode)`, persisted `AppPreferences.activeMode`, new `PartnerHistoryScreen` (`/partner/history`) | Completed |
+| Backend: `pnpm turbo run typecheck` (9/9), `pnpm exec vitest run` (133/133), OpenAPI inventory regenerated (127→130). Mobile: `flutter analyze` (0 issues), `flutter test` (110/110), freezed/json codegen regenerated | Completed |
+| Document/shop-photo upload UI for the application form (schema/DTOs/validation already accept the URLs; no upload widget wired on either platform yet) | **Not built** — explicitly deferred this pass |
+| New mobile unit tests for `getApplication`/`submitApplication`/`reapply` | **Not built** — covered only by `flutter analyze`/full-suite pass, not dedicated coverage |
+| Apply the pending migration to the live DB | **Not done** — needs explicit user go-ahead, rewrites existing account role/capability data |
+| Live two-account smoke test (apply → admin approves/rejects → mode switch → confirm neither capability is ever lost) | **Not done** — not verified in this environment |
+
 ## Service Provider registration/dashboard audit (2026-08-09, ADR-046)
 
 | Task | Status |

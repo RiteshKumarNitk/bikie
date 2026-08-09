@@ -69,6 +69,19 @@ _$PartnerProfileSummaryImpl _$$PartnerProfileSummaryImplFromJson(
   longitude: (json['longitude'] as num?)?.toDouble(),
   governmentIdType: json['governmentIdType'] as String?,
   governmentIdNumber: json['governmentIdNumber'] as String?,
+  verificationStatus: json['verificationStatus'] as String?,
+  rejectionReason: json['rejectionReason'] as String?,
+  reviewNote: json['reviewNote'] as String?,
+  submittedAt: json['submittedAt'] as String?,
+  reviewedAt: json['reviewedAt'] as String?,
+  profilePhotoUrl: json['profilePhotoUrl'] as String?,
+  shopPhotoUrls:
+      (json['shopPhotoUrls'] as List<dynamic>?)
+          ?.map((e) => e as String)
+          .toList() ??
+      const [],
+  identityDocumentUrl: json['identityDocumentUrl'] as String?,
+  businessDocumentUrl: json['businessDocumentUrl'] as String?,
 );
 
 Map<String, dynamic> _$$PartnerProfileSummaryImplToJson(
@@ -92,4 +105,26 @@ Map<String, dynamic> _$$PartnerProfileSummaryImplToJson(
   'longitude': instance.longitude,
   'governmentIdType': instance.governmentIdType,
   'governmentIdNumber': instance.governmentIdNumber,
+  'verificationStatus': instance.verificationStatus,
+  'rejectionReason': instance.rejectionReason,
+  'reviewNote': instance.reviewNote,
+  'submittedAt': instance.submittedAt,
+  'reviewedAt': instance.reviewedAt,
+  'profilePhotoUrl': instance.profilePhotoUrl,
+  'shopPhotoUrls': instance.shopPhotoUrls,
+  'identityDocumentUrl': instance.identityDocumentUrl,
+  'businessDocumentUrl': instance.businessDocumentUrl,
 };
+
+_$PartnerApplicationImpl _$$PartnerApplicationImplFromJson(
+  Map<String, dynamic> json,
+) => _$PartnerApplicationImpl(
+  status: json['status'] as String,
+  profile: json['profile'] == null
+      ? null
+      : PartnerProfileSummary.fromJson(json['profile'] as Map<String, dynamic>),
+);
+
+Map<String, dynamic> _$$PartnerApplicationImplToJson(
+  _$PartnerApplicationImpl instance,
+) => <String, dynamic>{'status': instance.status, 'profile': instance.profile};

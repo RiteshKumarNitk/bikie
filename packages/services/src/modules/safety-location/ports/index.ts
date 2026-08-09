@@ -146,6 +146,8 @@ export interface SosSessionRepositoryPort {
   countSessionsForHelperSince(helperId: string, since: Date): Promise<number>;
   countActiveSessionsForHelper(helperId: string): Promise<number>;
   listActiveSessionsForHelper(helperId: string): Promise<PartnerActiveSessionRow[]>;
+  /** ADR-046b — "Completed Assistance"/"Assistance History". */
+  listHistorySessionsForHelper(helperId: string): Promise<PartnerHistorySessionRow[]>;
 }
 
 /** Row shape for a partner's "Active Assistance" list (ADR-044) — `distanceMeters`/`etaMinutes`
@@ -158,6 +160,19 @@ export interface PartnerActiveSessionRow {
   alertType: string;
   distanceMeters: number | null;
   etaMinutes: number | null;
+}
+
+/** Row shape for a partner's "Assistance History" list (ADR-046b) — finished sessions
+ * (COMPLETED/CANCELLED), newest first. */
+export interface PartnerHistorySessionRow {
+  sessionId: string;
+  alertId: string;
+  status: string;
+  riderName: string;
+  alertType: string;
+  completedAt: Date | null;
+  cancelledAt: Date | null;
+  rating: number | null;
 }
 
 export interface SosTimelineRepositoryPort {

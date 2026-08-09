@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-09T08:21:57.269Z",
-  "count": 127,
+  "generatedAt": "2026-08-09T17:02:59.423Z",
+  "count": 130,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -195,6 +195,7 @@
     {
       "path": "/api/admin/partners/{id}",
       "methods": [
+        "GET",
         "PATCH",
         "DELETE"
       ],
@@ -544,6 +545,30 @@
       "file": "apps/web/app/api/otp/mobile/send/route.ts"
     },
     {
+      "path": "/api/partner/application/reapply",
+      "methods": [
+        "POST"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/application/reapply/route.ts"
+    },
+    {
+      "path": "/api/partner/application",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/application/route.ts"
+    },
+    {
+      "path": "/api/partner/application/submit",
+      "methods": [
+        "POST"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/application/submit/route.ts"
+    },
+    {
       "path": "/api/partner/availability",
       "methods": [
         "PATCH"
@@ -616,6 +641,14 @@
       ],
       "auth": "partner",
       "file": "apps/web/app/api/partner/sos/dashboard/route.ts"
+    },
+    {
+      "path": "/api/partner/sos/history",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/sos/history/route.ts"
     },
     {
       "path": "/api/partner/sos/nearby",
@@ -1001,14 +1034,6 @@
       ],
       "auth": "session",
       "file": "apps/web/app/api/upload/route.ts"
-    },
-    {
-      "path": "/api/user/become-partner",
-      "methods": [
-        "POST"
-      ],
-      "auth": "session",
-      "file": "apps/web/app/api/user/become-partner/route.ts"
     },
     {
       "path": "/api/user/complete-phone-signup",

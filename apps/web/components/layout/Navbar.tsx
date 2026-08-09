@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { authClient } from "@/lib/auth-client";
 import type { SelectedRole } from "@/lib/role";
+import { switchActiveMode } from "@/lib/actions/role-actions";
 import { LogoMark } from "./LogoMark";
 import { MegaMenu } from "./MegaMenu";
 import { NotificationBell } from "./NotificationBell";
@@ -15,10 +16,12 @@ import {
   riderPrimaryLinks,
 } from "./nav-config";
 
-function dashboardHrefForRole(role: string | undefined) {
-  if (role === "ADMIN") return "/admin";
-  if (role === "PARTNER") return "/partner";
-  return "/dashboard";
+/** ADMIN -> /admin; else by the current active mode (ADR-046b) — `activeMode` is the same
+ * `selectedRole` cookie value the layout already reads to pick the nav variant, passed down as
+ * this component's own `role` prop. */
+function dashboardHrefForRole(sessionRole: string | undefined, activeMode: SelectedRole | null) {
+  if (sessionRole === "ADMIN") return "/admin";
+  return activeMode === "PARTNER" ? "/partner" : "/dashboard";
 }
 
 function UserAvatar({ name }: { name: string }) {
@@ -79,7 +82,8 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [userMenuOpen]);
 
-  const dashboardHref = dashboardHrefForRole(session?.user.role);
+  const dashboardHref = dashboardHrefForRole(session?.user.role, role);
+  const isApprovedPartner = session?.user.partnerStatus === "APPROVED";
 
   const navLinkClass = "text-sm font-medium text-foreground/70 hover:text-foreground transition-colors";
 
@@ -155,8 +159,24 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                         </svg>
                         Dashboard
                       </Link>
+                      {isApprovedPartner && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            switchActiveMode(role === "PARTNER" ? "RIDER" : "PARTNER");
+                          }}
+                          role="menuitem"
+                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-foreground/5"
+                        >
+                          <svg className="h-4 w-4 text-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4" />
+                          </svg>
+                          Switch to {role === "PARTNER" ? "Rider" : "Service Provider"} mode
+                        </button>
+                      )}
                       <Link
-                        href={session.user.role === "ADMIN" ? "/admin/settings" : session.user.role === "PARTNER" ? "/partner/settings" : "/dashboard/settings"}
+                        href={session.user.role === "ADMIN" ? "/admin/settings" : role === "PARTNER" ? "/partner/settings" : "/dashboard/settings"}
                         onClick={() => setUserMenuOpen(false)}
                         role="menuitem"
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-foreground/5"

@@ -1,6 +1,7 @@
 import { prisma } from "../client";
 import { Prisma } from "../generated/prisma/client.js";
 import { sumCompletedBookingRevenue } from "./booking.repository";
+import { toPartnerDTO } from "./partner.repository";
 
 export async function getAdminOverviewStats() {
   const [totalUsers, totalPartners, totalBikes, totalBookings, totalTrips, revenueTotal] = await Promise.all([
@@ -88,17 +89,107 @@ export async function findAllPartners() {
     businessName: p.businessName,
     type: p.type,
     city: p.city,
-    isVerified: p.isVerified,
+    verificationStatus: p.verificationStatus,
     ratingAvg: p.ratingAvg.toNumber(),
     ratingCount: p.ratingCount,
     owner: { name: p.user.name, email: p.user.email },
   }));
 }
 
-export async function updatePartnerVerification(partnerId: string, isVerified: boolean) {
-  await prisma.partner.update({
+/** `GET /api/admin/partners/[id]` — application-review detail. `history` is this partner's slice
+ * of `AuditLog` (entity: "Partner"), not a second table — see ADR-046b. */
+export async function findPartnerDetailById(partnerId: string) {
+  const partner = await prisma.partner.findUnique({
     where: { id: partnerId },
-    data: { isVerified },
+    include: { user: { select: { id: true, name: true, email: true, phone: true, createdAt: true } } },
+  });
+  if (!partner) return null;
+
+  // AuditLog.userId is a plain string, not a Prisma relation (no FK — logs must outlive a
+  // deleted actor), so actor names are resolved with a small batched follow-up lookup instead
+  // of an `include`.
+  const history = await prisma.auditLog.findMany({
+    where: { entity: "Partner", entityId: partnerId },
+    orderBy: { createdAt: "desc" },
+  });
+  const actorIds = [...new Set(history.map((h) => h.userId).filter((id): id is string => id !== null))];
+  const actors = actorIds.length
+    ? await prisma.user.findMany({ where: { id: { in: actorIds } }, select: { id: true, name: true } })
+    : [];
+  const actorNameById = new Map(actors.map((a) => [a.id, a.name]));
+
+  return {
+    partner: toPartnerDTO(partner),
+    owner: {
+      id: partner.user.id,
+      name: partner.user.name,
+      email: partner.user.email,
+      phone: partner.user.phone,
+      createdAt: partner.user.createdAt.toISOString(),
+    },
+    history: history.map((h) => ({
+      id: h.id,
+      action: h.action,
+      metadata: h.metadata as Record<string, unknown> | null,
+      actorName: h.userId ? (actorNameById.get(h.userId) ?? null) : null,
+      createdAt: h.createdAt.toISOString(),
+    })),
+  };
+}
+
+export type PartnerVerificationAction = "APPROVE" | "REJECT" | "REQUEST_INFO" | "SUSPEND" | "RESTORE";
+
+const ALLOWED_FROM_STATUS: Record<PartnerVerificationAction, string[]> = {
+  APPROVE: ["PENDING_VERIFICATION"],
+  REJECT: ["PENDING_VERIFICATION", "MORE_INFORMATION_REQUIRED"],
+  REQUEST_INFO: ["PENDING_VERIFICATION"],
+  SUSPEND: ["APPROVED"],
+  RESTORE: ["SUSPENDED"],
+};
+
+const TARGET_STATUS: Record<PartnerVerificationAction, string> = {
+  APPROVE: "APPROVED",
+  REJECT: "REJECTED",
+  REQUEST_INFO: "MORE_INFORMATION_REQUIRED",
+  SUSPEND: "SUSPENDED",
+  RESTORE: "APPROVED",
+};
+
+export type TransitionPartnerVerificationResult =
+  | { ok: true; userId: string; status: string }
+  | { ok: false; reason: "NOT_FOUND" | "INVALID_TRANSITION"; currentStatus?: string };
+
+/** The one place every admin verification decision (Approve/Reject/Request-info/Suspend/Restore)
+ * writes through — a validated state transition (ADR-046b), not a bare boolean toggle. Syncs the
+ * denormalized `User.partnerStatus` in the same transaction so a session read is never stale. */
+export async function transitionPartnerVerification(
+  partnerId: string,
+  action: PartnerVerificationAction,
+  opts: { reason?: string; adminUserId: string },
+): Promise<TransitionPartnerVerificationResult> {
+  return prisma.$transaction(async (tx) => {
+    const partner = await tx.partner.findUnique({ where: { id: partnerId } });
+    if (!partner) return { ok: false, reason: "NOT_FOUND" };
+    if (!ALLOWED_FROM_STATUS[action].includes(partner.verificationStatus)) {
+      return { ok: false, reason: "INVALID_TRANSITION", currentStatus: partner.verificationStatus };
+    }
+
+    const nextStatus = TARGET_STATUS[action];
+    await tx.partner.update({
+      where: { id: partnerId },
+      data: {
+        verificationStatus: nextStatus as any,
+        isVerified: nextStatus === "APPROVED",
+        reviewedAt: new Date(),
+        reviewedByUserId: opts.adminUserId,
+        rejectionReason: action === "REJECT" ? (opts.reason ?? null) : partner.rejectionReason,
+        reviewNote: opts.reason ?? null,
+        ...(action === "SUSPEND" ? { isAvailable: false } : {}),
+      },
+    });
+    await tx.user.update({ where: { id: partner.userId }, data: { partnerStatus: nextStatus as any } });
+
+    return { ok: true, userId: partner.userId, status: nextStatus };
   });
 }
 

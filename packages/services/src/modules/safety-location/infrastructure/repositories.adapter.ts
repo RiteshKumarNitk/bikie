@@ -101,6 +101,7 @@ export function createSosSessionRepositoryAdapter(): SosSessionRepositoryPort {
     countSessionsForHelperSince: (helperId, since) => sosSessionRepository.countSessionsForHelperSince(helperId, since),
     countActiveSessionsForHelper: (helperId) => sosSessionRepository.countActiveSessionsForHelper(helperId),
     listActiveSessionsForHelper: (helperId) => sosSessionRepository.listActiveSessionsForHelper(helperId),
+    listHistorySessionsForHelper: (helperId) => sosSessionRepository.listHistorySessionsForHelper(helperId),
   };
 }
 

@@ -1,5 +1,5 @@
 import { createAdminApplication } from "./application/admin.application";
-import { createAdminRepositoryAdapter } from "./infrastructure/repositories.adapter";
+import { createAdminNotificationAdapter, createAdminRepositoryAdapter } from "./infrastructure/repositories.adapter";
 import type { AdministrationPorts } from "./ports";
 
 export type AdministrationModule = {
@@ -12,6 +12,7 @@ export type AdministrationDeps = Partial<AdministrationPorts>;
 export function createAdministrationModule(overrides: AdministrationDeps = {}): AdministrationModule {
   const ports: AdministrationPorts = {
     admin: overrides.admin ?? createAdminRepositoryAdapter(),
+    notifications: overrides.notifications ?? createAdminNotificationAdapter(),
   };
   return {
     ports,

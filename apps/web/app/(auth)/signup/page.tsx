@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
-import { SELECTED_ROLE_COOKIE, selectedRoleToDbRole } from "@/lib/role";
+import { SELECTED_ROLE_COOKIE, resolveActiveMode } from "@/lib/role";
 import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { useMsg91Widget } from "@/lib/use-msg91-widget";
@@ -18,12 +18,11 @@ function readSelectedRoleCookie(): "RIDER" | "PARTNER" {
   return match?.[1] === "PARTNER" ? "PARTNER" : "RIDER";
 }
 
-/** ADMIN -> /admin, PARTNER -> /partner, else "/" — mirrors the local helper in
+/** ADMIN -> /admin; else by capability/active-mode (ADR-046b) — mirrors the local helper in
  * apps/web/components/layout/Navbar.tsx (a client component, so not directly importable). */
-function dashboardHrefForRole(role: string | undefined) {
+function dashboardHrefForRole(role: string | undefined, partnerStatus: string | null | undefined) {
   if (role === "ADMIN") return "/admin";
-  if (role === "PARTNER") return "/partner";
-  return "/";
+  return resolveActiveMode(partnerStatus) === "PARTNER" ? "/partner" : "/";
 }
 
 export default function SignUpPage() {
@@ -53,8 +52,6 @@ export default function SignUpPage() {
     const roleParam = params.get("role");
     setSelectedRole(roleParam === "partner" ? "PARTNER" : readSelectedRoleCookie());
   }, []);
-
-  const dbRole = selectedRoleToDbRole(selectedRole);
 
   async function handleSendCode() {
     setServerError(null);
@@ -111,13 +108,15 @@ export default function SignUpPage() {
 
       if (exists === false) {
         // Name isn't collected here — it's asked for on the onboarding/partner-onboarding
-        // form right after this, so this call only needs to apply the role picked on /welcome.
-        const completeRes = await fetch("/api/user/complete-phone-signup", {
+        // form right after this. ADR-046b: this call no longer applies a role — every new
+        // account is a Rider; picking "Service Provider" on /welcome just seeds where we send
+        // them next (straight into the application flow) rather than instantly granting
+        // capability.
+        await fetch("/api/user/complete-phone-signup", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ role: dbRole }),
+          body: JSON.stringify({}),
         });
-        const completeData: { success: boolean; becamePartner: boolean } = await completeRes.json();
 
         // Referral code is collected on the onboarding form itself now, not here —
         // forward it along as a query param so that step can prefill it.
@@ -130,7 +129,7 @@ export default function SignUpPage() {
 
       // This phone number already had an account — verify() just logged them into it.
       const { data: sessionData } = await authClient.getSession();
-      window.location.href = dashboardHrefForRole(sessionData?.user.role);
+      window.location.href = dashboardHrefForRole(sessionData?.user.role, sessionData?.user.partnerStatus);
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Invalid or expired code. Please try again.");
     } finally {

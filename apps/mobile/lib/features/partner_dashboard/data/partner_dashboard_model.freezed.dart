@@ -856,3 +856,330 @@ abstract class _PartnerActiveSession implements PartnerActiveSession {
   _$$PartnerActiveSessionImplCopyWith<_$PartnerActiveSessionImpl>
   get copyWith => throw _privateConstructorUsedError;
 }
+
+PartnerHistorySession _$PartnerHistorySessionFromJson(
+  Map<String, dynamic> json,
+) {
+  return _PartnerHistorySession.fromJson(json);
+}
+
+/// @nodoc
+mixin _$PartnerHistorySession {
+  String get id => throw _privateConstructorUsedError;
+  String get alertId => throw _privateConstructorUsedError;
+  String get status => throw _privateConstructorUsedError;
+  String get riderName => throw _privateConstructorUsedError;
+  String get alertType => throw _privateConstructorUsedError;
+  String? get completedAt => throw _privateConstructorUsedError;
+  String? get cancelledAt => throw _privateConstructorUsedError;
+  int? get rating => throw _privateConstructorUsedError;
+
+  /// Serializes this PartnerHistorySession to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of PartnerHistorySession
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $PartnerHistorySessionCopyWith<PartnerHistorySession> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $PartnerHistorySessionCopyWith<$Res> {
+  factory $PartnerHistorySessionCopyWith(
+    PartnerHistorySession value,
+    $Res Function(PartnerHistorySession) then,
+  ) = _$PartnerHistorySessionCopyWithImpl<$Res, PartnerHistorySession>;
+  @useResult
+  $Res call({
+    String id,
+    String alertId,
+    String status,
+    String riderName,
+    String alertType,
+    String? completedAt,
+    String? cancelledAt,
+    int? rating,
+  });
+}
+
+/// @nodoc
+class _$PartnerHistorySessionCopyWithImpl<
+  $Res,
+  $Val extends PartnerHistorySession
+>
+    implements $PartnerHistorySessionCopyWith<$Res> {
+  _$PartnerHistorySessionCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of PartnerHistorySession
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? alertId = null,
+    Object? status = null,
+    Object? riderName = null,
+    Object? alertType = null,
+    Object? completedAt = freezed,
+    Object? cancelledAt = freezed,
+    Object? rating = freezed,
+  }) {
+    return _then(
+      _value.copyWith(
+            id: null == id
+                ? _value.id
+                : id // ignore: cast_nullable_to_non_nullable
+                      as String,
+            alertId: null == alertId
+                ? _value.alertId
+                : alertId // ignore: cast_nullable_to_non_nullable
+                      as String,
+            status: null == status
+                ? _value.status
+                : status // ignore: cast_nullable_to_non_nullable
+                      as String,
+            riderName: null == riderName
+                ? _value.riderName
+                : riderName // ignore: cast_nullable_to_non_nullable
+                      as String,
+            alertType: null == alertType
+                ? _value.alertType
+                : alertType // ignore: cast_nullable_to_non_nullable
+                      as String,
+            completedAt: freezed == completedAt
+                ? _value.completedAt
+                : completedAt // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            cancelledAt: freezed == cancelledAt
+                ? _value.cancelledAt
+                : cancelledAt // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            rating: freezed == rating
+                ? _value.rating
+                : rating // ignore: cast_nullable_to_non_nullable
+                      as int?,
+          )
+          as $Val,
+    );
+  }
+}
+
+/// @nodoc
+abstract class _$$PartnerHistorySessionImplCopyWith<$Res>
+    implements $PartnerHistorySessionCopyWith<$Res> {
+  factory _$$PartnerHistorySessionImplCopyWith(
+    _$PartnerHistorySessionImpl value,
+    $Res Function(_$PartnerHistorySessionImpl) then,
+  ) = __$$PartnerHistorySessionImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({
+    String id,
+    String alertId,
+    String status,
+    String riderName,
+    String alertType,
+    String? completedAt,
+    String? cancelledAt,
+    int? rating,
+  });
+}
+
+/// @nodoc
+class __$$PartnerHistorySessionImplCopyWithImpl<$Res>
+    extends
+        _$PartnerHistorySessionCopyWithImpl<$Res, _$PartnerHistorySessionImpl>
+    implements _$$PartnerHistorySessionImplCopyWith<$Res> {
+  __$$PartnerHistorySessionImplCopyWithImpl(
+    _$PartnerHistorySessionImpl _value,
+    $Res Function(_$PartnerHistorySessionImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of PartnerHistorySession
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({
+    Object? id = null,
+    Object? alertId = null,
+    Object? status = null,
+    Object? riderName = null,
+    Object? alertType = null,
+    Object? completedAt = freezed,
+    Object? cancelledAt = freezed,
+    Object? rating = freezed,
+  }) {
+    return _then(
+      _$PartnerHistorySessionImpl(
+        id: null == id
+            ? _value.id
+            : id // ignore: cast_nullable_to_non_nullable
+                  as String,
+        alertId: null == alertId
+            ? _value.alertId
+            : alertId // ignore: cast_nullable_to_non_nullable
+                  as String,
+        status: null == status
+            ? _value.status
+            : status // ignore: cast_nullable_to_non_nullable
+                  as String,
+        riderName: null == riderName
+            ? _value.riderName
+            : riderName // ignore: cast_nullable_to_non_nullable
+                  as String,
+        alertType: null == alertType
+            ? _value.alertType
+            : alertType // ignore: cast_nullable_to_non_nullable
+                  as String,
+        completedAt: freezed == completedAt
+            ? _value.completedAt
+            : completedAt // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        cancelledAt: freezed == cancelledAt
+            ? _value.cancelledAt
+            : cancelledAt // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        rating: freezed == rating
+            ? _value.rating
+            : rating // ignore: cast_nullable_to_non_nullable
+                  as int?,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$PartnerHistorySessionImpl implements _PartnerHistorySession {
+  const _$PartnerHistorySessionImpl({
+    required this.id,
+    required this.alertId,
+    required this.status,
+    required this.riderName,
+    required this.alertType,
+    this.completedAt,
+    this.cancelledAt,
+    this.rating,
+  });
+
+  factory _$PartnerHistorySessionImpl.fromJson(Map<String, dynamic> json) =>
+      _$$PartnerHistorySessionImplFromJson(json);
+
+  @override
+  final String id;
+  @override
+  final String alertId;
+  @override
+  final String status;
+  @override
+  final String riderName;
+  @override
+  final String alertType;
+  @override
+  final String? completedAt;
+  @override
+  final String? cancelledAt;
+  @override
+  final int? rating;
+
+  @override
+  String toString() {
+    return 'PartnerHistorySession(id: $id, alertId: $alertId, status: $status, riderName: $riderName, alertType: $alertType, completedAt: $completedAt, cancelledAt: $cancelledAt, rating: $rating)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PartnerHistorySessionImpl &&
+            (identical(other.id, id) || other.id == id) &&
+            (identical(other.alertId, alertId) || other.alertId == alertId) &&
+            (identical(other.status, status) || other.status == status) &&
+            (identical(other.riderName, riderName) ||
+                other.riderName == riderName) &&
+            (identical(other.alertType, alertType) ||
+                other.alertType == alertType) &&
+            (identical(other.completedAt, completedAt) ||
+                other.completedAt == completedAt) &&
+            (identical(other.cancelledAt, cancelledAt) ||
+                other.cancelledAt == cancelledAt) &&
+            (identical(other.rating, rating) || other.rating == rating));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    alertId,
+    status,
+    riderName,
+    alertType,
+    completedAt,
+    cancelledAt,
+    rating,
+  );
+
+  /// Create a copy of PartnerHistorySession
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PartnerHistorySessionImplCopyWith<_$PartnerHistorySessionImpl>
+  get copyWith =>
+      __$$PartnerHistorySessionImplCopyWithImpl<_$PartnerHistorySessionImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$PartnerHistorySessionImplToJson(this);
+  }
+}
+
+abstract class _PartnerHistorySession implements PartnerHistorySession {
+  const factory _PartnerHistorySession({
+    required final String id,
+    required final String alertId,
+    required final String status,
+    required final String riderName,
+    required final String alertType,
+    final String? completedAt,
+    final String? cancelledAt,
+    final int? rating,
+  }) = _$PartnerHistorySessionImpl;
+
+  factory _PartnerHistorySession.fromJson(Map<String, dynamic> json) =
+      _$PartnerHistorySessionImpl.fromJson;
+
+  @override
+  String get id;
+  @override
+  String get alertId;
+  @override
+  String get status;
+  @override
+  String get riderName;
+  @override
+  String get alertType;
+  @override
+  String? get completedAt;
+  @override
+  String? get cancelledAt;
+  @override
+  int? get rating;
+
+  /// Create a copy of PartnerHistorySession
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PartnerHistorySessionImplCopyWith<_$PartnerHistorySessionImpl>
+  get copyWith => throw _privateConstructorUsedError;
+}

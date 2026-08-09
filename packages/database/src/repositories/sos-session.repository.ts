@@ -246,6 +246,32 @@ export async function countActiveSessionsForHelper(helperId: string): Promise<nu
   return prisma.sOSSession.count({ where: { helperId, status: { in: [...OPEN_SESSION_STATUSES] } } });
 }
 
+const HISTORY_SESSION_STATUSES = ["COMPLETED", "CANCELLED"] as const;
+
+/** "Completed Assistance"/"Assistance History" (ADR-046b) — the counterpart to
+ * `listActiveSessionsForHelper` above for sessions that have finished, newest first. */
+export async function listHistorySessionsForHelper(helperId: string, take = 50) {
+  const sessions = await prisma.sOSSession.findMany({
+    where: { helperId, status: { in: [...HISTORY_SESSION_STATUSES] } },
+    orderBy: { startedAt: "desc" },
+    take,
+    include: {
+      rider: { select: { name: true } },
+      alert: { select: { type: true } },
+    },
+  });
+  return sessions.map((s) => ({
+    sessionId: s.id,
+    alertId: s.alertId,
+    status: s.status,
+    riderName: s.rider.name,
+    alertType: s.alert.type,
+    completedAt: s.completedAt,
+    cancelledAt: s.cancelledAt,
+    rating: s.rating,
+  }));
+}
+
 export async function listActiveSessionsForHelper(helperId: string) {
   const sessions = await prisma.sOSSession.findMany({
     where: { helperId, status: { in: [...OPEN_SESSION_STATUSES] } },

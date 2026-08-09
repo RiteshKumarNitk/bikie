@@ -21,11 +21,15 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ? { latitude: parsed.data.latitude, longitude: parsed.data.longitude }
       : undefined;
 
-  // ADR-044 — a partner's "ACCEPT" reuses this exact endpoint, gated additively: verified,
-  // available, category-matched, and not already at capacity. Renters/other roles are
-  // completely unaffected (no opts passed, same behavior as before).
+  // ADR-044/046b — an approved Service Provider's "ACCEPT" reuses this exact endpoint, gated
+  // additively: verified, available, category-matched, and not already at capacity. Keyed off
+  // the server-verified `partnerStatus` (not `role`, which no longer indicates Partner capability
+  // under the dual-capability model — a backfilled ex-PARTNER account is `role: RENTER` now) and
+  // applied regardless of the caller's current UI "mode" — a dual-capability account offering
+  // help is always held to the stricter partner bar, deliberately not something the client-side
+  // mode preference can opt out of. Pure Riders are completely unaffected (no opts passed).
   const result = await SOSSessionService.offerHelp(id, session.user.id, location, parsed.data.message, {
-    requireAvailableAndCapacity: session.user.role === "PARTNER",
+    requireAvailableAndCapacity: session.user.partnerStatus === "APPROVED",
   });
   if (!result.ok) {
     const status =

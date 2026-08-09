@@ -9,7 +9,12 @@ type NotificationTypeValue =
   | "GROUP_JOIN_APPROVED"
   | "MODERATION_ACTION"
   | "SOS_ALERT"
-  | "SYSTEM";
+  | "SYSTEM"
+  // --- ADR-046b ---
+  | "PARTNER_APPLICATION_APPROVED"
+  | "PARTNER_APPLICATION_REJECTED"
+  | "PARTNER_APPLICATION_INFO_REQUESTED"
+  | "PARTNER_APPLICATION_SUSPENDED";
 
 export async function create(params: {
   userId: string;

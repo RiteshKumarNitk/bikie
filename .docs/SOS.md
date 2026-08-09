@@ -225,11 +225,11 @@ and is what keeps a redacted browse list usable ("2.8 km away" without exposing 
 
 | Route | Method | Who | Notes |
 | ----------------------------------------------- | ------ | ------------------ | -------------------------------------------------------------------- |
-| `/api/sos/alerts` | GET | Member, not PARTNER (ADR-046) | `?lat=&lng=` (ADR-042) — 25km radius around the viewer; non-admin must supply both. Results redacted per §6. Admin sees every alert network-wide, unfiltered. |
-| `/api/sos/alerts` | POST | Member, not PARTNER (ADR-046) | Create + immediate fan-out + tier-1 escalation seed. |
+| `/api/sos/alerts` | GET | Member | `?lat=&lng=` (ADR-042) — 25km radius around the viewer; non-admin must supply both. Results redacted per §6. Admin sees every alert network-wide, unfiltered. Open to approved Service Providers too (ADR-046b) — they're always also Riders. |
+| `/api/sos/alerts` | POST | Member | Create + immediate fan-out + tier-1 escalation seed. |
 | `/api/sos/alerts/history` | GET | Session | Caller's own past alerts. |
 | `/api/sos/alerts/[id]` | GET | Member | Alert + timeline. Redacted per §6 unless privileged. |
-| `/api/sos/alerts/[id]/offer` | POST | Member | "I'm Coming" / partner "ACCEPT". Partner callers additionally gated: verified, available, category-matched, not at capacity. |
+| `/api/sos/alerts/[id]/offer` | POST | Member | "I'm Coming" / partner "ACCEPT". Callers with an APPROVED Partner application (ADR-046b — checked via `session.user.partnerStatus`, not `role`) are additionally gated: verified, available, category-matched, not at capacity — applied regardless of the caller's current UI mode. |
 | `/api/sos/alerts/[id]/decline` | POST | Member | Decline without ever offering (ADR-045). |
 | `/api/sos/alerts/[id]/offers` | GET | Reporter/admin only | Offers received; responder phone withheld until `ACCEPTED`. |
 | `/api/sos/alerts/[id]/offers/[offerId]/accept` | POST | Reporter/admin | Transactional assignment. |
@@ -247,6 +247,7 @@ and is what keeps a redacted browse list usable ("2.8 km away" without exposing 
 | `/api/partner/sos/dashboard` | GET | Partner | Stats (ADR-044). |
 | `/api/partner/sos/nearby` | GET | Partner | Eligible open requests, excludes already-offered/declined (ADR-045). |
 | `/api/partner/sos/active` | GET | Partner | Current active-helper sessions. |
+| `/api/partner/sos/history` | GET | Partner | Completed Assistance / Assistance History — finished (COMPLETED/CANCELLED) sessions (ADR-046b). |
 | `/api/cron/sos-resolve` | GET | Cron Bearer | Auto-resolves alerts inactive 120+ min. |
 | `/api/cron/sos-escalate` | GET | Cron Bearer | The staged-escalation ticker (§4). |
 

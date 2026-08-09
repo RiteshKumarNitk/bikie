@@ -1,3 +1,15 @@
+/** ADR-046b — Service Provider application/verification state, decoupled from `User.role`.
+ * "NOT_APPLIED" is never stored (see `PartnerVerificationStatus` in the Prisma schema) — API
+ * responses surface it when the caller has no `Partner` row at all. */
+export type PartnerVerificationStatus =
+  | "NOT_APPLIED"
+  | "DRAFT"
+  | "PENDING_VERIFICATION"
+  | "MORE_INFORMATION_REQUIRED"
+  | "APPROVED"
+  | "REJECTED"
+  | "SUSPENDED";
+
 export interface PartnerProfileDTO {
   id: string;
   businessName: string;
@@ -24,6 +36,36 @@ export interface PartnerProfileDTO {
   // --- ADR-044 ---
   isAvailable: boolean;
   isGeneralResponder: boolean;
+  // --- ADR-046b: application/verification state ---
+  verificationStatus: PartnerVerificationStatus;
+  rejectionReason: string | null;
+  reviewNote: string | null;
+  submittedAt: string | null;
+  reviewedAt: string | null;
+  profilePhotoUrl: string | null;
+  shopPhotoUrls: string[];
+  identityDocumentUrl: string | null;
+  businessDocumentUrl: string | null;
+}
+
+/** `GET /api/partner/application` — the one read every "Become a Service Provider" screen
+ * polls; `profile` is `null` only while `status === "NOT_APPLIED"`. */
+export interface PartnerApplicationDTO {
+  status: PartnerVerificationStatus;
+  profile: PartnerProfileDTO | null;
+}
+
+/** `GET /api/admin/partners/[id]` — the application-review detail screen. */
+export interface AdminPartnerDetailDTO {
+  profile: PartnerProfileDTO;
+  owner: { id: string; name: string; email: string; phone: string | null; createdAt: string };
+  history: Array<{
+    id: string;
+    action: string;
+    metadata: Record<string, unknown> | null;
+    actorName: string | null;
+    createdAt: string;
+  }>;
 }
 
 export interface PartnerDashboardStatsDTO {
@@ -62,4 +104,16 @@ export interface PartnerActiveSessionDTO {
   alertType: string;
   distanceMeters: number | null;
   etaMinutes: number | null;
+}
+
+/** ADR-046b — "Completed Assistance"/"Assistance History" dashboard section. */
+export interface PartnerHistorySessionDTO {
+  id: string;
+  alertId: string;
+  status: string;
+  riderName: string;
+  alertType: string;
+  completedAt: string | null;
+  cancelledAt: string | null;
+  rating: number | null;
 }

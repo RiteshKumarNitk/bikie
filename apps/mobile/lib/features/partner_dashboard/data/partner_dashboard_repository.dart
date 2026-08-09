@@ -50,6 +50,16 @@ class PartnerDashboardRepository {
     });
   }
 
+  /// ADR-046b — "Completed Assistance"/"Assistance History".
+  Future<List<PartnerHistorySession>> getHistory() {
+    return apiGuard(() async {
+      final res = await _dio.get('/api/partner/sos/history');
+      return (res.data['sessions'] as List)
+          .map((e) => PartnerHistorySession.fromJson(e as Map<String, dynamic>))
+          .toList();
+    });
+  }
+
   Future<bool> setAvailability(bool isAvailable) {
     return apiGuard(() async {
       final res = await _dio.patch('/api/partner/availability', data: {'isAvailable': isAvailable});

@@ -1,5 +1,16 @@
 # BIKIE — Roadmap
 
+## New: Rider ⇄ Service Provider Dual Capability (2026-08-09, ADR-046b)
+One BIKIE account can now hold Rider capability (always on) and Service Provider capability at
+the same time. Becoming a Service Provider is no longer an instant self-service role flip that
+replaced a Rider's account — it's a real application: fill out a business profile, submit it,
+and an admin approves, rejects, requests more information, or suspends it. Once approved, the
+same account can switch between Rider and Service Provider modes at will (Navbar/Profile "Switch
+Mode") without ever losing either capability. `User.role` now only distinguishes Rider vs Admin;
+Service Provider status lives on `Partner.verificationStatus`, decoupled from role entirely. See
+ADR-046b — includes a data-backfill migration for existing Service Provider accounts, not yet
+applied to the live database (needs explicit go-ahead).
+
 ## Fixed: New Service Provider Registrations Stuck Showing the Rider Experience (2026-08-09, ADR-046)
 A brand-new mobile number registering as a Service Provider had its role correctly set to
 `PARTNER` server-side, but the mobile app never refreshed its own local session state afterward —

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/domain/auth_controller.dart';
 import '../../features/auth/domain/auth_state.dart';
+import '../../features/auth/domain/role_provider.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/bikes/presentation/bike_detail_screen.dart';
@@ -18,11 +19,13 @@ import '../../features/nearby_riders/presentation/nearby_riders_screen.dart';
 import '../../features/partners/presentation/partners_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
 import '../../features/onboarding/data/partner_profile_model.dart';
+import '../../features/onboarding/presentation/become_provider_screen.dart';
 import '../../features/onboarding/presentation/intro_screen.dart';
 import '../../features/onboarding/presentation/partner_onboarding_screen.dart';
 import '../../features/onboarding/presentation/rider_onboarding_screen.dart';
 import '../../features/onboarding/presentation/welcome_screen.dart';
 import '../../features/partner_dashboard/presentation/partner_active_screen.dart';
+import '../../features/partner_dashboard/presentation/partner_history_screen.dart';
 import '../../features/partner_dashboard/presentation/partner_home_screen.dart';
 import '../../features/partner_dashboard/presentation/partner_requests_screen.dart';
 import '../../features/partner_dashboard/presentation/partner_sos_request_screen.dart';
@@ -51,10 +54,15 @@ const _preAuthPaths = {'/intro', '/welcome', '/login', '/signup'};
 final routerProvider = Provider<GoRouter>((ref) {
   final authStatus = ref.watch(authControllerProvider.select((s) => s.status));
   final hasSeenIntro = ref.watch(hasSeenIntroProvider);
-  // ADR-044: Partners get a purpose-built Emergency Assistance Dashboard instead of the renter
-  // marketplace Home/SOS screens — branched here rather than as a second parallel route tree, so
-  // every other route (bookings, messages, profile, …) stays reachable identically for both roles.
-  final isPartner = ref.watch(authControllerProvider.select((s) => s.user?.role == 'PARTNER'));
+  // ADR-044/046b: an approved Service Provider *currently in Partner mode* gets a purpose-built
+  // Emergency Assistance Dashboard instead of the renter marketplace Home/SOS screens — branched
+  // here rather than as a second parallel route tree, so every other route (bookings, messages,
+  // profile, …) stays reachable identically for both roles. Capability (`partnerStatus`) is
+  // server-verified on every API call regardless of what this local flag says; `activeMode` here
+  // only decides which screen renders.
+  final partnerStatus = ref.watch(authControllerProvider.select((s) => s.user?.partnerStatus));
+  final storedMode = ref.watch(activeModeProvider);
+  final isPartner = resolveActiveMode(partnerStatus, storedMode) == 'PARTNER';
 
   final String initialLocation;
   if (authStatus == AuthStatus.authenticated) {
@@ -127,6 +135,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/sos/nearby-riders', builder: (context, state) => const NearbyRidersScreen()),
       GoRoute(path: '/partners', builder: (context, state) => const PartnersScreen()),
       GoRoute(path: '/sos/history', builder: (context, state) => const SosHistoryScreen()),
+      GoRoute(path: '/partner/history', builder: (context, state) => const PartnerHistoryScreen()),
       GoRoute(
         path: '/sos/:id',
         builder: (context, state) => isPartner
@@ -138,6 +147,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/partner-onboarding',
         builder: (context, state) => PartnerOnboardingScreen(initialProfile: state.extra as PartnerProfileSummary?),
       ),
+      // ADR-046b — the "Become a Service Provider" state-machine screen (NOT_APPLIED through
+      // APPROVED/REJECTED/SUSPENDED), reachable from Profile regardless of current mode.
+      GoRoute(path: '/become-provider', builder: (context, state) => const BecomeProviderScreen()),
       GoRoute(path: '/membership', builder: (context, state) => const MembershipScreen()),
       GoRoute(path: '/referrals', builder: (context, state) => const ReferralsScreen()),
       GoRoute(path: '/messages', builder: (context, state) => const ConversationsListScreen()),

@@ -77,10 +77,21 @@ export const auth = betterAuth({
     additionalFields: {
       role: {
         type: "string",
-        // Never accept role from client signup/update — RENTER default only; Partner via
-        // UserService.becomePartner / completePhoneSignup; Admin via AdminService only.
+        // Never accept role from client signup/update — RENTER default only; Admin via
+        // AdminService only. (ADR-046b: PARTNER capability no longer flips this field — see
+        // partnerStatus below.)
         input: false,
         defaultValue: "RENTER",
+      },
+      // ADR-046b — denormalized copy of Partner.verificationStatus, kept in sync on every
+      // verification-state write (application submit/withdraw, admin approve/reject/etc.).
+      // Exposes session.user.partnerStatus for cheap capability checks (middleware, route
+      // guards) without a join, same mechanism as role/accountStatus above. `null` means no
+      // Partner application has ever been started ("NOT_APPLIED").
+      partnerStatus: {
+        type: "string",
+        input: false,
+        required: false,
       },
       accountStatus: {
         type: "string",

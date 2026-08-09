@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { SOSSessionService } from "@bikie/services";
-import { requireRole } from "@/lib/require-role";
+import { requireApprovedPartner } from "@/lib/require-role";
 
 /** ADR-044 — stat row for the partner Emergency Assistance Dashboard Home screen. `?lat=&lng=`
  * are optional: without them, `activeRequests` reports 0 rather than the route failing outright. */
 export async function GET(request: Request) {
-  const { session, error } = await requireRole("PARTNER");
+  const { session, error } = await requireApprovedPartner();
   if (error) return error;
 
   const url = new URL(request.url);

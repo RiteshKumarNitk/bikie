@@ -72,8 +72,12 @@ export default function PartnerOnboardingPage() {
         const data = await res.json().catch(() => ({}) as { error?: string });
         throw new Error(data.error || "Failed to save partner profile");
       }
-      
-      router.push("/partner");
+
+      // ADR-046b: saving no longer grants capability — submit straight for verification (this
+      // is the "I'm done" moment of a brand-new signup) and land on the status page instead of
+      // the (now capability-gated) Partner Dashboard itself.
+      await fetch("/api/partner/application/submit", { method: "POST" }).catch(() => {});
+      router.push("/dashboard/become-provider");
     } catch (err: any) {
       setError(err.message || "Something went wrong saving your details. Please try again.");
     } finally {

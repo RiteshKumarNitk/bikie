@@ -4,11 +4,6 @@ import { useState, useEffect } from "react";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
 import { SELECTED_ROLE_COOKIE } from "@/lib/role";
-import {
-  PartnerBusinessFields,
-  emptyPartnerBusinessDetails,
-  type PartnerBusinessDetails,
-} from "@/components/auth/PartnerBusinessFields";
 import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { useMsg91Widget } from "@/lib/use-msg91-widget";
@@ -32,10 +27,10 @@ export default function LoginPage() {
   // to sign in as admin. Better Auth's emailAndPassword sign-in was never disabled server-side
   // (packages/auth/src/server.ts), this just restores a UI path to it.
   const [mode, setMode] = useState<"phone" | "email">("phone");
-  const [step, setStep] = useState<"phone" | "otp" | "upgrade">("phone");
+  const [step, setStep] = useState<"phone" | "otp">("phone");
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<"RIDER" | "PARTNER">("RIDER");
-  
+
   useEffect(() => {
     setSelectedRole(readSelectedRoleCookie());
   }, []);
@@ -43,16 +38,12 @@ export default function LoginPage() {
   const [localNumber, setLocalNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpCode, setOtpCode] = useState("");
-  const [partnerDetails, setPartnerDetails] = useState<PartnerBusinessDetails>(
-    emptyPartnerBusinessDetails,
-  );
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const resendTimer = useResendCountdown(60);
   const widget = useMsg91Widget();
@@ -116,62 +107,16 @@ export default function LoginPage() {
         return;
       }
 
-      const { data: sessionData } = await authClient.getSession();
-      const role = sessionData?.user.role;
-
-      // Existing Rider signing back in through the Partner path on /welcome (ADR-013's
-      // self-service upgrade) — the selectedRole cookie says PARTNER but the account is
-      // still RENTER. Show the upgrade mini-form instead of redirecting immediately.
-      if (role === "RENTER" && readSelectedRoleCookie() === "PARTNER") {
-        setStep("upgrade");
-        return;
-      }
-
-      // Every other case: preserve the pre-existing behavior of this page (always "/").
+      // ADR-046b: picking "Service Provider" on /welcome no longer triggers an instant
+      // self-service role upgrade here — every account logs into whatever it already is, and
+      // Service Provider capability only ever comes from the application/verification flow
+      // (Dashboard → "Become a Service Provider"). Preserve the pre-existing behavior of this
+      // page otherwise: always redirect home regardless of role.
       window.location.href = "/";
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Invalid or expired code. Please try again.");
     } finally {
       setVerifying(false);
-    }
-  }
-
-  async function onUpgrade(e: React.FormEvent) {
-    e.preventDefault();
-    setServerError(null);
-    setUpgrading(true);
-    try {
-      const res = await fetch("/api/user/become-partner", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          businessName: partnerDetails.businessName,
-          type: partnerDetails.type,
-          city: partnerDetails.city,
-          description: partnerDetails.description.trim() || undefined,
-          contactPerson1Name: partnerDetails.contactPerson1Name.trim() || undefined,
-          contactPerson1Mobile: partnerDetails.contactPerson1Mobile.trim() || undefined,
-          contactPerson2Name: partnerDetails.contactPerson2Name.trim() || undefined,
-          contactPerson2Mobile: partnerDetails.contactPerson2Mobile.trim() || undefined,
-          addressLine: partnerDetails.addressLine.trim() || undefined,
-          area: partnerDetails.area.trim() || undefined,
-          pincode: partnerDetails.pincode.trim() || undefined,
-          latitude: partnerDetails.latitude ?? undefined,
-          longitude: partnerDetails.longitude ?? undefined,
-          governmentIdType: partnerDetails.governmentIdType || undefined,
-          governmentIdNumber: partnerDetails.governmentIdNumber.trim() || undefined,
-        }),
-      });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}) as { error?: string });
-        setServerError(data.error ?? "Could not complete your application. Please try again.");
-        return;
-      }
-      window.location.href = "/partner";
-    } catch {
-      setServerError("Something went wrong. Please try again.");
-    } finally {
-      setUpgrading(false);
     }
   }
 
@@ -205,8 +150,8 @@ export default function LoginPage() {
             {selectedRole === "PARTNER" ? "Manage your business." : "Welcome back to the ride."}
           </h1>
           <p className="mt-4 text-lg text-white/60 leading-relaxed">
-            {selectedRole === "PARTNER" 
-              ? "Access your dashboard, manage your fleet, and oversee bookings — all from your partner account." 
+            {selectedRole === "PARTNER"
+              ? "Access your dashboard, manage your fleet, and oversee bookings — all from your partner account."
               : "Access your dashboard, manage bookings, or plan your next trip — all from one account."}
           </p>
           <div className="mt-8 flex gap-3">
@@ -237,13 +182,9 @@ export default function LoginPage() {
 
           <div className="mt-8 lg:mt-0">
             <h2 className="font-display text-2xl font-semibold">
-              {step === "upgrade" ? "Complete your Service Provider application" : selectedRole === "PARTNER" ? "Sign in to Service Provider" : "Sign in to Rider"}
+              {selectedRole === "PARTNER" ? "Sign in to Service Provider" : "Sign in to Rider"}
             </h2>
-            <p className="mt-1 text-sm text-foreground/50">
-              {step === "upgrade"
-                ? "A few business details and you're a partner."
-                : "Log in to your account"}
-            </p>
+            <p className="mt-1 text-sm text-foreground/50">Log in to your account</p>
           </div>
 
           {mode === "phone" && step === "phone" && (
@@ -409,28 +350,7 @@ export default function LoginPage() {
             </form>
           )}
 
-          {step === "upgrade" && (
-            <form onSubmit={onUpgrade} className="mt-6 space-y-4">
-              <PartnerBusinessFields
-                value={partnerDetails}
-                onChange={setPartnerDetails}
-                idPrefix="upgrade-partner"
-                showDescription
-              />
-
-              {serverError && (
-                <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
-                  {serverError}
-                </div>
-              )}
-
-              <Button type="submit" className="w-full" disabled={upgrading} size="lg">
-                {upgrading ? "Submitting..." : "Become a partner"}
-              </Button>
-            </form>
-          )}
-
-          {mode === "phone" && step !== "upgrade" && (
+          {mode === "phone" && (
             <p className="mt-6 text-center text-sm text-foreground/50">
               Don&apos;t have an account?{" "}
               <Link href="/signup" className="font-medium text-accent-text hover:text-accent-hover">

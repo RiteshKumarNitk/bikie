@@ -7,7 +7,12 @@ export type NotificationType =
   | "GROUP_JOIN_APPROVED"
   | "MODERATION_ACTION"
   | "SOS_ALERT"
-  | "SYSTEM";
+  | "SYSTEM"
+  // --- ADR-046b: Service Provider application/verification decisions ---
+  | "PARTNER_APPLICATION_APPROVED"
+  | "PARTNER_APPLICATION_REJECTED"
+  | "PARTNER_APPLICATION_INFO_REQUESTED"
+  | "PARTNER_APPLICATION_SUSPENDED";
 
 export interface NotificationDTO {
   id: string;

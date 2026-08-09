@@ -10,11 +10,11 @@ export async function findUserByPhoneNumber(phoneNumber: string) {
   });
 }
 
-/** Self-service role change — only ever called for the RENTER -> PARTNER upgrade path
- * (see ADR-013), guarded by the caller checking the user's current role first. Not a
- * general-purpose role setter; admin role changes go through `adminRepository.updateUserRole`. */
-export async function upgradeToPartnerRole(userId: string) {
-  await prisma.user.update({ where: { id: userId }, data: { role: "PARTNER" } });
+/** ADR-046b — keeps the denormalized `User.partnerStatus` (exposed on the Better Auth session)
+ * in sync with `Partner.verificationStatus` whenever the latter changes. Never mutates `role` —
+ * Partner capability is fully decoupled from the RENTER/ADMIN account-tier field now. */
+export async function syncPartnerStatus(userId: string, status: string | null) {
+  await prisma.user.update({ where: { id: userId }, data: { partnerStatus: status as any } });
 }
 
 export async function findById(userId: string) {

@@ -1,5 +1,30 @@
 # Changelog
 
+## New — Rider ⇄ Service Provider dual capability (ADR-046b)
+- **New**: one BIKIE account can now be a Rider and an approved Service Provider at the same
+  time. Becoming a Service Provider is a real application (fill out a business profile, submit,
+  admin reviews) instead of an instant self-service flip that used to silently replace your Rider
+  account. Once approved, switch between Rider and Service Provider modes from Profile/Navbar
+  without ever losing either capability.
+- **New**: Admin gets a real verification workflow — Approve, Reject, Request More Information,
+  Suspend, and Restore, each with a reason shown back to the applicant, a decision history, and a
+  notification sent on every decision. Replaces the old plain "Verified/Pending" toggle.
+- **New**: "Completed Assistance"/"Assistance History" — a Service Provider can now see their past
+  finished sessions, not just active ones.
+- **Fixed** (found while wiring capability decoupling): the stricter partner-eligibility check on
+  accepting an SOS request was keyed on account role — under the new model, an approved Service
+  Provider's role no longer reliably indicates that, which would have silently let them bypass the
+  verified/available/type/capacity check. Re-keyed on the actual verification status instead.
+- Retired the old sign-out-and-reverify self-service upgrade flow (`/login`'s upgrade mini-form,
+  `POST /api/user/become-partner`) — superseded by the application flow above.
+- Backend: 9/9 packages typecheck, 133/133 tests passing. Mobile: `flutter analyze` clean,
+  `flutter test` (110/110) passing.
+- **Not done**: the database migration (adds the new verification fields, backfills existing
+  Service Provider accounts) has not been applied to the live database — needs your explicit
+  go-ahead first, since it rewrites existing account data. Document/shop-photo upload UI for the
+  application form was also explicitly left for a follow-up. Worth a live two-account test once
+  the migration is applied.
+
 ## Fixed — Service Provider registration & dashboard audit (ADR-046)
 - **Fixed** (the reported bug): a brand-new phone number registering as a Service Provider had its
   role correctly set on the server, but the mobile app never refreshed its own local session

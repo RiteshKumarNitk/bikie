@@ -6,7 +6,11 @@ export type AccessDenialReason =
   | "UNAUTHENTICATED"
   | "ACCOUNT_RESTRICTED"
   | "FORBIDDEN"
-  | "MEMBERSHIP_REQUIRED";
+  | "MEMBERSHIP_REQUIRED"
+  // ADR-046b — the caller has no APPROVED Partner application (never had one, or it was
+  // rejected/suspended/still pending) — distinct from FORBIDDEN so callers can point the user
+  // at the application flow instead of a bare "no access" message.
+  | "PARTNER_NOT_APPROVED";
 
 export type AccessDecision = { allowed: true } | { allowed: false; reason: AccessDenialReason };
 

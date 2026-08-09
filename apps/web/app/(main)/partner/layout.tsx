@@ -17,7 +17,9 @@ const navItems = [
 
 export default async function PartnerLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession();
-  if (!session || session.user.role !== "PARTNER") redirect("/login?next=/partner");
+  // ADR-046b — capability gate, not a role check: any account with an APPROVED Partner
+  // application reaches this dashboard, RENTER or (legacy) PARTNER role alike.
+  if (!session || session.user.partnerStatus !== "APPROVED") redirect("/login?next=/partner");
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">

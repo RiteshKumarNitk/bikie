@@ -26,7 +26,10 @@ mixin _$UserModel {
   String get email => throw _privateConstructorUsedError;
   String get role => throw _privateConstructorUsedError;
   String? get phone => throw _privateConstructorUsedError;
-  String? get image => throw _privateConstructorUsedError;
+  String? get image =>
+      throw _privateConstructorUsedError; // ADR-046b — denormalized Partner.verificationStatus, decoupled from `role`. `null` means
+  // no Service Provider application has ever been started ("NOT_APPLIED").
+  String? get partnerStatus => throw _privateConstructorUsedError;
 
   /// Serializes this UserModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -50,6 +53,7 @@ abstract class $UserModelCopyWith<$Res> {
     String role,
     String? phone,
     String? image,
+    String? partnerStatus,
   });
 }
 
@@ -74,6 +78,7 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? role = null,
     Object? phone = freezed,
     Object? image = freezed,
+    Object? partnerStatus = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -101,6 +106,10 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
                 ? _value.image
                 : image // ignore: cast_nullable_to_non_nullable
                       as String?,
+            partnerStatus: freezed == partnerStatus
+                ? _value.partnerStatus
+                : partnerStatus // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -123,6 +132,7 @@ abstract class _$$UserModelImplCopyWith<$Res>
     String role,
     String? phone,
     String? image,
+    String? partnerStatus,
   });
 }
 
@@ -146,6 +156,7 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? role = null,
     Object? phone = freezed,
     Object? image = freezed,
+    Object? partnerStatus = freezed,
   }) {
     return _then(
       _$UserModelImpl(
@@ -173,6 +184,10 @@ class __$$UserModelImplCopyWithImpl<$Res>
             ? _value.image
             : image // ignore: cast_nullable_to_non_nullable
                   as String?,
+        partnerStatus: freezed == partnerStatus
+            ? _value.partnerStatus
+            : partnerStatus // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -188,6 +203,7 @@ class _$UserModelImpl implements _UserModel {
     required this.role,
     this.phone,
     this.image,
+    this.partnerStatus,
   });
 
   factory _$UserModelImpl.fromJson(Map<String, dynamic> json) =>
@@ -205,10 +221,14 @@ class _$UserModelImpl implements _UserModel {
   final String? phone;
   @override
   final String? image;
+  // ADR-046b — denormalized Partner.verificationStatus, decoupled from `role`. `null` means
+  // no Service Provider application has ever been started ("NOT_APPLIED").
+  @override
+  final String? partnerStatus;
 
   @override
   String toString() {
-    return 'UserModel(id: $id, name: $name, email: $email, role: $role, phone: $phone, image: $image)';
+    return 'UserModel(id: $id, name: $name, email: $email, role: $role, phone: $phone, image: $image, partnerStatus: $partnerStatus)';
   }
 
   @override
@@ -221,13 +241,23 @@ class _$UserModelImpl implements _UserModel {
             (identical(other.email, email) || other.email == email) &&
             (identical(other.role, role) || other.role == role) &&
             (identical(other.phone, phone) || other.phone == phone) &&
-            (identical(other.image, image) || other.image == image));
+            (identical(other.image, image) || other.image == image) &&
+            (identical(other.partnerStatus, partnerStatus) ||
+                other.partnerStatus == partnerStatus));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode =>
-      Object.hash(runtimeType, id, name, email, role, phone, image);
+  int get hashCode => Object.hash(
+    runtimeType,
+    id,
+    name,
+    email,
+    role,
+    phone,
+    image,
+    partnerStatus,
+  );
 
   /// Create a copy of UserModel
   /// with the given fields replaced by the non-null parameter values.
@@ -251,6 +281,7 @@ abstract class _UserModel implements UserModel {
     required final String role,
     final String? phone,
     final String? image,
+    final String? partnerStatus,
   }) = _$UserModelImpl;
 
   factory _UserModel.fromJson(Map<String, dynamic> json) =
@@ -267,7 +298,10 @@ abstract class _UserModel implements UserModel {
   @override
   String? get phone;
   @override
-  String? get image;
+  String? get image; // ADR-046b — denormalized Partner.verificationStatus, decoupled from `role`. `null` means
+  // no Service Provider application has ever been started ("NOT_APPLIED").
+  @override
+  String? get partnerStatus;
 
   /// Create a copy of UserModel
   /// with the given fields replaced by the non-null parameter values.

@@ -71,3 +71,29 @@ Map<String, dynamic> _$$PartnerActiveSessionImplToJson(
   'distanceMeters': instance.distanceMeters,
   'etaMinutes': instance.etaMinutes,
 };
+
+_$PartnerHistorySessionImpl _$$PartnerHistorySessionImplFromJson(
+  Map<String, dynamic> json,
+) => _$PartnerHistorySessionImpl(
+  id: json['id'] as String,
+  alertId: json['alertId'] as String,
+  status: json['status'] as String,
+  riderName: json['riderName'] as String,
+  alertType: json['alertType'] as String,
+  completedAt: json['completedAt'] as String?,
+  cancelledAt: json['cancelledAt'] as String?,
+  rating: (json['rating'] as num?)?.toInt(),
+);
+
+Map<String, dynamic> _$$PartnerHistorySessionImplToJson(
+  _$PartnerHistorySessionImpl instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'alertId': instance.alertId,
+  'status': instance.status,
+  'riderName': instance.riderName,
+  'alertType': instance.alertType,
+  'completedAt': instance.completedAt,
+  'cancelledAt': instance.cancelledAt,
+  'rating': instance.rating,
+};

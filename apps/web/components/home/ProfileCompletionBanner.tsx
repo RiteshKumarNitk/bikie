@@ -18,7 +18,9 @@ export function ProfileCompletionBanner() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    if (session?.user.role !== "RENTER") return;
+    // ADR-046b: every account has baseline Rider capability now (RENTER by default, dual-capable
+    // once approved as a Service Provider too) — only ADMIN has no Rider profile to complete.
+    if (session?.user.role === "ADMIN") return;
     fetch("/api/rider-profile")
       .then((r) => r.json())
       .then((data: { showCompletionReminder?: boolean }) => setShow(Boolean(data.showCompletionReminder)))

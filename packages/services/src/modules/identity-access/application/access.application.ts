@@ -44,6 +44,14 @@ export function createAccessApplication(ports: IdentityAccessPorts) {
       return hasPermission(session!.role, permission) ? ALLOWED : denied("FORBIDDEN");
     },
 
+    /** ADR-046b — Service Provider capability, decoupled from `role`. A dual-capability account
+     * still passes this the same way whether it's currently RENTER or was ever PARTNER. */
+    evaluatePartnerCapability(session: SessionSnapshot | null | undefined): AccessDecision {
+      const sessionDecision = evaluateSession(session);
+      if (!sessionDecision.allowed) return sessionDecision;
+      return session!.partnerStatus === "APPROVED" ? ALLOWED : denied("PARTNER_NOT_APPROVED");
+    },
+
     /** Admins bypass membership — they monitor the network without buying a plan. */
     async evaluateMembership(session: SessionSnapshot | null | undefined): Promise<AccessDecision> {
       const sessionDecision = evaluateSession(session);

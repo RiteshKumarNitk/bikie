@@ -46,6 +46,12 @@ export const partnerProfileSchema = z
     // --- ADR-044: explicit opt-in to be dispatched SOS categories outside this partner's own
     // `type` (e.g. a FUEL_DELIVERY partner receiving a MEDICAL emergency) ---
     isGeneralResponder: z.boolean().optional(),
+    // --- ADR-046b: application photos/documents, all uploaded via the existing POST /api/upload
+    // (Cloudinary, image-only) and passed here as URLs, same pattern as Bike.gallery/Trip.gallery ---
+    profilePhotoUrl: optionalString(500),
+    shopPhotoUrls: z.array(z.string().max(500)).max(8).optional(),
+    identityDocumentUrl: optionalString(500),
+    businessDocumentUrl: optionalString(500),
   })
   .superRefine((data, ctx) => {
     // Cross-field: a map pin without both coordinates is a bug, not a valid partial state —
@@ -85,6 +91,25 @@ export const partnerProfileSchema = z
   });
 
 export type PartnerProfileInput = z.infer<typeof partnerProfileSchema>;
+
+/** ADR-046b — `POST /api/admin/partners/[id]` verification-decision body. `reason` is required
+ * for every action except APPROVE (a clean approval needs no explanation back to the applicant). */
+export const partnerVerificationActionSchema = z
+  .object({
+    action: z.enum(["APPROVE", "REJECT", "REQUEST_INFO", "SUSPEND", "RESTORE"]),
+    reason: z.string().min(1).max(1000).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.action !== "APPROVE" && !data.reason) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["reason"],
+        message: "A reason is required for this action",
+      });
+    }
+  });
+
+export type PartnerVerificationActionInput = z.infer<typeof partnerVerificationActionSchema>;
 
 /** GET /api/partners/nearby query params — public "find a service provider" (ADR-036). */
 export const nearbyPartnersQuerySchema = z.object({

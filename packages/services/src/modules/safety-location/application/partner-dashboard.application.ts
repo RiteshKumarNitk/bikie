@@ -1,4 +1,4 @@
-import type { PartnerActiveSessionDTO, PartnerNearbyRequestDTO, PartnerSosDashboardDTO } from "@bikie/types";
+import type { PartnerActiveSessionDTO, PartnerHistorySessionDTO, PartnerNearbyRequestDTO, PartnerSosDashboardDTO } from "@bikie/types";
 import { haversineDistanceMeters } from "../domain/eta";
 import { partnerMatchesAlertType } from "../domain/partner-mapping";
 import { getReputationModule, type ReputationApplication } from "../../reputation/public";
@@ -95,7 +95,22 @@ export function createPartnerDashboardApplication(
     };
   }
 
-  return { getDashboard, listNearbyOpenRequests, listActiveAssistance };
+  /** ADR-046b — "Completed Assistance"/"Assistance History". */
+  async function listHistory(userId: string): Promise<PartnerHistorySessionDTO[]> {
+    const sessions = await ports.sosSessions.listHistorySessionsForHelper(userId);
+    return sessions.map((s) => ({
+      id: s.sessionId,
+      alertId: s.alertId,
+      status: s.status,
+      riderName: s.riderName,
+      alertType: s.alertType,
+      completedAt: s.completedAt?.toISOString() ?? null,
+      cancelledAt: s.cancelledAt?.toISOString() ?? null,
+      rating: s.rating,
+    }));
+  }
+
+  return { getDashboard, listNearbyOpenRequests, listActiveAssistance, listHistory };
 }
 
 export type PartnerDashboardApplication = ReturnType<typeof createPartnerDashboardApplication>;

@@ -54,4 +54,8 @@ export const SOSSessionService = {
   listActiveAssistance(userId: string) {
     return getSafetyLocationModule().partnerDashboard.listActiveAssistance(userId);
   },
+  // --- ADR-046b: Completed Assistance / Assistance History ---
+  listHistory(userId: string) {
+    return getSafetyLocationModule().partnerDashboard.listHistory(userId);
+  },
 };

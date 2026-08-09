@@ -6,6 +6,8 @@ export type SessionSnapshot = {
   role?: string | null;
   accountStatus?: string | null;
   accountStatusExpiresAt?: string | Date | null;
+  // ADR-046b — denormalized Partner.verificationStatus, decoupled from `role`.
+  partnerStatus?: string | null;
 };
 
 export interface MembershipPort {

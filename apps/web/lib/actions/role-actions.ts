@@ -3,6 +3,7 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { SELECTED_ROLE_COOKIE, isSafeNext, type SelectedRole } from "@/lib/role";
+import { getServerSession } from "@/lib/get-session";
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
@@ -26,4 +27,25 @@ export async function selectRole(role: SelectedRole, next?: string) {
   });
   const target = isSafeNext(next) && next !== "/" ? next : "/login";
   redirect(target);
+}
+
+/** ADR-046b — the post-auth "Switch Mode" control. Server-verifies capability before allowing
+ * PARTNER (never trusts the client to only call this when it's actually approved) and redirects
+ * straight to the target dashboard, same round-trip-a-redirect approach `middleware.ts` uses so
+ * the new cookie value is visible to the destination page's own `cookies()` read immediately. */
+export async function switchActiveMode(mode: SelectedRole) {
+  const session = await getServerSession();
+  if (!session) redirect("/login");
+
+  if (mode === "PARTNER" && session.user.partnerStatus !== "APPROVED") {
+    redirect("/dashboard/become-provider");
+  }
+
+  const store = await cookies();
+  store.set(SELECTED_ROLE_COOKIE, mode, {
+    path: "/",
+    maxAge: ONE_YEAR_SECONDS,
+    sameSite: "lax",
+  });
+  redirect(mode === "PARTNER" ? "/partner" : "/dashboard");
 }

@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { AdminService, BikeService } from "@bikie/services";
 import { createBikeSchema } from "@bikie/validation";
-import { requireRole } from "@/lib/require-role";
+import { requireApprovedPartner } from "@/lib/require-role";
 
 export async function GET() {
-  const { session, error } = await requireRole("PARTNER");
+  const { session, error } = await requireApprovedPartner();
   if (error) return error;
 
   const bikes = await BikeService.getByOwner(session.user.id);
@@ -19,7 +19,7 @@ export async function GET() {
  * `/api/admin/bikes`, so a real (non-admin) partner got a 403 trying to add a bike at all.
  */
 export async function POST(request: Request) {
-  const { session, error } = await requireRole("PARTNER");
+  const { session, error } = await requireApprovedPartner();
   if (error) return error;
 
   const parsed = createBikeSchema.safeParse(await request.json());

@@ -131,6 +131,7 @@ export function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partia
       countSessionsForHelperSince: vi.fn(async () => 0),
       countActiveSessionsForHelper: vi.fn(async () => 0),
       listActiveSessionsForHelper: vi.fn(async () => []),
+      listHistorySessionsForHelper: vi.fn(async () => []),
     },
     sosTimeline: {
       record: vi.fn(async () => undefined),

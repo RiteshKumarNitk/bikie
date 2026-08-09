@@ -13,6 +13,20 @@ enum UserRole {
   ADMIN
 }
 
+/** ADR-046b — Partner (Service Provider) application/verification state, decoupled from
+ * `User.role` so one account can hold Rider capability (always) and Service Provider capability
+ * (only once APPROVED) at the same time. "NOT_APPLIED" isn't a stored value — it's represented by
+ * the absence of a `Partner` row entirely; every reader that needs all 7 conceptual states surfaces
+ * that as `status: "NOT_APPLIED"` at the API layer. */
+enum PartnerVerificationStatus {
+  DRAFT
+  PENDING_VERIFICATION
+  MORE_INFORMATION_REQUIRED
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
 enum BikeCategory {
   ADVENTURE
   CRUISER
@@ -243,6 +257,11 @@ enum NotificationType {
   MODERATION_ACTION
   SOS_ALERT
   SYSTEM
+  // --- ADR-046b: Service Provider application/verification decisions ---
+  PARTNER_APPLICATION_APPROVED
+  PARTNER_APPLICATION_REJECTED
+  PARTNER_APPLICATION_INFO_REQUESTED
+  PARTNER_APPLICATION_SUSPENDED
 }
 
 // --- Better Auth core models ---
@@ -262,6 +281,12 @@ model User {
   phoneNumber         String?   @unique
   phoneNumberVerified Boolean?  @default(false)
   role          UserRole  @default(RENTER)
+  // ADR-046b — denormalized copy of `Partner.verificationStatus`, kept in sync on every write to
+  // the `Partner` row (same pattern as `phone` mirroring the phone-number plugin's field). Exists
+  // so a Better Auth session can expose `session.user.partnerStatus` cheaply (registered in
+  // `packages/auth/src/server.ts`'s `additionalFields`, same mechanism as `role`/`accountStatus`)
+  // without every route needing a second query. `Partner` itself remains the source of truth.
+  partnerStatus PartnerVerificationStatus?
   accountStatus          UserAccountStatus @default(ACTIVE)
   accountStatusExpiresAt DateTime?
   lastActiveAt  DateTime?
@@ -519,7 +544,24 @@ model Partner {
   city         String
   description  String?
   logoUrl      String?
+  // ADR-046b — kept true iff `verificationStatus === APPROVED`, written in the same
+  // transaction as every status change. Left in place (rather than replaced outright) so every
+  // pre-existing verified/available/type-matched SOS-eligibility query that already reads this
+  // boolean needs zero changes; `verificationStatus` is the new source of truth.
   isVerified   Boolean     @default(false)
+  verificationStatus PartnerVerificationStatus @default(DRAFT)
+  rejectionReason    String?
+  // Holds the current reject/more-info/suspend note shown back to the applicant. The full
+  // decision history (who, when, which action) lives in `AuditLog` (entity: "Partner"), not a
+  // second table here.
+  reviewNote         String?
+  submittedAt        DateTime?
+  reviewedAt         DateTime?
+  reviewedByUserId   String?
+  profilePhotoUrl    String?
+  shopPhotoUrls      String[] @default([])
+  identityDocumentUrl String?
+  businessDocumentUrl String?
   ratingAvg    Decimal     @default(0) @db.Decimal(2, 1)
   ratingCount  Int         @default(0)
   // --- Added in ADR-014 (client-provided onboarding field list) ---
@@ -547,6 +589,7 @@ model Partner {
   @@index([city])
   @@index([latitude, longitude])
   @@index([isAvailable])
+  @@index([verificationStatus])
 }
 
 // --- Bookings & reviews ---

@@ -111,19 +111,37 @@ reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md
 | `/api/wishlist/[bikeId]` | POST | Add a bike to the wishlist (idempotent upsert). `{ success: true }` |
 | `/api/wishlist/[bikeId]` | DELETE | Remove a bike from the wishlist. `{ success: true }` |
 
-## Partner (role: PARTNER)
+## Partner (capability: approved Service Provider — ADR-046b)
+
+Gated by `requireApprovedPartner()` (`session.user.partnerStatus === "APPROVED"`), not a role
+check — any account can hold this capability alongside its baseline Rider access. See
+"Become a Service Provider" below for how capability is obtained.
 
 | Route | Method | Notes |
 |---|---|---|
 | `/api/partner/bikes` | GET/POST | Partner's fleet |
 | `/api/partner/bookings` | GET | Bookings across the partner's bikes |
 | `/api/partner/dashboard` | GET | `{ stats: PartnerDashboardStatsDTO }` (previously mis-documented as `partner/analytics`) |
-| `/api/partner/profile` | GET/PUT | Partner business profile (`businessName`, `type`, `city`, `description`, `addressLine`/`area`/`pincode`, `latitude`/`longitude`, `governmentIdType`/`governmentIdNumber` — ADR-036, superseding the old `aadhaarNumber` field). PUT now also accepts `isGeneralResponder` (ADR-044) — opts a partner into receiving SOS categories with no natural partner-type mapping (accident/medical/life-threatening/lost/other). |
+| `/api/partner/profile` | GET/PUT | Partner business profile (`businessName`, `type`, `city`, `description`, `addressLine`/`area`/`pincode`, `latitude`/`longitude`, `governmentIdType`/`governmentIdNumber` — ADR-036, superseding the old `aadhaarNumber` field). PUT now also accepts `isGeneralResponder` (ADR-044). **ADR-046b**: GET requires APPROVED; **PUT requires only a session** (any authenticated user — this is how a Rider starts/edits a Service Provider application) and 409s with `{error: "NOT_EDITABLE", status}` while `PENDING_VERIFICATION`/`APPROVED`/`SUSPENDED` (must go through an explicit transition first). |
 | `/api/partner/reviews` | GET | See Reviews above |
 | `/api/partner/availability` | PATCH | ADR-044. `{isAvailable: boolean}` → `{isAvailable}`. Drives the mobile app's 🟢 AVAILABLE / ⚫ OFFLINE toggle — `isAvailable: false` (default) means this partner is never dispatched an SOS request regardless of type/radius match. |
 | `/api/partner/sos/dashboard` | GET | ADR-044. `?lat=&lng=` optional (omitting it just reports `activeRequests: 0`). `{ stats: PartnerSosDashboardDTO }` — `activeRequests`, `todayAssistanceCount`, `completedCount`, `ratingAvg`, `ratingCount`. |
 | `/api/partner/sos/nearby` | GET | ADR-044. `?lat=&lng=` required. `{ requests: PartnerNearbyRequestDTO[] }` — open (unassigned), type-eligible SOS alerts within 25km. Empty (not an error) if the partner is unverified or offline. ADR-045: also excludes alerts this partner has already offered on or declined. |
 | `/api/partner/sos/active` | GET | ADR-044. `{ sessions: PartnerActiveSessionDTO[] }` — this partner's current `SOSSession`s as the assigned helper. |
+| `/api/partner/sos/history` | GET | ADR-046b. `{ sessions: PartnerHistorySessionDTO[] }` — this partner's finished (COMPLETED/CANCELLED) sessions, newest first. |
+
+### Become a Service Provider (session required — ADR-046b)
+
+How Partner capability is actually obtained: any authenticated account (Rider by default)
+fills out `PUT /api/partner/profile` (creates the row as `DRAFT`), submits it, and an admin
+approves/rejects/requests-more-info/suspends it via `/api/admin/partners/[id]`. Never an
+instant self-service flip — see `.docs/DECISIONS.md` ADR-046b.
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/partner/application` | GET | Session-only, every verification state. `{ status: PartnerVerificationStatus, profile: PartnerProfileDTO \| null }` — `status: "NOT_APPLIED"` (never stored) when `profile` is `null`. |
+| `/api/partner/application/submit` | POST | `DRAFT \| MORE_INFORMATION_REQUIRED → PENDING_VERIFICATION`. `400 INCOMPLETE` if `businessName`/`type`/`city` are missing, `409 INVALID_TRANSITION` from any other state. |
+| `/api/partner/application/reapply` | POST | `REJECTED → DRAFT`, clearing the rejection reason but keeping every previously-entered field. `409 INVALID_TRANSITION` from any other state. |
 
 ## Partners (public, ADR-036)
 
@@ -135,7 +153,7 @@ reusing the existing messaging system — see ARCHITECTURE.md). See DECISIONS.md
 
 | Route | Method | Notes |
 |---|---|---|
-| `/api/sos/alerts` | GET/POST | List active alerts / send a new one. **Rider/Admin only** — ADR-046: a `PARTNER` caller gets `403 { error: "Forbidden" }` on both methods; Service Providers use `/api/partner/sos/*` below plus the singular `GET /api/sos/alerts/[id]` for their own accept/decline flow. **GET** `?lat=&lng=` (ADR-042) — a GPS radius (25km, plain Haversine) around the caller, replacing the old `?city=` exact-string match; non-admin callers without both get `400 { error: "LOCATION_REQUIRED", message }` (ADMIN sees every active alert network-wide, unfiltered, same as before). `SOSAlertDTO` now also includes `severity` (server-derived from `type`, never client input), `escalationTier`, `currentRadiusMeters`, `assignedHelperId`, and (ADR-038) `placeName`/`area`/`formattedAddress` — a best-effort reverse-geocoded address resolved once from `latitude`/`longitude` at creation time (null if the lookup failed/timed out; every reader falls back to `city`/raw coordinates in that case). ADR-044 additionally joins `riderVehicleType`/`riderVehicleBrand`/`riderVehicleModel` from the reporter's `RiderProfile` (all nullable — most riders never fill this in). ADR-045: `userPhone`/`userEmail`/`latitude`/`longitude`/`placeName`/`area`/`formattedAddress` are `null` for any viewer who is not the alert's reporter, its assigned helper, or an admin — see `.docs/SOS.md` §6. This GET also attaches a server-computed `distanceMeters` per alert now (previously computed internally for radius filtering, then discarded). `requireMembership()` returns `403 { error: "MEMBERSHIP_REQUIRED", message }` if the caller has no active membership. **POST** still takes `city` (free text, stored for display only now — no longer used to decide who can see the alert) and runs `SOSDispatchService.fanOut`, which now only immediately covers emergency contacts + optional `SOS_EMERGENCY_SERVICES_*` + tier-1 nearby riders (5km) — same-city partners are reached later, as the `SERVICE_PROVIDERS` escalation tier, not on every create. Response `dispatch` still carries `channels`/`escalatedToAdmins` (ADR-030's zero-recipient guarantee, preserved — see ADR-033 for the exact trigger-shape change) and per-channel counts. |
+| `/api/sos/alerts` | GET/POST | List active alerts / send a new one. Open to every membership-holding session — ADR-046b's dual-capability model means there's no such thing as an account with no Rider standing, so a Service Provider (who is always also a Rider) can still raise/browse their own SOS same as anyone; the Partner Dashboard simply never links here, using `/api/partner/sos/*` + the singular `GET /api/sos/alerts/[id]` for its own accept/decline flow instead. **GET** `?lat=&lng=` (ADR-042) — a GPS radius (25km, plain Haversine) around the caller, replacing the old `?city=` exact-string match; non-admin callers without both get `400 { error: "LOCATION_REQUIRED", message }` (ADMIN sees every active alert network-wide, unfiltered, same as before). `SOSAlertDTO` now also includes `severity` (server-derived from `type`, never client input), `escalationTier`, `currentRadiusMeters`, `assignedHelperId`, and (ADR-038) `placeName`/`area`/`formattedAddress` — a best-effort reverse-geocoded address resolved once from `latitude`/`longitude` at creation time (null if the lookup failed/timed out; every reader falls back to `city`/raw coordinates in that case). ADR-044 additionally joins `riderVehicleType`/`riderVehicleBrand`/`riderVehicleModel` from the reporter's `RiderProfile` (all nullable — most riders never fill this in). ADR-045: `userPhone`/`userEmail`/`latitude`/`longitude`/`placeName`/`area`/`formattedAddress` are `null` for any viewer who is not the alert's reporter, its assigned helper, or an admin — see `.docs/SOS.md` §6. This GET also attaches a server-computed `distanceMeters` per alert now (previously computed internally for radius filtering, then discarded). `requireMembership()` returns `403 { error: "MEMBERSHIP_REQUIRED", message }` if the caller has no active membership. **POST** still takes `city` (free text, stored for display only now — no longer used to decide who can see the alert) and runs `SOSDispatchService.fanOut`, which now only immediately covers emergency contacts + optional `SOS_EMERGENCY_SERVICES_*` + tier-1 nearby riders (5km) — same-city partners are reached later, as the `SERVICE_PROVIDERS` escalation tier, not on every create. Response `dispatch` still carries `channels`/`escalatedToAdmins` (ADR-030's zero-recipient guarantee, preserved — see ADR-033 for the exact trigger-shape change) and per-channel counts. |
 | `/api/sos/alerts/[id]` | GET | Alert detail + full timeline (`SOSTimelineEvent[]`). Same ADR-045 redaction as the list route above. |
 | `/api/sos/alerts/history` | GET | Auth required (no membership gate). Caller's past alerts, including resolved. |
 | `/api/sos/alerts/[id]/offer` | POST | Helper taps "I'm Coming." Optional `{latitude, longitude, message}` — distance/ETA computed straight-line if location given. Replaces `/respond`. When the caller's role is `PARTNER` (ADR-044), also gated on verified + available + type-eligible (`partnerMatchesAlertType`) + not already at capacity (1 concurrent active session as helper): `403` (`NOT_VERIFIED`) or `409` (`PARTNER_OFFLINE`/`CATEGORY_MISMATCH`/`AT_CAPACITY`). Belt-and-suspenders — dispatch already only notifies eligible partners. |
@@ -281,7 +299,9 @@ There is no dedicated "members" route — the room's real member list is the sam
 | `/api/admin/overview` | GET | `{ stats: AdminOverviewStatsDTO }` |
 | `/api/admin/users` | GET | |
 | `/api/admin/users/[id]` | PATCH/DELETE | Update role / delete user |
-| `/api/admin/partners` | GET | |
+| `/api/admin/partners` | GET | `{ partners: AdminPartnerRowDTO[] }` — now includes `verificationStatus` (ADR-046b), not a boolean. |
+| `/api/admin/partners/[id]` | GET | ADR-046b. `AdminPartnerDetailDTO` — full profile, owning user, and `AuditLog`-backed verification history. |
+| `/api/admin/partners/[id]` | PATCH | ADR-046b, **replaces** the old `{isVerified: boolean}` toggle. Body: `{ action: "APPROVE" \| "REJECT" \| "REQUEST_INFO" \| "SUSPEND" \| "RESTORE", reason? }` (`reason` required for every action except `APPROVE`). Validated state transition — `409 { error: "INVALID_TRANSITION" }` if illegal for the current status. Notifies the applicant (`NotificationService`) and audit-logs (`{action}_PARTNER_APPLICATION`). |
 | `/api/admin/bikes` | GET/POST | |
 | `/api/admin/bikes/[id]` | PATCH/DELETE | |
 | `/api/admin/bookings` | GET | |

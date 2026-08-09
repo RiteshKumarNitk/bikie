@@ -18,8 +18,15 @@ export const AdminService = {
   getAllPartners() {
     return getAdministrationModule().admin.getAllPartners();
   },
-  updatePartnerVerification(partnerId: string, isVerified: boolean) {
-    return getAdministrationModule().admin.updatePartnerVerification(partnerId, isVerified);
+  getPartnerDetail(partnerId: string) {
+    return getAdministrationModule().admin.getPartnerDetail(partnerId);
+  },
+  transitionPartnerVerification(
+    partnerId: string,
+    action: "APPROVE" | "REJECT" | "REQUEST_INFO" | "SUSPEND" | "RESTORE",
+    opts: { reason?: string; adminUserId: string },
+  ) {
+    return getAdministrationModule().admin.transitionPartnerVerification(partnerId, action, opts);
   },
   deletePartner(partnerId: string) {
     return getAdministrationModule().admin.deletePartner(partnerId);

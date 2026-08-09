@@ -540,7 +540,17 @@ mixin _$PartnerProfileSummary {
   double? get latitude => throw _privateConstructorUsedError;
   double? get longitude => throw _privateConstructorUsedError;
   String? get governmentIdType => throw _privateConstructorUsedError;
-  String? get governmentIdNumber => throw _privateConstructorUsedError;
+  String? get governmentIdNumber =>
+      throw _privateConstructorUsedError; // --- ADR-046b: application/verification state ---
+  String? get verificationStatus => throw _privateConstructorUsedError;
+  String? get rejectionReason => throw _privateConstructorUsedError;
+  String? get reviewNote => throw _privateConstructorUsedError;
+  String? get submittedAt => throw _privateConstructorUsedError;
+  String? get reviewedAt => throw _privateConstructorUsedError;
+  String? get profilePhotoUrl => throw _privateConstructorUsedError;
+  List<String> get shopPhotoUrls => throw _privateConstructorUsedError;
+  String? get identityDocumentUrl => throw _privateConstructorUsedError;
+  String? get businessDocumentUrl => throw _privateConstructorUsedError;
 
   /// Serializes this PartnerProfileSummary to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -578,6 +588,15 @@ abstract class $PartnerProfileSummaryCopyWith<$Res> {
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    String? verificationStatus,
+    String? rejectionReason,
+    String? reviewNote,
+    String? submittedAt,
+    String? reviewedAt,
+    String? profilePhotoUrl,
+    List<String> shopPhotoUrls,
+    String? identityDocumentUrl,
+    String? businessDocumentUrl,
   });
 }
 
@@ -617,6 +636,15 @@ class _$PartnerProfileSummaryCopyWithImpl<
     Object? longitude = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
+    Object? verificationStatus = freezed,
+    Object? rejectionReason = freezed,
+    Object? reviewNote = freezed,
+    Object? submittedAt = freezed,
+    Object? reviewedAt = freezed,
+    Object? profilePhotoUrl = freezed,
+    Object? shopPhotoUrls = null,
+    Object? identityDocumentUrl = freezed,
+    Object? businessDocumentUrl = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -692,6 +720,42 @@ class _$PartnerProfileSummaryCopyWithImpl<
                 ? _value.governmentIdNumber
                 : governmentIdNumber // ignore: cast_nullable_to_non_nullable
                       as String?,
+            verificationStatus: freezed == verificationStatus
+                ? _value.verificationStatus
+                : verificationStatus // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            rejectionReason: freezed == rejectionReason
+                ? _value.rejectionReason
+                : rejectionReason // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            reviewNote: freezed == reviewNote
+                ? _value.reviewNote
+                : reviewNote // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            submittedAt: freezed == submittedAt
+                ? _value.submittedAt
+                : submittedAt // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            reviewedAt: freezed == reviewedAt
+                ? _value.reviewedAt
+                : reviewedAt // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            profilePhotoUrl: freezed == profilePhotoUrl
+                ? _value.profilePhotoUrl
+                : profilePhotoUrl // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            shopPhotoUrls: null == shopPhotoUrls
+                ? _value.shopPhotoUrls
+                : shopPhotoUrls // ignore: cast_nullable_to_non_nullable
+                      as List<String>,
+            identityDocumentUrl: freezed == identityDocumentUrl
+                ? _value.identityDocumentUrl
+                : identityDocumentUrl // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            businessDocumentUrl: freezed == businessDocumentUrl
+                ? _value.businessDocumentUrl
+                : businessDocumentUrl // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -726,6 +790,15 @@ abstract class _$$PartnerProfileSummaryImplCopyWith<$Res>
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    String? verificationStatus,
+    String? rejectionReason,
+    String? reviewNote,
+    String? submittedAt,
+    String? reviewedAt,
+    String? profilePhotoUrl,
+    List<String> shopPhotoUrls,
+    String? identityDocumentUrl,
+    String? businessDocumentUrl,
   });
 }
 
@@ -762,6 +835,15 @@ class __$$PartnerProfileSummaryImplCopyWithImpl<$Res>
     Object? longitude = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
+    Object? verificationStatus = freezed,
+    Object? rejectionReason = freezed,
+    Object? reviewNote = freezed,
+    Object? submittedAt = freezed,
+    Object? reviewedAt = freezed,
+    Object? profilePhotoUrl = freezed,
+    Object? shopPhotoUrls = null,
+    Object? identityDocumentUrl = freezed,
+    Object? businessDocumentUrl = freezed,
   }) {
     return _then(
       _$PartnerProfileSummaryImpl(
@@ -837,6 +919,42 @@ class __$$PartnerProfileSummaryImplCopyWithImpl<$Res>
             ? _value.governmentIdNumber
             : governmentIdNumber // ignore: cast_nullable_to_non_nullable
                   as String?,
+        verificationStatus: freezed == verificationStatus
+            ? _value.verificationStatus
+            : verificationStatus // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        rejectionReason: freezed == rejectionReason
+            ? _value.rejectionReason
+            : rejectionReason // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        reviewNote: freezed == reviewNote
+            ? _value.reviewNote
+            : reviewNote // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        submittedAt: freezed == submittedAt
+            ? _value.submittedAt
+            : submittedAt // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        reviewedAt: freezed == reviewedAt
+            ? _value.reviewedAt
+            : reviewedAt // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        profilePhotoUrl: freezed == profilePhotoUrl
+            ? _value.profilePhotoUrl
+            : profilePhotoUrl // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        shopPhotoUrls: null == shopPhotoUrls
+            ? _value._shopPhotoUrls
+            : shopPhotoUrls // ignore: cast_nullable_to_non_nullable
+                  as List<String>,
+        identityDocumentUrl: freezed == identityDocumentUrl
+            ? _value.identityDocumentUrl
+            : identityDocumentUrl // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        businessDocumentUrl: freezed == businessDocumentUrl
+            ? _value.businessDocumentUrl
+            : businessDocumentUrl // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -864,7 +982,16 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
     this.longitude,
     this.governmentIdType,
     this.governmentIdNumber,
-  });
+    this.verificationStatus,
+    this.rejectionReason,
+    this.reviewNote,
+    this.submittedAt,
+    this.reviewedAt,
+    this.profilePhotoUrl,
+    final List<String> shopPhotoUrls = const [],
+    this.identityDocumentUrl,
+    this.businessDocumentUrl,
+  }) : _shopPhotoUrls = shopPhotoUrls;
 
   factory _$PartnerProfileSummaryImpl.fromJson(Map<String, dynamic> json) =>
       _$$PartnerProfileSummaryImplFromJson(json);
@@ -905,10 +1032,36 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
   final String? governmentIdType;
   @override
   final String? governmentIdNumber;
+  // --- ADR-046b: application/verification state ---
+  @override
+  final String? verificationStatus;
+  @override
+  final String? rejectionReason;
+  @override
+  final String? reviewNote;
+  @override
+  final String? submittedAt;
+  @override
+  final String? reviewedAt;
+  @override
+  final String? profilePhotoUrl;
+  final List<String> _shopPhotoUrls;
+  @override
+  @JsonKey()
+  List<String> get shopPhotoUrls {
+    if (_shopPhotoUrls is EqualUnmodifiableListView) return _shopPhotoUrls;
+    // ignore: implicit_dynamic_type
+    return EqualUnmodifiableListView(_shopPhotoUrls);
+  }
+
+  @override
+  final String? identityDocumentUrl;
+  @override
+  final String? businessDocumentUrl;
 
   @override
   String toString() {
-    return 'PartnerProfileSummary(businessName: $businessName, type: $type, isVerified: $isVerified, isAvailable: $isAvailable, isGeneralResponder: $isGeneralResponder, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber)';
+    return 'PartnerProfileSummary(businessName: $businessName, type: $type, isVerified: $isVerified, isAvailable: $isAvailable, isGeneralResponder: $isGeneralResponder, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, verificationStatus: $verificationStatus, rejectionReason: $rejectionReason, reviewNote: $reviewNote, submittedAt: $submittedAt, reviewedAt: $reviewedAt, profilePhotoUrl: $profilePhotoUrl, shopPhotoUrls: $shopPhotoUrls, identityDocumentUrl: $identityDocumentUrl, businessDocumentUrl: $businessDocumentUrl)';
   }
 
   @override
@@ -947,12 +1100,32 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
             (identical(other.governmentIdType, governmentIdType) ||
                 other.governmentIdType == governmentIdType) &&
             (identical(other.governmentIdNumber, governmentIdNumber) ||
-                other.governmentIdNumber == governmentIdNumber));
+                other.governmentIdNumber == governmentIdNumber) &&
+            (identical(other.verificationStatus, verificationStatus) ||
+                other.verificationStatus == verificationStatus) &&
+            (identical(other.rejectionReason, rejectionReason) ||
+                other.rejectionReason == rejectionReason) &&
+            (identical(other.reviewNote, reviewNote) ||
+                other.reviewNote == reviewNote) &&
+            (identical(other.submittedAt, submittedAt) ||
+                other.submittedAt == submittedAt) &&
+            (identical(other.reviewedAt, reviewedAt) ||
+                other.reviewedAt == reviewedAt) &&
+            (identical(other.profilePhotoUrl, profilePhotoUrl) ||
+                other.profilePhotoUrl == profilePhotoUrl) &&
+            const DeepCollectionEquality().equals(
+              other._shopPhotoUrls,
+              _shopPhotoUrls,
+            ) &&
+            (identical(other.identityDocumentUrl, identityDocumentUrl) ||
+                other.identityDocumentUrl == identityDocumentUrl) &&
+            (identical(other.businessDocumentUrl, businessDocumentUrl) ||
+                other.businessDocumentUrl == businessDocumentUrl));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     runtimeType,
     businessName,
     type,
@@ -972,7 +1145,16 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
     longitude,
     governmentIdType,
     governmentIdNumber,
-  );
+    verificationStatus,
+    rejectionReason,
+    reviewNote,
+    submittedAt,
+    reviewedAt,
+    profilePhotoUrl,
+    const DeepCollectionEquality().hash(_shopPhotoUrls),
+    identityDocumentUrl,
+    businessDocumentUrl,
+  ]);
 
   /// Create a copy of PartnerProfileSummary
   /// with the given fields replaced by the non-null parameter values.
@@ -1012,6 +1194,15 @@ abstract class _PartnerProfileSummary implements PartnerProfileSummary {
     final double? longitude,
     final String? governmentIdType,
     final String? governmentIdNumber,
+    final String? verificationStatus,
+    final String? rejectionReason,
+    final String? reviewNote,
+    final String? submittedAt,
+    final String? reviewedAt,
+    final String? profilePhotoUrl,
+    final List<String> shopPhotoUrls,
+    final String? identityDocumentUrl,
+    final String? businessDocumentUrl,
   }) = _$PartnerProfileSummaryImpl;
 
   factory _PartnerProfileSummary.fromJson(Map<String, dynamic> json) =
@@ -1052,7 +1243,25 @@ abstract class _PartnerProfileSummary implements PartnerProfileSummary {
   @override
   String? get governmentIdType;
   @override
-  String? get governmentIdNumber;
+  String? get governmentIdNumber; // --- ADR-046b: application/verification state ---
+  @override
+  String? get verificationStatus;
+  @override
+  String? get rejectionReason;
+  @override
+  String? get reviewNote;
+  @override
+  String? get submittedAt;
+  @override
+  String? get reviewedAt;
+  @override
+  String? get profilePhotoUrl;
+  @override
+  List<String> get shopPhotoUrls;
+  @override
+  String? get identityDocumentUrl;
+  @override
+  String? get businessDocumentUrl;
 
   /// Create a copy of PartnerProfileSummary
   /// with the given fields replaced by the non-null parameter values.
@@ -1060,4 +1269,194 @@ abstract class _PartnerProfileSummary implements PartnerProfileSummary {
   @JsonKey(includeFromJson: false, includeToJson: false)
   _$$PartnerProfileSummaryImplCopyWith<_$PartnerProfileSummaryImpl>
   get copyWith => throw _privateConstructorUsedError;
+}
+
+PartnerApplication _$PartnerApplicationFromJson(Map<String, dynamic> json) {
+  return _PartnerApplication.fromJson(json);
+}
+
+/// @nodoc
+mixin _$PartnerApplication {
+  String get status => throw _privateConstructorUsedError;
+  PartnerProfileSummary? get profile => throw _privateConstructorUsedError;
+
+  /// Serializes this PartnerApplication to a JSON map.
+  Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
+
+  /// Create a copy of PartnerApplication
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  $PartnerApplicationCopyWith<PartnerApplication> get copyWith =>
+      throw _privateConstructorUsedError;
+}
+
+/// @nodoc
+abstract class $PartnerApplicationCopyWith<$Res> {
+  factory $PartnerApplicationCopyWith(
+    PartnerApplication value,
+    $Res Function(PartnerApplication) then,
+  ) = _$PartnerApplicationCopyWithImpl<$Res, PartnerApplication>;
+  @useResult
+  $Res call({String status, PartnerProfileSummary? profile});
+
+  $PartnerProfileSummaryCopyWith<$Res>? get profile;
+}
+
+/// @nodoc
+class _$PartnerApplicationCopyWithImpl<$Res, $Val extends PartnerApplication>
+    implements $PartnerApplicationCopyWith<$Res> {
+  _$PartnerApplicationCopyWithImpl(this._value, this._then);
+
+  // ignore: unused_field
+  final $Val _value;
+  // ignore: unused_field
+  final $Res Function($Val) _then;
+
+  /// Create a copy of PartnerApplication
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? status = null, Object? profile = freezed}) {
+    return _then(
+      _value.copyWith(
+            status: null == status
+                ? _value.status
+                : status // ignore: cast_nullable_to_non_nullable
+                      as String,
+            profile: freezed == profile
+                ? _value.profile
+                : profile // ignore: cast_nullable_to_non_nullable
+                      as PartnerProfileSummary?,
+          )
+          as $Val,
+    );
+  }
+
+  /// Create a copy of PartnerApplication
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @pragma('vm:prefer-inline')
+  $PartnerProfileSummaryCopyWith<$Res>? get profile {
+    if (_value.profile == null) {
+      return null;
+    }
+
+    return $PartnerProfileSummaryCopyWith<$Res>(_value.profile!, (value) {
+      return _then(_value.copyWith(profile: value) as $Val);
+    });
+  }
+}
+
+/// @nodoc
+abstract class _$$PartnerApplicationImplCopyWith<$Res>
+    implements $PartnerApplicationCopyWith<$Res> {
+  factory _$$PartnerApplicationImplCopyWith(
+    _$PartnerApplicationImpl value,
+    $Res Function(_$PartnerApplicationImpl) then,
+  ) = __$$PartnerApplicationImplCopyWithImpl<$Res>;
+  @override
+  @useResult
+  $Res call({String status, PartnerProfileSummary? profile});
+
+  @override
+  $PartnerProfileSummaryCopyWith<$Res>? get profile;
+}
+
+/// @nodoc
+class __$$PartnerApplicationImplCopyWithImpl<$Res>
+    extends _$PartnerApplicationCopyWithImpl<$Res, _$PartnerApplicationImpl>
+    implements _$$PartnerApplicationImplCopyWith<$Res> {
+  __$$PartnerApplicationImplCopyWithImpl(
+    _$PartnerApplicationImpl _value,
+    $Res Function(_$PartnerApplicationImpl) _then,
+  ) : super(_value, _then);
+
+  /// Create a copy of PartnerApplication
+  /// with the given fields replaced by the non-null parameter values.
+  @pragma('vm:prefer-inline')
+  @override
+  $Res call({Object? status = null, Object? profile = freezed}) {
+    return _then(
+      _$PartnerApplicationImpl(
+        status: null == status
+            ? _value.status
+            : status // ignore: cast_nullable_to_non_nullable
+                  as String,
+        profile: freezed == profile
+            ? _value.profile
+            : profile // ignore: cast_nullable_to_non_nullable
+                  as PartnerProfileSummary?,
+      ),
+    );
+  }
+}
+
+/// @nodoc
+@JsonSerializable()
+class _$PartnerApplicationImpl implements _PartnerApplication {
+  const _$PartnerApplicationImpl({required this.status, this.profile});
+
+  factory _$PartnerApplicationImpl.fromJson(Map<String, dynamic> json) =>
+      _$$PartnerApplicationImplFromJson(json);
+
+  @override
+  final String status;
+  @override
+  final PartnerProfileSummary? profile;
+
+  @override
+  String toString() {
+    return 'PartnerApplication(status: $status, profile: $profile)';
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return identical(this, other) ||
+        (other.runtimeType == runtimeType &&
+            other is _$PartnerApplicationImpl &&
+            (identical(other.status, status) || other.status == status) &&
+            (identical(other.profile, profile) || other.profile == profile));
+  }
+
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  int get hashCode => Object.hash(runtimeType, status, profile);
+
+  /// Create a copy of PartnerApplication
+  /// with the given fields replaced by the non-null parameter values.
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  @override
+  @pragma('vm:prefer-inline')
+  _$$PartnerApplicationImplCopyWith<_$PartnerApplicationImpl> get copyWith =>
+      __$$PartnerApplicationImplCopyWithImpl<_$PartnerApplicationImpl>(
+        this,
+        _$identity,
+      );
+
+  @override
+  Map<String, dynamic> toJson() {
+    return _$$PartnerApplicationImplToJson(this);
+  }
+}
+
+abstract class _PartnerApplication implements PartnerApplication {
+  const factory _PartnerApplication({
+    required final String status,
+    final PartnerProfileSummary? profile,
+  }) = _$PartnerApplicationImpl;
+
+  factory _PartnerApplication.fromJson(Map<String, dynamic> json) =
+      _$PartnerApplicationImpl.fromJson;
+
+  @override
+  String get status;
+  @override
+  PartnerProfileSummary? get profile;
+
+  /// Create a copy of PartnerApplication
+  /// with the given fields replaced by the non-null parameter values.
+  @override
+  @JsonKey(includeFromJson: false, includeToJson: false)
+  _$$PartnerApplicationImplCopyWith<_$PartnerApplicationImpl> get copyWith =>
+      throw _privateConstructorUsedError;
 }

@@ -1,20 +1,29 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
+import type { AdminPartnerRowDTO } from "@bikie/types";
 
-interface AdminPartner {
-  id: string;
-  businessName: string;
-  type: string;
-  city: string;
-  isVerified: boolean;
-  ratingAvg: number;
-  ratingCount: number;
-  owner: { name: string; email: string };
-}
+const STATUS_STYLES: Record<string, string> = {
+  APPROVED: "bg-success/15 text-success",
+  PENDING_VERIFICATION: "bg-warning/15 text-warning",
+  MORE_INFORMATION_REQUIRED: "bg-warning/15 text-warning",
+  DRAFT: "bg-foreground/10 text-foreground/60",
+  REJECTED: "bg-red-500/15 text-red-400",
+  SUSPENDED: "bg-red-500/15 text-red-400",
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  APPROVED: "Approved",
+  PENDING_VERIFICATION: "Pending verification",
+  MORE_INFORMATION_REQUIRED: "Info requested",
+  DRAFT: "Draft",
+  REJECTED: "Rejected",
+  SUSPENDED: "Suspended",
+};
 
 export default function AdminPartnersPage() {
-  const [partners, setPartners] = useState<AdminPartner[]>([]);
+  const [partners, setPartners] = useState<AdminPartnerRowDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -24,15 +33,6 @@ export default function AdminPartnersPage() {
       .then((r) => r.json())
       .then((data) => { setPartners(data.partners); setLoading(false); });
   }, []);
-
-  async function handleToggleVerify(id: string, current: boolean) {
-    await fetch(`/api/admin/partners/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ isVerified: !current }),
-    });
-    setPartners((prev) => prev.map((p) => (p.id === id ? { ...p, isVerified: !current } : p)));
-  }
 
   async function handleDelete(id: string) {
     await fetch(`/api/admin/partners/${id}`, { method: "DELETE" });
@@ -68,8 +68,8 @@ export default function AdminPartnersPage() {
       <div className="mt-4 space-y-3">
         {filtered.map((partner) => (
           <div key={partner.id} className="flex items-center justify-between rounded-2xl border border-foreground/10 bg-card p-5">
-            <div className="min-w-0 flex-1">
-              <p className="font-medium">{partner.businessName}</p>
+            <Link href={`/admin/partners/${partner.id}`} className="min-w-0 flex-1">
+              <p className="font-medium hover:underline">{partner.businessName}</p>
               <p className="text-sm text-foreground/50">
                 {partner.type.replace(/_/g, " ")} · {partner.city} · {partner.owner.email}
               </p>
@@ -77,19 +77,14 @@ export default function AdminPartnersPage() {
                 Owner: {partner.owner.name}
                 {partner.ratingCount > 0 && ` · ★ ${partner.ratingAvg.toFixed(1)} (${partner.ratingCount})`}
               </p>
-            </div>
+            </Link>
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={() => handleToggleVerify(partner.id, partner.isVerified)}
-                className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                  partner.isVerified
-                    ? "bg-success/15 text-success hover:bg-success/25"
-                    : "bg-warning/15 text-warning hover:bg-warning/25"
-                }`}
+              <Link
+                href={`/admin/partners/${partner.id}`}
+                className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${STATUS_STYLES[partner.verificationStatus] ?? "bg-foreground/10"}`}
               >
-                {partner.isVerified ? "Verified" : "Pending"}
-              </button>
+                {STATUS_LABELS[partner.verificationStatus] ?? partner.verificationStatus}
+              </Link>
               <button
                 type="button"
                 onClick={() => setDeletingId(partner.id)}

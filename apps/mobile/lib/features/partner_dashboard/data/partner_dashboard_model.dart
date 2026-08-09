@@ -47,3 +47,20 @@ class PartnerActiveSession with _$PartnerActiveSession {
 
   factory PartnerActiveSession.fromJson(Map<String, dynamic> json) => _$PartnerActiveSessionFromJson(json);
 }
+
+/// Mirrors `PartnerHistorySessionDTO` (ADR-046b) — "Completed Assistance"/"Assistance History".
+@freezed
+class PartnerHistorySession with _$PartnerHistorySession {
+  const factory PartnerHistorySession({
+    required String id,
+    required String alertId,
+    required String status,
+    required String riderName,
+    required String alertType,
+    String? completedAt,
+    String? cancelledAt,
+    int? rating,
+  }) = _PartnerHistorySession;
+
+  factory PartnerHistorySession.fromJson(Map<String, dynamic> json) => _$PartnerHistorySessionFromJson(json);
+}

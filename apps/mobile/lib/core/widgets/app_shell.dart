@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../features/auth/domain/auth_controller.dart';
+import '../../features/auth/domain/role_provider.dart';
 import '../../features/partner_dashboard/presentation/widgets/partner_availability_banner.dart';
 
 /// Which bottom-nav tab a given `matchedLocation` selects — pure, so ADR-044's role-based tab
@@ -43,7 +44,9 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isPartner = ref.watch(authControllerProvider.select((s) => s.user?.role == 'PARTNER'));
+    final partnerStatus = ref.watch(authControllerProvider.select((s) => s.user?.partnerStatus));
+    final storedMode = ref.watch(activeModeProvider);
+    final isPartner = resolveActiveMode(partnerStatus, storedMode) == 'PARTNER';
     final tabs = isPartner ? partnerTabs : riderTabs;
     final destinations = isPartner ? _partnerDestinations : _riderDestinations;
 

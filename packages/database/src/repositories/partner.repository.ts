@@ -2,7 +2,7 @@ import { prisma } from "../client";
 import { haversineDistanceMeters } from "../lib/geo";
 import { countBookingsByStatus, sumCompletedBookingRevenue } from "./booking.repository";
 
-function toDTO(partner: {
+export function toPartnerDTO(partner: {
   id: string;
   businessName: string;
   type: string;
@@ -25,6 +25,15 @@ function toDTO(partner: {
   governmentIdNumber: string | null;
   isAvailable: boolean;
   isGeneralResponder: boolean;
+  verificationStatus: string;
+  rejectionReason: string | null;
+  reviewNote: string | null;
+  submittedAt: Date | null;
+  reviewedAt: Date | null;
+  profilePhotoUrl: string | null;
+  shopPhotoUrls: string[];
+  identityDocumentUrl: string | null;
+  businessDocumentUrl: string | null;
 }) {
   return {
     id: partner.id,
@@ -49,36 +58,58 @@ function toDTO(partner: {
     governmentIdNumber: partner.governmentIdNumber,
     isAvailable: partner.isAvailable,
     isGeneralResponder: partner.isGeneralResponder,
+    verificationStatus: partner.verificationStatus as
+      | "DRAFT"
+      | "PENDING_VERIFICATION"
+      | "MORE_INFORMATION_REQUIRED"
+      | "APPROVED"
+      | "REJECTED"
+      | "SUSPENDED",
+    rejectionReason: partner.rejectionReason,
+    reviewNote: partner.reviewNote,
+    submittedAt: partner.submittedAt?.toISOString() ?? null,
+    reviewedAt: partner.reviewedAt?.toISOString() ?? null,
+    profilePhotoUrl: partner.profilePhotoUrl,
+    shopPhotoUrls: partner.shopPhotoUrls,
+    identityDocumentUrl: partner.identityDocumentUrl,
+    businessDocumentUrl: partner.businessDocumentUrl,
   };
 }
 
 export async function findPartnerByUserId(userId: string) {
   const partner = await prisma.partner.findUnique({ where: { userId } });
-  return partner ? toDTO(partner) : null;
+  return partner ? toPartnerDTO(partner) : null;
 }
 
-export async function upsertPartnerProfile(
-  userId: string,
-  data: {
-    businessName: string;
-    type: string;
-    city: string;
-    description?: string;
-    contactPerson1Name?: string;
-    contactPerson1Mobile?: string;
-    contactPerson2Name?: string;
-    contactPerson2Mobile?: string;
-    addressLine?: string;
-    area?: string;
-    pincode?: string;
-    latitude?: number;
-    longitude?: number;
-    governmentIdType?: string;
-    governmentIdNumber?: string;
-    isGeneralResponder?: boolean;
-  },
-) {
-  const shared = {
+export type PartnerProfileWriteInput = {
+  businessName: string;
+  type: string;
+  city: string;
+  description?: string;
+  contactPerson1Name?: string;
+  contactPerson1Mobile?: string;
+  contactPerson2Name?: string;
+  contactPerson2Mobile?: string;
+  addressLine?: string;
+  area?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
+  governmentIdType?: string;
+  governmentIdNumber?: string;
+  isGeneralResponder?: boolean;
+  profilePhotoUrl?: string;
+  shopPhotoUrls?: string[];
+  identityDocumentUrl?: string;
+  businessDocumentUrl?: string;
+};
+
+// Deliberately never touches verificationStatus/isVerified/reviewedAt/etc. — a brand-new row
+// gets `verificationStatus: DRAFT` from the schema default; an existing row's status is only
+// ever advanced by submitPartnerApplication/reapplyPartner (self-service) or
+// adminRepository.transitionPartnerVerification (admin), never by a profile-field edit.
+function toUpsertData(data: PartnerProfileWriteInput) {
+  return {
     businessName: data.businessName,
     type: data.type as any,
     city: data.city,
@@ -95,13 +126,99 @@ export async function upsertPartnerProfile(
     governmentIdType: data.governmentIdType as any,
     governmentIdNumber: data.governmentIdNumber,
     isGeneralResponder: data.isGeneralResponder,
+    profilePhotoUrl: data.profilePhotoUrl,
+    ...(data.shopPhotoUrls ? { shopPhotoUrls: data.shopPhotoUrls } : {}),
+    identityDocumentUrl: data.identityDocumentUrl,
+    businessDocumentUrl: data.businessDocumentUrl,
   };
+}
+
+export async function upsertPartnerProfile(userId: string, data: PartnerProfileWriteInput) {
+  const shared = toUpsertData(data);
   const partner = await prisma.partner.upsert({
     where: { userId },
     create: { userId, ...shared },
     update: shared,
   });
-  return toDTO(partner);
+  return toPartnerDTO(partner);
+}
+
+export type PartnerProfileWriteResult =
+  | { ok: true; partner: ReturnType<typeof toPartnerDTO> }
+  | { ok: false; reason: "NOT_EDITABLE"; status: string };
+
+const EDITABLE_STATUSES = new Set(["DRAFT", "MORE_INFORMATION_REQUIRED", "REJECTED"]);
+
+/** Guarded write for the self-service profile form (`PUT /api/partner/profile`) — a submitted
+ * application (PENDING_VERIFICATION), an already-approved one, or a suspended one must go
+ * through an explicit transition (reapply, admin action) before its fields can change again. A
+ * brand-new applicant (no row yet) always passes — `findUnique` returns `null`, and creating the
+ * row also seeds `User.partnerStatus` to DRAFT so a session read reflects "has started an
+ * application" from the very first save. */
+export async function upsertPartnerProfileIfEditable(
+  userId: string,
+  data: Parameters<typeof upsertPartnerProfile>[1],
+): Promise<PartnerProfileWriteResult> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.partner.findUnique({ where: { userId }, select: { verificationStatus: true } });
+    if (existing && !EDITABLE_STATUSES.has(existing.verificationStatus)) {
+      return { ok: false, reason: "NOT_EDITABLE", status: existing.verificationStatus };
+    }
+    const shared = toUpsertData(data);
+    const partner = await tx.partner.upsert({
+      where: { userId },
+      create: { userId, ...shared },
+      update: shared,
+    });
+    if (!existing) {
+      await tx.user.update({ where: { id: userId }, data: { partnerStatus: "DRAFT" } });
+    }
+    return { ok: true, partner: toPartnerDTO(partner) };
+  });
+}
+
+export type SubmitApplicationResult =
+  | { ok: true; partner: ReturnType<typeof toPartnerDTO> }
+  | { ok: false; reason: "NOT_FOUND" | "INVALID_TRANSITION" | "INCOMPLETE"; status?: string };
+
+/** DRAFT | MORE_INFORMATION_REQUIRED -> PENDING_VERIFICATION. */
+export async function submitPartnerApplication(userId: string): Promise<SubmitApplicationResult> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.partner.findUnique({ where: { userId } });
+    if (!existing) return { ok: false, reason: "NOT_FOUND" };
+    if (existing.verificationStatus !== "DRAFT" && existing.verificationStatus !== "MORE_INFORMATION_REQUIRED") {
+      return { ok: false, reason: "INVALID_TRANSITION", status: existing.verificationStatus };
+    }
+    if (!existing.businessName || !existing.type || !existing.city) {
+      return { ok: false, reason: "INCOMPLETE" };
+    }
+    const partner = await tx.partner.update({
+      where: { userId },
+      data: { verificationStatus: "PENDING_VERIFICATION", submittedAt: new Date(), reviewNote: null },
+    });
+    await tx.user.update({ where: { id: userId }, data: { partnerStatus: "PENDING_VERIFICATION" } });
+    return { ok: true, partner: toPartnerDTO(partner) };
+  });
+}
+
+export type ReapplyResult =
+  | { ok: true; partner: ReturnType<typeof toPartnerDTO> }
+  | { ok: false; reason: "NOT_FOUND" | "INVALID_TRANSITION" };
+
+/** REJECTED -> DRAFT, clearing the rejection reason/review timestamps but keeping every
+ * previously-entered field as an editable starting point. */
+export async function reapplyPartner(userId: string): Promise<ReapplyResult> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.partner.findUnique({ where: { userId } });
+    if (!existing) return { ok: false, reason: "NOT_FOUND" };
+    if (existing.verificationStatus !== "REJECTED") return { ok: false, reason: "INVALID_TRANSITION" };
+    const partner = await tx.partner.update({
+      where: { userId },
+      data: { verificationStatus: "DRAFT", rejectionReason: null, reviewNote: null, reviewedAt: null, reviewedByUserId: null },
+    });
+    await tx.user.update({ where: { id: userId }, data: { partnerStatus: "DRAFT" } });
+    return { ok: true, partner: toPartnerDTO(partner) };
+  });
 }
 
 export async function getPartnerDashboardStats(userId: string) {

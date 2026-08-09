@@ -10,6 +10,26 @@ export function createPartnerApplication(ports: PartnersPorts) {
       return ports.partners.upsertProfile(userId, data);
     },
 
+    /** ADR-046b — the guarded write `PUT /api/partner/profile` calls. */
+    upsertProfileIfEditable(userId: string, data: PartnerProfileInput) {
+      return ports.partners.upsertProfileIfEditable(userId, data);
+    },
+
+    /** `GET /api/partner/application` — the one read the "Become a Service Provider" flow
+     * polls. `status: "NOT_APPLIED"` (never stored) when there's no Partner row yet. */
+    async getApplication(userId: string) {
+      const profile = await ports.partners.findByUserId(userId);
+      return { status: profile?.verificationStatus ?? ("NOT_APPLIED" as const), profile };
+    },
+
+    submitApplication(userId: string) {
+      return ports.partners.submitApplication(userId);
+    },
+
+    reapply(userId: string) {
+      return ports.partners.reapply(userId);
+    },
+
     getDashboardStats(userId: string) {
       return ports.partners.getDashboardStats(userId);
     },

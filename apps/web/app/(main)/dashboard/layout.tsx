@@ -34,6 +34,10 @@ const navGroups = [
       { label: "Nearby Riders", href: "/dashboard/nearby" },
       { label: "Membership", href: "/dashboard/membership" },
       { label: "Profile", href: "/dashboard/settings" },
+      // ADR-046b — one entry point for every state (start an application, resume a draft,
+      // check pending/rejected/suspended status). Approved partners use the "Switch Mode"
+      // control instead; this link still works for them too (redirects into /partner).
+      { label: "Become a Service Provider", href: "/dashboard/become-provider" },
     ]
   }
 ];

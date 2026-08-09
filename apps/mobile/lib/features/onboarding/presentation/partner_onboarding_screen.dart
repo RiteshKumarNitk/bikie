@@ -129,15 +129,18 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
             governmentIdNumber: _governmentIdNumber.text,
           ));
       // Refresh unconditionally (not just when `name` changed) — the very first call into this
-      // save path for a brand-new signup is also the moment the account's role actually flips
-      // RENTER -> PARTNER server-side; app_router.dart's `isPartner` branch needs the app's local
-      // auth state to reflect that immediately, not just after an incidental name update.
+      // save path for a brand-new signup is also the moment `partnerStatus` actually moves
+      // NOT_APPLIED -> DRAFT server-side (ADR-046b); app_router.dart's `isPartner` branch and
+      // the Profile tab both need the app's local auth state to reflect that immediately, not
+      // just after an incidental name update. `role` itself is never touched here anymore.
       await ref.read(authControllerProvider.notifier).refreshSession();
       if (!mounted) return;
       if (_isEditMode) {
         context.pop();
       } else {
-        context.go('/');
+        // ADR-046b: saving no longer grants capability — land on the application-status screen
+        // (which shows the draft/submit step next) instead of the Home route.
+        context.go('/become-provider');
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);

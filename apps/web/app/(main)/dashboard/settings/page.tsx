@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import type { RiderProfileDTO } from "@bikie/types";
 import { getServerSession } from "@/lib/get-session";
 import { getJson } from "@/lib/api";
 import { ProfileSettings } from "@/components/dashboard/ProfileSettings";
 import { RiderDetailsSettings } from "@/components/dashboard/RiderDetailsSettings";
-import { BecomeServiceProviderAction } from "@/components/dashboard/BecomeServiceProviderAction";
 import { PushNotificationToggle } from "@/components/dashboard/PushNotificationToggle";
 import { RiderLocationToggle } from "@/components/dashboard/RiderLocationToggle";
 import { ReceiveSosAlertsToggle } from "@/components/dashboard/ReceiveSosAlertsToggle";
@@ -66,15 +66,21 @@ export default async function DashboardSettingsPage() {
         </div>
       </section>
 
-      {session?.user.role === "RENTER" && (
+      {session?.user.partnerStatus !== "APPROVED" && (
         <section className="mt-6 rounded-3xl bg-card p-6">
           <p className="font-semibold">Become a Service Provider</p>
           <p className="mt-2 text-sm text-foreground/60">
-            List your bikes, offer services, or organize rides as a partner. You&apos;ll need to
-            re-verify your phone number and add a few business details.
+            List your bikes, offer roadside assistance, and grow your business with BIKIE —
+            without losing your Rider account. Complete a short application and an admin will
+            review it.
           </p>
           <div className="mt-4">
-            <BecomeServiceProviderAction />
+            <Link
+              href="/dashboard/become-provider"
+              className="inline-block rounded-xl border border-accent/30 bg-accent/[0.04] px-5 py-2.5 text-sm font-medium text-accent-text transition-colors hover:bg-accent/10"
+            >
+              {session?.user.partnerStatus ? "View application status" : "Become a Service Provider"}
+            </Link>
           </div>
         </section>
       )}

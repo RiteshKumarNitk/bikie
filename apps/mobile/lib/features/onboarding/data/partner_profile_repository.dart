@@ -27,14 +27,33 @@ class PartnerProfileRepository {
     return apiGuard(() => _dio.put('/api/partner/profile', data: _toRequestJson(input)));
   }
 
-  /// ADR-044 — `null` only if this account has no `Partner` row yet (shouldn't happen once past
-  /// onboarding, but the API allows it since `PartnerService.getProfile` can return `null`).
+  /// ADR-044 — approved-partner-only (`requireApprovedPartner()` server-side). `null` only if
+  /// this account has no `Partner` row yet, which shouldn't happen for an approved caller.
   Future<PartnerProfileSummary?> getProfile() {
     return apiGuard(() async {
       final res = await _dio.get('/api/partner/profile');
       final profile = res.data['profile'];
       return profile == null ? null : PartnerProfileSummary.fromJson(profile as Map<String, dynamic>);
     });
+  }
+
+  /// ADR-046b — session-only (works for every verification state, unlike `getProfile()` above).
+  /// The one read the "Become a Service Provider" screen polls.
+  Future<PartnerApplication> getApplication() {
+    return apiGuard(() async {
+      final res = await _dio.get('/api/partner/application');
+      return PartnerApplication.fromJson(res.data as Map<String, dynamic>);
+    });
+  }
+
+  /// DRAFT | MORE_INFORMATION_REQUIRED -> PENDING_VERIFICATION.
+  Future<void> submitApplication() {
+    return apiGuard(() => _dio.post('/api/partner/application/submit'));
+  }
+
+  /// REJECTED -> DRAFT, keeping previously-entered fields editable.
+  Future<void> reapply() {
+    return apiGuard(() => _dio.post('/api/partner/application/reapply'));
   }
 
   Map<String, dynamic> _toRequestJson(PartnerProfileInput input) {
