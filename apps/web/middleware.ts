@@ -55,11 +55,19 @@ export default async function middleware(request: NextRequest) {
 
   const isPartnerRoute = isPathOrSubpath(pathname, "/partner");
   const isAdminRoute = isPathOrSubpath(pathname, "/admin");
+  const isDashboardRoute = isPathOrSubpath(pathname, "/dashboard");
 
   if (isPartnerRoute && role !== "PARTNER") {
     return NextResponse.redirect(new URL(dashboardHomeForRole(role), url));
   }
   if (isAdminRoute && role !== "ADMIN") {
+    return NextResponse.redirect(new URL(dashboardHomeForRole(role), url));
+  }
+  // A Service Provider must never land on the Rider dashboard — that's where SOS
+  // *creation* (Red/Amber panic cards) lives, a Rider-only capability. ADMIN is
+  // intentionally exempt (see dashboardHomeForRole above — admins get the rider
+  // experience outside of /admin by design).
+  if (isDashboardRoute && role === "PARTNER") {
     return NextResponse.redirect(new URL(dashboardHomeForRole(role), url));
   }
 

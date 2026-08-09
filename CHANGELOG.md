@@ -1,5 +1,29 @@
 # Changelog
 
+## Fixed — Service Provider registration & dashboard audit (ADR-046)
+- **Fixed** (the reported bug): a brand-new phone number registering as a Service Provider had its
+  role correctly set on the server, but the mobile app never refreshed its own local session
+  afterward — so it kept showing the Rider Home, Rider bottom-nav tabs, and (if reached) the
+  Red/Amber SOS-*creation* screen instead of the Partner Dashboard, until the app was restarted.
+  Fixed by refreshing the app's session state immediately after the role upgrade completes.
+- **Fixed** (found during the same audit, defense-in-depth): mobile's bare `/sos` route and web's
+  `/dashboard/*` were both still reachable by a Service Provider outside normal navigation (a
+  deep-link fallback, a typed URL, the homepage's SOS CTA) and would show the Rider SOS-creation
+  UI. Both now redirect Partners to their own dashboard. The backend `GET/POST /api/sos/alerts`
+  (Rider browse/create) now also rejects a Partner caller directly, closing the same gap at the
+  API level, not just in the UI.
+- **New**: mobile's Partner Profile tab now shows a "Business Profile" editor (verification status,
+  same fields/route as onboarding) instead of the Rider-only tiles (Rider Details, Wishlist,
+  Membership) it previously showed to every role regardless of account type — matches what
+  `/partner/settings` already offered on web.
+- Confirmed several things already worked correctly and needed no fix: SOS eligibility filtering
+  for partners (ADR-044), `/partner/*` role-gating on both platforms, and existing-Partner login
+  (no staleness there — only the brand-new-signup path was affected).
+- Backend: 9/9 packages typecheck, 133/133 tests passing, no schema changes. Mobile: `flutter
+  analyze` clean, `flutter test` (110/110) passing.
+- **Not done**: a live device test walking a brand-new number through registration end to end —
+  worth your own verification given this is exactly the flow that was reported broken.
+
 ## New — SOS PII redaction, persisted decline, web Partner Dashboard, rider SOS opt-out (ADR-045)
 - **Fixed**: anyone browsing or viewing an SOS alert who wasn't the reporter, the eventually
   assigned helper, or an admin could see the reporter's exact phone number, email, and GPS

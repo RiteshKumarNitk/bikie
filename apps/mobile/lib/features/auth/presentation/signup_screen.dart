@@ -106,6 +106,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       if (_exists == false) {
         final role = ref.read(selectedRoleProvider);
         await ref.read(authRepositoryProvider).completePhoneSignup(role: role);
+        // completePhoneSignup() applies the chosen role server-side (RENTER -> PARTNER), but the
+        // AuthState this app already holds still carries the role from the OTP-verify response a
+        // moment ago (always RENTER for a brand-new account) — refresh it now so app_router.dart's
+        // `isPartner` check (and everything gated on it: Home, bottom nav, /sos/:id) is correct
+        // from the very first frame, instead of showing the Rider experience until the next
+        // restart/re-login.
+        await ref.read(authControllerProvider.notifier).refreshSession();
         // Brand-new account: collect the same profile details the website gathers post-signup
         // (mirrors web's role-based redirect in apps/web/app/(auth)/signup/page.tsx) — rider
         // profile is skippable, partner profile is not. Existing users never reach this branch.

@@ -17,6 +17,7 @@ import '../../features/messaging/presentation/conversations_list_screen.dart';
 import '../../features/nearby_riders/presentation/nearby_riders_screen.dart';
 import '../../features/partners/presentation/partners_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
+import '../../features/onboarding/data/partner_profile_model.dart';
 import '../../features/onboarding/presentation/intro_screen.dart';
 import '../../features/onboarding/presentation/partner_onboarding_screen.dart';
 import '../../features/onboarding/presentation/rider_onboarding_screen.dart';
@@ -118,7 +119,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
       GoRoute(path: '/requests', builder: (context, state) => const RideRequestsScreen()),
       GoRoute(path: '/wishlist', builder: (context, state) => const WishlistScreen()),
-      GoRoute(path: '/sos', builder: (context, state) => const SosScreen()),
+      // ADR-044/audit fix: `/sos` is the Rider SOS *creation* screen (Red/Amber panic cards) — a
+      // Service Provider must never land here (deep-link fallback, a stale bookmark, a typed
+      // URL). Route them to their own Requests list instead, same branching approach as `/`
+      // and `/sos/:id` below.
+      GoRoute(path: '/sos', builder: (context, state) => isPartner ? const PartnerRequestsScreen() : const SosScreen()),
       GoRoute(path: '/sos/nearby-riders', builder: (context, state) => const NearbyRidersScreen()),
       GoRoute(path: '/partners', builder: (context, state) => const PartnersScreen()),
       GoRoute(path: '/sos/history', builder: (context, state) => const SosHistoryScreen()),
@@ -129,7 +134,10 @@ final routerProvider = Provider<GoRouter>((ref) {
             : SosDetailScreen(alertId: state.pathParameters['id']!),
       ),
       GoRoute(path: '/onboarding', builder: (context, state) => const RiderOnboardingScreen()),
-      GoRoute(path: '/partner-onboarding', builder: (context, state) => const PartnerOnboardingScreen()),
+      GoRoute(
+        path: '/partner-onboarding',
+        builder: (context, state) => PartnerOnboardingScreen(initialProfile: state.extra as PartnerProfileSummary?),
+      ),
       GoRoute(path: '/membership', builder: (context, state) => const MembershipScreen()),
       GoRoute(path: '/referrals', builder: (context, state) => const ReferralsScreen()),
       GoRoute(path: '/messages', builder: (context, state) => const ConversationsListScreen()),

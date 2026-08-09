@@ -1620,3 +1620,87 @@ changes:
   non-assigned browser truly can't see phone/email/exact coordinates; confirm an opted-out rider
   genuinely stops receiving SOS pushes).
 
+## ADR-046: Service Provider registration/dashboard audit — mobile role staleness, unguarded Rider surfaces
+
+- **Context.** A user-reported audit: a brand-new phone number couldn't register as a Service
+  Provider, and once registered, Partners were seeing the Rider's Red/Amber SOS-creation UI
+  instead of the Partner Dashboard built for exactly that in ADR-044/045. Both symptoms traced to
+  gaps that predate this ADR, not the ADR-044/045 dashboard work itself, which was already correct
+  where it was reachable.
+- **Root cause 1 (mobile, the actual registration bug).** `PATCH /api/user/complete-phone-signup`
+  correctly flips the new account's DB role `RENTER -> PARTNER`, but `signup_screen.dart`'s
+  `_verify()` never refreshed the app's own `authControllerProvider` state afterward — it kept the
+  `role: RENTER` snapshot from the OTP-verify response a moment earlier (every brand-new account
+  starts `RENTER` before the role step runs). `app_router.dart`'s `isPartner` branch (Home,
+  bottom-nav tab set, `/sos/:id`) reads that same local state, not the DB, so a freshly-registered
+  Partner kept seeing the full Rider experience — Home, tabs, and (via the unbranched `/sos` route,
+  root cause 2) the Red/Amber creation screen — until an unrelated `refreshSession()` call
+  happened to fire (only wired into `partner_onboarding_screen.dart`'s save path, and only when the
+  "Full name" field was non-empty) or the app restarted. Fixed: `signup_screen.dart` now calls
+  `refreshSession()` unconditionally right after `completePhoneSignup` succeeds; the onboarding
+  save path's own `refreshSession()` call is now also unconditional (previously gated on `name`
+  being non-empty), as defense-in-depth for the same screen's reuse as a profile editor (see below).
+  This is why "the role wasn't set correctly" appeared to be true from the UI even though the
+  server-side role assignment (`UserService.completePhoneSignup`) was, and remains, correct.
+- **Root cause 2 (mobile, defense-in-depth).** `app_router.dart` branched `/` and `/sos/:id` by
+  role (ADR-044) but left the bare `/sos` route — the Rider SOS *creation* screen
+  (`SosScreen()`) — unbranched. Not reachable from any Partner-side nav/button today, but reachable
+  via a typed URL, a stale bookmark, or `notification_deep_link.dart`'s own `alertId == null`
+  fallback. Fixed: branched the same way, routing a Partner to `PartnerRequestsScreen` instead.
+- **Root cause 3 (web, defense-in-depth).** `middleware.ts` gated `/partner` and `/admin` against
+  the wrong role but never gated `/dashboard` — the Rider dashboard, including SOS creation at
+  `/dashboard/sos` — against `PARTNER`. Not reachable from the Partner-aware `Navbar.tsx` (its
+  "Dashboard" link is already role-correct) under normal use, but reachable directly, e.g. the
+  homepage Hero's SOS CTA (unconditional, any logged-in role) or a bookmark. Fixed: `PARTNER`
+  visiting any `/dashboard/*` path is now redirected to `/partner`, mirroring the existing
+  `isPartnerRoute`/`isAdminRoute` pattern. ADMIN is deliberately exempt (unchanged — admins get the
+  Rider experience outside `/admin` by existing design, see `lib/role.ts`).
+- **Root cause 4 (backend authorization gap, both platforms).** `GET/POST /api/sos/alerts` — the
+  Rider SOS browse/create surface — only ever checked `requireMembership()`, with no role
+  exclusion. A Partner account could create or browse the unfiltered Rider SOS feed by calling the
+  API directly, bypassing every UI-level separation above. Fixed: both methods now 403 a `PARTNER`
+  caller. Confirmed safe to add: the Partner Dashboard (web `/partner/sos*`, mobile
+  `partner_dashboard/*`) never calls this bare route — it uses `/api/partner/sos/*` for
+  listing/stats and the singular `GET /api/sos/alerts/[id]` (untouched) plus `/offer`/`/decline`
+  for the accept flow, all left exactly as they were.
+- **Confirmed already correct, no change needed.** SOS eligibility filtering
+  (`partnerMatchesAlertType`, verified/available/capacity/radius — ADR-044) — a Service Provider
+  already only ever sees eligible requests via `/api/partner/sos/nearby`. `/partner/*` (web) and
+  the mobile Partner tab set/availability banner were already correctly role-gated server- and
+  client-side. Existing-Partner login (web and mobile) was already correct — an existing account's
+  OTP-verify response already carries its real DB role, so there was never a staleness window
+  there; only the brand-new-signup path (role changes *during* the session) was affected.
+- **Partner Profile parity (the session's other ask).** Web's Partner Profile section already had
+  everything asked for — Notifications (global bell), business-details edit-and-save
+  (`/partner/settings` → `PartnerSettingsForm.tsx`, reusing the same `PartnerBusinessFields` the
+  signup/onboarding forms use). Mobile's `ProfileScreen` was shared, unbranched, and Rider-only
+  (Rider Details/Wishlist/Membership/Service-Providers tiles, no business-profile editor at all)
+  — a Partner had no way to fix their shop details after onboarding short of re-running onboarding
+  itself, which didn't exist as a re-entrant flow. Fixed: `ProfileScreen` now branches into
+  `_RiderProfileSection`/`_PartnerProfileSection`; the Partner section adds a "Business Profile"
+  tile (verification-status subtitle) that reuses `PartnerOnboardingScreen` as an editor —
+  `initialProfile` (new, optional) pre-fills it from `GET /api/partner/profile` and swaps its
+  copy/navigation (`Save changes` + pop, vs. `Save & continue` + go-home) into edit mode, the same
+  reuse pattern web's own `/partner/settings` already established (one form, two callers). No new
+  backend route: same `PUT /api/partner/profile` onboarding always used.
+  `PartnerProfileSummary` (mobile) widened from a 5-field dashboard-only summary to mirror
+  `PartnerProfileDTO` in full, since the edit form needs the fields the dashboard never read
+  (city/address/contacts/government ID) — the server already returned them, only the mobile model
+  hadn't caught up. The persistent `PartnerAvailabilityBanner` (ADR-044) already covers
+  Available/Offline from every partner screen, so it wasn't duplicated into Profile too.
+- **Explicitly not changed.** The `/welcome -> /login -> "no account, sign up instead" -> /signup`
+  detour (ADR-014, both platforms) for a genuinely new number was investigated and found to work
+  correctly end-to-end (the `selectedRole` cookie/provider survives the detour) — confusing on
+  first encounter, but not a functional bug, and not touched here to avoid re-litigating an
+  explicit prior product decision. SOS business logic (eligibility, escalation, offer/accept/
+  session lifecycle) is untouched — every fix above is an authorization/state-freshness gap around
+  that logic, not a change to it. The Rider flow is untouched: no Rider-facing file was modified
+  except adding one role-aware branch to a Partner/Admin-only middleware check and one notification
+  link (both no-ops for Rider sessions).
+- **Consequences.** Backend: `pnpm turbo run typecheck` (9/9) and `pnpm exec vitest run`
+  (133/133, 15/15 files) clean, no schema changes. Mobile: `flutter analyze` clean (0 issues),
+  freezed/json codegen regenerated for the widened `PartnerProfileSummary`. Not done: a live
+  two-account test actually walking a brand-new number through registration on a real device —
+  same caveat as every prior SOS/Partner change in this project; verify this one especially
+  closely given it's precisely the flow that was reported broken.
+

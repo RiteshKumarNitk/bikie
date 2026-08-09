@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { NotificationDTO } from "@bikie/types";
+import { authClient } from "@/lib/auth-client";
 
 const POLL_INTERVAL_MS = 45_000;
 
@@ -33,6 +34,11 @@ function linkifyBody(body: string) {
 
 export function NotificationsTab({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
+  // The generic Rider SOS dashboard is off-limits to Service Provider accounts (they get their
+  // own /partner/sos) — route the "Open SOS dashboard" link accordingly instead of dead-ending
+  // a Partner who taps an SOS notification.
+  const { data: session } = authClient.useSession();
+  const sosDashboardHref = session?.user.role === "PARTNER" ? "/partner/sos" : "/dashboard/sos";
 
   useEffect(() => {
     let cancelled = false;
@@ -133,7 +139,7 @@ export function NotificationsTab({ userId }: { userId: string }) {
 
               {n.type === "SOS_ALERT" && n.entityId && (
                 <a
-                  href="/dashboard/sos"
+                  href={sosDashboardHref}
                   className="mt-2 ml-0 block w-fit text-xs font-medium text-accent-text hover:underline"
                   onClick={(e) => e.stopPropagation()}
                 >

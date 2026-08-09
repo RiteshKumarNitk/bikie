@@ -8,9 +8,22 @@ import { enforceRateLimit } from "@/lib/rate-limit";
 // for GET /api/partners/nearby.
 const ALERT_VISIBILITY_RADIUS_METERS = 25_000;
 
+// Service Providers get their own eligibility-filtered feed (`GET /api/partner/sos/nearby`) —
+// this generic browse/create surface is Rider (+ Admin monitoring) only. Belt-and-suspenders
+// alongside the UI-level separation (Partner dashboard never links here): without this, a
+// Partner account could still create/browse the Rider SOS feed by calling the API directly.
+function forbidPartner(session: { user: { role: string } }) {
+  if (session.user.role === "PARTNER") {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+  return null;
+}
+
 export async function GET(request: Request) {
   const { session, error } = await requireMembership();
   if (error) return error;
+  const partnerError = forbidPartner(session);
+  if (partnerError) return partnerError;
 
   const url = new URL(request.url);
   const parsed = sosActiveAlertsQuerySchema.safeParse(Object.fromEntries(url.searchParams));
@@ -46,6 +59,8 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   const { session, error } = await requireMembership();
   if (error) return error;
+  const partnerError = forbidPartner(session);
+  if (partnerError) return partnerError;
 
   // SOS alerts fan out to every connected client + SMS/WhatsApp/email — cap how often one
   // account can trigger that (real emergencies are rare; 5 per 5 minutes is generous

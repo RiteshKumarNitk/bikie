@@ -33,9 +33,9 @@ class PartnerProfileInput with _$PartnerProfileInput {
   factory PartnerProfileInput.fromJson(Map<String, dynamic> json) => _$PartnerProfileInputFromJson(json);
 }
 
-/// `GET /api/partner/profile` (ADR-044) — a read-only mirror of `PartnerProfileDTO`'s
-/// dashboard-relevant fields, not the full write shape `PartnerProfileInput` covers. First mobile
-/// caller of this GET route; previously the profile endpoint was write-only from the app's side.
+/// `GET /api/partner/profile` (ADR-044) — a mirror of `PartnerProfileDTO` (`packages/types`),
+/// used both for the dashboard's stats/availability read and (as of the Profile "Business
+/// Profile" editor) to pre-fill an edit of the same fields `PartnerProfileInput` writes.
 @freezed
 class PartnerProfileSummary with _$PartnerProfileSummary {
   const factory PartnerProfileSummary({
@@ -44,6 +44,19 @@ class PartnerProfileSummary with _$PartnerProfileSummary {
     required bool isVerified,
     required bool isAvailable,
     required bool isGeneralResponder,
+    String? city,
+    String? description,
+    String? contactPerson1Name,
+    String? contactPerson1Mobile,
+    String? contactPerson2Name,
+    String? contactPerson2Mobile,
+    String? addressLine,
+    String? area,
+    String? pincode,
+    double? latitude,
+    double? longitude,
+    String? governmentIdType,
+    String? governmentIdNumber,
   }) = _PartnerProfileSummary;
 
   factory PartnerProfileSummary.fromJson(Map<String, dynamic> json) => _$PartnerProfileSummaryFromJson(json);

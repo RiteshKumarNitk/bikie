@@ -1,5 +1,17 @@
 # BIKIE — Roadmap
 
+## Fixed: New Service Provider Registrations Stuck Showing the Rider Experience (2026-08-09, ADR-046)
+A brand-new mobile number registering as a Service Provider had its role correctly set to
+`PARTNER` server-side, but the mobile app never refreshed its own local session state afterward —
+so it kept showing the Rider Home/tabs/SOS-creation screen instead of the Partner Dashboard built
+for it, until a restart. Fixed by refreshing session state right after the role upgrade. Also
+closed three defense-in-depth gaps found during the same audit: an unbranched `/sos` route (mobile)
+and an ungated `/dashboard/*` (web) that could both still surface the Rider SOS-creation UI to a
+Partner outside normal navigation, and a backend `/api/sos/alerts` gap that let a Partner call the
+Rider SOS create/browse API directly. Mobile's Partner Profile tab also gained a Business Profile
+editor (mirroring web's existing `/partner/settings`), replacing the Rider-only tiles it
+previously showed to every role. See ADR-046.
+
 ## Fixed: Production Build Was Broken (2026-08-06, ADR-041)
 A Vercel deploy failed outright — `/login` crashed while prerendering (`window is not defined`)
 because `leaflet` was imported eagerly at module scope in `LocationPicker.tsx`/`PartnersMap.tsx`

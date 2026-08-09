@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../../notifications/domain/notification_providers.dart';
+import '../../onboarding/data/partner_profile_repository.dart';
 import '../data/profile_repository.dart';
 
 class ProfileScreen extends ConsumerWidget {
@@ -16,6 +17,8 @@ class ProfileScreen extends ConsumerWidget {
     final unreadNotifications = ref.watch(unreadNotificationCountProvider);
 
     if (user == null) return const SizedBox.shrink();
+
+    final isPartner = user.role == 'PARTNER';
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -38,24 +41,9 @@ class ProfileScreen extends ConsumerWidget {
             badgeCount: unreadNotifications,
             onTap: () => context.push('/notifications'),
           ),
-          _ProfileTile(
-            icon: Icons.badge_outlined,
-            label: 'Rider Details',
-            onTap: () => context.push('/onboarding'),
-          ),
-          _ProfileTile(
-            icon: Icons.storefront_outlined,
-            label: 'Service Providers',
-            onTap: () => context.push('/partners'),
-          ),
-          _ProfileTile(icon: Icons.favorite_border, label: 'Wishlist', onTap: () => context.push('/wishlist')),
-          _ProfileTile(
-            icon: Icons.workspace_premium_outlined,
-            label: 'Membership',
-            onTap: () => context.push('/membership'),
-          ),
-          _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
+          if (isPartner) ...const [_PartnerProfileSection()] else ...const [_RiderProfileSection()],
           _ProfileTile(icon: Icons.chat_bubble_outline, label: 'Messages', onTap: () => context.push('/messages')),
+          _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () => ref.read(authControllerProvider.notifier).signOut(),
@@ -68,19 +56,85 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
+/// The Rider-specific tiles — unchanged from before the Partner/Rider profile split, just
+/// extracted so `ProfileScreen` can swap them out for `_PartnerProfileSection` by role.
+class _RiderProfileSection extends StatelessWidget {
+  const _RiderProfileSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _ProfileTile(
+          icon: Icons.badge_outlined,
+          label: 'Rider Details',
+          onTap: () => context.push('/onboarding'),
+        ),
+        _ProfileTile(
+          icon: Icons.storefront_outlined,
+          label: 'Service Providers',
+          onTap: () => context.push('/partners'),
+        ),
+        _ProfileTile(icon: Icons.favorite_border, label: 'Wishlist', onTap: () => context.push('/wishlist')),
+        _ProfileTile(
+          icon: Icons.workspace_premium_outlined,
+          label: 'Membership',
+          onTap: () => context.push('/membership'),
+        ),
+      ],
+    );
+  }
+}
+
+/// Mirrors the web's `/partner/settings` (`PartnerSettingsForm.tsx`) from the Profile tab: a
+/// Business Profile tile (verification badge, opens the same business-details form onboarding
+/// uses, pre-filled for editing) plus the Available/Offline toggle already surfaced persistently
+/// in `PartnerAvailabilityBanner` above every partner screen — not duplicated here, just linked.
+class _PartnerProfileSection extends ConsumerWidget {
+  const _PartnerProfileSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profileAsync = ref.watch(partnerProfileSummaryProvider);
+
+    return Column(
+      children: [
+        _ProfileTile(
+          icon: Icons.storefront_outlined,
+          label: 'Business Profile',
+          subtitle: profileAsync.when(
+            data: (p) => p == null ? null : (p.isVerified ? 'Verified' : 'Verification pending'),
+            loading: () => null,
+            error: (_, __) => null,
+          ),
+          onTap: () async {
+            final profile = await ref.read(partnerProfileRepositoryProvider).getProfile();
+            if (context.mounted) {
+              await context.push('/partner-onboarding', extra: profile);
+              ref.invalidate(partnerProfileSummaryProvider);
+            }
+          },
+        ),
+      ],
+    );
+  }
+}
+
 class _ProfileTile extends StatelessWidget {
-  const _ProfileTile({required this.icon, required this.label, required this.onTap, this.badgeCount = 0});
+  const _ProfileTile({required this.icon, required this.label, required this.onTap, this.badgeCount = 0, this.subtitle});
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
   final int badgeCount;
+  final String? subtitle;
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
       leading: Icon(icon),
       title: Text(label),
+      subtitle: subtitle != null ? Text(subtitle!) : null,
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

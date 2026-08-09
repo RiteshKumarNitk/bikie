@@ -2,6 +2,24 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Service Provider registration/dashboard audit (2026-08-09, ADR-046)
+
+| Task | Status |
+|---|---|
+| **Root cause found**: a new mobile-number Partner signup applied the correct DB role but never refreshed the app's own local auth state, so the app kept showing the Rider experience (Home, tabs, SOS creation) until restart — reported as "role not set correctly" / "Partner sees Rider SOS" | Completed |
+| Mobile: `signup_screen.dart` calls `refreshSession()` unconditionally right after `completePhoneSignup` | Completed |
+| Mobile: `partner_onboarding_screen.dart`'s `refreshSession()` call made unconditional (was gated on the optional "Full name" field being filled) | Completed |
+| Mobile: bare `/sos` route (Rider SOS creation) branched by role in `app_router.dart` — Partner now routes to `PartnerRequestsScreen` (was reachable via deep-link fallback/typed URL, not any Partner nav) | Completed |
+| Web: `middleware.ts` now redirects `PARTNER` away from `/dashboard/*` (Rider dashboard incl. `/dashboard/sos`) to `/partner`, mirroring the existing `/partner`/`/admin` role gates. ADMIN unaffected (by existing design) | Completed |
+| Backend: `GET/POST /api/sos/alerts` (bare browse/create) now 403s a `PARTNER` caller — confirmed the Partner Dashboard never called this route (uses `/api/partner/sos/*` + the singular `/api/sos/alerts/[id]`, both untouched) | Completed |
+| Web: `NotificationsTab.tsx`'s "Open SOS dashboard" link is now role-aware (`/partner/sos` for Partners) so it doesn't dead-end after the middleware gate above | Completed |
+| Mobile: `ProfileScreen` now branches Rider vs. Partner tiles — Partner gets a "Business Profile" tile (verification badge) that reuses `PartnerOnboardingScreen` as a pre-filled editor (`initialProfile` param, new) instead of the Rider-only Rider-Details/Wishlist/Membership/Service-Providers tiles. Same `PUT /api/partner/profile` route, no new backend | Completed |
+| Mobile: `PartnerProfileSummary` widened to mirror `PartnerProfileDTO` in full (city/address/contacts/government ID) so the new edit form can prefill; freezed/json codegen regenerated | Completed |
+| **Confirmed already correct, no change**: SOS partner eligibility filtering (ADR-044), `/partner/*` web + mobile Partner tab role-gating, existing-Partner login on both platforms (no staleness — only the brand-new-signup path was affected) | Verified |
+| **Explicitly not changed**: the `/welcome → /login → "sign up instead" → /signup` detour (ADR-014) — investigated, confirmed to work correctly end-to-end despite being an extra tap; not touched to avoid re-litigating a prior explicit product decision | N/A |
+| Backend: `pnpm turbo run typecheck` (9/9), `pnpm exec vitest run` (133/133, 15/15 files) clean, no schema changes. Mobile: `flutter analyze` (0 issues), `flutter test` (110/110) | Completed |
+| Live device test of a brand-new mobile number through the full registration → Partner Dashboard flow | **Not done** — not verified in this environment; this is precisely the flow that was reported broken, verify closely |
+
 ## SOS audit remediation: PII redaction, persisted decline, web Partner Dashboard, rider SOS opt-out (2026-08-09, ADR-045)
 
 | Task | Status |

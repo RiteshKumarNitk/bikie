@@ -9,6 +9,13 @@ final partnerProfileRepositoryProvider = Provider<PartnerProfileRepository>((ref
   return PartnerProfileRepository(ref.watch(dioProvider));
 });
 
+/// Backs the Partner Profile tab's "Business Profile" tile (verification badge + edit-form
+/// prefill) — a thin, separately-invalidatable read so editing the profile doesn't have to also
+/// refetch/duplicate `partnerAvailabilityProvider`'s own `getProfile()` call.
+final partnerProfileSummaryProvider = FutureProvider.autoDispose<PartnerProfileSummary?>((ref) {
+  return ref.watch(partnerProfileRepositoryProvider).getProfile();
+});
+
 /// `PUT /api/partner/profile` — the same partner-profile API the web `/partner-onboarding` form
 /// uses.
 class PartnerProfileRepository {

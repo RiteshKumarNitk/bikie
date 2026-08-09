@@ -16,8 +16,15 @@ import 'onboarding_widgets.dart';
 /// `PUT /api/partner/profile` route. Shown once, right after a brand-new Partner signup
 /// completes (see `signup_screen.dart`). Unlike rider onboarding, there is **no skip** — matches
 /// web exactly, since a partner account is useless without at least business name/type/city.
+///
+/// Also reused as the "Business Profile" editor from the Partner Profile tab (mirrors
+/// `PartnerSettingsForm.tsx`/`/partner/settings` on web, which reuses the same
+/// `PartnerBusinessFields` the onboarding form uses) — pass [initialProfile] to pre-fill and
+/// switch the screen into edit mode (title/button copy, pops back instead of routing home).
 class PartnerOnboardingScreen extends ConsumerStatefulWidget {
-  const PartnerOnboardingScreen({super.key});
+  const PartnerOnboardingScreen({super.key, this.initialProfile});
+
+  final PartnerProfileSummary? initialProfile;
 
   @override
   ConsumerState<PartnerOnboardingScreen> createState() => _PartnerOnboardingScreenState();
@@ -43,6 +50,32 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
 
   bool _saving = false;
   String? _error;
+
+  bool get _isEditMode => widget.initialProfile != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final profile = widget.initialProfile;
+    if (profile != null) {
+      _businessName.text = profile.businessName;
+      _type = profile.type;
+      _city.text = profile.city ?? '';
+      _addressLine.text = profile.addressLine ?? '';
+      _area.text = profile.area ?? '';
+      _pincode.text = profile.pincode ?? '';
+      _governmentIdType = profile.governmentIdType;
+      _governmentIdNumber.text = profile.governmentIdNumber ?? '';
+      _contactPerson1Name.text = profile.contactPerson1Name ?? '';
+      _contactPerson1Mobile.text = profile.contactPerson1Mobile ?? '';
+      _contactPerson2Name.text = profile.contactPerson2Name ?? '';
+      _contactPerson2Mobile.text = profile.contactPerson2Mobile ?? '';
+      _showContactPerson2 = profile.contactPerson2Name != null || profile.contactPerson2Mobile != null;
+      if (profile.latitude != null && profile.longitude != null) {
+        _location = LatLng(profile.latitude!, profile.longitude!);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -78,7 +111,6 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       final name = _fullName.text.trim();
       if (name.isNotEmpty) {
         await ref.read(authRepositoryProvider).updateUser(name: name);
-        await ref.read(authControllerProvider.notifier).refreshSession();
       }
       await ref.read(partnerProfileRepositoryProvider).save(PartnerProfileInput(
             businessName: _businessName.text.trim(),
@@ -96,7 +128,17 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
             governmentIdType: _governmentIdType,
             governmentIdNumber: _governmentIdNumber.text,
           ));
-      if (mounted) context.go('/');
+      // Refresh unconditionally (not just when `name` changed) — the very first call into this
+      // save path for a brand-new signup is also the moment the account's role actually flips
+      // RENTER -> PARTNER server-side; app_router.dart's `isPartner` branch needs the app's local
+      // auth state to reflect that immediately, not just after an incidental name update.
+      await ref.read(authControllerProvider.notifier).refreshSession();
+      if (!mounted) return;
+      if (_isEditMode) {
+        context.pop();
+      } else {
+        context.go('/');
+      }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
     } finally {
@@ -107,7 +149,9 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Complete your Partner Profile')),
+      appBar: AppBar(
+        title: Text(_isEditMode ? 'Business Profile' : 'Complete your Partner Profile'),
+      ),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -115,9 +159,18 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Tell us about your business. This helps us set up your fleet and payouts.',
+                _isEditMode
+                    ? 'Update your business details. Riders and the SOS dispatch system see this information.'
+                    : 'Tell us about your business. This helps us set up your fleet and payouts.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
+              if (_isEditMode && widget.initialProfile != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  widget.initialProfile!.isVerified ? 'Verification status: Verified' : 'Verification status: Pending',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               const SizedBox(height: 20),
               OnboardingSection(
                 title: 'Your details',
@@ -251,7 +304,7 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                 onPressed: _saving ? null : _save,
                 child: _saving
                     ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Text('Save & continue'),
+                    : Text(_isEditMode ? 'Save changes' : 'Save & continue'),
               ),
             ],
           ),

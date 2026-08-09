@@ -225,8 +225,8 @@ and is what keeps a redacted browse list usable ("2.8 km away" without exposing 
 
 | Route | Method | Who | Notes |
 | ----------------------------------------------- | ------ | ------------------ | -------------------------------------------------------------------- |
-| `/api/sos/alerts` | GET | Member | `?lat=&lng=` (ADR-042) — 25km radius around the viewer; non-admin must supply both. Results redacted per §6. Admin sees every alert network-wide, unfiltered. |
-| `/api/sos/alerts` | POST | Member | Create + immediate fan-out + tier-1 escalation seed. |
+| `/api/sos/alerts` | GET | Member, not PARTNER (ADR-046) | `?lat=&lng=` (ADR-042) — 25km radius around the viewer; non-admin must supply both. Results redacted per §6. Admin sees every alert network-wide, unfiltered. |
+| `/api/sos/alerts` | POST | Member, not PARTNER (ADR-046) | Create + immediate fan-out + tier-1 escalation seed. |
 | `/api/sos/alerts/history` | GET | Session | Caller's own past alerts. |
 | `/api/sos/alerts/[id]` | GET | Member | Alert + timeline. Redacted per §6 unless privileged. |
 | `/api/sos/alerts/[id]/offer` | POST | Member | "I'm Coming" / partner "ACCEPT". Partner callers additionally gated: verified, available, category-matched, not at capacity. |
