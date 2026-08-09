@@ -3640,6 +3640,57 @@
         }
       }
     },
+    "/api/membership/checkout": {
+      "post": {
+        "operationId": "post_api_membership_checkout",
+        "tags": [
+          "membership"
+        ],
+        "summary": "POST /api/membership/checkout",
+        "description": "Source: `apps/web/app/api/membership/checkout/route.ts`. Auth class: `session`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "session",
+        "x-bikie-source": "apps/web/app/api/membership/checkout/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
     "/api/membership/plans": {
       "get": {
         "operationId": "get_api_membership_plans",

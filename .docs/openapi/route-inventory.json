@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-06T09:31:50.421Z",
-  "count": 120,
+  "generatedAt": "2026-08-06T18:32:28.126Z",
+  "count": 121,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -466,6 +466,14 @@
       ],
       "auth": "session",
       "file": "apps/web/app/api/membership/active/route.ts"
+    },
+    {
+      "path": "/api/membership/checkout",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/membership/checkout/route.ts"
     },
     {
       "path": "/api/membership/plans",
