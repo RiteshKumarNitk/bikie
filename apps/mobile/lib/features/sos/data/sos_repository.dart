@@ -89,6 +89,15 @@ class SosRepository {
     return apiGuard(() => _dio.post('/api/sos/alerts/$alertId/offers/$offerId/withdraw'));
   }
 
+  /// A responder declines without ever offering (ADR-045) — persisted, not a local UI-only
+  /// dismissal.
+  Future<void> declineAlert(String alertId, {String? message}) {
+    return apiGuard(() => _dio.post(
+          '/api/sos/alerts/$alertId/decline',
+          data: {if (message != null && message.isNotEmpty) 'message': message},
+        ));
+  }
+
   Future<List<SOSOffer>> listOffers(String alertId) {
     return apiGuard(() async {
       final res = await _dio.get('/api/sos/alerts/$alertId/offers');

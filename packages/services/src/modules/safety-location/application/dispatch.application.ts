@@ -1,4 +1,4 @@
-import type { SOSAlertDTO } from "@bikie/types";
+import type { RawSOSAlertDTO } from "../domain/pii-redaction";
 import { getPlatformModule } from "../../platform/public";
 import { resolveChannelAvailability } from "../domain/channel-selection";
 import type { SOSRecipient } from "../domain/dispatch-message";
@@ -31,7 +31,7 @@ export function createDispatchOrchestrator(ports: SafetyLocationPorts) {
   const escalationApp = createEscalationApplication(ports);
 
   return {
-    async fanOut(alert: SOSAlertDTO, deps: FanOutDeps = {}): Promise<SOSDispatchSummary> {
+    async fanOut(alert: RawSOSAlertDTO, deps: FanOutDeps = {}): Promise<SOSDispatchSummary> {
       const communications = deps.communications ?? ports.communications;
       const idempotency = deps.idempotency ?? getPlatformModule().ports.idempotency;
       const idemKey = `sos-dispatch:${alert.id}`;

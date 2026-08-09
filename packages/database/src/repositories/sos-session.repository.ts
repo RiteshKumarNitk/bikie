@@ -61,6 +61,41 @@ export async function listOffersForAlert(alertId: string) {
   });
 }
 
+/** ADR-045 — a responder (typically a partner browsing "Nearby Requests") declines an alert
+ * without ever offering. Same table/uniqueness constraint as `createOffer` — declining IS this
+ * responder's terminal relationship to the alert, same concept `SOSAlertResponse` already models
+ * for offers, just a different starting status. */
+export async function declineAlert(params: { alertId: string; responderId: string; message?: string }) {
+  try {
+    return await prisma.sOSAlertResponse.create({
+      data: {
+        alertId: params.alertId,
+        responderId: params.responderId,
+        message: params.message,
+        status: "DECLINED",
+        respondedAt: new Date(),
+        respondedBy: params.responderId,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
+      throw new AlreadyOfferedError("You've already responded to this alert");
+    }
+    throw err;
+  }
+}
+
+/** Batch lookup backing the partner "Nearby Requests" list (ADR-045) — alerts this responder has
+ * already offered on or declined shouldn't keep reappearing as if they were still new. */
+export async function findRespondedAlertIds(responderId: string, alertIds: string[]): Promise<Set<string>> {
+  if (alertIds.length === 0) return new Set();
+  const rows = await prisma.sOSAlertResponse.findMany({
+    where: { responderId, alertId: { in: alertIds } },
+    select: { alertId: true },
+  });
+  return new Set(rows.map((r) => r.alertId));
+}
+
 /**
  * The transactional accept — the single mechanism preventing two helpers from both being
  * assigned to the same alert. The guard is `WHERE assignedHelperId IS NULL` embedded inside

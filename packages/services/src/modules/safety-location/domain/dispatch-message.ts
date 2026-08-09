@@ -1,4 +1,4 @@
-import type { SOSAlertDTO } from "@bikie/types";
+import type { RawSOSAlertDTO } from "./pii-redaction";
 import { alertKind } from "./alert-kind";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "./maps";
 
@@ -32,13 +32,13 @@ export function humanizeSosType(type: string): string {
     .join(" ");
 }
 
-export function describeLocation(alert: SOSAlertDTO): string {
+export function describeLocation(alert: RawSOSAlertDTO): string {
   if (alert.formattedAddress) return alert.formattedAddress;
   const parts = [alert.placeName, alert.area, alert.city].filter((p): p is string => Boolean(p));
   return parts.length > 0 ? parts.join(", ") : alert.city;
 }
 
-export function buildTextBody(alert: SOSAlertDTO, recipient: SOSRecipient): string {
+export function buildTextBody(alert: RawSOSAlertDTO, recipient: SOSRecipient): string {
   const kind = alertKind(alert.description);
   const label =
     kind === "RED" ? "RED ALERT (Emergency)" : kind === "AMBER" ? "AMBER ALERT (Assistance)" : "SOS ALERT";
@@ -73,7 +73,7 @@ export function buildTextBody(alert: SOSAlertDTO, recipient: SOSRecipient): stri
     .join("\n");
 }
 
-export function buildEmailHtml(alert: SOSAlertDTO, recipient: SOSRecipient): string {
+export function buildEmailHtml(alert: RawSOSAlertDTO, recipient: SOSRecipient): string {
   const pin = mapsPinUrl(alert.latitude, alert.longitude);
   const navigate = mapsNavigateUrl(alert.latitude, alert.longitude);
   const distance = formatDistance(recipient.distanceMeters);

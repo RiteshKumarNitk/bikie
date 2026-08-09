@@ -178,9 +178,15 @@ class _AlertCard extends ConsumerWidget {
               ],
               const SizedBox(height: 8),
               Text(
-                alert.assignedHelperId != null
-                    ? 'Helper assigned'
-                    : 'Searching: ${alert.escalationTier.replaceAll('_', ' ').toLowerCase()} · ${alert.currentRadiusMeters ~/ 1000}km',
+                [
+                  alert.assignedHelperId != null
+                      ? 'Helper assigned'
+                      : 'Searching: ${alert.escalationTier.replaceAll('_', ' ').toLowerCase()} · ${alert.currentRadiusMeters ~/ 1000}km',
+                  if (alert.distanceMeters != null)
+                    alert.distanceMeters! < 1000
+                        ? '${alert.distanceMeters!.round()} m away'
+                        : '${(alert.distanceMeters! / 1000).toStringAsFixed(1)} km away',
+                ].join(' · '),
                 style: Theme.of(context).textTheme.labelSmall,
               ),
             ],

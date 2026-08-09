@@ -10,12 +10,15 @@ class SOSAlert with _$SOSAlert {
     required String id,
     required String userId,
     required String userName,
+    // ADR-045 — phone/email/exact location are null unless the viewer is the reporter, the
+    // assigned helper, or an admin (see redactAlertForViewer, packages/services). Every screen
+    // that reads these must handle null, not just "missing profile field."
     String? userPhone,
-    required String userEmail,
+    String? userEmail,
     required String type,
     String? description,
-    required num latitude,
-    required num longitude,
+    num? latitude,
+    num? longitude,
     required String city,
     required String status,
     required String severity,
@@ -25,7 +28,8 @@ class SOSAlert with _$SOSAlert {
     String? resolvedAt,
     required String createdAt,
     // Reverse-geocoded from latitude/longitude at creation time (ADR-038) — null if the
-    // lookup failed/timed out; fall back to `city`/raw coordinates when null.
+    // lookup failed/timed out, OR redacted for a non-privileged pre-assignment viewer (ADR-045);
+    // fall back to `city`/raw coordinates when null.
     String? placeName,
     String? area,
     String? formattedAddress,
@@ -33,6 +37,10 @@ class SOSAlert with _$SOSAlert {
     String? riderVehicleType,
     String? riderVehicleBrand,
     String? riderVehicleModel,
+    // ADR-045 — server-computed distance from the viewer's own supplied lat/lng; only populated
+    // on the active-alerts list (`GET /api/sos/alerts?lat=&lng=`), null elsewhere. Compensates
+    // for latitude/longitude being redacted pre-assignment.
+    num? distanceMeters,
   }) = _SOSAlert;
 
   factory SOSAlert.fromJson(Map<String, dynamic> json) => _$SOSAlertFromJson(json);

@@ -28,6 +28,16 @@ export function createRiderLocationApplication(ports: SafetyLocationPorts) {
     async autoDisableStaleSharing(minutes: number): Promise<void> {
       await ports.riderLocation.autoDisableStaleSharing(minutes);
     },
+
+    /** ADR-045 — independent of `setSharing`: whether this rider should be paged as an SOS
+     * dispatch candidate at all. */
+    async setReceiveSosAlerts(userId: string, enabled: boolean): Promise<void> {
+      await ports.riderLocation.setReceiveSosAlerts(userId, enabled);
+    },
+
+    getReceiveSosAlerts(userId: string): Promise<boolean> {
+      return ports.riderLocation.getReceiveSosAlerts(userId);
+    },
   };
 }
 

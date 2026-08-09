@@ -10,7 +10,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   if (error) return error;
 
   const { id } = await params;
-  const alert = await SOSService.getAlertById(id);
+  // ADR-045 — redacted (phone/email/exact location nulled) unless this viewer is the reporter,
+  // the assigned helper, or an admin.
+  const alert = await SOSService.getAlertById(id, {
+    userId: authSession.user.id,
+    isAdmin: authSession.user.role === "ADMIN",
+  });
   if (!alert) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
 
   const timeline = await SOSService.getTimeline(id);

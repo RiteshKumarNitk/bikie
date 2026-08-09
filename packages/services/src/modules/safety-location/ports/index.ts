@@ -1,6 +1,9 @@
 import type { SOSAlertCreateInput, SOSAlertDTO } from "@bikie/types";
 import type { CommunicationsPorts } from "../../communications/ports";
 import type { SOSRecipient } from "../domain/dispatch-message";
+import type { RawSOSAlertDTO } from "../domain/pii-redaction";
+
+export type { RawSOSAlertDTO };
 
 /** Internal create input — severity/radius/escalation timing are always server-derived
  * (escalation.application.ts), never taken from the client's SOSAlertCreateInput. */
@@ -21,9 +24,9 @@ export type SosAlertCreateData = SOSAlertCreateInput & {
 export type SosLocationFilter = { latitude: number; longitude: number; radiusMeters: number };
 
 export interface SosAlertRepositoryPort {
-  createAlert(data: SosAlertCreateData): Promise<SOSAlertDTO>;
-  getActiveAlerts(location?: SosLocationFilter): Promise<SOSAlertDTO[]>;
-  getAlertById(alertId: string): Promise<SOSAlertDTO | null>;
+  createAlert(data: SosAlertCreateData): Promise<RawSOSAlertDTO>;
+  getActiveAlerts(location?: SosLocationFilter): Promise<RawSOSAlertDTO[]>;
+  getAlertById(alertId: string): Promise<RawSOSAlertDTO | null>;
   resolveAlert(alertId: string, userId: string): Promise<void>;
   /** Deprecated alias target for the old /respond route — new callers use SosOfferRepositoryPort. */
   respondToAlert(alertId: string, responderId: string, message?: string): Promise<void>;
@@ -54,7 +57,7 @@ export interface SosAlertRepositoryPort {
   ): Promise<Array<{ id: string; userId: string; assignedHelperId: string | null }>>;
   bulkResolve(alertIds: string[]): Promise<void>;
   /** Cron-poll query key for GET /api/cron/sos-escalate. */
-  findAlertsDueForEscalation(before: Date, take?: number): Promise<SOSAlertDTO[]>;
+  findAlertsDueForEscalation(before: Date, take?: number): Promise<RawSOSAlertDTO[]>;
   updateEscalationState(
     alertId: string,
     data: { escalationTier?: string; currentRadiusMeters?: number; nextEscalationAt: Date | null },
@@ -65,7 +68,7 @@ export interface SosAlertRepositoryPort {
    * Requests" list. Distinct from `getActiveAlerts(location)`: that one intentionally still
    * shows already-assigned alerts to riders/admins browsing; a partner shouldn't see a request
    * someone else already claimed. */
-  getOpenAlertsNearPoint(latitude: number, longitude: number, radiusMeters: number): Promise<SOSAlertDTO[]>;
+  getOpenAlertsNearPoint(latitude: number, longitude: number, radiusMeters: number): Promise<RawSOSAlertDTO[]>;
 }
 
 export interface SosOfferRow {
@@ -91,6 +94,12 @@ export interface SosOfferRepositoryPort {
   withdrawOffer(offerId: string, responderId: string): Promise<void>;
   rejectOffer(alertId: string, offerId: string, actorId: string): Promise<void>;
   listOffersForAlert(alertId: string): Promise<SosOfferRow[]>;
+  /** ADR-045 — a responder declines without ever offering; throws AlreadyOfferedError on a
+   * repeat response (offer or decline) for the same [alertId, responderId]. */
+  declineAlert(params: { alertId: string; responderId: string; message?: string }): Promise<SosOfferRow>;
+  /** ADR-045 — which of these alert IDs this responder has already offered on or declined, so a
+   * partner's "Nearby Requests" list can exclude them. */
+  findRespondedAlertIds(responderId: string, alertIds: string[]): Promise<Set<string>>;
 }
 
 export interface SosSessionRow {
@@ -195,6 +204,10 @@ export interface RiderLocationRepositoryPort {
     radiusMeters: number,
   ): Promise<NearbyRiderContactRow[]>;
   autoDisableStaleSharing(minutes: number): Promise<number>;
+  /** ADR-045 — independent of sharingEnabled: whether this rider should be paged as an SOS
+   * dispatch candidate. */
+  setReceiveSosAlerts(userId: string, enabled: boolean): Promise<void>;
+  getReceiveSosAlerts(userId: string): Promise<boolean>;
 }
 
 /** Partner-shaped DTO for SOS fan-out — no Prisma types. */

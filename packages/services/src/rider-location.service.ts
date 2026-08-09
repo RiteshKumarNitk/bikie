@@ -22,4 +22,13 @@ export const RiderLocationService = {
   async autoDisableStaleSharing(minutes: number): Promise<void> {
     await getSafetyLocationModule().riderLocation.autoDisableStaleSharing(minutes);
   },
+
+  /** ADR-045 — independent of setSharing: whether this rider receives SOS dispatch pings. */
+  async setReceiveSosAlerts(userId: string, enabled: boolean): Promise<void> {
+    await getSafetyLocationModule().riderLocation.setReceiveSosAlerts(userId, enabled);
+  },
+
+  async getReceiveSosAlerts(userId: string): Promise<boolean> {
+    return getSafetyLocationModule().riderLocation.getReceiveSosAlerts(userId);
+  },
 };

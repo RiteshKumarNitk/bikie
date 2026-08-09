@@ -20,6 +20,25 @@ export async function getSharingEnabled(userId: string): Promise<boolean> {
   return row?.sharingEnabled ?? false;
 }
 
+/** ADR-045 — independent of `sharingEnabled`: whether this rider should be paged as an SOS
+ * dispatch candidate at all. Defaults `true` for a rider with no row yet (never touched either
+ * toggle) — opt-out, not opt-in, since every existing rider already receives SOS pings today. */
+export async function setReceiveSosAlerts(userId: string, enabled: boolean) {
+  await prisma.riderLocation.upsert({
+    where: { userId },
+    create: { userId, receiveSosAlerts: enabled },
+    update: { receiveSosAlerts: enabled },
+  });
+}
+
+export async function getReceiveSosAlerts(userId: string): Promise<boolean> {
+  const row = await prisma.riderLocation.findUnique({
+    where: { userId },
+    select: { receiveSosAlerts: true },
+  });
+  return row?.receiveSosAlerts ?? true;
+}
+
 /**
  * Updates the GPS fix. Requires sharing to already be enabled — returns the affected row
  * count so the caller can reject if consent isn't on, rather than trusting the client to only
@@ -78,7 +97,9 @@ export async function findNearby(
 /**
  * Nearby riders around an arbitrary GPS fix (used by SOS dispatch). Unlike `findNearby`, this
  * does NOT require the reporter to have opted into live sharing — SOS alerts carry their own
- * lat/lng from the panic button's one-shot geolocation.
+ * lat/lng from the panic button's one-shot geolocation. `receiveSosAlerts = true` (ADR-045) is a
+ * second, independent gate from `sharingEnabled` — a rider can stay findable/browsable
+ * (`sharingEnabled`) while opting out of being paged as an SOS candidate, or the reverse.
  */
 export async function findNearbyAroundPoint(
   latitude: number,
@@ -96,6 +117,7 @@ export async function findNearbyAroundPoint(
     FROM "rider_location" rl
     JOIN "user" u ON u."id" = rl."userId"
     WHERE rl."sharingEnabled" = true
+      AND rl."receiveSosAlerts" = true
       AND rl."location" IS NOT NULL
       AND rl."userId" != ${excludeUserId}
       AND rl."updatedAt" > now() - (${staleMinutes} || ' minutes')::interval

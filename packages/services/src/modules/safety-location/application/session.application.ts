@@ -3,6 +3,7 @@ import { partnerMatchesAlertType } from "../domain/partner-mapping";
 import { getReputationModule, type ReputationApplication } from "../../reputation/public";
 import { AlreadyAssignedError, AlreadyOfferedError, OfferNotAvailableError, type SafetyLocationPorts } from "../ports";
 
+
 export type SessionApplicationDeps = { reputation?: ReputationApplication };
 
 export function createSessionApplication(ports: SafetyLocationPorts, deps: SessionApplicationDeps = {}) {
@@ -85,6 +86,29 @@ export function createSessionApplication(ports: SafetyLocationPorts, deps: Sessi
         return { ok: true as const };
       } catch (err) {
         if (err instanceof OfferNotAvailableError) return { ok: false as const, reason: "OFFER_NOT_AVAILABLE" as const };
+        throw err;
+      }
+    },
+
+    /**
+     * A responder (typically a partner browsing "Nearby Requests") declines without ever
+     * offering (ADR-045) — a real, persisted decision, not a local UI-only dismissal. Never
+     * notifies the reporter or touches the timeline: this is the responder's own private signal,
+     * same as it silently not offering would have been, just now remembered so the same request
+     * doesn't keep reappearing in their own list.
+     */
+    async declineAlert(alertId: string, responderId: string, message?: string) {
+      const alert = await ports.sosAlerts.getAlertById(alertId);
+      if (!alert) return { ok: false as const, reason: "NOT_FOUND" as const };
+      if (alert.status !== "ACTIVE") return { ok: false as const, reason: "ALERT_NOT_ACTIVE" as const };
+      if (alert.assignedHelperId) return { ok: false as const, reason: "ALREADY_ASSIGNED" as const };
+      if (alert.userId === responderId) return { ok: false as const, reason: "FORBIDDEN" as const };
+
+      try {
+        await ports.sosOffers.declineAlert({ alertId, responderId, message });
+        return { ok: true as const };
+      } catch (err) {
+        if (err instanceof AlreadyOfferedError) return { ok: false as const, reason: "ALREADY_RESPONDED" as const };
         throw err;
       }
     },

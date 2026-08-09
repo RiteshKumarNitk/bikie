@@ -1,0 +1,1 @@
+ALTER TYPE "SOSResponseStatus" ADD VALUE 'DECLINED';

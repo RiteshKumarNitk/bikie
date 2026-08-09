@@ -35,6 +35,19 @@ class _NearbyRidersScreenState extends ConsumerState<NearbyRidersScreen> {
     }
   }
 
+  /// ADR-045 — independent of `_toggleSharing`: whether this rider receives SOS dispatch pings.
+  Future<void> _toggleReceiveSosAlerts(bool enabled) async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(nearbyRidersRepositoryProvider).setReceiveSosAlerts(enabled);
+      ref.invalidate(receiveSosAlertsProvider);
+    } on ApiException catch (e) {
+      _showMessage(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _pushLocation({bool silent = false}) async {
     try {
       var permission = await Geolocator.checkPermission();
@@ -61,6 +74,7 @@ class _NearbyRidersScreenState extends ConsumerState<NearbyRidersScreen> {
   @override
   Widget build(BuildContext context) {
     final sharingAsync = ref.watch(sharingEnabledProvider);
+    final receiveSosAsync = ref.watch(receiveSosAlertsProvider);
     final radiusKm = ref.watch(radiusKmProvider);
     final ridersAsync = ref.watch(nearbyRidersProvider);
 
@@ -103,6 +117,31 @@ class _NearbyRidersScreenState extends ConsumerState<NearbyRidersScreen> {
                     onPressed: _busy ? null : () => _pushLocation(),
                     icon: const Icon(Icons.my_location, size: 18),
                     label: const Text('Update my location now'),
+                  ),
+                  const Divider(height: 24),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text('Receive SOS assistance requests', style: Theme.of(context).textTheme.titleMedium),
+                      ),
+                      receiveSosAsync.when(
+                        data: (enabled) => Switch(
+                          value: enabled,
+                          onChanged: _busy ? null : _toggleReceiveSosAlerts,
+                        ),
+                        loading: () => const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        error: (_, __) => const Icon(Icons.error_outline),
+                      ),
+                    ],
+                  ),
+                  const Text(
+                    'Temporarily stop receiving nearby-rider SOS pings without turning off location '
+                    'sharing — you stay findable, you just won\'t be paged for assistance requests.',
+                    style: TextStyle(fontSize: 12),
                   ),
                 ],
               ),

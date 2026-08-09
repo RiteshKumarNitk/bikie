@@ -42,8 +42,14 @@ export function createPartnerDashboardApplication(
       location.longitude,
       SOS_PARTNER_ELIGIBILITY_RADIUS_METERS,
     );
-    return open
-      .filter((a) => partnerMatchesAlertType(partner, a.type))
+    const typeMatched = open.filter((a) => partnerMatchesAlertType(partner, a.type));
+
+    // ADR-045 — an alert this partner already offered on or declined shouldn't keep reappearing
+    // as if it were new; declining in particular would otherwise have no visible effect at all.
+    const responded = await ports.sosOffers.findRespondedAlertIds(userId, typeMatched.map((a) => a.id));
+
+    return typeMatched
+      .filter((a) => !responded.has(a.id))
       .map((a) => ({
         id: a.id,
         type: a.type,

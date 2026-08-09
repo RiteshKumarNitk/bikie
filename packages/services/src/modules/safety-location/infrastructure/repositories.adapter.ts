@@ -68,6 +68,16 @@ export function createSosOfferRepositoryAdapter(): SosOfferRepositoryPort {
       }
     },
     listOffersForAlert: (alertId) => sosSessionRepository.listOffersForAlert(alertId) as any,
+    declineAlert: async (params) => {
+      try {
+        return (await sosSessionRepository.declineAlert(params)) as any;
+      } catch (err) {
+        if (err instanceof sosSessionRepository.AlreadyOfferedError) throw new AlreadyOfferedError(err.message);
+        throw err;
+      }
+    },
+    findRespondedAlertIds: (responderId, alertIds) =>
+      sosSessionRepository.findRespondedAlertIds(responderId, alertIds),
   };
 }
 
@@ -129,6 +139,8 @@ export function createRiderLocationRepositoryAdapter(): RiderLocationRepositoryP
     findNearbyAroundPoint: (lat, lng, excludeUserId, radiusMeters) =>
       riderLocationRepository.findNearbyAroundPoint(lat, lng, excludeUserId, radiusMeters),
     autoDisableStaleSharing: (minutes) => riderLocationRepository.autoDisableStaleSharing(minutes),
+    setReceiveSosAlerts: (userId, enabled) => riderLocationRepository.setReceiveSosAlerts(userId, enabled),
+    getReceiveSosAlerts: (userId) => riderLocationRepository.getReceiveSosAlerts(userId),
   };
 }
 

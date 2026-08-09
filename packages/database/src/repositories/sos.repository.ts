@@ -37,7 +37,7 @@ function toDTO(alert: {
   placeName: string | null;
   area: string | null;
   formattedAddress: string | null;
-}) {
+}, distanceMeters?: number) {
   return {
     id: alert.id,
     userId: alert.userId,
@@ -63,6 +63,9 @@ function toDTO(alert: {
     riderVehicleType: alert.user.riderProfile?.vehicleType ?? null,
     riderVehicleBrand: alert.user.riderProfile?.vehicleBrand ?? null,
     riderVehicleModel: alert.user.riderProfile?.vehicleModel ?? null,
+    // ADR-045 — only set when the caller supplied viewer coordinates (getActiveAlerts' location
+    // filter already computes this for radius filtering; previously discarded before returning).
+    ...(distanceMeters !== undefined ? { distanceMeters: Math.round(distanceMeters) } : {}),
   };
 }
 
@@ -130,7 +133,7 @@ export async function getActiveAlerts(location?: { latitude: number; longitude: 
     }))
     .filter((a) => a.distanceMeters <= location.radiusMeters)
     .sort((a, b) => a.distanceMeters - b.distanceMeters)
-    .map((a) => toDTO(a.alert));
+    .map((a) => toDTO(a.alert, a.distanceMeters));
 }
 
 export async function getAlertById(alertId: string) {

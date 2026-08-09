@@ -116,6 +116,10 @@ enum SOSResponseStatus {
   REJECTED
   WITHDRAWN
   EXPIRED
+  // ADR-045 — a responder (typically a partner) proactively declines before ever offering.
+  // Distinct from WITHDRAWN (withdrawing an existing OFFERED offer) and REJECTED (the reporter
+  // rejecting someone else's offer) — this is the responder's own "not interested" signal.
+  DECLINED
 }
 
 enum SOSSessionStatus {
@@ -1054,11 +1058,16 @@ model AuditLog {
 // into this model's migration.sql and are invisible to `prisma migrate dev`'s diff engine —
 // see that migration's comments before touching this table's migrations again.
 model RiderLocation {
-  userId         String    @id
-  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  location       Unsupported("geography(Point, 4326)")?
-  sharingEnabled Boolean   @default(false)
-  updatedAt      DateTime  @updatedAt
+  userId           String    @id
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location         Unsupported("geography(Point, 4326)")?
+  sharingEnabled   Boolean   @default(false)
+  // ADR-045 — independent of sharingEnabled: a rider can keep sharing (findable/browsable) while
+  // opting out of being paged as an SOS dispatch candidate, or vice versa. Defaults true (unlike
+  // Partner.isAvailable's false default) because every existing rider already receives SOS pings
+  // today — defaulting false would silently cut off dispatch for the whole existing user base.
+  receiveSosAlerts Boolean   @default(true)
+  updatedAt        DateTime  @updatedAt
 
   @@map("rider_location")
 }

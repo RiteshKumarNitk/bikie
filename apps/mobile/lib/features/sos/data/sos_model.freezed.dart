@@ -23,13 +23,16 @@ SOSAlert _$SOSAlertFromJson(Map<String, dynamic> json) {
 mixin _$SOSAlert {
   String get id => throw _privateConstructorUsedError;
   String get userId => throw _privateConstructorUsedError;
-  String get userName => throw _privateConstructorUsedError;
+  String get userName =>
+      throw _privateConstructorUsedError; // ADR-045 — phone/email/exact location are null unless the viewer is the reporter, the
+  // assigned helper, or an admin (see redactAlertForViewer, packages/services). Every screen
+  // that reads these must handle null, not just "missing profile field."
   String? get userPhone => throw _privateConstructorUsedError;
-  String get userEmail => throw _privateConstructorUsedError;
+  String? get userEmail => throw _privateConstructorUsedError;
   String get type => throw _privateConstructorUsedError;
   String? get description => throw _privateConstructorUsedError;
-  num get latitude => throw _privateConstructorUsedError;
-  num get longitude => throw _privateConstructorUsedError;
+  num? get latitude => throw _privateConstructorUsedError;
+  num? get longitude => throw _privateConstructorUsedError;
   String get city => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
   String get severity => throw _privateConstructorUsedError;
@@ -39,14 +42,19 @@ mixin _$SOSAlert {
   String? get resolvedAt => throw _privateConstructorUsedError;
   String get createdAt =>
       throw _privateConstructorUsedError; // Reverse-geocoded from latitude/longitude at creation time (ADR-038) — null if the
-  // lookup failed/timed out; fall back to `city`/raw coordinates when null.
+  // lookup failed/timed out, OR redacted for a non-privileged pre-assignment viewer (ADR-045);
+  // fall back to `city`/raw coordinates when null.
   String? get placeName => throw _privateConstructorUsedError;
   String? get area => throw _privateConstructorUsedError;
   String? get formattedAddress =>
       throw _privateConstructorUsedError; // From the reporting rider's own RiderProfile (ADR-044) — most riders never fill this in.
   String? get riderVehicleType => throw _privateConstructorUsedError;
   String? get riderVehicleBrand => throw _privateConstructorUsedError;
-  String? get riderVehicleModel => throw _privateConstructorUsedError;
+  String? get riderVehicleModel =>
+      throw _privateConstructorUsedError; // ADR-045 — server-computed distance from the viewer's own supplied lat/lng; only populated
+  // on the active-alerts list (`GET /api/sos/alerts?lat=&lng=`), null elsewhere. Compensates
+  // for latitude/longitude being redacted pre-assignment.
+  num? get distanceMeters => throw _privateConstructorUsedError;
 
   /// Serializes this SOSAlert to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -68,11 +76,11 @@ abstract class $SOSAlertCopyWith<$Res> {
     String userId,
     String userName,
     String? userPhone,
-    String userEmail,
+    String? userEmail,
     String type,
     String? description,
-    num latitude,
-    num longitude,
+    num? latitude,
+    num? longitude,
     String city,
     String status,
     String severity,
@@ -87,6 +95,7 @@ abstract class $SOSAlertCopyWith<$Res> {
     String? riderVehicleType,
     String? riderVehicleBrand,
     String? riderVehicleModel,
+    num? distanceMeters,
   });
 }
 
@@ -109,11 +118,11 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
     Object? userId = null,
     Object? userName = null,
     Object? userPhone = freezed,
-    Object? userEmail = null,
+    Object? userEmail = freezed,
     Object? type = null,
     Object? description = freezed,
-    Object? latitude = null,
-    Object? longitude = null,
+    Object? latitude = freezed,
+    Object? longitude = freezed,
     Object? city = null,
     Object? status = null,
     Object? severity = null,
@@ -128,6 +137,7 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
     Object? riderVehicleType = freezed,
     Object? riderVehicleBrand = freezed,
     Object? riderVehicleModel = freezed,
+    Object? distanceMeters = freezed,
   }) {
     return _then(
       _value.copyWith(
@@ -147,10 +157,10 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
                 ? _value.userPhone
                 : userPhone // ignore: cast_nullable_to_non_nullable
                       as String?,
-            userEmail: null == userEmail
+            userEmail: freezed == userEmail
                 ? _value.userEmail
                 : userEmail // ignore: cast_nullable_to_non_nullable
-                      as String,
+                      as String?,
             type: null == type
                 ? _value.type
                 : type // ignore: cast_nullable_to_non_nullable
@@ -159,14 +169,14 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
                 ? _value.description
                 : description // ignore: cast_nullable_to_non_nullable
                       as String?,
-            latitude: null == latitude
+            latitude: freezed == latitude
                 ? _value.latitude
                 : latitude // ignore: cast_nullable_to_non_nullable
-                      as num,
-            longitude: null == longitude
+                      as num?,
+            longitude: freezed == longitude
                 ? _value.longitude
                 : longitude // ignore: cast_nullable_to_non_nullable
-                      as num,
+                      as num?,
             city: null == city
                 ? _value.city
                 : city // ignore: cast_nullable_to_non_nullable
@@ -223,6 +233,10 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
                 ? _value.riderVehicleModel
                 : riderVehicleModel // ignore: cast_nullable_to_non_nullable
                       as String?,
+            distanceMeters: freezed == distanceMeters
+                ? _value.distanceMeters
+                : distanceMeters // ignore: cast_nullable_to_non_nullable
+                      as num?,
           )
           as $Val,
     );
@@ -243,11 +257,11 @@ abstract class _$$SOSAlertImplCopyWith<$Res>
     String userId,
     String userName,
     String? userPhone,
-    String userEmail,
+    String? userEmail,
     String type,
     String? description,
-    num latitude,
-    num longitude,
+    num? latitude,
+    num? longitude,
     String city,
     String status,
     String severity,
@@ -262,6 +276,7 @@ abstract class _$$SOSAlertImplCopyWith<$Res>
     String? riderVehicleType,
     String? riderVehicleBrand,
     String? riderVehicleModel,
+    num? distanceMeters,
   });
 }
 
@@ -283,11 +298,11 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
     Object? userId = null,
     Object? userName = null,
     Object? userPhone = freezed,
-    Object? userEmail = null,
+    Object? userEmail = freezed,
     Object? type = null,
     Object? description = freezed,
-    Object? latitude = null,
-    Object? longitude = null,
+    Object? latitude = freezed,
+    Object? longitude = freezed,
     Object? city = null,
     Object? status = null,
     Object? severity = null,
@@ -302,6 +317,7 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
     Object? riderVehicleType = freezed,
     Object? riderVehicleBrand = freezed,
     Object? riderVehicleModel = freezed,
+    Object? distanceMeters = freezed,
   }) {
     return _then(
       _$SOSAlertImpl(
@@ -321,10 +337,10 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
             ? _value.userPhone
             : userPhone // ignore: cast_nullable_to_non_nullable
                   as String?,
-        userEmail: null == userEmail
+        userEmail: freezed == userEmail
             ? _value.userEmail
             : userEmail // ignore: cast_nullable_to_non_nullable
-                  as String,
+                  as String?,
         type: null == type
             ? _value.type
             : type // ignore: cast_nullable_to_non_nullable
@@ -333,14 +349,14 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
             ? _value.description
             : description // ignore: cast_nullable_to_non_nullable
                   as String?,
-        latitude: null == latitude
+        latitude: freezed == latitude
             ? _value.latitude
             : latitude // ignore: cast_nullable_to_non_nullable
-                  as num,
-        longitude: null == longitude
+                  as num?,
+        longitude: freezed == longitude
             ? _value.longitude
             : longitude // ignore: cast_nullable_to_non_nullable
-                  as num,
+                  as num?,
         city: null == city
             ? _value.city
             : city // ignore: cast_nullable_to_non_nullable
@@ -397,6 +413,10 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
             ? _value.riderVehicleModel
             : riderVehicleModel // ignore: cast_nullable_to_non_nullable
                   as String?,
+        distanceMeters: freezed == distanceMeters
+            ? _value.distanceMeters
+            : distanceMeters // ignore: cast_nullable_to_non_nullable
+                  as num?,
       ),
     );
   }
@@ -410,11 +430,11 @@ class _$SOSAlertImpl implements _SOSAlert {
     required this.userId,
     required this.userName,
     this.userPhone,
-    required this.userEmail,
+    this.userEmail,
     required this.type,
     this.description,
-    required this.latitude,
-    required this.longitude,
+    this.latitude,
+    this.longitude,
     required this.city,
     required this.status,
     required this.severity,
@@ -429,6 +449,7 @@ class _$SOSAlertImpl implements _SOSAlert {
     this.riderVehicleType,
     this.riderVehicleBrand,
     this.riderVehicleModel,
+    this.distanceMeters,
   });
 
   factory _$SOSAlertImpl.fromJson(Map<String, dynamic> json) =>
@@ -440,18 +461,21 @@ class _$SOSAlertImpl implements _SOSAlert {
   final String userId;
   @override
   final String userName;
+  // ADR-045 — phone/email/exact location are null unless the viewer is the reporter, the
+  // assigned helper, or an admin (see redactAlertForViewer, packages/services). Every screen
+  // that reads these must handle null, not just "missing profile field."
   @override
   final String? userPhone;
   @override
-  final String userEmail;
+  final String? userEmail;
   @override
   final String type;
   @override
   final String? description;
   @override
-  final num latitude;
+  final num? latitude;
   @override
-  final num longitude;
+  final num? longitude;
   @override
   final String city;
   @override
@@ -469,7 +493,8 @@ class _$SOSAlertImpl implements _SOSAlert {
   @override
   final String createdAt;
   // Reverse-geocoded from latitude/longitude at creation time (ADR-038) — null if the
-  // lookup failed/timed out; fall back to `city`/raw coordinates when null.
+  // lookup failed/timed out, OR redacted for a non-privileged pre-assignment viewer (ADR-045);
+  // fall back to `city`/raw coordinates when null.
   @override
   final String? placeName;
   @override
@@ -483,10 +508,15 @@ class _$SOSAlertImpl implements _SOSAlert {
   final String? riderVehicleBrand;
   @override
   final String? riderVehicleModel;
+  // ADR-045 — server-computed distance from the viewer's own supplied lat/lng; only populated
+  // on the active-alerts list (`GET /api/sos/alerts?lat=&lng=`), null elsewhere. Compensates
+  // for latitude/longitude being redacted pre-assignment.
+  @override
+  final num? distanceMeters;
 
   @override
   String toString() {
-    return 'SOSAlert(id: $id, userId: $userId, userName: $userName, userPhone: $userPhone, userEmail: $userEmail, type: $type, description: $description, latitude: $latitude, longitude: $longitude, city: $city, status: $status, severity: $severity, escalationTier: $escalationTier, currentRadiusMeters: $currentRadiusMeters, assignedHelperId: $assignedHelperId, resolvedAt: $resolvedAt, createdAt: $createdAt, placeName: $placeName, area: $area, formattedAddress: $formattedAddress, riderVehicleType: $riderVehicleType, riderVehicleBrand: $riderVehicleBrand, riderVehicleModel: $riderVehicleModel)';
+    return 'SOSAlert(id: $id, userId: $userId, userName: $userName, userPhone: $userPhone, userEmail: $userEmail, type: $type, description: $description, latitude: $latitude, longitude: $longitude, city: $city, status: $status, severity: $severity, escalationTier: $escalationTier, currentRadiusMeters: $currentRadiusMeters, assignedHelperId: $assignedHelperId, resolvedAt: $resolvedAt, createdAt: $createdAt, placeName: $placeName, area: $area, formattedAddress: $formattedAddress, riderVehicleType: $riderVehicleType, riderVehicleBrand: $riderVehicleBrand, riderVehicleModel: $riderVehicleModel, distanceMeters: $distanceMeters)';
   }
 
   @override
@@ -533,7 +563,9 @@ class _$SOSAlertImpl implements _SOSAlert {
             (identical(other.riderVehicleBrand, riderVehicleBrand) ||
                 other.riderVehicleBrand == riderVehicleBrand) &&
             (identical(other.riderVehicleModel, riderVehicleModel) ||
-                other.riderVehicleModel == riderVehicleModel));
+                other.riderVehicleModel == riderVehicleModel) &&
+            (identical(other.distanceMeters, distanceMeters) ||
+                other.distanceMeters == distanceMeters));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -563,6 +595,7 @@ class _$SOSAlertImpl implements _SOSAlert {
     riderVehicleType,
     riderVehicleBrand,
     riderVehicleModel,
+    distanceMeters,
   ]);
 
   /// Create a copy of SOSAlert
@@ -585,11 +618,11 @@ abstract class _SOSAlert implements SOSAlert {
     required final String userId,
     required final String userName,
     final String? userPhone,
-    required final String userEmail,
+    final String? userEmail,
     required final String type,
     final String? description,
-    required final num latitude,
-    required final num longitude,
+    final num? latitude,
+    final num? longitude,
     required final String city,
     required final String status,
     required final String severity,
@@ -604,6 +637,7 @@ abstract class _SOSAlert implements SOSAlert {
     final String? riderVehicleType,
     final String? riderVehicleBrand,
     final String? riderVehicleModel,
+    final num? distanceMeters,
   }) = _$SOSAlertImpl;
 
   factory _SOSAlert.fromJson(Map<String, dynamic> json) =
@@ -614,19 +648,21 @@ abstract class _SOSAlert implements SOSAlert {
   @override
   String get userId;
   @override
-  String get userName;
+  String get userName; // ADR-045 — phone/email/exact location are null unless the viewer is the reporter, the
+  // assigned helper, or an admin (see redactAlertForViewer, packages/services). Every screen
+  // that reads these must handle null, not just "missing profile field."
   @override
   String? get userPhone;
   @override
-  String get userEmail;
+  String? get userEmail;
   @override
   String get type;
   @override
   String? get description;
   @override
-  num get latitude;
+  num? get latitude;
   @override
-  num get longitude;
+  num? get longitude;
   @override
   String get city;
   @override
@@ -643,7 +679,8 @@ abstract class _SOSAlert implements SOSAlert {
   String? get resolvedAt;
   @override
   String get createdAt; // Reverse-geocoded from latitude/longitude at creation time (ADR-038) — null if the
-  // lookup failed/timed out; fall back to `city`/raw coordinates when null.
+  // lookup failed/timed out, OR redacted for a non-privileged pre-assignment viewer (ADR-045);
+  // fall back to `city`/raw coordinates when null.
   @override
   String? get placeName;
   @override
@@ -655,7 +692,11 @@ abstract class _SOSAlert implements SOSAlert {
   @override
   String? get riderVehicleBrand;
   @override
-  String? get riderVehicleModel;
+  String? get riderVehicleModel; // ADR-045 — server-computed distance from the viewer's own supplied lat/lng; only populated
+  // on the active-alerts list (`GET /api/sos/alerts?lat=&lng=`), null elsewhere. Compensates
+  // for latitude/longitude being redacted pre-assignment.
+  @override
+  num? get distanceMeters;
 
   /// Create a copy of SOSAlert
   /// with the given fields replaced by the non-null parameter values.

@@ -1,12 +1,18 @@
 import type { SOSAlertCreateInput, SOSAlertDTO } from "@bikie/types";
+import { isPrivilegedViewer, redactAlertForViewer, type RawSOSAlertDTO } from "../domain/pii-redaction";
 import { deriveSeverity } from "../domain/severity";
 import type { SafetyLocationPorts, SosLocationFilter } from "../ports";
 
 const INITIAL_RADIUS_METERS = 5000;
 
+/** ADR-045 — the caller's identity, used to decide how much of each alert they get to see.
+ * Required (not optional) on every read below — redaction must never silently default to
+ * "show everything" just because a caller forgot to pass it. */
+export type AlertViewer = { userId: string; isAdmin: boolean };
+
 export function createSosApplication(ports: SafetyLocationPorts) {
   return {
-    async createAlert(userId: string, data: SOSAlertCreateInput): Promise<SOSAlertDTO> {
+    async createAlert(userId: string, data: SOSAlertCreateInput): Promise<RawSOSAlertDTO> {
       // Best-effort (ADR-038): a failed/timed-out lookup must never block sending the alert —
       // every downstream reader (dispatch text, UI) already falls back to city/raw coordinates
       // when these come back null.
@@ -26,12 +32,15 @@ export function createSosApplication(ports: SafetyLocationPorts) {
       });
     },
 
-    getActiveAlerts(location?: SosLocationFilter): Promise<SOSAlertDTO[]> {
-      return ports.sosAlerts.getActiveAlerts(location);
+    async getActiveAlerts(location: SosLocationFilter | undefined, viewer: AlertViewer): Promise<SOSAlertDTO[]> {
+      const alerts = await ports.sosAlerts.getActiveAlerts(location);
+      return alerts.map((alert) => redactAlertForViewer(alert, isPrivilegedViewer(alert, viewer)));
     },
 
-    getAlertById(alertId: string) {
-      return ports.sosAlerts.getAlertById(alertId);
+    async getAlertById(alertId: string, viewer: AlertViewer): Promise<SOSAlertDTO | null> {
+      const alert = await ports.sosAlerts.getAlertById(alertId);
+      if (!alert) return null;
+      return redactAlertForViewer(alert, isPrivilegedViewer(alert, viewer));
     },
 
     /**

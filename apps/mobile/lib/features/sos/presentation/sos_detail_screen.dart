@@ -288,15 +288,17 @@ class _AlertHeader extends StatelessWidget {
               const SizedBox(height: 4),
               Text(alert.description!),
             ],
-            const SizedBox(height: 8),
-            OutlinedButton.icon(
-              icon: const Icon(Icons.map_outlined, size: 18),
-              label: const Text('View on map'),
-              onPressed: () => launchUrl(
-                Uri.parse('https://www.google.com/maps?q=${alert.latitude},${alert.longitude}'),
-                mode: LaunchMode.externalApplication,
+            if (alert.latitude != null && alert.longitude != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.map_outlined, size: 18),
+                label: const Text('View on map'),
+                onPressed: () => launchUrl(
+                  Uri.parse('https://www.google.com/maps?q=${alert.latitude},${alert.longitude}'),
+                  mode: LaunchMode.externalApplication,
+                ),
               ),
-            ),
+            ],
             const SizedBox(height: 4),
             Text(
               alert.assignedHelperId != null
@@ -405,6 +407,10 @@ class _SessionPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final other = isAssignedHelper ? session.rider : session.helper;
     final canRate = session.status == 'COMPLETED' && isReporter && session.rating == null;
+    // This panel only renders for a privileged viewer (assigned helper/reporter/admin, gated by
+    // the caller) — the same audience ADR-045 redaction never withholds coordinates from.
+    final lat = alert.latitude!;
+    final lng = alert.longitude!;
 
     return Card(
       child: Padding(
@@ -439,7 +445,7 @@ class _SessionPanel extends StatelessWidget {
                   label: const Text('Navigate'),
                   onPressed: () => launchUrl(
                     Uri.parse(
-                      'https://www.google.com/maps/dir/?api=1&destination=${alert.latitude},${alert.longitude}',
+                      'https://www.google.com/maps/dir/?api=1&destination=$lat,$lng',
                     ),
                     mode: LaunchMode.externalApplication,
                   ),
@@ -472,7 +478,7 @@ class _SessionPanel extends StatelessWidget {
                         height: 160,
                         child: FlutterMap(
                           options: MapOptions(
-                            initialCenter: LatLng(alert.latitude.toDouble(), alert.longitude.toDouble()),
+                            initialCenter: LatLng(lat.toDouble(), lng.toDouble()),
                             initialZoom: 12,
                           ),
                           children: [
@@ -482,7 +488,7 @@ class _SessionPanel extends StatelessWidget {
                             ),
                             MarkerLayer(markers: [
                               Marker(
-                                point: LatLng(alert.latitude.toDouble(), alert.longitude.toDouble()),
+                                point: LatLng(lat.toDouble(), lng.toDouble()),
                                 width: 36,
                                 height: 36,
                                 child: const Icon(Icons.sos, color: Colors.red, size: 30),

@@ -1528,3 +1528,95 @@ changes:
   carried. Existing partners all start `isAvailable: false` — they will receive zero SOS pings
   until they open the app and flip the toggle on, a deliberate rollout choice, not a bug.
 
+## ADR-045: SOS audit remediation — PII redaction, persisted decline, web Partner Dashboard, rider SOS opt-out
+
+- **Context.** A capability audit of the SOS system (ADR-028 through ADR-044) found the core
+  offer/accept/session/escalation lifecycle solid but flagged concrete gaps: any member within
+  browse radius could see a reporter's exact phone/email/GPS before anyone was assigned; a
+  service provider declining a request had no server-side effect (pure local UI dismissal); the
+  Partner Emergency Assistance Dashboard (ADR-044) existed on mobile only; and a rider had no way
+  to stop being paged for SOS without also going invisible to their own "share my location"
+  reciprocity. This ADR closes exactly those gaps. **One item in the audit was itself wrong**,
+  corrected here: offer auto-expiry-on-accept was already implemented (`acceptOffer` in
+  `sos-session.repository.ts` already flips every other `OFFERED` response on an alert to
+  `EXPIRED` inside the same transaction that assigns the helper) — no code changed for that part,
+  only a regression test added to lock it in.
+- **PII redaction.** New `packages/services/.../domain/pii-redaction.ts`: `isPrivilegedViewer`
+  (reporter, assigned helper, or admin) and `redactAlertForViewer`, applied by
+  `sos.application.ts`'s `getActiveAlerts`/`getAlertById` — both now take a required
+  `viewer: {userId, isAdmin}` and null `userPhone`/`userEmail`/`latitude`/`longitude`/
+  `placeName`/`area`/`formattedAddress` for anyone else. `city` and a newly-added
+  `distanceMeters` (the Haversine distance `getActiveAlerts` already computed for radius
+  filtering, previously discarded before returning) stay visible so a redacted list is still
+  usable for deciding whether to respond. A new `RawSOSAlertDTO` type (same module) represents
+  the always-non-redacted shape every internal consumer (dispatch, sessions, the partner
+  dashboard) actually works with — the public `SOSAlertDTO`'s `userEmail`/`latitude`/`longitude`
+  became nullable to represent the redacted wire shape, and this split keeps that nullability
+  from leaking into code that never sees a redacted alert.
+- **Persisted decline.** New `SOSResponseStatus.DECLINED` enum value — a responder's own
+  "not interested" signal, written via `session.application.ts`'s new `declineAlert` into the
+  same `SOSAlertResponse` table offers already use (same `[alertId, responderId]` uniqueness,
+  same repository file). New `POST /api/sos/alerts/[id]/decline`. Declining never notifies the
+  reporter or writes a timeline event — deliberately a private signal, matching what silently
+  not-offering already meant, just now remembered so `listNearbyOpenRequests` (the partner
+  "Nearby Requests" list) excludes it going forward via a new `findRespondedAlertIds` batch
+  lookup.
+- **Real bug found and fixed while wiring decline into mobile/web parity, not part of the
+  original audit list.** `partner_sos_request_screen.dart`'s "waiting for rider" state was
+  derived from `GET /api/sos/alerts/[id]/offers` — but that route is reporter/admin-only
+  (`403 FORBIDDEN` for anyone else), so a partner could never actually detect their own pending
+  offer through it; the screen was silently stuck showing "Needs Response" forever after a
+  successful accept. Fixed by tracking the offer locally from `offerHelp`'s own response instead
+  (the same pattern `sos_detail_screen.dart` already used, for the same reason) — applied on both
+  mobile and the new web page from the start.
+- **Web Partner SOS Dashboard.** New `/partner/sos` (availability toggle, stats, nearby/active
+  previews) and `/partner/sos/[id]` (Accept/Decline → Waiting → Confirmed → Unavailable) pages —
+  a separate page tree from `/partner/*`'s existing pages and from the generic
+  `/dashboard/sos/[id]`, not a modification of either, mirroring mobile's own strategy of a
+  dedicated screen rather than touching the generic rider-facing flow. Zero new backend routes:
+  reuses the 4 existing ADR-044 `/api/partner/*` routes as-is, plus the new decline route above.
+  New `PartnerAvailabilityToggle`/`ReceiveSosAlertsToggle` components mirror the existing
+  `RiderLocationToggle`'s fetch/PUT/button pattern; styling reuses `/dashboard/sos*`'s existing
+  Tailwind classes (`red-500`/`#ffaa00`/`bg-accent`/`text-success`) — no new design tokens.
+- **Rider SOS opt-out.** New `RiderLocation.receiveSosAlerts Boolean @default(true)` — sibling
+  column to the existing `sharingEnabled`, same model, same 1:1-with-user shape. **Default `true`**
+  (the opposite of ADR-044's `Partner.isAvailable` default-`false`) because every existing rider
+  already receives SOS pings today; defaulting `false` would silently cut off dispatch for the
+  whole existing user base, which nothing asked for. Enforced inside `findNearbyAroundPoint`'s
+  raw SQL (`rider-location.repository.ts`) as a second, independent `AND` clause alongside
+  `sharingEnabled` — `escalation.application.ts` needed no changes, it just keeps consuming
+  whatever the port returns. Deliberately does **not** affect `findNearby`/browsing nearby riders
+  — being pageable for emergencies and being browsable for company are different concerns. New
+  `GET/PUT /api/rider-location/sos-opt-out`, new `ReceiveSosAlertsToggle` (web, on
+  `/dashboard/settings`) and a second `Switch` row on `nearby_riders_screen.dart` (mobile),
+  alongside — not replacing — the existing sharing toggle.
+- **Tests.** New `packages/services/.../safety-location.e2e.test.ts` — full-flow tests (create →
+  dispatch → offer → accept → complete → resolve chained in one test, against stateful in-memory
+  port fakes, not one-off per-function mocks) covering rider→rider, rider→service-provider,
+  provider eligibility, accept/reject, multiple responders + assignment locking, decline, PII
+  redaction by viewer, full session completion, and escalation tier ordering. This repo has no
+  Playwright/Cypress/browser-test harness anywhere (checked before writing these) — Vitest
+  against mocked ports is the only test paradigm that exists here, so "end-to-end" here means
+  full-flow application-layer tests, not browser tests; introducing a browser-test harness was
+  out of scope. These tests prove the *application layer's* orchestration is correct, not that
+  the real Postgres transaction inside `acceptOffer` is race-safe under genuine concurrency (that
+  property is already implemented and untouched here; verifying it independently would need a
+  real-database integration test this repo doesn't currently support).
+  **Found and fixed a real bug in the test suite itself while writing these**: importing
+  `sampleAlert`/`emptyRepos`/etc. directly from `safety-location.test.ts` caused Vitest to
+  re-execute that file's entire existing suite as a side effect of the import, corrupting shared
+  mock-call bookkeeping across the two "runs" (2 spurious failures). Fixed by extracting those
+  factories into a new non-test `safety-location.test-support.ts` (not `*.test.ts`, so Vitest
+  never treats it as its own suite) that both test files import from instead; each test file
+  keeps its own `vi.mock(...)` calls, since Vitest only hoists/applies those when called directly
+  in the file that needs them.
+- **Consequences.** Backend: `pnpm turbo run typecheck` (9/9) and `pnpm exec vitest run`
+  (133/133, 15/15 files) clean; 2 new hand-written migrations applied, zero drift; OpenAPI
+  inventory regenerated (125→127 routes). Mobile: `flutter analyze` clean, `flutter test` (110/110)
+  passing — no new mobile-side tests were required since the changed logic is entirely
+  server-side; the null-safety ripple through `SOSAlert.latitude`/`longitude`/`userEmail` and the
+  decline wiring were verified by the existing suite plus `flutter analyze`. Not done, same
+  caveat as every SOS-dispatch change this session: a live two-account smoke test (confirm a
+  non-assigned browser truly can't see phone/email/exact coordinates; confirm an opted-out rider
+  genuinely stops receiving SOS pushes).
+

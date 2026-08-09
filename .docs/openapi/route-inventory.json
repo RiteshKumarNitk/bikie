@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-09T04:01:26.234Z",
-  "count": 125,
+  "generatedAt": "2026-08-09T08:21:57.269Z",
+  "count": 127,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -699,6 +699,15 @@
       "file": "apps/web/app/api/rider-location/route.ts"
     },
     {
+      "path": "/api/rider-location/sos-opt-out",
+      "methods": [
+        "GET",
+        "PUT"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/rider-location/sos-opt-out/route.ts"
+    },
+    {
       "path": "/api/rider-profile",
       "methods": [
         "GET",
@@ -722,6 +731,14 @@
       ],
       "auth": "membership",
       "file": "apps/web/app/api/riders/nearby/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/{id}/decline",
+      "methods": [
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/[id]/decline/route.ts"
     },
     {
       "path": "/api/sos/alerts/{id}/offer",

@@ -1,19 +1,23 @@
 import { getSafetyLocationModule } from "./modules/safety-location/public";
-import type { SosLocationFilter } from "./modules/safety-location/ports";
+import type { AlertViewer } from "./modules/safety-location/application/sos.application";
+import type { RawSOSAlertDTO, SosLocationFilter } from "./modules/safety-location/ports";
 import type { SOSAlertDTO, SOSAlertCreateInput } from "@bikie/types";
 
 /** Compatibility facade — routes keep importing SOSService. */
 export const SOSService = {
-  async createAlert(userId: string, data: SOSAlertCreateInput): Promise<SOSAlertDTO> {
+  /** Always the raw, non-redacted alert (fresh from creation) — the caller immediately hands
+   * this to SOSDispatchService.fanOut, before any HTTP read/redaction boundary (ADR-045). */
+  async createAlert(userId: string, data: SOSAlertCreateInput): Promise<RawSOSAlertDTO> {
     return getSafetyLocationModule().sos.createAlert(userId, data);
   },
 
-  async getActiveAlerts(location?: SosLocationFilter): Promise<SOSAlertDTO[]> {
-    return getSafetyLocationModule().sos.getActiveAlerts(location);
+  /** ADR-045 — `viewer` decides how much PII each returned alert carries; see pii-redaction.ts. */
+  async getActiveAlerts(location: SosLocationFilter | undefined, viewer: AlertViewer): Promise<SOSAlertDTO[]> {
+    return getSafetyLocationModule().sos.getActiveAlerts(location, viewer);
   },
 
-  async getAlertById(alertId: string): Promise<SOSAlertDTO | null> {
-    return getSafetyLocationModule().sos.getAlertById(alertId);
+  async getAlertById(alertId: string, viewer: AlertViewer): Promise<SOSAlertDTO | null> {
+    return getSafetyLocationModule().sos.getAlertById(alertId, viewer);
   },
 
   async getTimeline(alertId: string) {

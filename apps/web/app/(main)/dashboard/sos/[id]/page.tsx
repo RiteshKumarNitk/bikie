@@ -13,12 +13,13 @@ interface Alert {
   id: string;
   userId: string;
   userName: string;
+  // ADR-045 — null unless the viewer is the reporter, the assigned helper, or an admin.
   userPhone: string | null;
-  userEmail: string;
+  userEmail: string | null;
   type: string;
   description: string | null;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   city: string;
   status: string;
   severity: string;
@@ -313,16 +314,18 @@ export default function SOSAlertDetailPage() {
           ) : (
             <p>🏙️ {alert.city}</p>
           )}
-          <p>
-            <a
-              href={`https://www.google.com/maps?q=${alert.latitude},${alert.longitude}`}
-              target="_blank"
-              rel="noreferrer"
-              className="text-accent-text hover:underline"
-            >
-              View on map
-            </a>
-          </p>
+          {alert.latitude != null && alert.longitude != null && (
+            <p>
+              <a
+                href={`https://www.google.com/maps?q=${alert.latitude},${alert.longitude}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-accent-text hover:underline"
+              >
+                View on map
+              </a>
+            </p>
+          )}
         </div>
         {alert.description && <p className="mt-2 text-sm text-foreground/70">{alert.description}</p>}
         <p className="mt-2 text-xs text-foreground/40">{new Date(alert.createdAt).toLocaleString("en-IN")}</p>
@@ -426,8 +429,11 @@ export default function SOSAlertDetailPage() {
                   📞 Call {isAssignedHelper ? "Rider" : "Helper"}
                 </a>
               )}
+              {/* alert.latitude/longitude are non-null here — this whole panel only renders for
+                  a privileged viewer (assigned helper/reporter/admin), the same audience ADR-045
+                  redaction never withholds coordinates from. */}
               <a
-                href={mapsNavigateUrl(alert.latitude, alert.longitude)}
+                href={mapsNavigateUrl(alert.latitude!, alert.longitude!)}
                 target="_blank"
                 rel="noreferrer"
                 className="rounded-lg border border-foreground/15 px-3 py-1.5 text-xs font-medium hover:bg-foreground/5"
@@ -465,7 +471,7 @@ export default function SOSAlertDetailPage() {
                         pins={partners
                           .filter((p): p is Partner & { latitude: number; longitude: number } => p.latitude != null && p.longitude != null)
                           .map((p) => ({ id: p.userId, name: p.businessName, latitude: p.latitude, longitude: p.longitude }))}
-                        center={{ latitude: alert.latitude, longitude: alert.longitude }}
+                        center={{ latitude: alert.latitude!, longitude: alert.longitude! }}
                         height="12rem"
                       />
                     )}

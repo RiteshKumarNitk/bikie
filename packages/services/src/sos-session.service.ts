@@ -14,6 +14,9 @@ export const SOSSessionService = {
   withdrawOffer(offerId: string, responderId: string) {
     return getSafetyLocationModule().session.withdrawOffer(offerId, responderId);
   },
+  declineAlert(alertId: string, responderId: string, message?: string) {
+    return getSafetyLocationModule().session.declineAlert(alertId, responderId, message);
+  },
   listOffers(alertId: string, actorId: string, isAdmin: boolean) {
     return getSafetyLocationModule().session.listOffers(alertId, actorId, isAdmin);
   },

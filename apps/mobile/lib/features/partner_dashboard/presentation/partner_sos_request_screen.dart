@@ -62,6 +62,12 @@ class PartnerSosRequestScreen extends ConsumerStatefulWidget {
 class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScreen> {
   bool _busy = false;
   double? _distanceMeters;
+  // ADR-045 fix — `GET /api/sos/alerts/[id]/offers` is reporter/admin only (403 for anyone
+  // else), so a partner can never discover their own pending offer through it the way the
+  // original ADR-044 pass assumed. Tracked locally instead, set directly from offerHelp's own
+  // response — the same pattern the generic sos_detail_screen.dart already uses for exactly
+  // this reason.
+  SOSOffer? _myOffer;
 
   @override
   void initState() {
@@ -74,11 +80,15 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
   }
 
   void _computeDistance(({double latitude, double longitude}) location, SOSAlert alert) {
+    // ADR-045 — null pre-assignment (redacted); the partner already saw distance once on the
+    // Nearby Requests list (server-computed, PartnerNearbyRequestDTO), so this just has nothing
+    // to show here until the alert is privileged (assigned to them).
+    if (alert.latitude == null || alert.longitude == null) return;
     _distanceMeters = Geolocator.distanceBetween(
       location.latitude,
       location.longitude,
-      alert.latitude.toDouble(),
-      alert.longitude.toDouble(),
+      alert.latitude!.toDouble(),
+      alert.longitude!.toDouble(),
     );
   }
 
@@ -89,7 +99,6 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
 
   Future<void> _refresh() async {
     await ref.read(sosAlertDetailProvider(widget.alertId).notifier).refresh(widget.alertId);
-    await ref.read(sosOffersProvider(widget.alertId).notifier).refresh(widget.alertId);
   }
 
   Future<void> _handleAccept() async {
@@ -107,12 +116,27 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
       } catch (_) {
         // Offer without a location fix — distance/ETA just come back null.
       }
-      await ref.read(sosRepositoryProvider).offerHelp(
+      final offer = await ref.read(sosRepositoryProvider).offerHelp(
             widget.alertId,
             latitude: position?.latitude,
             longitude: position?.longitude,
           );
+      if (mounted) setState(() => _myOffer = offer);
       await _refresh();
+    } on ApiException catch (e) {
+      _showError(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  /// A persisted decision (ADR-045), not a local UI-only dismissal — pops only after the server
+  /// confirms, same busy/error handling as every other action here.
+  Future<void> _handleDecline() async {
+    setState(() => _busy = true);
+    try {
+      await ref.read(sosRepositoryProvider).declineAlert(widget.alertId);
+      if (mounted) context.pop();
     } on ApiException catch (e) {
       _showError(e.message);
     } finally {
@@ -124,6 +148,7 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
     setState(() => _busy = true);
     try {
       await ref.read(sosRepositoryProvider).withdrawOffer(widget.alertId, offerId);
+      if (mounted) setState(() => _myOffer = null);
       await _refresh();
     } on ApiException catch (e) {
       _showError(e.message);
@@ -145,6 +170,7 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
   }
 
   void _viewLocation(SOSAlert alert) {
+    if (alert.latitude == null || alert.longitude == null) return;
     launchUrl(
       Uri.parse('https://www.google.com/maps?q=${alert.latitude},${alert.longitude}'),
       mode: LaunchMode.externalApplication,
@@ -152,8 +178,10 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
   }
 
   void _navigate(SOSAlert alert) {
+    // Confirmed state only — alert is privileged (assigned to this partner) by the time this
+    // is reachable, so latitude/longitude are always present here (ADR-045).
     launchUrl(
-      Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${alert.latitude},${alert.longitude}'),
+      Uri.parse('https://www.google.com/maps/dir/?api=1&destination=${alert.latitude!},${alert.longitude!}'),
       mode: LaunchMode.externalApplication,
     );
   }
@@ -161,7 +189,6 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
   @override
   Widget build(BuildContext context) {
     final detailAsync = ref.watch(sosAlertDetailProvider(widget.alertId));
-    final offersAsync = ref.watch(sosOffersProvider(widget.alertId));
     final me = ref.watch(authControllerProvider).user;
 
     return Scaffold(
@@ -170,9 +197,7 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
         data: (detail) {
           final alert = detail.alert;
           final session = detail.session;
-          final myOffer = offersAsync.valueOrNull
-              ?.where((o) => o.responderId == me?.id && o.status == 'OFFERED')
-              .firstOrNull;
+          final myOffer = _myOffer;
 
           final requestState = derivePartnerRequestState(
             alert: alert,
@@ -189,7 +214,7 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
                   distanceMeters: _distanceMeters,
                   busy: _busy,
                   onAccept: _handleAccept,
-                  onDecline: () => context.pop(),
+                  onDecline: _handleDecline,
                   onViewLocation: () => _viewLocation(alert),
                 ),
               PartnerRequestState.waitingForRider => _WaitingForRiderView(
@@ -300,12 +325,14 @@ class _NeedsResponseView extends StatelessWidget {
                   const SizedBox(height: 8),
                   Text(alert.description!),
                 ],
-                const SizedBox(height: 12),
-                OutlinedButton.icon(
-                  icon: const Icon(Icons.map_outlined, size: 18),
-                  label: const Text('View Location'),
-                  onPressed: onViewLocation,
-                ),
+                if (alert.latitude != null && alert.longitude != null) ...[
+                  const SizedBox(height: 12),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.map_outlined, size: 18),
+                    label: const Text('View Location'),
+                    onPressed: onViewLocation,
+                  ),
+                ],
               ],
             ),
           ),

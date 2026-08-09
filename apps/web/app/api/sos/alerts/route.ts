@@ -34,7 +34,12 @@ export async function GET(request: Request) {
   const location = lat !== undefined && lng !== undefined
     ? { latitude: lat, longitude: lng, radiusMeters: ALERT_VISIBILITY_RADIUS_METERS }
     : undefined;
-  const alerts = await SOSService.getActiveAlerts(location);
+  // ADR-045 — each returned alert is redacted (phone/email/exact location nulled) unless this
+  // viewer is its reporter, its assigned helper, or an admin.
+  const alerts = await SOSService.getActiveAlerts(location, {
+    userId: session.user.id,
+    isAdmin: session.user.role === "ADMIN",
+  });
   return NextResponse.json({ alerts });
 }
 

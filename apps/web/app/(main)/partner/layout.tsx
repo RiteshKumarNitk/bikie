@@ -4,6 +4,7 @@ import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
 
 const navItems = [
   { label: "Overview", href: "/partner" },
+  { label: "SOS Emergency", href: "/partner/sos" },
   { label: "Fleet", href: "/partner/fleet" },
   { label: "Bookings", href: "/partner/bookings" },
   { label: "Messages", href: "/partner/messages" },

@@ -27,6 +27,19 @@ class NearbyRidersRepository {
     return apiGuard(() => _dio.put('/api/rider-location/consent', data: {'enabled': enabled}));
   }
 
+  /// ADR-045 — independent of location sharing: whether this rider should be paged as an SOS
+  /// dispatch candidate at all.
+  Future<bool> getReceiveSosAlerts() {
+    return apiGuard(() async {
+      final res = await _dio.get('/api/rider-location/sos-opt-out');
+      return res.data['enabled'] as bool;
+    });
+  }
+
+  Future<void> setReceiveSosAlerts(bool enabled) {
+    return apiGuard(() => _dio.put('/api/rider-location/sos-opt-out', data: {'enabled': enabled}));
+  }
+
   /// Throws `ApiException` with `errorCode == 'SHARING_DISABLED'` (409) if sharing isn't on.
   Future<void> updateLocation(double latitude, double longitude) {
     return apiGuard(

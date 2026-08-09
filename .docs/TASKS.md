@@ -2,6 +2,23 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SOS audit remediation: PII redaction, persisted decline, web Partner Dashboard, rider SOS opt-out (2026-08-09, ADR-045)
+
+| Task | Status |
+|---|---|
+| PII redaction: `domain/pii-redaction.ts` (`isPrivilegedViewer`/`redactAlertForViewer`), applied in `sos.application.ts`'s `getActiveAlerts`/`getAlertById`; new `RawSOSAlertDTO` internal type keeps redaction from leaking into dispatch/session/partner-dashboard code that always works with unredacted data | Completed |
+| `GET /api/sos/alerts` now attaches server-computed `distanceMeters` per alert (previously computed for radius filtering, then discarded) | Completed |
+| Persisted decline: new `SOSResponseStatus.DECLINED`, `session.application.ts`'s `declineAlert`, `POST /api/sos/alerts/[id]/decline`, `listNearbyOpenRequests` excludes already-offered/declined alerts via new `findRespondedAlertIds` | Completed |
+| **Fixed pre-existing bug** found while wiring decline: `partner_sos_request_screen.dart`'s "waiting for rider" state relied on `GET /api/sos/alerts/[id]/offers`, which is reporter/admin-only — a partner could never detect their own pending offer through it. Fixed on mobile and built correctly on the new web page from the start (offer tracked locally from `offerHelp`'s own response) | Completed |
+| **Confirmed already correct**: offer auto-expiry-on-accept (the audit assumed this was missing) — `acceptOffer`'s transaction already expired other `OFFERED` responses; only a regression test was added | Completed |
+| Web Partner SOS Dashboard: `/partner/sos` (availability, stats, previews), `/partner/sos/[id]` (Accept/Decline/Waiting/Confirmed), `PartnerAvailabilityToggle`, nav entry — zero new backend routes, reuses ADR-044's `/api/partner/*` as-is | Completed |
+| Rider SOS opt-out: `RiderLocation.receiveSosAlerts` (default `true`, additive migration), enforced in `findNearbyAroundPoint`'s SQL alongside `sharingEnabled`, `GET/PUT /api/rider-location/sos-opt-out`, `ReceiveSosAlertsToggle` (web settings page), second toggle row on `nearby_riders_screen.dart` (mobile) | Completed |
+| New `safety-location.e2e.test.ts`: full create→dispatch→offer→accept→complete→resolve flows against stateful in-memory port fakes — rider→rider, rider→provider, eligibility, accept/reject, multiple responders + assignment locking, decline, PII redaction, completion, escalation ordering | Completed |
+| **Fixed a real test-infra bug** found while writing the above: importing helpers from `safety-location.test.ts` caused Vitest to silently re-execute its whole suite as an import side effect, corrupting shared mock state. Extracted helpers into non-test `safety-location.test-support.ts` | Completed |
+| `.docs/SOS.md` fully rewritten — was stale since before ADR-033 (wrong category list, wrong route table, wrong fan-out model, no mention of the offer/accept/session lifecycle at all) | Completed |
+| Backend: 2 new migrations applied, zero drift; `pnpm turbo run typecheck` (9/9), `pnpm exec vitest run` (133/133, 15/15 files), OpenAPI inventory regenerated (125→127). Mobile: `flutter analyze` clean, `flutter test` (110/110) | Completed |
+| Live two-account smoke test (redaction genuinely hides PII from a browser session; an opted-out rider genuinely stops receiving SOS pushes) | **Not done** — not verified in this environment, same caveat as every prior SOS-dispatch change |
+
 ## Partner Emergency Assistance Dashboard + real SOS eligibility filtering (2026-08-09, ADR-044)
 
 | Task | Status |

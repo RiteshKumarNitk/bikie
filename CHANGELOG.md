@@ -1,5 +1,35 @@
 # Changelog
 
+## New — SOS PII redaction, persisted decline, web Partner Dashboard, rider SOS opt-out (ADR-045)
+- **Fixed**: anyone browsing or viewing an SOS alert who wasn't the reporter, the eventually
+  assigned helper, or an admin could see the reporter's exact phone number, email, and GPS
+  coordinates before anyone had even offered to help. Now redacted for everyone else — name,
+  category, city, and distance stay visible so browsing still makes sense; contact details and
+  exact location reveal themselves automatically once someone is actually assigned.
+- **New**: a service provider can now decline an assistance request — a real, persisted decision,
+  not just closing the screen. Declining removes that request from their own future "Nearby
+  Requests" list without notifying the reporter.
+- **New**: the Partner Emergency Assistance Dashboard (previously mobile-only) is now on web too
+  — `/partner/sos` (availability toggle, live stats, nearby/active previews) and
+  `/partner/sos/[id]` (accept/decline, waiting-for-rider, confirmed-with-navigate/call/chat),
+  built the same way the mobile screens were: alongside the existing rider-facing SOS pages, not
+  in place of them.
+- **New**: riders can now temporarily stop receiving SOS assistance requests without turning off
+  their "share my location" setting — two independent toggles instead of one overloaded one.
+  Existing riders are unaffected (still opted in by default).
+- **Fixed** (found while wiring the above, not part of the original ask): a partner's "waiting for
+  rider confirmation" screen could get stuck forever after a successful accept, because it was
+  reading an endpoint only the *reporter* is allowed to read. Fixed on both mobile and the new web
+  page.
+- Confirmed one thing already worked correctly and needed no fix: when a rider accepts a helper,
+  every other pending offer on that request is already automatically closed out — nothing extra
+  to build there.
+- Backend: 9/9 packages typecheck, 133/133 tests passing (new full-flow coverage: rider-to-rider,
+  rider-to-provider, eligibility, accept/decline, multiple responders, PII protection, completion,
+  and escalation ordering). Mobile: `flutter analyze` clean, `flutter test` (110/110) passing.
+- **Not done**: a live two-account test confirming redaction and the opt-out actually work end to
+  end against a real deployment — worth your own verification, same as every prior change to SOS.
+
 ## New — Partner Emergency Assistance Dashboard; fixed SOS eligibility bug (ADR-044)
 - **Fixed**: an SOS alert's `SERVICE_PROVIDERS` escalation tier could dispatch to *any* verified
   partner — including one whose service type had nothing to do with the emergency (a fuel-delivery

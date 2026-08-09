@@ -50,3 +50,8 @@ export const sosRatingSchema = z.object({
   rating: z.coerce.number().int().min(1).max(5),
   comment: z.string().max(500).optional(),
 });
+
+/** ADR-045 — declining without ever offering; body is optional (an empty POST is valid). */
+export const sosDeclineSchema = z.object({
+  message: z.string().max(500).optional(),
+});

@@ -12,11 +12,11 @@ _$SOSAlertImpl _$$SOSAlertImplFromJson(Map<String, dynamic> json) =>
       userId: json['userId'] as String,
       userName: json['userName'] as String,
       userPhone: json['userPhone'] as String?,
-      userEmail: json['userEmail'] as String,
+      userEmail: json['userEmail'] as String?,
       type: json['type'] as String,
       description: json['description'] as String?,
-      latitude: json['latitude'] as num,
-      longitude: json['longitude'] as num,
+      latitude: json['latitude'] as num?,
+      longitude: json['longitude'] as num?,
       city: json['city'] as String,
       status: json['status'] as String,
       severity: json['severity'] as String,
@@ -31,6 +31,7 @@ _$SOSAlertImpl _$$SOSAlertImplFromJson(Map<String, dynamic> json) =>
       riderVehicleType: json['riderVehicleType'] as String?,
       riderVehicleBrand: json['riderVehicleBrand'] as String?,
       riderVehicleModel: json['riderVehicleModel'] as String?,
+      distanceMeters: json['distanceMeters'] as num?,
     );
 
 Map<String, dynamic> _$$SOSAlertImplToJson(_$SOSAlertImpl instance) =>
@@ -58,6 +59,7 @@ Map<String, dynamic> _$$SOSAlertImplToJson(_$SOSAlertImpl instance) =>
       'riderVehicleType': instance.riderVehicleType,
       'riderVehicleBrand': instance.riderVehicleBrand,
       'riderVehicleModel': instance.riderVehicleModel,
+      'distanceMeters': instance.distanceMeters,
     };
 
 _$SOSHistoryEntryImpl _$$SOSHistoryEntryImplFromJson(

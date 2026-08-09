@@ -94,6 +94,7 @@ export function setSafetyLocationModuleForTests(module: SafetyLocationModule | n
 export type {
   NearbyPlace,
   PlaceType,
+  RawSOSAlertDTO,
   SafetyLocationPorts,
   SOSRecipient,
 } from "./ports";

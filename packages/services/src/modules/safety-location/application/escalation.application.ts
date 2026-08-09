@@ -1,9 +1,8 @@
-import type { SOSAlertDTO } from "@bikie/types";
 import { resolveChannelAvailability, type ChannelAvailability } from "../domain/channel-selection";
 import type { CommunicationsPorts } from "../../communications/public";
 import { partnerMatchesAlertType } from "../domain/partner-mapping";
 import type { SOSRecipient } from "../domain/dispatch-message";
-import type { SafetyLocationPorts } from "../ports";
+import type { RawSOSAlertDTO, SafetyLocationPorts } from "../ports";
 import { dispatchToRecipient, emptySummary, type SOSDispatchSummary } from "./fan-out.application";
 
 const INITIAL_RADIUS_METERS = 5000;
@@ -28,7 +27,7 @@ function nextTier(tier: string): Tier | null {
 }
 
 async function resolveNearbyRiders(
-  alert: Pick<SOSAlertDTO, "latitude" | "longitude" | "userId">,
+  alert: Pick<RawSOSAlertDTO, "latitude" | "longitude" | "userId">,
   ports: SafetyLocationPorts,
   radiusMeters: number,
 ): Promise<SOSRecipient[]> {
@@ -62,7 +61,7 @@ async function resolveNearbyRiders(
  * "SOS must never reach nobody" guarantee (ADR-030) holds without one.
  */
 async function resolveServiceProviders(
-  alert: Pick<SOSAlertDTO, "latitude" | "longitude" | "type">,
+  alert: Pick<RawSOSAlertDTO, "latitude" | "longitude" | "type">,
   ports: SafetyLocationPorts,
 ): Promise<SOSRecipient[]> {
   const candidates = await ports.partnerDispatch.findEligibleForAlert({
@@ -100,7 +99,7 @@ async function resolveServiceProviders(
 }
 
 async function notifyRecipients(
-  alert: SOSAlertDTO,
+  alert: RawSOSAlertDTO,
   recipients: SOSRecipient[],
   ports: SafetyLocationPorts,
   communications: CommunicationsPorts,
@@ -126,7 +125,7 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
    * immediately (ADR-030's guarantee, preserved even though the search is now staged).
    */
   async function seedEscalation(
-    alert: SOSAlertDTO,
+    alert: RawSOSAlertDTO,
     deps: EscalationDeps = {},
   ): Promise<{ summary: SOSDispatchSummary; nearbyRiderCount: number }> {
     const communications = deps.communications ?? ports.communications;
@@ -165,7 +164,7 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
   }
 
   /** One cron-poll step for one alert that's due (GET /api/cron/sos-escalate). */
-  async function tickEscalation(alert: SOSAlertDTO, deps: EscalationDeps = {}): Promise<void> {
+  async function tickEscalation(alert: RawSOSAlertDTO, deps: EscalationDeps = {}): Promise<void> {
     if (alert.assignedHelperId) {
       // Race between the cron query and processing — defensive no-op.
       await ports.sosAlerts.updateEscalationState(alert.id, { nextEscalationAt: null });

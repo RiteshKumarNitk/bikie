@@ -12,12 +12,14 @@ interface SOSAlert {
   id: string;
   userId: string;
   userName: string;
+  // ADR-045 — phone/email/exact location are null unless the viewer is the reporter, the
+  // assigned helper, or an admin.
   userPhone: string | null;
-  userEmail: string;
+  userEmail: string | null;
   type: string;
   description: string | null;
-  latitude: number;
-  longitude: number;
+  latitude: number | null;
+  longitude: number | null;
   city: string;
   status: string;
   severity: string;
@@ -27,6 +29,7 @@ interface SOSAlert {
   placeName: string | null;
   area: string | null;
   formattedAddress: string | null;
+  distanceMeters?: number | null;
 }
 
 const alertTypes = [
@@ -245,23 +248,33 @@ export default function SOSPage() {
                     </div>
                     <p className="mt-1 text-sm font-medium text-foreground/80">{a.userName}</p>
                     <div className="mt-1 space-y-0.5 text-sm text-foreground/50">
-                      <p>📧 {a.userEmail}</p>
+                      {a.userEmail && <p>📧 {a.userEmail}</p>}
                       {a.userPhone && <p>📞 {a.userPhone}</p>}
                       {a.formattedAddress || a.placeName ? (
                         <p>📍 {a.formattedAddress ?? [a.placeName, a.area, a.city].filter(Boolean).join(", ")}</p>
                       ) : (
                         <p>🏙️ {a.city}</p>
                       )}
-                      <p>
-                        <a
-                          href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-accent-text hover:underline"
-                        >
-                          View on map
-                        </a>
-                      </p>
+                      {a.distanceMeters != null && (
+                        <p>
+                          📏{" "}
+                          {a.distanceMeters < 1000
+                            ? `${a.distanceMeters} m away`
+                            : `${(a.distanceMeters / 1000).toFixed(1)} km away`}
+                        </p>
+                      )}
+                      {a.latitude != null && a.longitude != null && (
+                        <p>
+                          <a
+                            href={`https://www.google.com/maps?q=${a.latitude},${a.longitude}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-accent-text hover:underline"
+                          >
+                            View on map
+                          </a>
+                        </p>
+                      )}
                     </div>
                     {a.description && (
                       <p className="mt-2 text-sm text-foreground/70">{a.description}</p>

@@ -1,4 +1,3 @@
-import type { SOSAlertDTO } from "@bikie/types";
 import { toE164Phone } from "../../communications/domain/phone";
 import { whatsappShareUrl, type CommunicationsPorts } from "../../communications/public";
 import type { IdempotencyPort } from "../../platform/public";
@@ -16,6 +15,7 @@ import {
   type SOSRecipient,
 } from "../domain/dispatch-message";
 import { formatDistance, mapsNavigateUrl } from "../domain/maps";
+import type { RawSOSAlertDTO } from "../domain/pii-redaction";
 import type { SafetyLocationPorts } from "../ports";
 
 export interface SOSDispatchSummary {
@@ -109,7 +109,7 @@ function resolveEmergencyServices(): SOSRecipient[] {
 }
 
 export async function dispatchToRecipient(
-  alert: SOSAlertDTO,
+  alert: RawSOSAlertDTO,
   recipient: SOSRecipient,
   summary: SOSDispatchSummary,
   communications: CommunicationsPorts,
@@ -269,7 +269,7 @@ export function createFanOutApplication(ports: SafetyLocationPorts) {
     // Idempotency is the orchestrator's responsibility now (dispatch.application.ts) — it has
     // to span this leg AND escalation.seedEscalation's tier-1 leg together, since both run on
     // every alert creation and a retried request must not double-notify either one.
-    async fanOut(alert: SOSAlertDTO, deps: FanOutDeps = {}): Promise<SOSDispatchSummary> {
+    async fanOut(alert: RawSOSAlertDTO, deps: FanOutDeps = {}): Promise<SOSDispatchSummary> {
       const communications = deps.communications ?? ports.communications;
       const availability = resolveChannelAvailability(communications);
       const [emergencyContacts, emergencyServices] = await Promise.all([

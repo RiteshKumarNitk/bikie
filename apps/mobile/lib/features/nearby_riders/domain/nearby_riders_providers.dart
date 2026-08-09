@@ -7,6 +7,12 @@ final sharingEnabledProvider = FutureProvider.autoDispose<bool>((ref) {
   return ref.watch(nearbyRidersRepositoryProvider).getSharingEnabled();
 });
 
+/// ADR-045 — independent toggle from `sharingEnabledProvider`: whether this rider receives SOS
+/// dispatch pings at all.
+final receiveSosAlertsProvider = FutureProvider.autoDispose<bool>((ref) {
+  return ref.watch(nearbyRidersRepositoryProvider).getReceiveSosAlerts();
+});
+
 final radiusKmProvider = StateProvider<int>((ref) => 5);
 
 final nearbyRidersProvider = FutureProvider.autoDispose<List<NearbyRider>>((ref) {

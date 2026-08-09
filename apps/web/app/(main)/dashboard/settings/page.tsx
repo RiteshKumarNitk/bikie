@@ -7,6 +7,7 @@ import { RiderDetailsSettings } from "@/components/dashboard/RiderDetailsSetting
 import { BecomeServiceProviderAction } from "@/components/dashboard/BecomeServiceProviderAction";
 import { PushNotificationToggle } from "@/components/dashboard/PushNotificationToggle";
 import { RiderLocationToggle } from "@/components/dashboard/RiderLocationToggle";
+import { ReceiveSosAlertsToggle } from "@/components/dashboard/ReceiveSosAlertsToggle";
 
 export const metadata: Metadata = { title: "Profile" };
 
@@ -42,6 +43,9 @@ export default async function DashboardSettingsPage() {
         <p className="font-semibold">Nearby riders</p>
         <div className="mt-4">
           <RiderLocationToggle />
+        </div>
+        <div className="mt-4 border-t border-foreground/10 pt-4">
+          <ReceiveSosAlertsToggle />
         </div>
       </section>
 
