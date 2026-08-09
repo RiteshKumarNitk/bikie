@@ -64,18 +64,52 @@ class ProfileScreen extends ConsumerWidget {
 }
 
 /// ADR-046b — shown only once the account is dual-capable (`partnerStatus == 'APPROVED'`);
-/// mirrors web's Navbar "Switch Mode" control.
-class _ModeSwitch extends ConsumerWidget {
+/// mirrors web's Navbar "Switch Mode" control. Switching to Partner mode is server-verified
+/// (see [switchActiveMode]) — this button being visible is a UX convenience, not the actual
+/// authorization, so a since-suspended/rejected account still gets turned back at the door.
+class _ModeSwitch extends ConsumerStatefulWidget {
   const _ModeSwitch({required this.isPartnerMode});
 
   final bool isPartnerMode;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ModeSwitch> createState() => _ModeSwitchState();
+}
+
+class _ModeSwitchState extends ConsumerState<_ModeSwitch> {
+  bool _busy = false;
+
+  Future<void> _handleSwitch() async {
+    setState(() => _busy = true);
+    final result = await switchActiveMode(ref, widget.isPartnerMode ? 'RIDER' : 'PARTNER');
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    switch (result) {
+      case SwitchModeResult.success:
+        // Replaces the stack root (not a push) so no Rider-mode screens linger underneath the
+        // new tab set, and lands on Home so the freshly-swapped tabs render immediately.
+        context.go('/');
+      case SwitchModeResult.notApproved:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("You're not an approved Service Provider yet.")),
+        );
+        context.push('/become-provider');
+      case SwitchModeResult.networkError:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Couldn't verify Service Provider status. Please try again.")),
+        );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return OutlinedButton.icon(
-      onPressed: () => switchActiveMode(ref, isPartnerMode ? 'RIDER' : 'PARTNER'),
-      icon: const Icon(Icons.swap_horiz),
-      label: Text('Switch to ${isPartnerMode ? 'Rider' : 'Service Provider'} mode'),
+      onPressed: _busy ? null : _handleSwitch,
+      icon: _busy
+          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.swap_horiz),
+      label: Text(_busy ? 'Checking…' : 'Switch to ${widget.isPartnerMode ? 'Rider' : 'Service Provider'} mode'),
     );
   }
 }

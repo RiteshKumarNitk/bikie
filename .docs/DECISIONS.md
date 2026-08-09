@@ -1837,3 +1837,36 @@ changes:
   neither capability is ever lost) on a real deployment, same caveat as every prior SOS/Partner
   change in this project.
 
+### Follow-up: mobile mode-switch tightened to match web's server-verified authorization
+
+- **Gap.** Mobile's `switchActiveMode()` flipped the local mode straight from whatever
+  `partnerStatus` happened to already be cached, with no fresh server check — unlike web's
+  `switchActiveMode()` server action, which re-reads `session.user.partnerStatus` via a fresh
+  `getServerSession()` before allowing `PARTNER` mode. Every actual Partner-only *API call* was
+  always safe (each one re-checks capability server-side independently), but the mode-switch
+  action itself — the thing that decides which 5-tab set renders — trusted a value that could be
+  stale (e.g. an admin suspends the account mid-session; the device hasn't refreshed yet).
+- **Fix.** `switchActiveMode(ref, mode)` now, when switching *to* `'PARTNER'`, calls
+  `AuthController.refreshSession()` first — the same `GET /api/auth/get-session` Better Auth
+  endpoint web's `getServerSession()` reads, so this is the same authorization source, not a
+  parallel one. That single field (`partnerStatus === 'APPROVED'`) is sufficient proof of
+  authenticated + has a Partner row + approved + not suspended/rejected, since
+  `transitionPartnerVerification` is the only writer and those are the only states that value can
+  hold. Returns a `SwitchModeResult` (`success | notApproved | networkError`) instead of `void`:
+  the local mode/persisted preference only ever change on `success`; `notApproved` routes to
+  `/become-provider`; `networkError` leaves the mode untouched and surfaces a retry message.
+  Switching back to `'RIDER'` is unchanged — no server round-trip, since every account already
+  has baseline Rider capability.
+- **Already-correct, confirmed not new work.** `resolveActiveMode(partnerStatus, storedMode)`
+  already ignored a stored `'PARTNER'` preference whenever `partnerStatus` wasn't `APPROVED` —
+  so a since-suspended/rejected account that still has `storedMode: 'PARTNER'` on disk
+  auto-demotes to Rider tabs the moment `partnerStatus` gets refreshed (which the tightened
+  switch path now guarantees happens on every attempt to switch into Partner mode). New tests:
+  `test/features/auth/role_provider_test.dart` (6 cases — NOT_APPLIED/DRAFT/PENDING/
+  MORE_INFO/REJECTED all resolve RIDER, APPROVED respects/defaults correctly, SUSPENDED demotes).
+- **Not automated-test-covered**: `switchActiveMode`'s async orchestration itself (the
+  `AuthController.refreshSession()` call + result branching) — exercising it would need mocking
+  `AuthController`'s full dependency graph (repository + push service); verified by direct code
+  trace instead of a harness built for this one function. `flutter analyze` clean, full
+  `flutter test` suite (116/116 — 110 pre-existing + 6 new) passing.
+
