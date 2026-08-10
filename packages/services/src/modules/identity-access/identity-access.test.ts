@@ -282,4 +282,99 @@ describe("otp send/verify applications (ADR-034)", () => {
       expect(result).toBe(false);
     });
   });
+
+  describe("fixed test-number bypass (TEST_RIDER_PHONE/TEST_SERVICE_PROVIDER_PHONE/TEST_OTP)", () => {
+    const originalEnv = {
+      NODE_ENV: process.env.NODE_ENV,
+      TEST_RIDER_PHONE: process.env.TEST_RIDER_PHONE,
+      TEST_SERVICE_PROVIDER_PHONE: process.env.TEST_SERVICE_PROVIDER_PHONE,
+      TEST_OTP: process.env.TEST_OTP,
+    };
+
+    afterEach(() => {
+      for (const [key, value] of Object.entries(originalEnv)) {
+        if (value === undefined) delete process.env[key];
+        else process.env[key] = value;
+      }
+    });
+
+    it("accepts the fixed TEST_OTP for a configured test rider phone without calling MSG91", async () => {
+      process.env.NODE_ENV = "development";
+      process.env.TEST_RIDER_PHONE = "+919876500001";
+      process.env.TEST_OTP = "123456";
+      const nativeVerify = vi.fn(async () => true);
+      const widgetVerify = vi.fn(async () => ({ verified: true, phoneNumber: null }));
+      const { otp } = createIdentityAccessModule(
+        fakePorts({
+          msg91NativeOtp: { send: vi.fn(), verify: nativeVerify },
+          msg91WidgetVerify: { verifyAccessToken: widgetVerify },
+        }),
+      );
+
+      const result = await otp.verifyLoginOtp({ phoneNumber: "+919876500001", code: "123456" });
+
+      expect(result).toBe(true);
+      expect(nativeVerify).not.toHaveBeenCalled();
+      expect(widgetVerify).not.toHaveBeenCalled();
+    });
+
+    it("rejects a wrong code for a test phone without ever falling through to MSG91", async () => {
+      process.env.NODE_ENV = "development";
+      process.env.TEST_SERVICE_PROVIDER_PHONE = "+919876500002";
+      process.env.TEST_OTP = "123456";
+      const nativeVerify = vi.fn(async () => true);
+      const { otp } = createIdentityAccessModule(
+        fakePorts({ msg91NativeOtp: { send: vi.fn(), verify: nativeVerify } }),
+      );
+
+      const result = await otp.verifyLoginOtp({ phoneNumber: "+919876500002", code: "000000" });
+
+      expect(result).toBe(false);
+      expect(nativeVerify).not.toHaveBeenCalled();
+    });
+
+    it("never bypasses in production, even for a configured test number and correct code", async () => {
+      process.env.NODE_ENV = "production";
+      process.env.TEST_RIDER_PHONE = "+919876500001";
+      process.env.TEST_OTP = "123456";
+      const nativeVerify = vi.fn(async () => false);
+      const { otp } = createIdentityAccessModule(
+        fakePorts({ msg91NativeOtp: { send: vi.fn(), verify: nativeVerify } }),
+      );
+
+      const result = await otp.verifyLoginOtp({ phoneNumber: "+919876500001", code: "123456" });
+
+      expect(nativeVerify).toHaveBeenCalledWith("+919876500001", "123456");
+      expect(result).toBe(false);
+    });
+
+    it("skips MSG91's native send for a configured test number and reports test-bypass", async () => {
+      process.env.NODE_ENV = "development";
+      process.env.TEST_SERVICE_PROVIDER_PHONE = "+919876500002";
+      const send = vi.fn(async (): Promise<ChannelResult> => ({ ok: true, provider: "msg91" }));
+      const remember = vi.fn(async () => undefined);
+      const { otp } = createIdentityAccessModule(
+        fakePorts({ msg91NativeOtp: { send, verify: vi.fn() }, otpEcho: { remember, recall: vi.fn() } }),
+      );
+
+      const result = await otp.sendNativeLoginOtp({ phoneNumber: "+919876500002" });
+
+      expect(send).not.toHaveBeenCalled();
+      expect(remember).not.toHaveBeenCalled();
+      expect(result).toEqual({ ok: true, provider: "test-bypass" });
+    });
+
+    it("leaves a non-test phone number on the normal MSG91 send path", async () => {
+      process.env.NODE_ENV = "development";
+      process.env.TEST_RIDER_PHONE = "+919876500001";
+      const send = vi.fn(async (): Promise<ChannelResult> => ({ ok: true, provider: "msg91" }));
+      const { otp } = createIdentityAccessModule(
+        fakePorts({ msg91NativeOtp: { send, verify: vi.fn() } }),
+      );
+
+      await otp.sendNativeLoginOtp({ phoneNumber: "+919876543210" });
+
+      expect(send).toHaveBeenCalledWith("+919876543210", { otpLength: 6, expirySeconds: 300 });
+    });
+  });
 });

@@ -1,4 +1,5 @@
 import { toE164Phone } from "../../communications/domain/phone";
+import { isTestBypassPhoneNumber, matchesTestOtpCode } from "../domain/test-otp-bypass";
 import type { IdentityAccessPorts } from "../ports";
 
 /** MSG91's native OTP is numeric-only (we configure otp_length=6); the Widget SDK's access
@@ -15,6 +16,10 @@ const NATIVE_OTP_SHAPE = /^\d{4,9}$/;
 export function createOtpVerifyApplication(ports: IdentityAccessPorts) {
   return {
     async verifyLoginOtp(input: { phoneNumber: string; code: string }): Promise<boolean> {
+      if (isTestBypassPhoneNumber(input.phoneNumber)) {
+        return matchesTestOtpCode(input.code);
+      }
+
       const devCode = await ports.otpEcho.recall(input.phoneNumber);
       if (devCode !== null) {
         return devCode === input.code;

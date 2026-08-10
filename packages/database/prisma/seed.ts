@@ -6,8 +6,25 @@ const AUTH_BASE_URL = process.env.BETTER_AUTH_URL ?? "http://localhost:4000";
 
 const SEED_ACCOUNTS = {
   admin: { name: "BIKIE Admin", email: "admin@bikie.app", password: "Admin@12345" },
-  partner: { name: "Arjun Rentals", email: "partner@bikie.app", password: "Partner@12345" },
+  // Verified Service Provider persona (ADR-046b/047 test-account set) — Rider capability
+  // (role stays RENTER) plus an APPROVED Partner profile.
+  partner: { name: "BIKIE Test Verified Partner", email: "partner@bikie.app", password: "Partner@12345" },
   user: { name: "Demo Rider", email: "rider@bikie.app", password: "Rider@12345" },
+  // Service Provider persona with a profile created but nothing submitted yet — proves a
+  // Service Provider is active/usable without admin verification (spec section 4/6).
+  providerDraft: {
+    name: "Test SP Draft",
+    email: "provider-draft@bikie.app",
+    password: "Provider@12345",
+    phone: "+919900002222",
+  },
+  // Service Provider persona with an application submitted, awaiting admin review.
+  providerPending: {
+    name: "Test SP Pending",
+    email: "provider-pending@bikie.app",
+    password: "Provider@12345",
+    phone: "+919900003333",
+  },
   // Nearby riders used by the SOS fan-out E2E flow (see project doc / SOS testing guide).
   // Phones/emails are the live test WhatsApp + Gmail inboxes for local dispatch verification.
   nearby1: {
@@ -66,13 +83,9 @@ async function main() {
   const demoUser = await signUpViaAuthApi(SEED_ACCOUNTS.user);
 
   await prisma.user.update({ where: { id: adminUser.id }, data: { role: "ADMIN" } });
-  await prisma.user.update({ where: { id: partnerUser.id }, data: { role: "PARTNER" } });
-  // demoUser stays RENTER (default)
-
-  // No dummy Partner business profile is seeded — `partnerUser` has role PARTNER but no
-  // Partner row, so logging in hits the real partner-onboarding flow, same as a fresh partner
-  // signup would. Previously seeded a fake "Arjun Rentals" profile here; removed per explicit
-  // request once real data started replacing the demo dataset.
+  // demoUser and partnerUser both stay RENTER (default) — as of ADR-046b, `role` is account
+  // tier only, `PARTNER` is a legacy value no longer assigned. Service Provider capability
+  // lives entirely on `Partner.verificationStatus` / `User.partnerStatus`, set below.
 
   await prisma.user.update({
     where: { id: partnerUser.id },
@@ -81,6 +94,83 @@ async function main() {
   await prisma.user.update({
     where: { id: demoUser.id },
     data: { phone: "+919900001111", name: "Demo Rider" },
+  });
+
+  // --- Service Provider personas (ADR-046b/047) ---
+  // Three distinct capability/verification states on top of the existing Rider/Admin
+  // personas above, so the dual-capability model can be exercised end to end without
+  // manually walking every account through onboarding each time.
+
+  // 1) Verified Service Provider — reuses the existing `partner@bikie.app` account.
+  const verifiedPartner = await prisma.partner.upsert({
+    where: { userId: partnerUser.id },
+    update: {
+      verificationStatus: "APPROVED",
+      isVerified: true,
+      isAvailable: true,
+      isGeneralResponder: true,
+    },
+    create: {
+      userId: partnerUser.id,
+      businessName: SEED_ACCOUNTS.partner.name,
+      type: "MECHANIC",
+      city: SOS_SEED_GPS.city,
+      verificationStatus: "APPROVED",
+      isVerified: true,
+      isAvailable: true,
+      isGeneralResponder: true,
+      submittedAt: new Date(),
+      reviewedAt: new Date(),
+    },
+  });
+  await prisma.user.update({
+    where: { id: partnerUser.id },
+    data: { partnerStatus: verifiedPartner.verificationStatus },
+  });
+
+  // 2) Draft Service Provider — profile created, capability active, nothing submitted yet.
+  const providerDraftUser = await signUpViaAuthApi(SEED_ACCOUNTS.providerDraft);
+  await prisma.user.update({
+    where: { id: providerDraftUser.id },
+    data: { phone: SEED_ACCOUNTS.providerDraft.phone },
+  });
+  const draftPartner = await prisma.partner.upsert({
+    where: { userId: providerDraftUser.id },
+    update: {},
+    create: {
+      userId: providerDraftUser.id,
+      businessName: SEED_ACCOUNTS.providerDraft.name,
+      type: "FUEL_DELIVERY",
+      city: SOS_SEED_GPS.city,
+      verificationStatus: "DRAFT",
+    },
+  });
+  await prisma.user.update({
+    where: { id: providerDraftUser.id },
+    data: { partnerStatus: draftPartner.verificationStatus },
+  });
+
+  // 3) Pending-verification Service Provider — application submitted, awaiting admin review.
+  const providerPendingUser = await signUpViaAuthApi(SEED_ACCOUNTS.providerPending);
+  await prisma.user.update({
+    where: { id: providerPendingUser.id },
+    data: { phone: SEED_ACCOUNTS.providerPending.phone },
+  });
+  const pendingPartner = await prisma.partner.upsert({
+    where: { userId: providerPendingUser.id },
+    update: { verificationStatus: "PENDING_VERIFICATION" },
+    create: {
+      userId: providerPendingUser.id,
+      businessName: SEED_ACCOUNTS.providerPending.name,
+      type: "MECHANIC",
+      city: SOS_SEED_GPS.city,
+      verificationStatus: "PENDING_VERIFICATION",
+      submittedAt: new Date(),
+    },
+  });
+  await prisma.user.update({
+    where: { id: providerPendingUser.id },
+    data: { partnerStatus: pendingPartner.verificationStatus },
   });
 
   // No dummy Bike/Category/Destination/Testimonial/Trip content is seeded — all of it is
@@ -243,8 +333,20 @@ async function main() {
   console.log("Seeded nearby rider GPS fixes (PostGIS) for SOS fan-out.");
 
   console.log("Admin:", SEED_ACCOUNTS.admin.email, "/", SEED_ACCOUNTS.admin.password);
-  console.log("Partner:", SEED_ACCOUNTS.partner.email, "/", SEED_ACCOUNTS.partner.password);
-  console.log("Demo user:", SEED_ACCOUNTS.user.email, "/", SEED_ACCOUNTS.user.password);
+  console.log("Rider:", SEED_ACCOUNTS.user.email, "/", SEED_ACCOUNTS.user.password);
+  console.log("Verified Service Provider:", SEED_ACCOUNTS.partner.email, "/", SEED_ACCOUNTS.partner.password);
+  console.log(
+    "Draft Service Provider:",
+    SEED_ACCOUNTS.providerDraft.email,
+    "/",
+    SEED_ACCOUNTS.providerDraft.password,
+  );
+  console.log(
+    "Pending Service Provider:",
+    SEED_ACCOUNTS.providerPending.email,
+    "/",
+    SEED_ACCOUNTS.providerPending.password,
+  );
   console.log("Nearby1:", SEED_ACCOUNTS.nearby1.email, "/", SEED_ACCOUNTS.nearby1.password, "WA", SEED_ACCOUNTS.nearby1.phone);
   console.log("Nearby2:", SEED_ACCOUNTS.nearby2.email, "/", SEED_ACCOUNTS.nearby2.password, "WA", SEED_ACCOUNTS.nearby2.phone);
   console.log("SOS test GPS:", SOS_SEED_GPS.lat, SOS_SEED_GPS.lng, "city=", SOS_SEED_GPS.city);

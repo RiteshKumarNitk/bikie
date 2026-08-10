@@ -1,4 +1,5 @@
 import type { ChannelResult } from "../../communications/ports";
+import { isTestBypassPhoneNumber } from "../domain/test-otp-bypass";
 import type { IdentityAccessPorts } from "../ports";
 
 const DEV_OTP_LENGTH = 6;
@@ -22,6 +23,11 @@ function randomDevCode(length: number): string {
 export function createOtpSendApplication(ports: IdentityAccessPorts) {
   return {
     async sendNativeLoginOtp(input: { phoneNumber: string }): Promise<ChannelResult> {
+      if (isTestBypassPhoneNumber(input.phoneNumber)) {
+        console.log(`[OTP][TEST-BYPASS] ${input.phoneNumber} -> skipping MSG91, fixed test OTP`);
+        return { ok: true, provider: "test-bypass" };
+      }
+
       if (devBypassEnabled()) {
         const code = randomDevCode(DEV_OTP_LENGTH);
         await ports.otpEcho.remember(input.phoneNumber, code, DEV_OTP_EXPIRY_SECONDS);

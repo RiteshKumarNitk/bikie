@@ -1,5 +1,23 @@
 # BIKIE — Roadmap
 
+## Fixed: ADR-046b Migration Applied Live; Test-Number OTP Bypass; Seed Personas (2026-08-10, ADR-047)
+ADR-046b's dual-capability model was fully built but never applied to the live database — this
+closes that gap and the related loose ends found while verifying it live. The migration was
+applied (confirmed already run on 2026-08-09 with a real `finished_at` timestamp; earlier docs
+were stale). Live-DB testing then surfaced a real bug the migration's own backfill couldn't have
+caught: 8 accounts (including the seeded `partner@bikie.app`) had the legacy `role: PARTNER` with
+**no** `Partner` row at all, so the backfill's `Partner`-join never matched them, leaving them
+stranded with `partnerStatus: null` and no way to use Join-as-Service-Provider. Repaired by
+resetting those accounts to `role: RENTER` (matching what the migration would have done had a
+`Partner` row existed). Also: `seed.ts` was still assigning the legacy `role: PARTNER` to its demo
+partner account with no `Partner` row at all — fixed, and expanded to seed all 5 test personas
+(Rider, Draft/Pending/Verified Service Provider, Admin). New dev-only fixed-number OTP bypass
+(`TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`/`TEST_OTP`) lets mobile/API testing skip MSG91
+entirely for named numbers, independent of the existing random-code `SHOW_OTP_TOAST` bypass,
+always disabled when `NODE_ENV=production`. The full flow (OTP bypass signup/login → become-provider
+→ profile → submit → admin approve → availability unlock) was verified live end-to-end against the
+real Neon DB and a running dev server, not just unit tests. See ADR-047.
+
 ## New: Rider ⇄ Service Provider Dual Capability (2026-08-09, ADR-046b)
 One BIKIE account can now hold Rider capability (always on) and Service Provider capability at
 the same time. Becoming a Service Provider is no longer an instant self-service role flip that
@@ -8,8 +26,8 @@ and an admin approves, rejects, requests more information, or suspends it. Once 
 same account can switch between Rider and Service Provider modes at will (Navbar/Profile "Switch
 Mode") without ever losing either capability. `User.role` now only distinguishes Rider vs Admin;
 Service Provider status lives on `Partner.verificationStatus`, decoupled from role entirely. See
-ADR-046b — includes a data-backfill migration for existing Service Provider accounts, not yet
-applied to the live database (needs explicit go-ahead).
+ADR-046b — includes a data-backfill migration for existing Service Provider accounts, applied to
+the live database 2026-08-09 (see ADR-047 for a follow-up repair of accounts the backfill missed).
 
 ## Fixed: New Service Provider Registrations Stuck Showing the Rider Experience (2026-08-09, ADR-046)
 A brand-new mobile number registering as a Service Provider had its role correctly set to

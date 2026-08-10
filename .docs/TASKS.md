@@ -2,6 +2,22 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## ADR-046b migration applied live; orphaned-account repair; fixed-number OTP bypass; 5 seed personas (2026-08-10, ADR-047)
+
+| Task | Status |
+|---|---|
+| Confirm live-DB migration state (prior docs said "not applied") | Completed — `_prisma_migrations` shows `20260809120000_partner_capability_model` already ran 2026-08-09T17:55:47Z; docs were stale, corrected |
+| Repair 8 accounts (7 real phone-signups + seeded `partner@bikie.app`) left with legacy `role: PARTNER` + no `Partner` row at all, missed by the migration's own backfill join | Completed — explicit user go-ahead, `role → RENTER`, no `Partner` row invented |
+| Fix `seed.ts`'s identical `role: "PARTNER"` bug (no `Partner` row) on the demo partner account | Completed |
+| Seed all 5 required test personas (Rider, Admin, Draft/Pending/Verified Service Provider) | Completed — `admin@bikie.app`/`rider@bikie.app` reused as-is, `partner@bikie.app` became the Verified persona, 2 new accounts (`provider-draft@bikie.app`, `provider-pending@bikie.app`) added |
+| Dev-only fixed-number OTP bypass (`TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`/`TEST_OTP`), backend-only, always blocked in production | Completed — `identity-access/domain/test-otp-bypass.ts`, wired into `otp-verify`/`otp-send` applications |
+| Web login/signup UI test-number support | **Explicitly out of scope** — user decision: mobile/API only, web stays 100% real MSG91 |
+| Document/shop-photo upload UI | **Explicitly out of scope** — user decision: leave as the pre-existing known gap |
+| New tests: fixed-bypass accept/reject/production-lockout (verify) + skip-MSG91/non-test-number-unaffected (send) | Completed — 5 new cases in `identity-access.test.ts` |
+| Backend: `pnpm turbo run typecheck` (8/9 — pre-existing unrelated `razorpay.service.ts` error, confirmed present on `master` before this work), `pnpm exec vitest run` (138/138, 15/15 files) | Completed |
+| Live verification against the real Neon DB + a running dev server (not just unit tests): OTP-bypass signup + re-login, become-provider profile create/submit with no membership/verification required, verified-only route correctly rejecting until approved, admin approve, same-session availability unlock | Completed — via direct API calls (curl), not a browser session |
+| Live two-device/browser session test (mode-switch UI, availability affecting real SOS dispatch, concurrent multi-responder fan-out) | **Not done** — not verifiable in this environment, same caveat as every prior SOS/Partner change |
+
 ## Rider ⇄ Service Provider dual capability + application/verification workflow (2026-08-09, ADR-046b)
 
 | Task | Status |
@@ -20,8 +36,8 @@ Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 | Backend: `pnpm turbo run typecheck` (9/9), `pnpm exec vitest run` (133/133), OpenAPI inventory regenerated (127→130). Mobile: `flutter analyze` (0 issues), `flutter test` (110/110), freezed/json codegen regenerated | Completed |
 | Document/shop-photo upload UI for the application form (schema/DTOs/validation already accept the URLs; no upload widget wired on either platform yet) | **Not built** — explicitly deferred this pass |
 | New mobile unit tests for `getApplication`/`submitApplication`/`reapply` | **Not built** — covered only by `flutter analyze`/full-suite pass, not dedicated coverage |
-| Apply the pending migration to the live DB | **Not done** — needs explicit user go-ahead, rewrites existing account role/capability data |
-| Live two-account smoke test (apply → admin approves/rejects → mode switch → confirm neither capability is ever lost) | **Not done** — not verified in this environment |
+| Apply the pending migration to the live DB | Completed — confirmed 2026-08-10 already applied 2026-08-09T17:55:47Z (this row was stale); see ADR-047 for the orphaned-account repair the backfill itself couldn't reach |
+| Live two-account smoke test (apply → admin approves/rejects → mode switch → confirm neither capability is ever lost) | Partially done (2026-08-10, ADR-047) — apply→submit→approve→availability-unlock verified via direct API calls against the live DB; mode-switch UI and a real two-device session are still **not done** |
 
 ## Service Provider registration/dashboard audit (2026-08-09, ADR-046)
 

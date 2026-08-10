@@ -1870,3 +1870,87 @@ changes:
   trace instead of a harness built for this one function. `flutter analyze` clean, full
   `flutter test` suite (116/116 — 110 pre-existing + 6 new) passing.
 
+## ADR-047: ADR-046b migration applied live; orphaned-account repair; fixed-number OTP bypass; 5 seed personas
+
+- **Context.** A request to "correct the Service Provider model" turned out, on inspection, to
+  already be correctly designed and built — ADR-046b landed the exact one-account
+  Rider+Service-Provider dual-capability model two days earlier, confirmed still intact at `HEAD`
+  (three intervening commits touched SOS internals/mobile files, never reverted it). What remained
+  was closing the gap between "designed and built" and "live and testable": the migration had
+  never been applied, `seed.ts` still contradicted the model it was meant to demonstrate, and no
+  test-OTP mechanism existed for the spec's `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`
+  requirement.
+- **Migration applied — and found already applied.** Running `prisma migrate status` reported
+  "up to date"; querying `_prisma_migrations` directly showed
+  `20260809120000_partner_capability_model` had a real `finished_at` (2026-08-09T17:55:47Z) — it
+  had already been run in an earlier session, just never marked as such in `TASKS.md`/ADR-046b
+  (both said "not applied," and this ADR's own predecessor entry above has been corrected in
+  place rather than left stale).
+- **Bug found that the migration's own backfill couldn't have caught.** ADR-046b's backfill
+  UPDATE only reaches `User` rows with a matching `Partner` row (`WHERE p."userId" = u."id" AND
+  u."role" = 'PARTNER'`). Querying live data turned up 8 accounts with `role: PARTNER` and **no**
+  `Partner` row at all — 7 real phone-signups (`phone-XXXXXXXXXX@bikie.local`, consistent with
+  earlier dev/test sessions on this pre-launch app) plus the seeded `partner@bikie.app`. These
+  were never reachable by the backfill's join and were left stranded: legacy role, `partnerStatus:
+  null`, no `Partner` row to build an application on top of. Repaired (explicit user go-ahead,
+  separate from the pre-approved migration itself) with a one-off `role → RENTER` UPDATE scoped
+  exactly to that `LEFT JOIN ... WHERE Partner.id IS NULL` set — matching what ADR-046b's own
+  migration would have produced had a `Partner` row existed. No `Partner` row was invented for
+  them; they simply regain a clean `NOT_APPLIED` starting point.
+- **`seed.ts` had the identical bug ADR-046b was written to prevent.** Line 69 still did
+  `data: { role: "PARTNER" }` for the demo partner account with no `Partner` row created —
+  contradicting ADR-046b's own schema comment that `PARTNER` is a legacy value no longer assigned.
+  Fixed, and used as the seed vehicle for the spec's 5 required test personas rather than adding
+  5 parallel new accounts: `admin@bikie.app` (Admin, unchanged) and `rider@bikie.app` (plain
+  Rider, unchanged) already covered 2 of the 5; `partner@bikie.app` became the **Verified Service
+  Provider** persona (`Partner.verificationStatus: APPROVED`, `isVerified: true`, `isAvailable:
+  true`, `isGeneralResponder: true` — SOS-eligible out of the box); two new accounts,
+  `provider-draft@bikie.app` and `provider-pending@bikie.app`, cover the **Draft** (profile
+  created, capability active, nothing submitted — the spec's "active without verification" rule)
+  and **Pending Verification** states respectively.
+- **Fixed-number OTP bypass (`TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`/`TEST_OTP`),
+  backend-only by explicit user decision.** New `identity-access/domain/test-otp-bypass.ts`:
+  `isTestOtpBypassEnabled()` is a hard `NODE_ENV !== "production"` check with no override;
+  `isTestBypassPhoneNumber()` matches against comma-separated lists in either env var (E.164
+  normalized via the existing `toE164Phone`); `matchesTestOtpCode()` compares against a single
+  `TEST_OTP`. Wired into two places: `otp-verify.application.ts`'s `verifyLoginOtp` checks this
+  *before* the existing `otpEcho.recall()` dev-bypass — a match returns immediately (success or
+  failure) without ever calling `msg91NativeOtp.verify`/`msg91WidgetVerify`, so a wrong-code guess
+  against a test number can never fall through and spend a real MSG91 verification attempt.
+  `otp-send.application.ts`'s `sendNativeLoginOtp` (mobile's native send path) skips MSG91 for a
+  test number entirely and returns `{ ok: true, provider: "test-bypass" }` — no `DevOtpStore`
+  round-trip needed since the code is fixed and already known. **Deliberately independent of
+  `SHOW_OTP_TOAST`/`DevOtpStore`**: that mechanism generates a random per-session code for manual
+  toast-based QA; this one is a fixed, predictable credential for named personas in automated/API
+  testing — different purpose, same production-lockout guarantee.
+  **Web UI intentionally left untouched** (explicit user decision): making the browser login page
+  itself accept these numbers would require the client bundle to know the test phone list (even
+  dead-code-eliminated in production builds via a `NODE_ENV` check), which was judged unnecessary
+  surface for a testing convenience — mobile app and direct API/curl calls already exercise the
+  same shared `POST /api/auth/phone-number/verify` endpoint MSG91-free. Continues through the
+  *normal* `signUpOnVerification`/`callbackOnVerification` path unchanged, so a test number's
+  first login genuinely creates/logs in an ordinary `User` row exactly as a real OTP verification
+  would — no separate account type, no bypassed authorization rule.
+- **Verified live, not just unit-tested.** Started a real dev server against the live Neon DB and
+  drove the full flow with `curl`: brand-new signup via `TEST_RIDER_PHONE` + fixed `TEST_OTP`
+  (skips MSG91, creates an ordinary `RENTER`), re-login with the same number (same `User.id`,
+  confirming it's a login not a re-signup), `TEST_SERVICE_PROVIDER_PHONE` signup → `GET
+  /api/partner/application` (`NOT_APPLIED`) → `PUT /api/partner/profile` (creates `DRAFT`, no
+  membership/verification required, confirming spec's "active without verification" rule) → `POST
+  /api/partner/application/submit` (`PENDING_VERIFICATION`) → a verified-only route
+  (`PATCH /api/partner/availability`) correctly rejecting with `PARTNER_NOT_APPROVED` → admin
+  email/password login → `PATCH /api/admin/partners/[id]` `{action: "APPROVE"}` → the same
+  session (no re-login) immediately passing the previously-rejected availability call. This
+  confirms sections 4/6's core rule end-to-end: profile creation/submission needs no verification,
+  a named high-trust action does, and approval takes effect on the existing session.
+- **Explicitly out of scope, by explicit user decision.** Document/shop-photo upload UI (ADR-046b
+  already deferred this; fields exist, no widget on either platform — unchanged). Live two-device
+  SOS fan-out / mode-switch-UI / availability-affects-dispatch testing — same caveat as every
+  prior SOS-related ADR in this project, not verifiable without a real browser/device session.
+- **Consequences.** `pnpm turbo run typecheck`: 8/9 packages clean (`@bikie/services` has one
+  pre-existing `razorpay.service.ts` type error, confirmed present on `master` before this work
+  via `git stash`, unrelated to anything touched here). `pnpm exec vitest run`: 138/138 passing,
+  15/15 files (was 133/133 — 5 new tests for the bypass, covering accept/reject/production-lockout
+  on verify and skip-MSG91/non-test-number-unaffected on send). `.env.example` documents the 3 new
+  vars under a dedicated "TEST-ONLY" block; real dev-only values added to `apps/web/.env.local`.
+
