@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { PartnerService } from "@bikie/services";
 import { partnerProfileSchema } from "@bikie/validation";
-import { requireApprovedPartner, requireSession } from "@/lib/require-role";
+import { requirePartnerCapability, requireSession } from "@/lib/require-role";
 
 /** Already-approved partners' business-profile read (`/partner/settings`). Brand-new/pending
  * applicants read their in-progress application via `GET /api/partner/application` instead. */
 export async function GET() {
-  const { session, error } = await requireApprovedPartner();
+  const { session, error } = await requirePartnerCapability();
   if (error) return error;
 
   const profile = await PartnerService.getProfile(session.user.id);

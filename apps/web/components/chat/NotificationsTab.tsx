@@ -34,11 +34,14 @@ function linkifyBody(body: string) {
 
 export function NotificationsTab({ userId }: { userId: string }) {
   const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
-  // An approved Service Provider has their own SOS dashboard (/partner/sos) — route the "Open
-  // SOS dashboard" link there instead of the generic Rider one (ADR-046b: keyed on capability,
-  // not `role`, since a dual-capability account's role no longer indicates this).
+  // A capable Service Provider (ADR-049: active profile, verification status irrelevant here)
+  // has their own SOS dashboard (/partner/sos) — route the "Open SOS dashboard" link there
+  // instead of the generic Rider one (keyed on capability, not `role` or verification).
   const { data: session } = authClient.useSession();
-  const sosDashboardHref = session?.user.partnerStatus === "APPROVED" ? "/partner/sos" : "/dashboard/sos";
+  const sosDashboardHref =
+    session?.user.partnerStatus != null && session.user.partnerStatus !== "SUSPENDED"
+      ? "/partner/sos"
+      : "/dashboard/sos";
 
   useEffect(() => {
     let cancelled = false;

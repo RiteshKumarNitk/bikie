@@ -53,12 +53,17 @@ export default async function middleware(request: NextRequest) {
   }
 
   const role = session.user.role as string | undefined;
-  // ADR-046b — Service Provider capability, decoupled from `role`. Server-verified (it's read
-  // straight off the session, never trusted from a client-supplied cookie) — this is what every
-  // hard gate below (`/partner`) actually checks; the `selectedRole` cookie below is UX routing
-  // only (which of the two dashboards a *capable* account currently wants to see).
+  // ADR-049 — Service Provider CAPABILITY, decoupled from both `role` (ADR-046b) and from
+  // verification/`APPROVED` status. Server-verified (read straight off the session, never
+  // trusted from a client-supplied cookie) — this is what every hard gate below (`/partner`)
+  // actually checks; the `selectedRole` cookie below is UX routing only (which of the two
+  // dashboards a *capable* account currently wants to see). A profile exists (`partnerStatus`
+  // set at all) and hasn't been admin-`SUSPENDED` — verification status doesn't matter here,
+  // deliberately: membership is additionally enforced server-side per `/api/partner/**` call
+  // (`evaluatePartnerCapability`) and by the explicit "Switch Mode" action, not on every
+  // navigation, matching how Rider membership already isn't checked on every `/dashboard` render.
   const partnerStatus = session.user.partnerStatus as string | null | undefined;
-  const isApprovedPartner = partnerStatus === "APPROVED";
+  const isCapableServiceProvider = partnerStatus != null && partnerStatus !== "SUSPENDED";
 
   const cookieMode = request.cookies.get(SELECTED_ROLE_COOKIE)?.value;
   const activeMode: SelectedRole = isSelectedRole(cookieMode) ? cookieMode : resolveActiveMode(partnerStatus);
@@ -67,7 +72,7 @@ export default async function middleware(request: NextRequest) {
   const isAdminRoute = isPathOrSubpath(pathname, "/admin");
   const isDashboardRoute = isPathOrSubpath(pathname, "/dashboard");
 
-  if (isPartnerRoute && !isApprovedPartner) {
+  if (isPartnerRoute && !isCapableServiceProvider) {
     return NextResponse.redirect(new URL(dashboardHomeFor(role, activeMode), url));
   }
   if (isAdminRoute && role !== "ADMIN") {
@@ -75,11 +80,11 @@ export default async function middleware(request: NextRequest) {
   }
   // A Service Provider currently in Service Provider mode must never land on the Rider
   // dashboard — that's where SOS *creation* (Red/Amber panic cards) lives. Only a UX
-  // routing concern (not a capability gate, hence keyed on `activeMode` not `isApprovedPartner`
-  // alone) — a dual-capability account in Rider mode is completely unaffected. ADMIN is
-  // intentionally exempt (see dashboardHomeFor above — admins get the rider experience outside
-  // of /admin by design).
-  if (isDashboardRoute && role !== "ADMIN" && isApprovedPartner && activeMode === "PARTNER") {
+  // routing concern (not the capability gate above, hence also keyed on `activeMode`) — a
+  // dual-capability account in Rider mode is completely unaffected. ADMIN is intentionally
+  // exempt (see dashboardHomeFor above — admins get the rider experience outside of /admin by
+  // design).
+  if (isDashboardRoute && role !== "ADMIN" && isCapableServiceProvider && activeMode === "PARTNER") {
     return NextResponse.redirect(new URL(dashboardHomeFor(role, activeMode), url));
   }
   // Entering either section while capable implicitly switches the active mode to match —
@@ -87,7 +92,7 @@ export default async function middleware(request: NextRequest) {
   // A full redirect (not just setting the cookie on a pass-through response) so the new cookie
   // value is guaranteed visible to the page's own server-side `cookies()` read in this same
   // navigation, not just the next one.
-  const impliedMode: SelectedRole | null = isPartnerRoute && isApprovedPartner ? "PARTNER" : isDashboardRoute ? "RIDER" : null;
+  const impliedMode: SelectedRole | null = isPartnerRoute && isCapableServiceProvider ? "PARTNER" : isDashboardRoute ? "RIDER" : null;
 
   if (!isSelectedRole(cookieMode) || (impliedMode && impliedMode !== cookieMode)) {
     const response = NextResponse.redirect(url);

@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
 import { SOSSessionService } from "@bikie/services";
 import { partnerNearbyQuerySchema } from "@bikie/validation";
-import { requireApprovedPartner } from "@/lib/require-role";
+import { requirePartnerCapability } from "@/lib/require-role";
 
 /** ADR-044 — the partner's "Nearby Requests" list: open (unassigned) SOS alerts within range,
  * category-matched, only while verified + available. Returns an empty list rather than an error
  * for an offline/unverified partner (see partner-dashboard.application.ts). */
 export async function GET(request: Request) {
-  const { session, error } = await requireApprovedPartner();
+  const { session, error } = await requirePartnerCapability();
   if (error) return error;
 
   const url = new URL(request.url);

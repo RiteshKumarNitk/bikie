@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { getIdentityAccessModule } from "@bikie/services";
 import { SELECTED_ROLE_COOKIE, isSafeNext, type SelectedRole } from "@/lib/role";
 import { getServerSession } from "@/lib/get-session";
 
@@ -29,16 +30,30 @@ export async function selectRole(role: SelectedRole, next?: string) {
   redirect(target);
 }
 
-/** ADR-046b — the post-auth "Switch Mode" control. Server-verifies capability before allowing
- * PARTNER (never trusts the client to only call this when it's actually approved) and redirects
- * straight to the target dashboard, same round-trip-a-redirect approach `middleware.ts` uses so
- * the new cookie value is visible to the destination page's own `cookies()` read immediately. */
+/** ADR-046b — the post-auth "Switch Mode" control. Server-verifies CAPABILITY (ADR-049: an active
+ * profile + active membership — not verification/`APPROVED`) before allowing PARTNER, never
+ * trusting the client to only call this when it's actually entitled, and redirects straight to
+ * the target dashboard, same round-trip-a-redirect approach `middleware.ts` uses so the new
+ * cookie value is visible to the destination page's own `cookies()` read immediately. This is the
+ * one mode-routing path that's allowed the extra membership DB round-trip `resolveActiveMode`/
+ * `middleware.ts` deliberately skip — it only runs on a deliberate button press, not every
+ * request. */
 export async function switchActiveMode(mode: SelectedRole) {
   const session = await getServerSession();
   if (!session) redirect("/login");
 
-  if (mode === "PARTNER" && session.user.partnerStatus !== "APPROVED") {
-    redirect("/dashboard/become-provider");
+  if (mode === "PARTNER") {
+    const { access } = getIdentityAccessModule();
+    const decision = await access.evaluatePartnerCapability({
+      userId: session.user.id,
+      role: session.user.role,
+      accountStatus: session.user.accountStatus,
+      accountStatusExpiresAt: session.user.accountStatusExpiresAt,
+      partnerStatus: session.user.partnerStatus,
+    });
+    if (!decision.allowed) {
+      redirect(decision.reason === "MEMBERSHIP_REQUIRED" ? "/membership" : "/dashboard/become-provider");
+    }
   }
 
   const store = await cookies();

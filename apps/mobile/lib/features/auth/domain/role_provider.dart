@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
+import '../../membership/data/membership_repository.dart';
 import 'auth_controller.dart';
 
 /// Mirrors the web's `SELECTED_ROLE_COOKIE` (`lib/role.ts`) — a pre-auth UI
@@ -15,35 +16,38 @@ final selectedRoleProvider = StateProvider<String>((ref) => 'RENTER');
 /// ever been recorded. Never trusted for authorization by itself — see [resolveActiveMode].
 final activeModeProvider = StateProvider<String?>((ref) => ref.watch(appPreferencesProvider).activeMode);
 
-/// Derives the effective mode from the stored preference + server-verified capability — same
-/// semantics as web's `resolveActiveMode()` in `apps/web/lib/role.ts`: defaults to `'PARTNER'`
-/// only when the account is actually approved and no preference has been recorded yet; every
-/// other case (including an approved account whose last recorded preference was `'RIDER'`)
-/// respects the stored value or falls back to `'RIDER'`, the universal baseline. Also what
-/// silently demotes a since-suspended/rejected account back to Rider tabs the next time
-/// `partnerStatus` gets refreshed (app resume, [switchActiveMode] itself, etc.) — this function
-/// never trusts `storedMode` alone.
+/// Derives the effective mode from the stored preference + server-verified CAPABILITY — same
+/// semantics as web's `resolveActiveMode()` in `apps/web/lib/role.ts`. ADR-049: capability is
+/// decoupled from verification — defaults to `'PARTNER'` only when a Service Provider profile
+/// exists at all and hasn't been admin-suspended (verification status doesn't matter: `DRAFT`/
+/// `PENDING_VERIFICATION`/`MORE_INFORMATION_REQUIRED`/`REJECTED`/`APPROVED` all count) and no
+/// preference has been recorded yet; every other case (including a capable account whose last
+/// recorded preference was `'RIDER'`) respects the stored value or falls back to `'RIDER'`, the
+/// universal baseline. Also what silently demotes a since-suspended account back to Rider tabs
+/// the next time `partnerStatus` gets refreshed (app resume, [switchActiveMode] itself, etc.) —
+/// this function never trusts `storedMode` alone. Deliberately no membership check here (cheap,
+/// session-only — evaluated on every rebuild); membership is enforced in [switchActiveMode]
+/// itself and by every actual `/api/partner/**` call server-side.
 String resolveActiveMode(String? partnerStatus, String? storedMode) {
-  final isApprovedPartner = partnerStatus == 'APPROVED';
+  final hasCapability = partnerStatus != null && partnerStatus != 'SUSPENDED';
   if (storedMode == 'PARTNER' || storedMode == 'RIDER') {
-    return isApprovedPartner ? storedMode! : 'RIDER';
+    return hasCapability ? storedMode! : 'RIDER';
   }
-  return isApprovedPartner ? 'PARTNER' : 'RIDER';
+  return hasCapability ? 'PARTNER' : 'RIDER';
 }
 
 /// Outcome of a [switchActiveMode] attempt — the caller uses this to decide what to show; the
 /// mode/tab set only ever actually changes on `success`.
-enum SwitchModeResult { success, notApproved, networkError }
+enum SwitchModeResult { success, notCapable, membershipRequired, networkError }
 
 /// The mode-switch action itself (tightened to match web's `switchActiveMode()` server action —
-/// see DECISIONS.md ADR-046b's mode-switch follow-up). Switching TO Partner mode never trusts
-/// the locally-cached `partnerStatus` — it re-verifies against the server first, via the same
-/// `GET /api/auth/get-session` Better Auth endpoint web's `getServerSession()` reads
-/// (`AuthController.refreshSession()`, already the app's one "get me the authoritative current
-/// user" call). That single field is sufficient to prove authenticated + has a Partner profile +
-/// APPROVED + not suspended/rejected — `partnerStatus` can only ever be `'APPROVED'` if all of
-/// those are simultaneously true (see `admin.repository.ts`'s `transitionPartnerVerification`,
-/// which is the only writer). Switching back to Rider mode needs no such check — every account
+/// see DECISIONS.md ADR-046b's mode-switch follow-up, corrected for capability-vs-verification by
+/// ADR-049). Switching TO Partner mode never trusts the locally-cached `partnerStatus` — it
+/// re-verifies against the server first, via the same `GET /api/auth/get-session` Better Auth
+/// endpoint web's `getServerSession()` reads (`AuthController.refreshSession()`, already the
+/// app's one "get me the authoritative current user" call), then checks active membership (the
+/// one mode-routing path allowed that extra round-trip — it only runs on a deliberate button
+/// press, not every rebuild). Switching back to Rider mode needs no such check — every account
 /// already has baseline Rider capability, and every actual Partner-only API call re-checks
 /// capability server-side regardless of what this local mode says either way.
 Future<SwitchModeResult> switchActiveMode(WidgetRef ref, String mode) async {
@@ -55,8 +59,17 @@ Future<SwitchModeResult> switchActiveMode(WidgetRef ref, String mode) async {
       return SwitchModeResult.networkError;
     }
     final freshPartnerStatus = ref.read(authControllerProvider).user?.partnerStatus;
-    if (freshPartnerStatus != 'APPROVED') {
-      return SwitchModeResult.notApproved;
+    if (freshPartnerStatus == null || freshPartnerStatus == 'SUSPENDED') {
+      return SwitchModeResult.notCapable;
+    }
+
+    try {
+      final membership = await ref.read(membershipRepositoryProvider).getActive();
+      if (membership == null) {
+        return SwitchModeResult.membershipRequired;
+      }
+    } catch (_) {
+      return SwitchModeResult.networkError;
     }
   }
 

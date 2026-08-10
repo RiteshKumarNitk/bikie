@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { PartnerService } from "@bikie/services";
 import { partnerAvailabilitySchema } from "@bikie/validation";
-import { requireApprovedPartner } from "@/lib/require-role";
+import { requirePartnerCapability } from "@/lib/require-role";
 
 /** ADR-044 — the "🟢 Available / ⚫ Offline" toggle. */
 export async function PATCH(request: Request) {
-  const { session, error } = await requireApprovedPartner();
+  const { session, error } = await requirePartnerCapability();
   if (error) return error;
 
   const parsed = partnerAvailabilitySchema.safeParse(await request.json());

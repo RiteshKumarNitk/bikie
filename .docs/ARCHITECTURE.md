@@ -96,33 +96,47 @@ The web app authenticates via Better Auth's HTTP-only session cookie. The Flutte
 `requireSession()`/`requireRole()`/`requireMembership()`, resolves the session from
 either the cookie or an `Authorization: Bearer <token>` header with no per-route changes.
 
-### Dual capability: Rider + Service Provider (ADR-046b)
+### Dual capability: Rider + Service Provider (ADR-046b), capability vs. verification (ADR-049)
 
 One account can hold Rider capability (universal, always on) and Service Provider
 ("Partner") capability at the same time — becoming a Partner no longer replaces the
-account's Rider standing or requires a second login. Three previously-conflated concerns
+account's Rider standing or requires a second login. Four previously-conflated concerns
 are now separate:
 
 - **Account tier** — `User.role` (`RENTER`/`ADMIN`), unaffected by Partner capability.
-- **Partner capability** — `Partner.verificationStatus` (`DRAFT → PENDING_VERIFICATION →
-  APPROVED`, or `MORE_INFORMATION_REQUIRED`/`REJECTED`/`SUSPENDED`), reached through a real
-  application + admin-review workflow (`PartnerService.submitApplication`,
-  `AdminService.transitionPartnerVerification`) — never an instant self-service flip.
-  Denormalized onto `User.partnerStatus` (a Better Auth `additionalFields` entry, same
-  mechanism as `role`) so `session.user.partnerStatus` is cheaply available everywhere;
+- **Partner CAPABILITY** (ADR-049) — whether the account can operate as a Service Provider
+  at all: an active `Partner` profile (a row exists) + active membership + not admin-
+  `SUSPENDED`. Does **not** depend on verification — `DRAFT`/`PENDING_VERIFICATION`/
+  `MORE_INFORMATION_REQUIRED`/`REJECTED`/`APPROVED` all grant full capability, matching the
+  product rule "Service Provider ≠ Verified Service Provider." Only `SUSPENDED` (a
+  deliberate admin trust/safety action) revokes it. Gated by `evaluatePartnerCapability`
+  (async — checks membership) for actual API access, or the cheaper `hasPartnerCapabilitySync`
+  (session-only, no membership lookup) for UI mode-routing paths evaluated on every
+  request/render (middleware, tab bar).
+- **Partner VERIFICATION** — `Partner.verificationStatus` (`DRAFT → PENDING_VERIFICATION →
+  APPROVED`, or `MORE_INFORMATION_REQUIRED`/`REJECTED`/`SUSPENDED`), reached through a real,
+  **optional** application + admin-review workflow (`PartnerService.submitApplication`,
+  `AdminService.transitionPartnerVerification`) — never required just to create a profile or
+  operate. Denormalized onto `User.partnerStatus` (a Better Auth `additionalFields` entry,
+  same mechanism as `role`) so `session.user.partnerStatus` is cheaply available everywhere;
   `Partner.isVerified` is kept in sync (`true` iff `verificationStatus === APPROVED`) so
-  every pre-existing SOS-eligibility query that reads it needed no changes.
+  every pre-existing SOS-eligibility query that reads it needed no changes. Verification is
+  checked on its own only by the specific actions that legitimately need it — currently just
+  the stricter `requireAvailableAndCapacity` gate on `POST /api/sos/alerts/[id]/offer`
+  (reads `partnerStatus === "APPROVED"` directly, intentionally not through the capability
+  gate below).
 - **Active UI mode** — which dashboard (`/dashboard` vs `/partner`) a *capable* account
   currently wants to see, driven by the same `selectedRole` cookie (web) / persisted device
   preference (mobile, `AppPreferences.activeMode`) already used pre-auth for `/signup`/
   `/login` copy — repurposed post-auth as the mode switch
   (`switchActiveMode()`/`resolveActiveMode()`). **Never trusted for authorization** — every
-  route still gates on server-verified `partnerStatus`, the mode only decides which screen
+  route still gates on server-verified capability, the mode only decides which screen
   renders.
 
-`requireApprovedPartner()` (`apps/web/lib/require-role.ts`) replaces
-`requireRole("PARTNER")` on every `/api/partner/**` route; the policy itself lives in
-`identity-access`'s `evaluatePartnerCapability`.
+`requirePartnerCapability()` (`apps/web/lib/require-role.ts`, renamed from
+`requireApprovedPartner` by ADR-049) replaces `requireRole("PARTNER")` on every
+`/api/partner/**` route; the policy itself lives in `identity-access`'s
+`evaluatePartnerCapability`.
 
 ## Rides (community rides)
 

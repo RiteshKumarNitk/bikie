@@ -17,9 +17,11 @@ const navItems = [
 
 export default async function PartnerLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession();
-  // ADR-046b — capability gate, not a role check: any account with an APPROVED Partner
-  // application reaches this dashboard, RENTER or (legacy) PARTNER role alike.
-  if (!session || session.user.partnerStatus !== "APPROVED") redirect("/login?next=/partner");
+  // ADR-046b/ADR-049 — capability gate, not a role check and not a verification check: any
+  // account with an active (non-SUSPENDED) Service Provider profile reaches this dashboard,
+  // regardless of `role` or verification status — mirrors middleware.ts's own gate exactly.
+  const partnerStatus = session?.user.partnerStatus;
+  if (!session || partnerStatus == null || partnerStatus === "SUSPENDED") redirect("/login?next=/partner");
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">

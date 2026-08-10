@@ -12,10 +12,18 @@ export type SelectedRole = "RIDER" | "PARTNER";
  */
 
 /** Derives a starting mode when no cookie is present yet (first-ever visit, or a fresh/cleared
- * session). Defaults to PARTNER only when the account actually has approved Service Provider
- * capability — every other case falls back to RIDER, the universal baseline every account has. */
+ * session). Defaults to PARTNER only when the account actually has Service Provider CAPABILITY —
+ * every other case falls back to RIDER, the universal baseline every account has.
+ *
+ * ADR-049: capability is decoupled from verification — a Service Provider profile exists
+ * (`partnerStatus` is set at all) and hasn't been `SUSPENDED`. `DRAFT`/`PENDING_VERIFICATION`/
+ * `MORE_INFORMATION_REQUIRED`/`REJECTED`/`APPROVED` all still resolve to PARTNER mode being
+ * available; only a genuinely absent profile or an explicit suspension falls back to RIDER. This
+ * is the cheap, session-only check (no membership lookup — see
+ * `evaluatePartnerCapability`/`hasPartnerCapabilitySync` in `identity-access` for why that's
+ * deliberately not done here, on a path evaluated on every request/render). */
 export function resolveActiveMode(partnerStatus: string | null | undefined): SelectedRole {
-  return partnerStatus === "APPROVED" ? "PARTNER" : "RIDER";
+  return partnerStatus != null && partnerStatus !== "SUSPENDED" ? "PARTNER" : "RIDER";
 }
 
 export function isSelectedRole(value: string | undefined | null): value is SelectedRole {

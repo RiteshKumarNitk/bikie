@@ -166,6 +166,79 @@ describe("access application", () => {
   });
 });
 
+describe("Service Provider capability, decoupled from verification (ADR-049)", () => {
+  it("denies with no session or a restricted account, before checking anything partner-related", async () => {
+    const { access } = createIdentityAccessModule(fakePorts());
+    await expect(access.evaluatePartnerCapability(null)).resolves.toEqual({
+      allowed: false,
+      reason: "UNAUTHENTICATED",
+    });
+    await expect(
+      access.evaluatePartnerCapability(session({ partnerStatus: "APPROVED", accountStatus: "BANNED" })),
+    ).resolves.toEqual({ allowed: false, reason: "ACCOUNT_RESTRICTED" });
+  });
+
+  it("denies an account with no Partner profile at all", async () => {
+    const { access } = createIdentityAccessModule(fakePorts());
+    await expect(access.evaluatePartnerCapability(session({ partnerStatus: null }))).resolves.toEqual({
+      allowed: false,
+      reason: "PARTNER_NOT_APPROVED",
+    });
+  });
+
+  it("denies a SUSPENDED profile — the one verification state that also revokes capability", async () => {
+    const { access } = createIdentityAccessModule(
+      fakePorts({ membership: { hasActiveMembership: vi.fn(async () => true) } }),
+    );
+    await expect(access.evaluatePartnerCapability(session({ partnerStatus: "SUSPENDED" }))).resolves.toEqual({
+      allowed: false,
+      reason: "PARTNER_NOT_APPROVED",
+    });
+  });
+
+  it.each(["DRAFT", "PENDING_VERIFICATION", "MORE_INFORMATION_REQUIRED", "REJECTED", "APPROVED"])(
+    "grants capability for verificationStatus=%s as long as membership is active — verification is never the gate",
+    async (partnerStatus) => {
+      const { access } = createIdentityAccessModule(
+        fakePorts({ membership: { hasActiveMembership: vi.fn(async () => true) } }),
+      );
+      await expect(access.evaluatePartnerCapability(session({ partnerStatus }))).resolves.toEqual({
+        allowed: true,
+      });
+    },
+  );
+
+  it("still requires active membership, independent of profile/verification state", async () => {
+    const { access } = createIdentityAccessModule(
+      fakePorts({ membership: { hasActiveMembership: vi.fn(async () => false) } }),
+    );
+    await expect(access.evaluatePartnerCapability(session({ partnerStatus: "DRAFT" }))).resolves.toEqual({
+      allowed: false,
+      reason: "MEMBERSHIP_REQUIRED",
+    });
+  });
+
+  describe("hasPartnerCapabilitySync (cheap, session-only, for UI mode-routing)", () => {
+    const { access } = createIdentityAccessModule(fakePorts());
+
+    it("is false with no session, a restricted account, no profile, or SUSPENDED", () => {
+      expect(access.hasPartnerCapabilitySync(null)).toBe(false);
+      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "APPROVED", accountStatus: "BANNED" }))).toBe(
+        false,
+      );
+      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: null }))).toBe(false);
+      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "SUSPENDED" }))).toBe(false);
+    });
+
+    it("is true for any non-null, non-SUSPENDED profile — no membership lookup involved", () => {
+      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "DRAFT" }))).toBe(true);
+      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "PENDING_VERIFICATION" }))).toBe(true);
+      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "REJECTED" }))).toBe(true);
+      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "APPROVED" }))).toBe(true);
+    });
+  });
+});
+
 describe("otp send/verify applications (ADR-034)", () => {
   const originalShowOtpToast = process.env.SHOW_OTP_TOAST;
 

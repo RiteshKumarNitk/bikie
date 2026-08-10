@@ -1,5 +1,15 @@
 # BIKIE — Roadmap
 
+## Fixed: Pending-Verification Service Providers Can Now Actually Use the Platform (2026-08-10, ADR-049)
+A Service Provider whose verification was still `PENDING` could not toggle Available/Offline,
+view their own dashboard, manage bikes/bookings/reviews, or see nearby SOS requests — every
+`/api/partner/**` route required full admin `APPROVED` status, contradicting the core product
+rule that a Service Provider doesn't need to be verified to operate, only to earn a trust badge.
+Fixed by separating capability (an active, non-suspended profile + active membership — unlocks
+everything except one legitimately high-trust SOS action) from verification (a separate,
+optional, admin-reviewed status). No database migration was needed — the fix turned out to be
+entirely in which existing fields the authorization checks read. See ADR-049.
+
 ## Fixed: SOS Dispatch Now Notifies Riders and Service Providers Together (2026-08-10, ADR-048)
 An audit against an "Uber/Ola-style" dispatch spec found the SOS system already implemented
 almost all of it — assignment locking, decline persistence, offer expiry, the full assistance

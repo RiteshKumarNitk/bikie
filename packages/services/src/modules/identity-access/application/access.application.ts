@@ -44,12 +44,44 @@ export function createAccessApplication(ports: IdentityAccessPorts) {
       return hasPermission(session!.role, permission) ? ALLOWED : denied("FORBIDDEN");
     },
 
-    /** ADR-046b — Service Provider capability, decoupled from `role`. A dual-capability account
-     * still passes this the same way whether it's currently RENTER or was ever PARTNER. */
-    evaluatePartnerCapability(session: SessionSnapshot | null | undefined): AccessDecision {
+    /**
+     * ADR-049 — Service Provider CAPABILITY, decoupled from both `role` (ADR-046b) and from
+     * verification/`APPROVED` status. A Service Provider does not need admin verification to
+     * operate — only an active profile (a `Partner` row exists — created the moment a user
+     * completes "Join as Service Provider," never gated on admin review) and active membership.
+     * `SUSPENDED` is the one deliberate admin trust/safety action that also revokes capability,
+     * not just the verification badge; `DRAFT`/`PENDING_VERIFICATION`/`MORE_INFORMATION_REQUIRED`/
+     * `REJECTED`/`APPROVED` all keep full capability — verification stays a separately-displayed
+     * status, checked on its own only by the specific actions that legitimately need it (e.g. the
+     * stricter SOS `requireAvailableAndCapacity` gate, which reads `partnerStatus === "APPROVED"`
+     * directly and is intentionally untouched by this function).
+     */
+    async evaluatePartnerCapability(
+      session: SessionSnapshot | null | undefined,
+    ): Promise<AccessDecision> {
       const sessionDecision = evaluateSession(session);
       if (!sessionDecision.allowed) return sessionDecision;
-      return session!.partnerStatus === "APPROVED" ? ALLOWED : denied("PARTNER_NOT_APPROVED");
+      if (session!.partnerStatus == null || session!.partnerStatus === "SUSPENDED") {
+        return denied("PARTNER_NOT_APPROVED");
+      }
+      const activeMembership = await ports.membership.hasActiveMembership(session!.userId);
+      return activeMembership ? ALLOWED : denied("MEMBERSHIP_REQUIRED");
+    },
+
+    /**
+     * Cheap, session-only capability check (no membership DB call) — for UI mode-routing paths
+     * evaluated on every render/request (middleware, tab bar, mode resolvers), where an extra
+     * query per request isn't warranted. Mirrors the identical precedent Rider membership already
+     * sets: reaching `/dashboard` never checks membership either, only specific actions do.
+     * `evaluatePartnerCapability` above (async, membership-checked) is what actually gates every
+     * `/api/partner/**` route and the deliberate "Switch to Service Provider Mode" action.
+     */
+    hasPartnerCapabilitySync(session: SessionSnapshot | null | undefined): boolean {
+      if (!session) return false;
+      if (isAccountRestricted({ status: session.accountStatus, expiresAt: session.accountStatusExpiresAt })) {
+        return false;
+      }
+      return session.partnerStatus != null && session.partnerStatus !== "SUSPENDED";
     },
 
     /** Admins bypass membership — they monitor the network without buying a plan. */

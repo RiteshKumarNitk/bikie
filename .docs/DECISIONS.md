@@ -2038,3 +2038,77 @@ changes:
   cross-city/cross-radius leakage under real GPS data — same caveat as every prior SOS-dispatch
   ADR in this project.
 
+## ADR-049: Service Provider CAPABILITY decoupled from verification — `partnerStatus === "APPROVED"` was gating the wrong thing
+
+- **Context.** ADR-046b built the correct *shape* (one account, Rider always on, Partner
+  capability layered on top) but wired every actual gate — `requireApprovedPartner()` on all 11
+  `/api/partner/**` routes, web's `resolveActiveMode`/`switchActiveMode`/`middleware.ts`, and
+  mobile's `resolveActiveMode`/`switchActiveMode` — to `partnerStatus === "APPROVED"`. That's
+  verification, not capability. Concretely broken: a Service Provider with verification `PENDING`
+  could not toggle Available/Offline, view their own dashboard, manage bikes/bookings/reviews, or
+  see nearby SOS requests — every one of those blocked by the same APPROVED-only check, directly
+  contradicting the product rule "Service Provider ≠ Verified Service Provider." The one place
+  `APPROVED` was the *correct* gate — `POST /api/sos/alerts/[id]/offer`'s stricter
+  `requireAvailableAndCapacity` check, a genuinely high-trust safety-critical action — was already
+  right and is untouched by this ADR.
+- **Schema decision: no migration.** The obvious-looking fix (a separate `Partner.profileStatus`
+  Draft/Completed/Active column, decoupled from `verificationStatus`) turned out to be solving a
+  problem that doesn't exist: `partnerProfileSchema` already requires `businessName`/`type`/`city`
+  on every save, so any persisted `Partner` row is already "complete" by construction — a
+  `profileStatus` column would never differ from "row exists or not." Per explicit user decision,
+  capability is instead derived entirely from existing data: **a `Partner` row exists
+  (`partnerStatus` is non-null) AND `verificationStatus !== "SUSPENDED"` AND active membership.**
+  `DRAFT`/`PENDING_VERIFICATION`/`MORE_INFORMATION_REQUIRED`/`REJECTED`/`APPROVED` all grant full
+  capability — `SUSPENDED` is the one deliberate admin trust/safety action that revokes it too,
+  not just the verification badge. This satisfies every scenario in the product spec, including
+  verification being genuinely optional (a profile can sit at `DRAFT` forever, never submitted,
+  and still operate), with zero migration risk.
+- **Two capability checks, by design, not an accident.** `evaluatePartnerCapability`
+  (`identity-access/application/access.application.ts`) is now `async` — it checks the profile
+  condition above, then calls `ports.membership.hasActiveMembership()`, matching the product
+  spec's explicit "Active Service Provider membership" requirement. This is what gates every
+  actual `/api/partner/**` call and the deliberate "Switch to Service Provider Mode" action (web
+  `switchActiveMode` server action, mobile `switchActiveMode` in `role_provider.dart` — both now
+  call the membership check too, mobile via the existing `membershipRepositoryProvider.getActive()`
+  same one `/membership` already uses). A second, deliberately cheaper `hasPartnerCapabilitySync`
+  (session-only, no membership DB call) exists for paths evaluated on *every* request/render —
+  `middleware.ts`'s `/partner/*` gate, `resolveActiveMode` (web `lib/role.ts` and mobile
+  `role_provider.dart`), the Navbar mode-switch button visibility, `PartnerLayout`'s own
+  server-side guard — matching the exact precedent Rider membership already sets: reaching
+  `/dashboard` has never checked membership either, only specific actions do. The tradeoff this
+  accepts: an account whose membership lapses while already in Partner mode isn't instantly kicked
+  back to Rider tabs on next render, only blocked on its next `/api/partner/**` call or its next
+  attempt to *switch into* Partner mode — the same latency Rider membership lapses already have.
+- **Renamed for honesty.** `requireApprovedPartner()` → `requirePartnerCapability()`
+  (`apps/web/lib/require-role.ts`) — the old name was actively misleading once verification
+  stopped being the gate. The wire error code stays `PARTNER_NOT_APPROVED` (minimizing client-side
+  string-matching churn across web/mobile) but its message changed from "This requires an approved
+  Service Provider application" to "This requires an active Service Provider profile," since the
+  old text was simply now false. `MEMBERSHIP_REQUIRED` (an existing, separate reason) is returned
+  when the profile condition passes but membership doesn't, so a client can route the user
+  correctly (to `/become-provider` vs. `/membership`) instead of collapsing both failures into one
+  message.
+- **Every remaining `partnerStatus === "APPROVED"` capability check found and corrected**:
+  `apps/web/lib/role.ts` (`resolveActiveMode`), `apps/web/lib/actions/role-actions.ts`
+  (`switchActiveMode`, now also membership-checked via `evaluatePartnerCapability`),
+  `apps/web/middleware.ts` (`isCapableServiceProvider`, renamed from `isApprovedPartner`),
+  `apps/web/app/(main)/partner/layout.tsx` (its own duplicate server-side guard),
+  `apps/web/components/layout/Navbar.tsx` (mode-switch button visibility),
+  `apps/web/components/chat/NotificationsTab.tsx` ("Open SOS dashboard" link target), and mobile's
+  `role_provider.dart` (`resolveActiveMode`/`switchActiveMode`) +
+  `profile_screen.dart` (`isCapableServiceProvider`, mode-switch result handling). All 11
+  `/api/partner/**` route files renamed their import from `requireApprovedPartner` to
+  `requirePartnerCapability`. `POST /api/sos/alerts/[id]/offer` was read-verified unchanged —
+  confirmed it never went through any of the renamed functions, since it inlines its own
+  `partnerStatus === "APPROVED"` check for the one legitimately verification-gated action.
+- **Consequences.** `pnpm turbo run typecheck`: 8/9 clean (same pre-existing unrelated
+  `razorpay.service.ts` error). `pnpm exec vitest run`: 152/152 passing, 15/15 files — 11 new
+  tests covering the full capability matrix (no profile / SUSPENDED / each non-suspended
+  verification status × membership on/off) for both `evaluatePartnerCapability` and
+  `hasPartnerCapabilitySync`. Mobile: `flutter analyze` clean, `flutter test` 113/113 (1
+  pre-existing test rewritten — it had asserted the old, incorrect DRAFT/PENDING/REJECTED→RIDER
+  behavior as if it were correct). Not verified in this environment: a live PENDING-verification
+  Service Provider walking through dashboard/availability/bikes/messages end-to-end in a real
+  browser/device session, and a live membership-lapse-mid-session scenario — same caveat as every
+  prior architecture change in this project without a browser/device harness available.
+

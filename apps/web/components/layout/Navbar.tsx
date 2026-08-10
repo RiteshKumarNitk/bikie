@@ -83,7 +83,10 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
   }, [userMenuOpen]);
 
   const dashboardHref = dashboardHrefForRole(session?.user.role, role);
-  const isApprovedPartner = session?.user.partnerStatus === "APPROVED";
+  // ADR-049 — capability (an active, non-suspended profile), not verification/`APPROVED`; the
+  // "Switch Mode" click itself re-verifies (including membership) server-side in switchActiveMode.
+  const isCapableServiceProvider =
+    session?.user.partnerStatus != null && session.user.partnerStatus !== "SUSPENDED";
 
   const navLinkClass = "text-sm font-medium text-foreground/70 hover:text-foreground transition-colors";
 
@@ -159,7 +162,7 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                         </svg>
                         Dashboard
                       </Link>
-                      {isApprovedPartner && (
+                      {isCapableServiceProvider && (
                         <button
                           type="button"
                           onClick={() => {

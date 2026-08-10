@@ -35,7 +35,7 @@ function toResponse(reason: AccessDenialReason) {
       return NextResponse.json(
         {
           error: "PARTNER_NOT_APPROVED",
-          message: "This requires an approved Service Provider application.",
+          message: "This requires an active Service Provider profile.",
         },
         { status: 403 },
       );
@@ -94,14 +94,18 @@ export async function requireMembership() {
   return { session: null, error };
 }
 
-/** ADR-046b — Service Provider capability gate for `/api/partner/**`, replacing
- * `requireRole("PARTNER")`. Checks the server-verified `Partner.verificationStatus` (via the
- * denormalized session field), never a client-supplied "active mode" — capability and mode are
- * deliberately different concerns, see DECISIONS.md ADR-046b. */
-export async function requireApprovedPartner() {
+/** ADR-046b/ADR-049 — Service Provider CAPABILITY gate for `/api/partner/**`, replacing
+ * `requireRole("PARTNER")`. Checks an active profile + active membership (never verification —
+ * `Partner.verificationStatus === "APPROVED"` is a separate, optional trust badge, see
+ * DECISIONS.md ADR-049), and never a client-supplied "active mode" — capability and mode are
+ * deliberately different concerns (ADR-046b). The one exception, by design, is the SOS
+ * `requireAvailableAndCapacity` gate (`POST /api/sos/alerts/[id]/offer`), which legitimately does
+ * need verification for that one high-trust action and reads `partnerStatus === "APPROVED"`
+ * directly — not through this function. */
+export async function requirePartnerCapability() {
   const session = await getServerSession();
   const { access } = getIdentityAccessModule();
-  const decision = access.evaluatePartnerCapability(session ? toSnapshot(session) : null);
+  const decision = await access.evaluatePartnerCapability(session ? toSnapshot(session) : null);
 
   if (!decision.allowed || !session) {
     return { session: null, error: toResponse(decision.allowed ? "UNAUTHENTICATED" : decision.reason) };

@@ -2,6 +2,23 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Service Provider CAPABILITY decoupled from verification (2026-08-10, ADR-049)
+
+| Task | Status |
+|---|---|
+| Audit every `partnerStatus === "APPROVED"` capability check across backend/web/mobile before changing anything | Completed — 11 `/api/partner/**` routes + web middleware/role/role-actions/layout/Navbar/NotificationsTab + mobile role_provider/profile_screen, all found and corrected |
+| Schema decision: new `Partner.profileStatus` column vs. reuse existing data | Completed — no migration; `partnerProfileSchema` already requires full completeness on every save, so capability is derived from `partnerStatus` non-null + `!== SUSPENDED` + active membership |
+| `evaluatePartnerCapability` rewritten (async, membership-checked) — `DRAFT`/`PENDING_VERIFICATION`/`MORE_INFORMATION_REQUIRED`/`REJECTED`/`APPROVED` all grant capability, only `SUSPENDED` revokes it | Completed |
+| New `hasPartnerCapabilitySync` — cheap, session-only, for UI mode-routing paths evaluated every request/render (no membership DB call) | Completed |
+| `requireApprovedPartner()` renamed to `requirePartnerCapability()`, all 11 route imports updated | Completed |
+| Web: `middleware.ts`, `lib/role.ts`, `lib/actions/role-actions.ts` (membership check added to `switchActiveMode`), `partner/layout.tsx`, `Navbar.tsx`, `NotificationsTab.tsx` | Completed |
+| Mobile: `role_provider.dart` (`resolveActiveMode`, `switchActiveMode` — membership check added via existing `membershipRepositoryProvider`), `profile_screen.dart` | Completed |
+| `POST /api/sos/alerts/[id]/offer` confirmed unchanged — the one legitimately verification-gated action, never routed through the renamed capability functions | Verified, not touched |
+| New tests: full capability matrix (no profile / SUSPENDED / each verification status × membership on/off) for both capability functions | Completed — 11 new backend tests |
+| Fixed 1 pre-existing mobile test that asserted the old, incorrect DRAFT/PENDING/REJECTED→RIDER behavior | Completed |
+| Backend: `pnpm turbo run typecheck` (8/9 — pre-existing unrelated error), `pnpm exec vitest run` (152/152, 15/15 files). Mobile: `flutter analyze` (0 issues), `flutter test` (113/113) | Completed |
+| Live PENDING-verification Service Provider walkthrough (dashboard/availability/bikes/messages) in a real browser/device session | **Not done** — not verifiable in this environment |
+
 ## SOS dispatch corrected: simultaneous Rider+Provider dispatch, dispatch-wide PII redaction, already-assigned notice (2026-08-10, ADR-048)
 
 | Task | Status |

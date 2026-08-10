@@ -19,7 +19,8 @@ class ProfileScreen extends ConsumerWidget {
 
     if (user == null) return const SizedBox.shrink();
 
-    final isApprovedPartner = user.partnerStatus == 'APPROVED';
+    // ADR-049 — capability (an active, non-suspended profile), not verification/'APPROVED'.
+    final isCapableServiceProvider = user.partnerStatus != null && user.partnerStatus != 'SUSPENDED';
     final storedMode = ref.watch(activeModeProvider);
     final isPartnerMode = resolveActiveMode(user.partnerStatus, storedMode) == 'PARTNER';
 
@@ -35,7 +36,7 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Center(child: Text(user.name, style: Theme.of(context).textTheme.titleLarge)),
           Center(child: Text(user.email, style: Theme.of(context).textTheme.bodyMedium)),
-          if (isApprovedPartner) ...[
+          if (isCapableServiceProvider) ...[
             const SizedBox(height: 16),
             _ModeSwitch(isPartnerMode: isPartnerMode),
           ],
@@ -48,7 +49,7 @@ class ProfileScreen extends ConsumerWidget {
             badgeCount: unreadNotifications,
             onTap: () => context.push('/notifications'),
           ),
-          if (isPartnerMode) ...const [_PartnerProfileSection()] else ...[_RiderProfileSection(isApprovedPartner: isApprovedPartner)],
+          if (isPartnerMode) ...const [_PartnerProfileSection()] else ...[_RiderProfileSection(isCapableServiceProvider: isCapableServiceProvider)],
           _ProfileTile(icon: Icons.chat_bubble_outline, label: 'Messages', onTap: () => context.push('/messages')),
           _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
           const SizedBox(height: 24),
@@ -63,10 +64,12 @@ class ProfileScreen extends ConsumerWidget {
   }
 }
 
-/// ADR-046b — shown only once the account is dual-capable (`partnerStatus == 'APPROVED'`);
-/// mirrors web's Navbar "Switch Mode" control. Switching to Partner mode is server-verified
-/// (see [switchActiveMode]) — this button being visible is a UX convenience, not the actual
-/// authorization, so a since-suspended/rejected account still gets turned back at the door.
+/// ADR-046b/ADR-049 — shown once the account has Service Provider CAPABILITY (an active,
+/// non-suspended profile — verification status irrelevant here); mirrors web's Navbar
+/// "Switch Mode" control. Switching to Partner mode is server-verified (see [switchActiveMode],
+/// including a membership check) — this button being visible is a UX convenience, not the actual
+/// authorization, so a since-suspended account or one that let membership lapse still gets turned
+/// back at the door.
 class _ModeSwitch extends ConsumerStatefulWidget {
   const _ModeSwitch({required this.isPartnerMode});
 
@@ -90,11 +93,16 @@ class _ModeSwitchState extends ConsumerState<_ModeSwitch> {
         // Replaces the stack root (not a push) so no Rider-mode screens linger underneath the
         // new tab set, and lands on Home so the freshly-swapped tabs render immediately.
         context.go('/');
-      case SwitchModeResult.notApproved:
+      case SwitchModeResult.notCapable:
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("You're not an approved Service Provider yet.")),
+          const SnackBar(content: Text("You don't have a Service Provider profile yet.")),
         );
         context.push('/become-provider');
+      case SwitchModeResult.membershipRequired:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('An active membership is required for Service Provider mode.')),
+        );
+        context.push('/membership');
       case SwitchModeResult.networkError:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Couldn't verify Service Provider status. Please try again.")),
@@ -116,9 +124,9 @@ class _ModeSwitchState extends ConsumerState<_ModeSwitch> {
 
 /// The Rider-specific tiles, shown whenever the account is currently in Rider mode.
 class _RiderProfileSection extends StatelessWidget {
-  const _RiderProfileSection({required this.isApprovedPartner});
+  const _RiderProfileSection({required this.isCapableServiceProvider});
 
-  final bool isApprovedPartner;
+  final bool isCapableServiceProvider;
 
   @override
   Widget build(BuildContext context) {
@@ -131,7 +139,7 @@ class _RiderProfileSection extends StatelessWidget {
         ),
         // ADR-046b — an already-approved partner uses the mode switch above instead; this tile
         // is for starting/resuming/checking an application.
-        if (!isApprovedPartner)
+        if (!isCapableServiceProvider)
           _ProfileTile(
             icon: Icons.storefront_outlined,
             label: 'Become a Service Provider',
