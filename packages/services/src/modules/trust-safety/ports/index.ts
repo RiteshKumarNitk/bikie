@@ -57,6 +57,8 @@ export interface ModerationMessagePort {
   findMessageById(messageId: string): Promise<{ id: string; conversationId: string } | null>;
   deleteMessage(messageId: string, actorId: string): Promise<unknown>;
   getOtherParticipantIds(conversationId: string, excludeUserId: string): Promise<string[]>;
+  /** §34 — fetch raw (encrypted) messages for admin moderation review; requires a reason. */
+  getMessagesRaw(conversationId: string, take?: number): Promise<any[]>;
 }
 
 export interface TrustNotificationPort {

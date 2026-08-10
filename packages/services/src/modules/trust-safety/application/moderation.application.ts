@@ -1,4 +1,5 @@
 import type { ModerationConversationSummaryDTO } from "@bikie/types";
+import { decryptMessageContent } from "../../../lib/message-crypto";
 import { moderationExpiresAt } from "../domain/moderation";
 import type { TrustSafetyPorts } from "../ports";
 
@@ -160,6 +161,47 @@ export function createModerationApplication(ports: TrustSafetyPorts) {
         reason,
       );
       await ports.realtime.publishToUser(targetUserId, "moderation_action", { type: "BAN", reason });
+    },
+
+    /** §34 — gated, audited admin view of conversation content for trust/safety
+     * investigations. Every access creates an AuditLog entry (admin ID, conversation ID,
+     * reason, timestamp) before any content is returned. Returns decrypted messages
+     * (the admin's own session has no access to the message encryption key, but the
+     * server does — `message-crypto.ts` decrypts here, not on the client). */
+    async getMessagesForModeration(conversationId: string, adminId: string, reason: string) {
+      const messages = await ports.messages.getMessagesRaw(conversationId, 200);
+
+      const decrypted = messages.map((m: any) => {
+        if (m.type === "SYSTEM") {
+          return { id: m.id, type: m.type, content: m.content, senderId: m.senderId, createdAt: m.createdAt.toISOString() };
+        }
+        let content = m.content; // fallback: unencrypted TEXT
+        if (m.ciphertext && m.iv && m.authTag) {
+          try {
+            content = decryptMessageContent(m);
+          } catch {
+            content = "[encrypted — unable to decrypt]";
+          }
+        }
+        return {
+          id: m.id,
+          type: m.type,
+          content,
+          senderId: m.senderId,
+          senderName: m.sender?.name ?? null,
+          createdAt: m.createdAt.toISOString(),
+        };
+      });
+
+      await ports.audit.log({
+        userId: adminId,
+        action: "ADMIN_CONVERSATION_READ",
+        entity: "Conversation",
+        entityId: conversationId,
+        metadata: { reason },
+      });
+
+      return decrypted;
     },
 
     async restoreUser(targetUserId: string, adminId: string, reason: string) {

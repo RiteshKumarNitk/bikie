@@ -19,6 +19,25 @@ class PartnersScreen extends ConsumerStatefulWidget {
   ConsumerState<PartnersScreen> createState() => _PartnersScreenState();
 }
 
+class _Badge extends StatelessWidget {
+  const _Badge({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: color)),
+    );
+  }
+}
+
 class _PartnersScreenState extends ConsumerState<PartnersScreen> {
   bool _loading = false;
   String? _error;
@@ -64,7 +83,7 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            "See BIKIE's own verified mechanics, fuel delivery, and rental partners on a map.",
+            "See BIKIE's registered mechanics, fuel delivery, and rental partners on a map — each with its verification status, so you know exactly who's been checked by BIKIE.",
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
@@ -124,12 +143,40 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
               (p) => Card(
                 child: ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.storefront_outlined)),
-                  title: Text(p.businessName),
-                  subtitle: Text('${partnerTypeLabels[p.type] ?? p.type} · ${p.city}'),
-                  trailing: Text(
-                    p.distanceMeters < 1000
-                        ? '${p.distanceMeters.round()} m'
-                        : '${(p.distanceMeters / 1000).toStringAsFixed(1)} km',
+                  title: Row(
+                    children: [
+                      Flexible(child: Text(p.businessName, overflow: TextOverflow.ellipsis)),
+                      const SizedBox(width: 6),
+                      if (p.verificationStatus == 'APPROVED')
+                        const _Badge(label: '✓ Verified', color: Colors.green)
+                      else
+                        const _Badge(label: '⚠ Unverified', color: Colors.amber),
+                    ],
+                  ),
+                  subtitle: Text(
+                    [
+                      partnerTypeLabels[p.type] ?? p.type,
+                      p.city,
+                      if (p.ratingCount > 0) '⭐ ${p.ratingAvg.toStringAsFixed(1)} (${p.ratingCount})',
+                    ].join(' · '),
+                  ),
+                  trailing: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        p.distanceMeters < 1000
+                            ? '${p.distanceMeters.round()} m'
+                            : '${(p.distanceMeters / 1000).toStringAsFixed(1)} km',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                      Text(
+                        p.isAvailable ? '🟢 Available' : '⚫ Offline',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: p.isAvailable ? Colors.green : null,
+                            ),
+                      ),
+                    ],
                   ),
                 ),
               ),

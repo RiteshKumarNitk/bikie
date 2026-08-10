@@ -10,7 +10,15 @@ interface NearbyPartner {
   city: string;
   latitude: number;
   longitude: number;
+  verificationStatus: string;
+  isAvailable: boolean;
+  ratingAvg: number;
+  ratingCount: number;
   distanceMeters: number;
+}
+
+function isVerified(p: NearbyPartner): boolean {
+  return p.verificationStatus === "APPROVED";
 }
 
 const TYPE_LABEL: Record<string, string> = {
@@ -73,7 +81,8 @@ export function NearbyPartnersPanel() {
     <div className="rounded-2xl border border-foreground/10 bg-card p-6">
       <p className="text-lg font-semibold">Service providers near you</p>
       <p className="mt-1 text-sm text-foreground/50">
-        See BIKIE's own verified mechanics, fuel delivery, and rental partners on a map.
+        See BIKIE's registered mechanics, fuel delivery, and rental partners on a map — each with
+        its verification status, so you know exactly who's been checked by BIKIE.
       </p>
 
       <button
@@ -101,14 +110,31 @@ export function NearbyPartnersPanel() {
                     className="flex items-center justify-between gap-3 rounded-xl border border-foreground/10 p-3"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{p.businessName}</p>
-                      <p className="truncate text-xs text-foreground/50">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="truncate text-sm font-medium">{p.businessName}</p>
+                        {isVerified(p) ? (
+                          <span className="shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-[11px] font-semibold text-success">
+                            ✓ BIKIE Verified
+                          </span>
+                        ) : (
+                          <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-[11px] font-semibold text-warning">
+                            ⚠ Unverified
+                          </span>
+                        )}
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-foreground/50">
                         {TYPE_LABEL[p.type] ?? p.type} · {p.city}
+                        {p.ratingCount > 0 && ` · ⭐ ${p.ratingAvg.toFixed(1)} (${p.ratingCount})`}
                       </p>
                     </div>
-                    <span className="shrink-0 text-xs text-foreground/50">
-                      {p.distanceMeters < 1000 ? `${Math.round(p.distanceMeters)} m` : `${(p.distanceMeters / 1000).toFixed(1)} km`}
-                    </span>
+                    <div className="flex shrink-0 flex-col items-end gap-1">
+                      <span className="text-xs text-foreground/50">
+                        {p.distanceMeters < 1000 ? `${Math.round(p.distanceMeters)} m` : `${(p.distanceMeters / 1000).toFixed(1)} km`}
+                      </span>
+                      <span className={`text-[11px] ${p.isAvailable ? "text-success" : "text-foreground/40"}`}>
+                        {p.isAvailable ? "🟢 Available" : "⚫ Offline"}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -306,6 +306,7 @@ model User {
   membership    UserMembership[]
   sosAlerts     SOSAlert[]
   sosResponses  SOSAlertResponse[]
+  providerReviewsWritten ProviderReview[] @relation("ProviderReviewRider")
   assignedSosAlerts SOSAlert[]         @relation("SOSAssignedHelper")
   sosHelperSessions SOSSession[]       @relation("SOSSessionHelper")
   sosRiderSessions  SOSSession[]       @relation("SOSSessionRider")
@@ -549,6 +550,9 @@ model Partner {
   // pre-existing verified/available/type-matched SOS-eligibility query that already reads this
   // boolean needs zero changes; `verificationStatus` is the new source of truth.
   isVerified   Boolean     @default(false)
+  // §25 of the master product spec — Rider → Service Provider service reviews, aggregated into
+  // `ratingAvg`/`ratingCount` (surfaced on discovery cards and the partner dashboard).
+  reviews      ProviderReview[]
   verificationStatus PartnerVerificationStatus @default(DRAFT)
   rejectionReason    String?
   // Holds the current reject/more-info/suspend note shown back to the applicant. The full
@@ -577,6 +581,13 @@ model Partner {
   longitude         Float?
   governmentIdType  GovernmentIdType?
   governmentIdNumber String?
+  // --- §6 of the master product spec (OPERATIONS) ---
+  // Working hours as free text (e.g. "Mon–Sat 9:00–19:00") — deliberately not a structured
+  // Json schedule, most providers here run simple fixed hours and a text field is honest about
+  // that without inventing a slot model nobody has validated yet.
+  workingHours       String?
+  serviceRadiusKm    Int?
+  yearsOfExperience  Int?
   // --- Added in ADR-044 (SOS emergency-assistance dashboard) ---
   // Defaults false, not true: existing partners shouldn't start receiving live emergency pings
   // the moment this migration runs, before they've even seen the toggle to control it.
@@ -953,6 +964,29 @@ model UserMembership {
 }
 
 // --- SOS / Emergency ---
+
+// --- §25: Rider → Service Provider service reviews ---
+
+// Created when a rider rates a COMPLETED SOS assistance session whose helper has a Partner
+// profile. Deliberately separate from `Review` (bike reviews) and from `SOSSession.rating`
+// (the private per-session rating) — this is the public, listed service review of a provider's
+// business, and the aggregate that powers the "⭐ 4.8 (126)" on discovery cards (§12). One
+// review per SOS session — a rider rates a session once, so `sessionId` is unique.
+model ProviderReview {
+  id         String   @id @default(cuid())
+  providerId String
+  provider   Partner  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  riderId    String
+  rider      User     @relation("ProviderReviewRider", fields: [riderId], references: [id])
+  sessionId  String   @unique
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+
+  @@index([providerId])
+  @@index([riderId])
+  @@map("provider_review")
+}
 
 model SOSAlert {
   id          String      @id @default(cuid())

@@ -52,6 +52,7 @@ describe("moderation application", () => {
         findMessageById: vi.fn(),
         deleteMessage: vi.fn(),
         getOtherParticipantIds: vi.fn(async () => []),
+        getMessagesRaw: vi.fn(async () => []),
       },
       notifications: { notify },
       realtime: {
@@ -103,6 +104,7 @@ describe("moderation application", () => {
         findMessageById: vi.fn(async () => null),
         deleteMessage: vi.fn(),
         getOtherParticipantIds: vi.fn(async () => []),
+        getMessagesRaw: vi.fn(async () => []),
       },
       notifications: { notify: vi.fn() },
       realtime: {

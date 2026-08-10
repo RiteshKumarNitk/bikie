@@ -65,6 +65,9 @@ export default function PartnerOnboardingPage() {
           longitude: partnerDetails.longitude ?? undefined,
           governmentIdType: partnerDetails.governmentIdType || undefined,
           governmentIdNumber: partnerDetails.governmentIdNumber.trim() || undefined,
+          workingHours: partnerDetails.workingHours.trim() || undefined,
+          serviceRadiusKm: partnerDetails.serviceRadiusKm.trim() || undefined,
+          yearsOfExperience: partnerDetails.yearsOfExperience.trim() || undefined,
         }),
       });
       

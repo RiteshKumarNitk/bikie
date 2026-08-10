@@ -96,6 +96,46 @@ export async function findAllPartners() {
   }));
 }
 
+/** §37 of the master product spec — the summary counts for the admin Service Provider
+ * dashboard. The categories are deliberately overlapping, matching the spec's own list
+ * (Total / Active / Unverified / Draft / Pending verification / Verified / Info requested /
+ * Rejected / Suspended / Reported):
+ *  - `active` = every partner whose capability isn't revoked (not admin-SUSPENDED);
+ *  - `unverified` = every partner who is not APPROVED (draft + pending + info-requested +
+ *    rejected), the aggregate "exists on the platform without BIKIE verification";
+ *  - `reported` = partners whose owner account has at least one Report (targetType USER).
+ * A provider is reported against their *account* (ReportTargetType has no PARTNER value),
+ * so this counts reports whose targetId is one of these owners' userIds. */
+export async function getAdminPartnerStats() {
+  const partners = await prisma.partner.findMany({
+    select: { id: true, userId: true, verificationStatus: true },
+  });
+
+  const statusCount: Record<string, number> = {};
+  for (const p of partners) {
+    statusCount[p.verificationStatus] = (statusCount[p.verificationStatus] ?? 0) + 1;
+  }
+
+  const reportedRows = await prisma.report.findMany({
+    where: { targetType: "USER", targetId: { in: partners.map((p) => p.userId) } },
+    select: { targetId: true },
+    distinct: ["targetId"],
+  });
+
+  return {
+    total: partners.length,
+    active: partners.length - (statusCount.SUSPENDED ?? 0),
+    unverified: partners.length - (statusCount.APPROVED ?? 0),
+    draft: statusCount.DRAFT ?? 0,
+    pendingVerification: statusCount.PENDING_VERIFICATION ?? 0,
+    moreInfoRequired: statusCount.MORE_INFORMATION_REQUIRED ?? 0,
+    verified: statusCount.APPROVED ?? 0,
+    rejected: statusCount.REJECTED ?? 0,
+    suspended: statusCount.SUSPENDED ?? 0,
+    reported: reportedRows.length,
+  };
+}
+
 /** `GET /api/admin/partners/[id]` — application-review detail. `history` is this partner's slice
  * of `AuditLog` (entity: "Partner"), not a second table — see ADR-046b. */
 export async function findPartnerDetailById(partnerId: string) {

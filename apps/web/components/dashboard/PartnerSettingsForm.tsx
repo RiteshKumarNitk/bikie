@@ -31,6 +31,9 @@ export function PartnerSettingsForm({ profile }: { profile: PartnerProfileDTO | 
     longitude: profile?.longitude ?? null,
     governmentIdType: profile?.governmentIdType ?? "",
     governmentIdNumber: profile?.governmentIdNumber ?? "",
+    workingHours: profile?.workingHours ?? "",
+    serviceRadiusKm: profile?.serviceRadiusKm != null ? String(profile.serviceRadiusKm) : "",
+    yearsOfExperience: profile?.yearsOfExperience != null ? String(profile.yearsOfExperience) : "",
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +60,9 @@ export function PartnerSettingsForm({ profile }: { profile: PartnerProfileDTO | 
       longitude: details.longitude ?? undefined,
       governmentIdType: details.governmentIdType || undefined,
       governmentIdNumber: details.governmentIdNumber.trim() || undefined,
+      workingHours: details.workingHours.trim() || undefined,
+      serviceRadiusKm: details.serviceRadiusKm.trim() || undefined,
+      yearsOfExperience: details.yearsOfExperience.trim() || undefined,
     };
 
     const parsed = partnerProfileSchema.safeParse(body);

@@ -37,6 +37,10 @@ export interface PartnerBusinessDetails {
   longitude: number | null;
   governmentIdType: string;
   governmentIdNumber: string;
+  // --- §6 (OPERATIONS) ---
+  workingHours: string;
+  serviceRadiusKm: string;
+  yearsOfExperience: string;
 }
 
 export const emptyPartnerBusinessDetails: PartnerBusinessDetails = {
@@ -55,6 +59,9 @@ export const emptyPartnerBusinessDetails: PartnerBusinessDetails = {
   longitude: null,
   governmentIdType: "",
   governmentIdNumber: "",
+  workingHours: "",
+  serviceRadiusKm: "",
+  yearsOfExperience: "",
 };
 
 const inputClassName =
@@ -184,6 +191,50 @@ export function PartnerBusinessFields({
             <LocationPicker
               value={value.latitude != null && value.longitude != null ? { latitude: value.latitude, longitude: value.longitude } : null}
               onChange={(coords) => onChange({ ...value, latitude: coords.latitude, longitude: coords.longitude })}
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4 border-t border-foreground/10 pt-4">
+        <p className="text-sm font-medium">Operations</p>
+        <div>
+          <label className="text-sm font-medium" htmlFor={`${idPrefix}-workingHours`}>
+            Working hours <span className="font-normal text-foreground/40">(optional)</span>
+          </label>
+          <input
+            id={`${idPrefix}-workingHours`}
+            value={value.workingHours}
+            onChange={(e) => onChange({ ...value, workingHours: e.target.value })}
+            placeholder="e.g. Mon–Sat 9:00–19:00, Sun by appointment"
+            className={inputClassName}
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="text-sm font-medium" htmlFor={`${idPrefix}-serviceRadiusKm`}>
+              Service radius (km) <span className="font-normal text-foreground/40">(optional)</span>
+            </label>
+            <input
+              id={`${idPrefix}-serviceRadiusKm`}
+              value={value.serviceRadiusKm}
+              onChange={(e) => onChange({ ...value, serviceRadiusKm: e.target.value.replace(/[^0-9]/g, "") })}
+              placeholder="e.g. 20"
+              inputMode="numeric"
+              className={inputClassName}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium" htmlFor={`${idPrefix}-yearsOfExperience`}>
+              Years of experience <span className="font-normal text-foreground/40">(optional)</span>
+            </label>
+            <input
+              id={`${idPrefix}-yearsOfExperience`}
+              value={value.yearsOfExperience}
+              onChange={(e) => onChange({ ...value, yearsOfExperience: e.target.value.replace(/[^0-9]/g, "") })}
+              placeholder="e.g. 8"
+              inputMode="numeric"
+              className={inputClassName}
             />
           </div>
         </div>

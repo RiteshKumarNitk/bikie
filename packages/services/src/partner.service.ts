@@ -77,4 +77,10 @@ export const PartnerService = {
   async setAvailability(userId: string, isAvailable: boolean): Promise<{ isAvailable: boolean }> {
     return getPartnersModule().partners.setAvailability(userId, isAvailable);
   },
+
+  /** §25 — the provider's own Rider → Service Provider service reviews (from SOS assistance
+   * ratings), newest first. */
+  async getProviderReviews(userId: string) {
+    return getPartnersModule().partners.getProviderReviews(userId);
+  },
 };

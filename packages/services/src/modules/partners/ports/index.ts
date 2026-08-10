@@ -16,6 +16,10 @@ export type PartnerProfileInput = {
   longitude?: number;
   governmentIdType?: string;
   governmentIdNumber?: string;
+  // --- §6 (OPERATIONS) ---
+  workingHours?: string;
+  serviceRadiusKm?: number;
+  yearsOfExperience?: number;
   // --- ADR-044 ---
   isGeneralResponder?: boolean;
   // --- ADR-046b ---
@@ -38,7 +42,9 @@ export type ReapplyResult =
   | { ok: false; reason: "NOT_FOUND" | "INVALID_TRANSITION" };
 
 /** Public "find a service provider near me" result — a lighter shape than PartnerProfileDTO,
- * just what a map pin + list row needs. */
+ * just what a map pin + list row needs. §9/§12: `verificationStatus`, `ratingAvg`/`ratingCount`
+ * and `isAvailable` are carried so every discovery card can render the verification badge,
+ * rating, and live availability — "never hide verification status". */
 export interface NearbyPartnerRow {
   id: string;
   businessName: string;
@@ -46,6 +52,10 @@ export interface NearbyPartnerRow {
   city: string;
   latitude: number;
   longitude: number;
+  verificationStatus: string;
+  isAvailable: boolean;
+  ratingAvg: number;
+  ratingCount: number;
   distanceMeters: number;
 }
 
@@ -66,6 +76,8 @@ export interface PartnerRepositoryPort {
   ): Promise<NearbyPartnerRow[]>;
   /** ADR-044 — the SOS-availability toggle. */
   setAvailability(userId: string, isAvailable: boolean): Promise<{ isAvailable: boolean }>;
+  /** §25 — Rider → Service Provider service reviews, newest first. */
+  findProviderReviews(providerId: string, take?: number): Promise<any[]>;
 }
 
 export interface PartnersPorts {

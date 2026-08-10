@@ -23,6 +23,9 @@ export function toPartnerDTO(partner: {
   longitude: number | null;
   governmentIdType: string | null;
   governmentIdNumber: string | null;
+  workingHours: string | null;
+  serviceRadiusKm: number | null;
+  yearsOfExperience: number | null;
   isAvailable: boolean;
   isGeneralResponder: boolean;
   verificationStatus: string;
@@ -56,6 +59,9 @@ export function toPartnerDTO(partner: {
     longitude: partner.longitude,
     governmentIdType: partner.governmentIdType as "AADHAAR" | "PASSPORT" | null,
     governmentIdNumber: partner.governmentIdNumber,
+    workingHours: partner.workingHours,
+    serviceRadiusKm: partner.serviceRadiusKm,
+    yearsOfExperience: partner.yearsOfExperience,
     isAvailable: partner.isAvailable,
     isGeneralResponder: partner.isGeneralResponder,
     verificationStatus: partner.verificationStatus as
@@ -97,6 +103,9 @@ export type PartnerProfileWriteInput = {
   longitude?: number;
   governmentIdType?: string;
   governmentIdNumber?: string;
+  workingHours?: string;
+  serviceRadiusKm?: number;
+  yearsOfExperience?: number;
   isGeneralResponder?: boolean;
   profilePhotoUrl?: string;
   shopPhotoUrls?: string[];
@@ -125,6 +134,9 @@ function toUpsertData(data: PartnerProfileWriteInput) {
     longitude: data.longitude,
     governmentIdType: data.governmentIdType as any,
     governmentIdNumber: data.governmentIdNumber,
+    workingHours: data.workingHours,
+    serviceRadiusKm: data.serviceRadiusKm,
+    yearsOfExperience: data.yearsOfExperience,
     isGeneralResponder: data.isGeneralResponder,
     profilePhotoUrl: data.profilePhotoUrl,
     ...(data.shopPhotoUrls ? { shopPhotoUrls: data.shopPhotoUrls } : {}),
@@ -264,11 +276,18 @@ export async function findPartnersByCityForDispatch(
 }
 
 /**
- * Public "find a service provider near me" (ADR-036) — plain in-app Haversine over verified
- * partners with a set map pin, not PostGIS. Partner volume is small enough (unlike the
- * high-write `rider_location` table, which does use PostGIS via `ST_DWithin`) that fetching
- * every geotagged partner and filtering/sorting in JS is simpler and fine for v1; revisit only
- * if partner counts grow enough to matter.
+ * Public "find a service provider near me" (ADR-036) — plain in-app Haversine over partners
+ * with a set map pin, not PostGIS. Partner volume is small enough (unlike the high-write
+ * `rider_location` table, which does use PostGIS via `ST_DWithin`) that fetching every
+ * geotagged partner and filtering/sorting in JS is simpler and fine for v1; revisit only if
+ * partner counts grow enough to matter.
+ *
+ * §9/§12 of the master product spec — shows EVERY registered partner (verified and unverified
+ * alike) so riders can see the trust difference for themselves; only admin-SUSPENDED partners
+ * (capability revoked by a deliberate trust/safety action) are excluded. The rows carry
+ * `verificationStatus`/`ratingAvg`/`ratingCount`/`isAvailable` so every card can render the
+ * "✓ BIKIE VERIFIED" / "⚠ Unverified Provider" badge, rating, and live availability the spec
+ * requires — the old `isVerified: true` filter hid unverified providers entirely.
  */
 export async function findPartnersNearPoint(
   latitude: number,
@@ -280,10 +299,21 @@ export async function findPartnersNearPoint(
     where: {
       latitude: { not: null },
       longitude: { not: null },
-      isVerified: true,
+      verificationStatus: { not: "SUSPENDED" },
       ...(options.type ? { type: options.type as any } : {}),
     },
-    select: { id: true, businessName: true, type: true, city: true, latitude: true, longitude: true },
+    select: {
+      id: true,
+      businessName: true,
+      type: true,
+      city: true,
+      latitude: true,
+      longitude: true,
+      verificationStatus: true,
+      isAvailable: true,
+      ratingAvg: true,
+      ratingCount: true,
+    },
   });
 
   return partners
@@ -295,6 +325,10 @@ export async function findPartnersNearPoint(
       city: p.city,
       latitude: p.latitude,
       longitude: p.longitude,
+      verificationStatus: p.verificationStatus,
+      isAvailable: p.isAvailable,
+      ratingAvg: p.ratingAvg.toNumber(),
+      ratingCount: p.ratingCount,
       distanceMeters: haversineDistanceMeters(latitude, longitude, p.latitude, p.longitude),
     }))
     .filter((p) => p.distanceMeters <= radiusMeters)
@@ -308,13 +342,65 @@ export async function setAvailability(userId: string, isAvailable: boolean) {
 }
 
 /** Thin select for `offerHelp`'s eligibility gate and the nearby-requests filter (ADR-044) —
- * not the full `toDTO` shape, just what those two callers actually need. */
+ * not the full `toDTO` shape, just what those callers actually need. `id` is included so the
+ * session-rating path can decide "does this helper have a Service Provider profile at all" and,
+ * if so, attach a §25 service review to exactly that provider. */
 export async function findPartnerEligibilityFields(userId: string) {
   const partner = await prisma.partner.findUnique({
     where: { userId },
-    select: { isVerified: true, isAvailable: true, isGeneralResponder: true, type: true },
+    select: { id: true, isVerified: true, isAvailable: true, isGeneralResponder: true, type: true },
   });
   return partner;
+}
+
+// --- §25: Rider → Service Provider service reviews ---
+
+/** Insert one review and fold it into the partner's running `ratingAvg`/`ratingCount` atomically
+ * (the same aggregate the discovery cards and dashboard read). Returns false when a review for
+ * this SOS session already exists — the application layer already prevents double-rating via
+ * `SOSSession.rating`, this is just belt-and-suspenders on the `sessionId` unique index. */
+export async function addProviderReview(params: {
+  providerId: string;
+  riderId: string;
+  sessionId: string;
+  rating: number;
+  comment?: string;
+}): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.providerReview.findUnique({ where: { sessionId: params.sessionId } });
+    if (existing) return false;
+
+    const partner = await tx.partner.findUniqueOrThrow({ where: { id: params.providerId } });
+    const nextCount = partner.ratingCount + 1;
+    // Weighted running average — `avg * count` loses nothing meaningful at these scales and
+    // avoids a second aggregate query inside the transaction.
+    const nextAvg = (Number(partner.ratingAvg) * partner.ratingCount + params.rating) / nextCount;
+
+    await tx.providerReview.create({
+      data: {
+        providerId: params.providerId,
+        riderId: params.riderId,
+        sessionId: params.sessionId,
+        rating: params.rating,
+        comment: params.comment ?? null,
+      },
+    });
+    await tx.partner.update({
+      where: { id: params.providerId },
+      data: { ratingCount: nextCount, ratingAvg: nextAvg },
+    });
+    return true;
+  });
+}
+
+/** A provider's own service reviews, newest first, with the rider's name for display. */
+export async function findProviderReviews(providerId: string, take = 50) {
+  return prisma.providerReview.findMany({
+    where: { providerId },
+    orderBy: { createdAt: "desc" },
+    take,
+    include: { rider: { select: { id: true, name: true } } },
+  });
 }
 
 /**

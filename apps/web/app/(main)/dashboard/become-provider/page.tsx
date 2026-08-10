@@ -49,6 +49,9 @@ export default function BecomeProviderPage() {
         longitude: data.profile.longitude,
         governmentIdType: data.profile.governmentIdType ?? "",
         governmentIdNumber: data.profile.governmentIdNumber ?? "",
+        workingHours: data.profile.workingHours ?? "",
+        serviceRadiusKm: data.profile.serviceRadiusKm != null ? String(data.profile.serviceRadiusKm) : "",
+        yearsOfExperience: data.profile.yearsOfExperience != null ? String(data.profile.yearsOfExperience) : "",
       });
     }
     setLoading(false);
@@ -79,6 +82,9 @@ export default function BecomeProviderPage() {
       longitude: details.longitude ?? undefined,
       governmentIdType: details.governmentIdType || undefined,
       governmentIdNumber: details.governmentIdNumber.trim() || undefined,
+      workingHours: details.workingHours.trim() || undefined,
+      serviceRadiusKm: details.serviceRadiusKm.trim() || undefined,
+      yearsOfExperience: details.yearsOfExperience.trim() || undefined,
     });
     if (!parsed.success) {
       setError(formatZodError(parsed.error).join(" "));

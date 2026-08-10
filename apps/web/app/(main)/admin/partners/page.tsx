@@ -2,7 +2,19 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import type { AdminPartnerRowDTO } from "@bikie/types";
+import type { AdminPartnerRowDTO, AdminPartnerStatsDTO } from "@bikie/types";
+
+const STAT_CARDS: { key: keyof AdminPartnerStatsDTO; label: string; tone?: string }[] = [
+  { key: "total", label: "Total Providers" },
+  { key: "active", label: "Active" },
+  { key: "unverified", label: "Unverified" },
+  { key: "pendingVerification", label: "Verification Pending", tone: "text-warning" },
+  { key: "verified", label: "Verified", tone: "text-success" },
+  { key: "moreInfoRequired", label: "Info Requested" },
+  { key: "rejected", label: "Rejected", tone: "text-red-400" },
+  { key: "suspended", label: "Suspended", tone: "text-red-400" },
+  { key: "reported", label: "Reported", tone: "text-red-400" },
+];
 
 const STATUS_STYLES: Record<string, string> = {
   APPROVED: "bg-success/15 text-success",
@@ -24,6 +36,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 export default function AdminPartnersPage() {
   const [partners, setPartners] = useState<AdminPartnerRowDTO[]>([]);
+  const [stats, setStats] = useState<AdminPartnerStatsDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -31,7 +44,7 @@ export default function AdminPartnersPage() {
   useEffect(() => {
     fetch("/api/admin/partners")
       .then((r) => r.json())
-      .then((data) => { setPartners(data.partners); setLoading(false); });
+      .then((data) => { setPartners(data.partners); setStats(data.stats); setLoading(false); });
   }, []);
 
   async function handleDelete(id: string) {
@@ -54,6 +67,17 @@ export default function AdminPartnersPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Partners ({partners.length})</h1>
       </div>
+
+      {stats && (
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {STAT_CARDS.map(({ key, label, tone }) => (
+            <div key={key} className="rounded-2xl border border-foreground/10 bg-card p-4">
+              <p className={`text-2xl font-semibold ${tone ?? ""}`}>{stats[key]}</p>
+              <p className="mt-0.5 text-xs text-foreground/50">{label}</p>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="mt-4">
         <input

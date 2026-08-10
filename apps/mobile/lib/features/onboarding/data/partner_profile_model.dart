@@ -26,6 +26,10 @@ class PartnerProfileInput with _$PartnerProfileInput {
     double? longitude,
     String? governmentIdType, // "AADHAAR" | "PASSPORT"
     String? governmentIdNumber,
+    // --- §6 (OPERATIONS) ---
+    String? workingHours,
+    int? serviceRadiusKm,
+    int? yearsOfExperience,
     // --- ADR-044 ---
     bool? isGeneralResponder,
   }) = _PartnerProfileInput;
@@ -59,6 +63,10 @@ class PartnerProfileSummary with _$PartnerProfileSummary {
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    // --- §6 (OPERATIONS) ---
+    String? workingHours,
+    int? serviceRadiusKm,
+    int? yearsOfExperience,
     // --- ADR-046b: application/verification state ---
     String? verificationStatus,
     String? rejectionReason,
@@ -69,6 +77,9 @@ class PartnerProfileSummary with _$PartnerProfileSummary {
     @Default([]) List<String> shopPhotoUrls,
     String? identityDocumentUrl,
     String? businessDocumentUrl,
+    // --- §25 - aggregates for the discovery card and reviews section ---
+    @Default(0) double ratingAvg,
+    @Default(0) int ratingCount,
   }) = _PartnerProfileSummary;
 
   factory PartnerProfileSummary.fromJson(Map<String, dynamic> json) => _$PartnerProfileSummaryFromJson(json);

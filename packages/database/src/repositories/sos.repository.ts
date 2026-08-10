@@ -173,6 +173,21 @@ export async function resolveAlert(alertId: string, userId: string) {
   });
 }
 
+/** §28 of the master product spec — the reporter (or an admin) cancels an SOS while it's still
+ * being dispatched. `FALSE_ALARM` is the existing SOSStatus for a rider-initiated cancellation
+ * (the emergency turned out not to need help); `nextEscalationAt: null` stops the cron ticker
+ * from picking it back up. Returns the number of rows actually transitioned — 0 means the alert
+ * was no longer ACTIVE (already resolved/assigned-then-resolved by the time we got here), which
+ * the application layer maps to ALERT_NOT_ACTIVE. Offer expiry + responder notifications are the
+ * caller's job (application layer) so they stay audit-friendly. */
+export async function cancelAlert(alertId: string, userId: string): Promise<number> {
+  const result = await prisma.sOSAlert.updateMany({
+    where: { id: alertId, status: "ACTIVE" },
+    data: { status: "FALSE_ALARM", resolvedAt: new Date(), resolvedBy: userId, nextEscalationAt: null },
+  });
+  return result.count;
+}
+
 /** Deprecated alias target — kept only for the old /respond route (ADR-028: no facade deletion
  * without zero-use proof). New callers should go through sos-session.repository.ts's createOffer. */
 export async function respondToAlert(alertId: string, responderId: string, message?: string) {

@@ -69,6 +69,10 @@ export interface SosAlertRepositoryPort {
    * shows already-assigned alerts to riders/admins browsing; a partner shouldn't see a request
    * someone else already claimed. */
   getOpenAlertsNearPoint(latitude: number, longitude: number, radiusMeters: number): Promise<RawSOSAlertDTO[]>;
+  /** §28 — the reporter (or admin) cancels an alert while it's being dispatched: marks it
+   * FALSE_ALARM and stops escalation. Returns 0 if the alert was no longer ACTIVE (the caller
+   * maps that to ALERT_NOT_ACTIVE). Offer expiry + responder notifications are the caller's job. */
+  cancelAlert(alertId: string, userId: string): Promise<number>;
 }
 
 export interface SosOfferRow {
@@ -100,6 +104,9 @@ export interface SosOfferRepositoryPort {
   /** ADR-045 — which of these alert IDs this responder has already offered on or declined, so a
    * partner's "Nearby Requests" list can exclude them. */
   findRespondedAlertIds(responderId: string, alertIds: string[]): Promise<Set<string>>;
+  /** §28 — expire every outstanding OFFERED offer on the alert and return the responders who had
+   * one, so the caller can tell them the request is no longer available. */
+  expireOpenOffersForAlert(alertId: string): Promise<string[]>;
 }
 
 export interface SosSessionRow {
@@ -267,7 +274,26 @@ export interface PartnerDispatchPort {
   }): Promise<Array<PartnerDispatchRow & { isGeneralResponder: boolean; distanceMeters: number }>>;
   getEligibilityFields(
     userId: string,
-  ): Promise<{ isVerified: boolean; isAvailable: boolean; isGeneralResponder: boolean; type: string } | null>;
+  ): Promise<{
+    /** null when this user has no Partner profile at all (pure rider). */
+    providerId: string | null;
+    isVerified: boolean;
+    isAvailable: boolean;
+    isGeneralResponder: boolean;
+    type: string;
+  } | null>;
+}
+
+/** §25 — Rider → Service Provider service reviews. Written once per SOS session, when the rider
+ * rates a COMPLETED session whose helper has a Partner profile. */
+export interface ProviderReviewPort {
+  addProviderReview(params: {
+    providerId: string;
+    riderId: string;
+    sessionId: string;
+    rating: number;
+    comment?: string;
+  }): Promise<boolean>;
 }
 
 export interface EmergencyContactRow {
@@ -345,6 +371,7 @@ export interface SafetyLocationPorts {
   sosOffers: SosOfferRepositoryPort;
   sosSessions: SosSessionRepositoryPort;
   sosTimeline: SosTimelineRepositoryPort;
+  providerReviews: ProviderReviewPort;
   community: CommunityMembershipPort;
   riderLocation: RiderLocationRepositoryPort;
   partnerDispatch: PartnerDispatchPort;

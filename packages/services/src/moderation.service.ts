@@ -97,4 +97,10 @@ export const ModerationService = {
   restoreUser(targetUserId: string, adminId: string, reason: string) {
     return getTrustSafetyModule().moderation.restoreUser(targetUserId, adminId, reason);
   },
+
+  /** §34 — gated, audited admin view of conversation content for trust/safety investigations.
+   * Every access is audit-logged. Content is decrypted server-side. */
+  getMessagesForModeration(conversationId: string, adminId: string, reason: string) {
+    return getTrustSafetyModule().moderation.getMessagesForModeration(conversationId, adminId, reason);
+  },
 };

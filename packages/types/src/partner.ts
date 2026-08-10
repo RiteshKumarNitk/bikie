@@ -36,6 +36,10 @@ export interface PartnerProfileDTO {
   // --- ADR-044 ---
   isAvailable: boolean;
   isGeneralResponder: boolean;
+  // --- §6 (OPERATIONS) ---
+  workingHours: string | null;
+  serviceRadiusKm: number | null;
+  yearsOfExperience: number | null;
   // --- ADR-046b: application/verification state ---
   verificationStatus: PartnerVerificationStatus;
   rejectionReason: string | null;

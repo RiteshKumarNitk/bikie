@@ -96,6 +96,9 @@ export function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partia
       findEligibleForAlert: vi.fn(async () => []),
       getEligibilityFields: vi.fn(async () => null),
     },
+    providerReviews: {
+      addProviderReview: vi.fn(async () => true),
+    },
     emergencyContacts: { findByUserId: vi.fn(async () => []) },
     userContact: { findSosContactFields: vi.fn(async () => null) },
     escalation: { findAdminContacts: vi.fn(async () => []) },
@@ -112,6 +115,7 @@ export function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partia
       updateEscalationState: vi.fn(async () => undefined),
       findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
       getOpenAlertsNearPoint: vi.fn(async () => []),
+      cancelAlert: vi.fn(async () => 1),
     },
     sosOffers: {
       createOffer: vi.fn(),
@@ -120,6 +124,7 @@ export function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partia
       listOffersForAlert: vi.fn(async () => []),
       declineAlert: vi.fn(),
       findRespondedAlertIds: vi.fn(async () => new Set<string>()),
+      expireOpenOffersForAlert: vi.fn(async () => []),
     },
     sosSessions: {
       acceptOffer: vi.fn(),

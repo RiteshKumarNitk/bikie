@@ -375,6 +375,12 @@ function ConversationsQueue() {
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [actionModal, setActionModal] = useState<ConversationActionModalState | null>(null);
+  const [viewMessagesId, setViewMessagesId] = useState<string | null>(null);
+  const [viewMessages, setViewMessages] = useState<any[] | null>(null);
+  const [viewMessagesLoading, setViewMessagesLoading] = useState(false);
+  const [viewMessagesError, setViewMessagesError] = useState<string | null>(null);
+  const [viewReason, setViewReason] = useState("");
+  const [viewReasonPending, setViewReasonPending] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -393,6 +399,33 @@ function ConversationsQueue() {
   function openAction(conversation: ModerationConversationSummaryDTO, action: ConversationActionModalState["action"]) {
     setActionModal({ conversation, action });
     setReason("");
+  }
+
+  function handleViewMessages(conversationId: string) {
+    setViewReasonPending(conversationId);
+    setViewReason("");
+  }
+
+  async function confirmViewMessages() {
+    if (!viewReasonPending || !viewReason.trim()) return;
+    setViewMessagesLoading(true);
+    setViewMessagesError(null);
+    setViewMessagesId(viewReasonPending);
+    setViewReasonPending(null);
+    try {
+      const res = await fetch(`/api/admin/moderation/conversations/${viewMessagesId}/messages?reason=${encodeURIComponent(viewReason.trim())}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}) as { error?: string });
+        throw new Error(data.error ?? "Failed to load messages");
+      }
+      const data = await res.json();
+      setViewMessages(data.messages);
+    } catch (err) {
+      setViewMessagesError(err instanceof Error ? err.message : "Failed to load messages");
+      setViewMessagesId(null);
+    } finally {
+      setViewMessagesLoading(false);
+    }
   }
 
   async function submitAction() {
@@ -454,6 +487,28 @@ function ConversationsQueue() {
                     ) : (
                       <button type="button" onClick={() => openAction(c, "LOCK")} className="rounded-lg border border-foreground/10 px-3 py-1 text-xs font-medium transition-colors hover:bg-foreground/5">Lock</button>
                     )}
+                    <button type="button" onClick={() => handleViewMessages(c.id)} className="rounded-lg border border-foreground/10 px-3 py-1 text-xs font-medium transition-colors hover:bg-foreground/5">View</button>
+                    {viewReasonPending === c.id && (
+                      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setViewReasonPending(null)}>
+                        <div className="w-full max-w-sm rounded-2xl bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+                          <h3 className="text-lg font-semibold">Read conversation messages</h3>
+                          <p className="mt-1 text-sm text-foreground/50">
+                            Why are you reading this conversation? Every access is audit-logged.
+                          </p>
+                          <textarea
+                            value={viewReason}
+                            onChange={(e) => setViewReason(e.target.value)}
+                            rows={3}
+                            className="mt-4 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent"
+                            placeholder="Investigation reason (required)"
+                          />
+                          <div className="mt-6 flex gap-3">
+                            <button type="button" onClick={() => setViewReasonPending(null)} className="flex-1 rounded-xl border border-foreground/10 px-4 py-2.5 text-sm font-medium">Cancel</button>
+                            <button type="button" disabled={!viewReason.trim()} onClick={confirmViewMessages} className="flex-1 rounded-xl bg-accent px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">Confirm</button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <button type="button" onClick={() => openAction(c, "DELETE")} className="rounded-lg border border-red-500/20 px-3 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/10">Delete</button>
                   </div>
                 </td>
@@ -462,6 +517,34 @@ function ConversationsQueue() {
           </tbody>
         </table>
         {conversations.length === 0 && <div className="p-8 text-center text-sm text-foreground/50">No conversations found</div>}
+
+        {/* Message viewer modal */}
+        {viewMessagesId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => { setViewMessagesId(null); setViewMessages(null); }}>
+            <div className="w-full max-w-2xl max-h-[80vh] rounded-2xl bg-card p-6 shadow-xl overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Conversation Messages</h3>
+                <button type="button" onClick={() => { setViewMessagesId(null); setViewMessages(null); }} className="text-sm text-foreground/50 hover:text-foreground">Close</button>
+              </div>
+              {viewMessagesLoading && <div className="mt-4 animate-pulse h-32 bg-foreground/5 rounded-xl" />}
+              {viewMessagesError && <div className="mt-4 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">{viewMessagesError}</div>}
+              {viewMessages && (
+                <div className="mt-4 space-y-3">
+                  {viewMessages.length === 0 && <p className="text-sm text-foreground/50">No messages in this conversation.</p>}
+                  {viewMessages.map((msg: any) => (
+                    <div key={msg.id} className="rounded-xl border border-foreground/10 p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs font-semibold text-foreground/60">{msg.senderName ?? "System"}</span>
+                        <span className="text-[10px] text-foreground/40">{new Date(msg.createdAt).toLocaleString()}</span>
+                      </div>
+                      <p className="mt-1 text-sm">{msg.content ?? "[deleted]"}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
 
       {total > 25 && (

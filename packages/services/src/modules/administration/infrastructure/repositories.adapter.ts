@@ -9,6 +9,7 @@ export function createAdminRepositoryAdapter(): AdminRepositoryPort {
     updateUserRole: (userId, role) => adminRepository.updateUserRole(userId, role),
     deleteUser: (userId) => adminRepository.deleteUser(userId),
     findAllPartners: () => adminRepository.findAllPartners(),
+    getAdminPartnerStats: () => adminRepository.getAdminPartnerStats(),
     findPartnerDetailById: (partnerId) => adminRepository.findPartnerDetailById(partnerId),
     transitionPartnerVerification: (partnerId, action, opts) =>
       adminRepository.transitionPartnerVerification(partnerId, action, opts),

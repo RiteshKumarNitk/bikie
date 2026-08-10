@@ -6,6 +6,6 @@ export async function GET() {
   const { error } = await requireRole("ADMIN");
   if (error) return error;
 
-  const partners = await AdminService.getAllPartners();
-  return NextResponse.json({ partners });
+  const [partners, stats] = await Promise.all([AdminService.getAllPartners(), AdminService.getPartnerStats()]);
+  return NextResponse.json({ partners, stats });
 }

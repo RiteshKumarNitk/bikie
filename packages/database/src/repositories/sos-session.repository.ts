@@ -85,6 +85,23 @@ export async function declineAlert(params: { alertId: string; responderId: strin
   }
 }
 
+/** §28 — cancellation: every outstanding OFFERED offer on an alert is expired in one bulk update
+ * (the same transition `acceptOffer` uses for the offers it supersedes) and the responders who had
+ * one are returned so the caller can notify them the request is no longer available. */
+export async function expireOpenOffersForAlert(alertId: string): Promise<string[]> {
+  const open = await prisma.sOSAlertResponse.findMany({
+    where: { alertId, status: "OFFERED" },
+    select: { responderId: true },
+  });
+  if (open.length > 0) {
+    await prisma.sOSAlertResponse.updateMany({
+      where: { alertId, status: "OFFERED" },
+      data: { status: "EXPIRED", respondedAt: new Date() },
+    });
+  }
+  return open.map((o) => o.responderId);
+}
+
 /** Batch lookup backing the partner "Nearby Requests" list (ADR-045) — alerts this responder has
  * already offered on or declined shouldn't keep reappearing as if they were still new. */
 export async function findRespondedAlertIds(responderId: string, alertIds: string[]): Promise<Set<string>> {

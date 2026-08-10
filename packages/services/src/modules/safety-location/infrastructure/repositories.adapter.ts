@@ -13,6 +13,7 @@ import type {
   EmergencyContactsPort,
   EscalationPort,
   PartnerDispatchPort,
+  ProviderReviewPort,
   RiderLocationRepositoryPort,
   SosAlertRepositoryPort,
   SosOfferRepositoryPort,
@@ -38,6 +39,7 @@ export function createSosAlertRepositoryAdapter(): SosAlertRepositoryPort {
     findNotifiedUserIdsForAlert: (alertId) => sosRepository.findNotifiedUserIdsForAlert(alertId),
     getOpenAlertsNearPoint: (latitude, longitude, radiusMeters) =>
       sosRepository.getOpenAlertsNearPoint(latitude, longitude, radiusMeters),
+    cancelAlert: (alertId, userId) => sosRepository.cancelAlert(alertId, userId),
   };
 }
 
@@ -78,6 +80,7 @@ export function createSosOfferRepositoryAdapter(): SosOfferRepositoryPort {
     },
     findRespondedAlertIds: (responderId, alertIds) =>
       sosSessionRepository.findRespondedAlertIds(responderId, alertIds),
+    expireOpenOffersForAlert: (alertId) => sosSessionRepository.expireOpenOffersForAlert(alertId),
   };
 }
 
@@ -185,7 +188,18 @@ export function createPartnerDispatchAdapter(): PartnerDispatchPort {
     },
     findEligibleForAlert: ({ latitude, longitude, radiusMeters }) =>
       partnerRepository.findEligiblePartnersNearPoint(latitude, longitude, radiusMeters),
-    getEligibilityFields: (userId) => partnerRepository.findPartnerEligibilityFields(userId),
+    getEligibilityFields: async (userId) => {
+      const row = await partnerRepository.findPartnerEligibilityFields(userId);
+      if (!row) return null;
+      return { providerId: row.id, isVerified: row.isVerified, isAvailable: row.isAvailable, isGeneralResponder: row.isGeneralResponder, type: row.type };
+    },
+  };
+}
+
+export function createProviderReviewAdapter(): ProviderReviewPort {
+  return {
+    addProviderReview: (params: { providerId: string; riderId: string; sessionId: string; rating: number; comment?: string }) =>
+      partnerRepository.addProviderReview(params),
   };
 }
 

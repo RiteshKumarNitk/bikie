@@ -41,6 +41,14 @@ export function createPartnerApplication(ports: PartnersPorts) {
     setAvailability(userId: string, isAvailable: boolean) {
       return ports.partners.setAvailability(userId, isAvailable);
     },
+
+    /** §25 — the provider's own Rider → Service Provider service reviews (from SOS assistance
+     * ratings), newest first. Returns [] for a profile-less account. */
+    async getProviderReviews(userId: string) {
+      const profile = await ports.partners.findByUserId(userId);
+      if (!profile) return [];
+      return ports.partners.findProviderReviews(profile.id, 50);
+    },
   };
 }
 

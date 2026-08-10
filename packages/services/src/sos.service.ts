@@ -33,6 +33,12 @@ export const SOSService = {
     return getSafetyLocationModule().sos.resolveAlert(alertId, userId, isAdmin);
   },
 
+  /** §28 — reporter/admin cancel while dispatching: stops dispatch, expires offers, notifies
+   * responders, records the SOS_CANCELLED timeline event. */
+  async cancelAlert(alertId: string, userId: string, isAdmin: boolean, reason?: string) {
+    return getSafetyLocationModule().sos.cancelAlert(alertId, userId, isAdmin, reason);
+  },
+
   async respondToAlert(alertId: string, responderId: string, message?: string) {
     return getSafetyLocationModule().sos.respondToAlert(alertId, responderId, message);
   },

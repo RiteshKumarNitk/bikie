@@ -43,6 +43,17 @@ export const partnerProfileSchema = z
     longitude: z.number().min(-180).max(180).optional(),
     governmentIdType: z.enum(["AADHAAR", "PASSPORT"]).optional(),
     governmentIdNumber: optionalString(30),
+    // --- §6 (OPERATIONS): working hours, service radius, experience — all optional, a local
+    // mechanic without fixed business hours or a big service area must still be able to register ---
+    workingHours: optionalString(200),
+    serviceRadiusKm: z.preprocess(
+      emptyToUndefined,
+      z.coerce.number().int().min(1).max(500).optional(),
+    ),
+    yearsOfExperience: z.preprocess(
+      emptyToUndefined,
+      z.coerce.number().int().min(0).max(100).optional(),
+    ),
     // --- ADR-044: explicit opt-in to be dispatched SOS categories outside this partner's own
     // `type` (e.g. a FUEL_DELIVERY partner receiving a MEDICAL emergency) ---
     isGeneralResponder: z.boolean().optional(),

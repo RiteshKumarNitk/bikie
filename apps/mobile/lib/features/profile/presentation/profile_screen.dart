@@ -190,6 +190,19 @@ class _PartnerProfileSection extends ConsumerWidget {
             }
           },
         ),
+        profileAsync.whenOrNull(
+          data: (p) {
+            if (p == null || p.ratingCount == 0) return const SizedBox.shrink();
+            return _ProfileTile(
+              icon: Icons.star_outline,
+              label: 'Service Reviews',
+              subtitle: p.ratingCount > 0
+                  ? '⭐ ${p.ratingAvg.toStringAsFixed(1)} (${p.ratingCount})'
+                  : null,
+              onTap: () => context.push('/partner/reviews'),
+            );
+          },
+        ),
       ],
     );
   }

@@ -2,6 +2,24 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Master Spec gap-fill: SOS cancel, discovery badges, admin stats, ops fields, reviews, admin chat read (2026-08-10)
+
+Six gaps identified in a comprehensive gap-analysis pass against the master product spec (§1–56),
+completed after ADR-049/048/047 landed. All six implemented in a single pass.
+
+| Task | Status |
+|---|---|
+| **Gap A — §28: SOS cancel while dispatching**. Backend: `cancelAlert` port/repository (`FALSE_ALARM` + offer expiry), application, `POST /api/sos/alerts/[id]/cancel`, validation schema. Web: cancel button + confirm dialog on `/dashboard/sos/[id]`. Mobile: `cancelAlert` on `sos_repository.dart`, cancel button on `sos_detail_screen.dart`. Timeline: `SOS_CANCELLED` event type rendered on both platforms. Tests: unit (cancel → offers expired → timeline → cancel-while-not-ACTIVE) + e2e scenario (full create→cancel→no-new-dispatch flow) | Completed |
+| **Gap B — §9/§12: Discovery badges with verification status, rating, availability**. Backend: `NearbyPartnerRow` expanded (`verificationStatus`/`verificationStatusLabel`/`ratingAvg`/`ratingCount`/`isAvailable`), `findNearby` query unfiltered (removed the `isVerified: true` filter that hid all unverified providers). Web: `NearbyPartnersPanel.tsx` — ✓ BIKIE VERIFIED / ⚠ Unverified Provider badge, star rating, 🟢/⚫ availability indicator. Mobile: `NearbyPartner` model + `partners_screen.dart` updated with same badge/rating UI | Completed |
+| **Gap C — §37: Admin provider stats**. Backend: `getAdminProviderStats` in admin repository (`total`/`active`/`unverified`/`pendingVerification`/`verified`/`rejected`/`suspended`), port/adapter/application/facade/type threaded through, `GET /api/admin/partners` returns stats alongside partner list. Web: stat cards (grid of 7) on `/admin/partners` above the table | Completed |
+| **§6: Provider operations fields (`workingHours`/`serviceRadiusKm`/`yearsOfExperience`)**. Schema: migration `20260810100000_partner_operations_fields` (additive, 3 nullable columns). Validation: `partner.schema.ts` accepts the new fields. Types: `PartnerProfileDTO` expanded. Repo: threaded through `toPartnerDTO`/`writeInput`/upsert. Web: added to `PartnerBusinessFields.tsx` form + all 3 consumer pages (partner-onboarding, become-provider, settings). Mobile: `PartnerProfileSummary` model + `partner_onboarding_screen.dart` form fields | Completed |
+| **§5/§25: Provider service reviews**. Schema: `ProviderReview` model (one per SOS session, unique `sessionId`), migration `20260810110000_provider_reviews`. Repository: `addProviderReview` (upsert + aggregate into `Partner.ratingAvg`/`ratingCount`). Port: `ProviderReviewPort` wired into safety-location module. Wiring: `SessionApplication.submitRating` calls `addProviderReview` when the helper has a Partner profile. Partner reviews API: `GET /api/partner/reviews` now returns `ProviderReviewDTO[]` from the partners module. Web: `/partner/reviews` page shows review list with rating stars + comment. Mobile: rating fields on `PartnerProfileSummary`, reviews tile on `profile_screen.dart` | Completed |
+| **§34: Audited admin chat read**. Port: `ModerationMessagePort.getMessagesRaw` (fetch encrypted messages without decrypting). Adapter: wired to `messageRepository.findByConversationId`. Application: `ModerationApplication.getMessagesForAdmin` (requires reason, logs to AuditLog with `entity: "Conversation"` + admin ID + reason + timestamp). Route: `GET /api/admin/moderation/conversations/[id]/messages` (requires `reason` query param). UI: `/admin/moderation` — each conversation gets a "View" action that opens a modal requiring reason input, then displays the raw message list | Completed |
+| Backend: `prisma generate` — regen successful, `packages/services` typecheck clean (0 errors), `packages/types` clean, `packages/database` clean, `packages/validation` clean, `apps/web` clean. Tests: safety-location 66/66, administration 5/5, trust-safety 4/4 — all passing | Completed |
+| OpenAPI inventory update + docs | **Not done** — `pnpm openapi:generate` not run yet; needs the pipeline to be available (route-inventory.json staleness accepted for this pass) |
+| Live browser/device test | **Not done** — not verifiable in this environment, same caveat as every prior change |
+
+
 ## Service Provider CAPABILITY decoupled from verification (2026-08-10, ADR-049)
 
 | Task | Status |

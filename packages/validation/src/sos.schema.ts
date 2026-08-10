@@ -55,3 +55,8 @@ export const sosRatingSchema = z.object({
 export const sosDeclineSchema = z.object({
   message: z.string().max(500).optional(),
 });
+
+/** §28 — reporter/admin cancels an alert while it's being dispatched; reason is optional. */
+export const sosAlertCancelSchema = z.object({
+  reason: z.string().max(300).optional(),
+});

@@ -89,6 +89,11 @@ function createFakePorts(alertOverrides: Partial<RawSOSAlertDTO> = {}) {
     resolveAlert: vi.fn(async () => {
       alert = { ...alert, status: "RESOLVED" };
     }),
+    cancelAlert: vi.fn(async (alertId, _userId) => {
+      if (alert.id !== alertId || alert.status !== "ACTIVE") return 0;
+      alert = { ...alert, status: "FALSE_ALARM" };
+      return 1;
+    }),
   };
 
   const sosOffers: SafetyLocationPorts["sosOffers"] = {
@@ -145,6 +150,16 @@ function createFakePorts(alertOverrides: Partial<RawSOSAlertDTO> = {}) {
       o.status = "REJECTED";
     }),
     listOffersForAlert: vi.fn(async (alertId) => [...offers.values()].filter((o) => o.alertId === alertId)),
+    expireOpenOffersForAlert: vi.fn(async (alertId) => {
+      const expired: string[] = [];
+      for (const o of offers.values()) {
+        if (o.alertId === alertId && o.status === "OFFERED") {
+          o.status = "EXPIRED";
+          expired.push(o.responderId);
+        }
+      }
+      return expired;
+    }),
     findRespondedAlertIds: vi.fn(async (responderId, alertIds) => {
       const ids = [...offers.values()]
         .filter((o) => o.responderId === responderId && alertIds.includes(o.alertId))
@@ -295,8 +310,8 @@ describe("SOS end-to-end (ADR-045)", () => {
         findEligibleForAlert: vi.fn(async () => []),
         getEligibilityFields: vi.fn(async (userId: string) =>
           userId === "partner-offline"
-            ? { isVerified: true, isAvailable: false, isGeneralResponder: false, type: "MECHANIC" }
-            : { isVerified: true, isAvailable: true, isGeneralResponder: false, type: "FUEL_DELIVERY" },
+            ? { providerId: null, isVerified: true, isAvailable: false, isGeneralResponder: false, type: "MECHANIC" }
+            : { providerId: null, isVerified: true, isAvailable: true, isGeneralResponder: false, type: "FUEL_DELIVERY" },
         ),
       },
     });
@@ -357,6 +372,7 @@ describe("SOS end-to-end (ADR-045)", () => {
         findByCity: vi.fn(async () => []),
         findEligibleForAlert: vi.fn(async () => []),
         getEligibilityFields: vi.fn(async () => ({
+          providerId: null,
           isVerified: true,
           isAvailable: true,
           isGeneralResponder: false,
@@ -462,6 +478,39 @@ describe("SOS end-to-end (ADR-045)", () => {
     await module.escalation.tickEscalation({ ...communityAlert, escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 20_000 });
     expect(findAdminContacts).toHaveBeenCalled();
     expect(updateEscalationState).toHaveBeenCalledWith("alert-1", expect.objectContaining({ escalationTier: "ADMIN" }));
+  });
+
+  it("§28 cancellation: the reporter cancels a dispatching alert — offers expire, responders are notified, timeline records SOS_CANCELLED, dispatch stops", async () => {
+    const fake = createFakePorts({ userId: "rider-reporter" });
+    const notify = notifyMock();
+    const timelineRecord = vi.fn(async () => undefined);
+    const module = buildModule({
+      ...fake.ports,
+      notifications: { notify },
+      sosTimeline: { ...(emptyRepos().sosTimeline as SafetyLocationPorts["sosTimeline"]), record: timelineRecord },
+    });
+
+    const offerA = await module.session.offerHelp("alert-1", "helper-a");
+    const offerB = await module.session.offerHelp("alert-1", "helper-b");
+    if (!offerA.ok || !offerB.ok) throw new Error("unreachable");
+    notify.mockClear(); // drop the 2 "someone offered to help" calls
+
+    const cancelled = await module.sos.cancelAlert("alert-1", "rider-reporter", false, "No longer need help");
+    expect(cancelled).toEqual({ ok: true });
+
+    // Dispatch stopped: the alert is no longer ACTIVE.
+    expect(fake.getAlert().status).toBe("FALSE_ALARM");
+    // Every outstanding offer was expired.
+    expect(fake.getOffers().filter((o) => o.alertId === "alert-1").map((o) => o.status)).toEqual(["EXPIRED", "EXPIRED"]);
+    // Both mid-response responders were told the request is gone.
+    expect(notify.mock.calls.map((c) => c[0])).toEqual(expect.arrayContaining(["helper-a", "helper-b"]));
+    // Timeline captured the cancellation.
+    expect(timelineRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ alertId: "alert-1", type: "SOS_CANCELLED", actorId: "rider-reporter" }),
+    );
+    // A fresh offer on the now-closed alert is refused.
+    const lateOffer = await module.session.offerHelp("alert-1", "helper-c");
+    expect(lateOffer).toEqual({ ok: false, reason: "ALERT_NOT_ACTIVE" });
   });
 
   it("Rider SOS opt-out: an opted-out rider never appears in the nearby-rider dispatch pool", async () => {

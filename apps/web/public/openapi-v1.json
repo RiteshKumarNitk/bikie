@@ -998,6 +998,57 @@
         }
       }
     },
+    "/api/admin/moderation/conversations/{id}/messages": {
+      "get": {
+        "operationId": "get_api_admin_moderation_conversations_id_messages",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/moderation/conversations/{id}/messages",
+        "description": "Source: `apps/web/app/api/admin/moderation/conversations/[id]/messages/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/moderation/conversations/[id]/messages/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
     "/api/admin/moderation/conversations/{id}": {
       "delete": {
         "operationId": "delete_api_admin_moderation_conversations_id_",
@@ -5892,6 +5943,57 @@
         ],
         "x-bikie-auth": "membership",
         "x-bikie-source": "apps/web/app/api/riders/nearby/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/sos/alerts/{id}/cancel": {
+      "post": {
+        "operationId": "post_api_sos_alerts_id_cancel",
+        "tags": [
+          "sos"
+        ],
+        "summary": "POST /api/sos/alerts/{id}/cancel",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/cancel/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "membership",
+        "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/cancel/route.ts",
         "responses": {
           "200": {
             "description": "Success (shape documented in .docs/API.md for this route).",

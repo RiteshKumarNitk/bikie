@@ -27,7 +27,7 @@ const _timelineLabels = {
   'ASSISTANCE_STARTED': 'Assistance started',
   'ASSISTANCE_COMPLETED': 'Assistance completed',
   'SOS_RESOLVED': 'SOS resolved',
-  'SOS_CANCELLED': 'Session cancelled',
+  'SOS_CANCELLED': 'Cancelled',
   'RATING_SUBMITTED': 'Rating submitted',
 };
 
@@ -121,6 +121,31 @@ class _SosDetailScreenState extends ConsumerState<SosDetailScreen> {
     }
   }
 
+  Future<void> _handleCancel() async {
+    if (!mounted) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel SOS?'),
+        content: const Text('All offers will expire and responders will be notified that the request is no longer available.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep SOS')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel SOS')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() => _busy = true);
+    try {
+      await ref.read(sosRepositoryProvider).cancelAlert(widget.alertId);
+      await _refresh();
+    } on ApiException catch (e) {
+      _showError(e.message);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _handleStatus(SOSSessionDetail session, String status) async {
     setState(() => _busy = true);
     try {
@@ -188,6 +213,13 @@ class _SosDetailScreenState extends ConsumerState<SosDetailScreen> {
                   OutlinedButton(
                     onPressed: _busy ? null : _handleWithdraw,
                     child: const Text('Cannot Help — Withdraw Offer'),
+                  ),
+                if (alert.status == 'ACTIVE' && (isReporter || isAdmin))
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _handleCancel,
+                    icon: const Icon(Icons.cancel_outlined),
+                    style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
+                    label: const Text('Cancel SOS'),
                   ),
                 if (isOpen && (isReporter || isAdmin)) ...[
                   const SizedBox(height: 16),

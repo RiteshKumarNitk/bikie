@@ -247,6 +247,25 @@ export function createSessionApplication(ports: SafetyLocationPorts, deps: Sessi
       await ports.sosSessions.submitRating(sessionId, rating, comment);
       await ports.sosTimeline.record({ alertId: session.alertId, sessionId, type: "RATING_SUBMITTED", actorId: riderId, metadata: { rating } });
       await reputation.recordRating(session.helperId, rating).catch(console.error);
+
+      // §25 — if the helper has a Service Provider profile, record a public ProviderReview that
+      // powers the "⭐ 4.8 (126)" on discovery cards. A helper without a Partner row is a nearby
+      // rider, not a service provider — getEligibilityFields returns providerId: null for them.
+      const eligibility = await ports.partnerDispatch.getEligibilityFields(session.helperId).catch(() => null);
+      if (eligibility?.providerId) {
+        await ports.providerReviews
+          .addProviderReview({
+            providerId: eligibility.providerId,
+            riderId,
+            sessionId,
+            rating,
+            comment,
+          })
+          .catch((err: unknown) =>
+            console.error("[SOS][ProviderReview] failed to write", err),
+          );
+      }
+
       return { ok: true as const };
     },
   };

@@ -60,6 +60,7 @@ export function createModerationMessageAdapter(): ModerationMessagePort {
     deleteMessage: (messageId, actorId) => messageRepository.deleteMessage(messageId, actorId),
     getOtherParticipantIds: (conversationId, excludeUserId) =>
       messageRepository.getOtherParticipantIds(conversationId, excludeUserId),
+    getMessagesRaw: (conversationId, take) => messageRepository.getMessagesRaw(conversationId, take),
   };
 }
 

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-09T17:02:59.423Z",
-  "count": 130,
+  "generatedAt": "2026-08-10T16:39:57.614Z",
+  "count": 132,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -103,6 +103,14 @@
       ],
       "auth": "admin",
       "file": "apps/web/app/api/admin/moderation/conversations/[id]/lock/route.ts"
+    },
+    {
+      "path": "/api/admin/moderation/conversations/{id}/messages",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/moderation/conversations/[id]/messages/route.ts"
     },
     {
       "path": "/api/admin/moderation/conversations/{id}",
@@ -764,6 +772,14 @@
       ],
       "auth": "membership",
       "file": "apps/web/app/api/riders/nearby/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/{id}/cancel",
+      "methods": [
+        "POST"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/[id]/cancel/route.ts"
     },
     {
       "path": "/api/sos/alerts/{id}/decline",

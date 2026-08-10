@@ -18,6 +18,9 @@ export const AdminService = {
   getAllPartners() {
     return getAdministrationModule().admin.getAllPartners();
   },
+  getPartnerStats() {
+    return getAdministrationModule().admin.getPartnerStats();
+  },
   getPartnerDetail(partnerId: string) {
     return getAdministrationModule().admin.getPartnerDetail(partnerId);
   },

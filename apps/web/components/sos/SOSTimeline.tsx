@@ -21,7 +21,7 @@ const STEP_LABEL: Record<string, string> = {
   ASSISTANCE_STARTED: "Assistance started",
   ASSISTANCE_COMPLETED: "Assistance completed",
   SOS_RESOLVED: "SOS resolved",
-  SOS_CANCELLED: "Session cancelled",
+  SOS_CANCELLED: "Cancelled",
   RATING_SUBMITTED: "Rating submitted",
 };
 

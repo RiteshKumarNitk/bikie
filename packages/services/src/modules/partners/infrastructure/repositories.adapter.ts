@@ -21,5 +21,6 @@ export function createPartnerRepositoryAdapter(): PartnerRepositoryPort {
     findNearby: (latitude, longitude, radiusMeters, options) =>
       partnerRepository.findPartnersNearPoint(latitude, longitude, radiusMeters, options),
     setAvailability: (userId, isAvailable) => partnerRepository.setAvailability(userId, isAvailable),
+    findProviderReviews: (providerId, take) => partnerRepository.findProviderReviews(providerId, take),
   };
 }

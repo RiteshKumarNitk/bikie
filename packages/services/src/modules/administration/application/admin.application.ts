@@ -46,6 +46,7 @@ export function createAdminApplication(ports: AdministrationPorts) {
     updateUserRole: (userId: string, role: string) => ports.admin.updateUserRole(userId, role),
     deleteUser: (userId: string) => ports.admin.deleteUser(userId),
     getAllPartners: () => ports.admin.findAllPartners(),
+    getPartnerStats: () => ports.admin.getAdminPartnerStats(),
     getPartnerDetail: (partnerId: string) => ports.admin.findPartnerDetailById(partnerId),
     /** ADR-046b — the one place every Approve/Reject/Request-info/Suspend/Restore decision goes
      * through. The DB write is the transactional part (Partner.verificationStatus + isVerified +

@@ -75,6 +75,61 @@ export function createSosApplication(ports: SafetyLocationPorts) {
       return { ok: true as const };
     },
 
+    /** §28 — the reporter (or an admin) cancels an SOS while it's being dispatched. Stops the
+     * dispatch (nextEscalationAt is cleared), expires every outstanding offer, ends an already-
+     * assigned helper's active session if one exists ("already assigned → appropriate
+     * cancellation flow" — the provider is never left travelling to a cancelled emergency), and
+     * records the SOS_CANCELLED timeline event. Everyone who was mid-response gets told the
+     * request is no longer available.
+     */
+    async cancelAlert(alertId: string, userId: string, isAdmin: boolean, reason?: string) {
+      const alert = await ports.sosAlerts.getAlertById(alertId);
+      if (!alert) return { ok: false as const, reason: "NOT_FOUND" as const };
+      if (alert.userId !== userId && !isAdmin) return { ok: false as const, reason: "FORBIDDEN" as const };
+      if (alert.status !== "ACTIVE") return { ok: false as const, reason: "ALERT_NOT_ACTIVE" as const };
+
+      const assignedHelperId = alert.assignedHelperId;
+      if (assignedHelperId) {
+        const session = await ports.sosSessions.getActiveSessionForAlert(alertId).catch(() => null);
+        if (session) {
+          await ports.sosSessions
+            .updateSessionStatus(session.id, "CANCELLED", reason ?? "SOS cancelled by rider")
+            .catch(() => undefined);
+        }
+      }
+
+      const expiredResponderIds = await ports.sosOffers.expireOpenOffersForAlert(alertId);
+      const cancelled = await ports.sosAlerts.cancelAlert(alertId, userId);
+      if (cancelled === 0) return { ok: false as const, reason: "ALERT_NOT_ACTIVE" as const };
+
+      await ports.sosTimeline.record({
+        alertId,
+        type: "SOS_CANCELLED",
+        actorId: userId,
+        metadata: { reason: reason ?? null, expiredOffers: expiredResponderIds.length },
+      });
+
+      const recipients = new Set<string>();
+      if (assignedHelperId) recipients.add(assignedHelperId);
+      for (const id of expiredResponderIds) recipients.add(id);
+      await Promise.all(
+        [...recipients].map((recipientId) =>
+          ports.notifications
+            .notify(
+              recipientId,
+              "SOS_ALERT",
+              "SOS cancelled",
+              "This SOS request was cancelled by the rider and is no longer available.",
+              "sos_alert",
+              alertId,
+            )
+            .catch(console.error),
+        ),
+      );
+
+      return { ok: true as const };
+    },
+
     /** Deprecated alias target — kept only for the old /respond route (ADR-028: no facade
      * deletion without zero-use proof). New callers should use the session application's
      * offerHelp instead. */

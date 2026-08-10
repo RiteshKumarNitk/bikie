@@ -55,6 +55,7 @@ describe("exportCsv application", () => {
         updateUserRole: vi.fn(),
         deleteUser: vi.fn(),
         findAllPartners: vi.fn(),
+        getAdminPartnerStats: vi.fn(),
         findPartnerDetailById: vi.fn(),
         transitionPartnerVerification: vi.fn(),
         deletePartner: vi.fn(),

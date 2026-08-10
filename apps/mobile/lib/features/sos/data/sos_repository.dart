@@ -70,6 +70,15 @@ class SosRepository {
     return apiGuard(() => _dio.post('/api/sos/alerts/$id/resolve'));
   }
 
+  /// §28 — the reporter (or admin) cancels an SOS while it's being dispatched. Stops dispatch,
+  /// expires offers, notifies responders, records the SOS_CANCELLED timeline event.
+  Future<void> cancelAlert(String alertId, {String? reason}) {
+    return apiGuard(() => _dio.post(
+          '/api/sos/alerts/$alertId/cancel',
+          data: {if (reason != null && reason.isNotEmpty) 'reason': reason},
+        ));
+  }
+
   /// Helper taps "I'm Coming."
   Future<SOSOffer> offerHelp(String alertId, {double? latitude, double? longitude, String? message}) {
     return apiGuard(() async {

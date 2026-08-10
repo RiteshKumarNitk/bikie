@@ -12,6 +12,8 @@ export interface AdminRepositoryPort {
   updateUserRole(userId: string, role: string): Promise<any>;
   deleteUser(userId: string): Promise<any>;
   findAllPartners(): Promise<any[]>;
+  /** §37 — summary counts for the admin Service Provider dashboard. */
+  getAdminPartnerStats(): Promise<any>;
   findPartnerDetailById(partnerId: string): Promise<any | null>;
   transitionPartnerVerification(
     partnerId: string,

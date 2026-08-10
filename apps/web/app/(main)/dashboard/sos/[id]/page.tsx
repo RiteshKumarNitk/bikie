@@ -230,6 +230,30 @@ export default function SOSAlertDetailPage() {
     }
   }
 
+  async function handleCancelSos() {
+    if (!alert || !(isReporter || isAdmin)) return;
+    const reason = window.prompt("Reason for cancelling this SOS? (optional)", "No longer need help");
+    if (reason === null) return; // user dismissed the prompt
+    if (!window.confirm("Cancel this SOS request? All offers will expire and responders will be notified.")) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      const res = await fetch(`/api/sos/alerts/${alertId}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: reason?.trim() || undefined }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setActionError(friendlyError(data?.error));
+        return;
+      }
+      await load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleRate() {
     if (!sosSession) return;
     setBusy(true);
@@ -352,6 +376,16 @@ export default function SOSAlertDetailPage() {
             className="mt-4 rounded-xl border border-foreground/15 px-5 py-2.5 text-sm font-medium hover:bg-foreground/5 disabled:opacity-50"
           >
             Cannot Help — Withdraw Offer
+          </button>
+        )}
+        {alert.status === "ACTIVE" && (isReporter || isAdmin) && (
+          <button
+            type="button"
+            onClick={handleCancelSos}
+            disabled={busy}
+            className="mt-4 rounded-xl border border-red-500/30 px-5 py-2.5 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10 disabled:opacity-50"
+          >
+            Cancel SOS
           </button>
         )}
       </div>

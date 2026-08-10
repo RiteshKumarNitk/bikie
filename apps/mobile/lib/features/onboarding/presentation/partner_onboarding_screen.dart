@@ -38,6 +38,9 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
   final _area = TextEditingController();
   final _pincode = TextEditingController();
   final _governmentIdNumber = TextEditingController();
+  final _workingHours = TextEditingController();
+  final _serviceRadiusKm = TextEditingController();
+  final _yearsOfExperience = TextEditingController();
   final _contactPerson1Name = TextEditingController();
   final _contactPerson1Mobile = TextEditingController();
   final _contactPerson2Name = TextEditingController();
@@ -66,6 +69,9 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       _pincode.text = profile.pincode ?? '';
       _governmentIdType = profile.governmentIdType;
       _governmentIdNumber.text = profile.governmentIdNumber ?? '';
+      _workingHours.text = profile.workingHours ?? '';
+      _serviceRadiusKm.text = profile.serviceRadiusKm?.toString() ?? '';
+      _yearsOfExperience.text = profile.yearsOfExperience?.toString() ?? '';
       _contactPerson1Name.text = profile.contactPerson1Name ?? '';
       _contactPerson1Mobile.text = profile.contactPerson1Mobile ?? '';
       _contactPerson2Name.text = profile.contactPerson2Name ?? '';
@@ -87,6 +93,9 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       _area,
       _pincode,
       _governmentIdNumber,
+      _workingHours,
+      _serviceRadiusKm,
+      _yearsOfExperience,
       _contactPerson1Name,
       _contactPerson1Mobile,
       _contactPerson2Name,
@@ -127,6 +136,9 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
             longitude: _location?.longitude,
             governmentIdType: _governmentIdType,
             governmentIdNumber: _governmentIdNumber.text,
+            workingHours: _workingHours.text,
+            serviceRadiusKm: int.tryParse(_serviceRadiusKm.text),
+            yearsOfExperience: int.tryParse(_yearsOfExperience.text),
           ));
       // Refresh unconditionally (not just when `name` changed) — the very first call into this
       // save path for a brand-new signup is also the moment `partnerStatus` actually moves
@@ -220,6 +232,37 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                   LocationPickerField(
                     value: _location,
                     onChanged: (position) => setState(() => _location = position),
+                  ),
+                ],
+              ),
+              OnboardingSection(
+                title: 'Operations',
+                children: [
+                  OnboardingTextField(
+                    controller: _workingHours,
+                    label: 'Working hours (optional)',
+                    hint: 'e.g. Mon–Sat 9:00–19:00',
+                  ),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OnboardingTextField(
+                          controller: _serviceRadiusKm,
+                          label: 'Service radius (km, optional)',
+                          hint: 'e.g. 20',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OnboardingTextField(
+                          controller: _yearsOfExperience,
+                          label: 'Years of experience (optional)',
+                          hint: 'e.g. 8',
+                          keyboardType: TextInputType.number,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

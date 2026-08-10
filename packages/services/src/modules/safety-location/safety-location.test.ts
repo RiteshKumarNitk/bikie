@@ -296,6 +296,7 @@ describe("sos resolveAlert ownership", () => {
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
           getOpenAlertsNearPoint: vi.fn(async () => []),
+          cancelAlert: vi.fn(async () => 1),
         },
       }),
       communications: fakeCommunications(),
@@ -323,6 +324,7 @@ describe("sos resolveAlert ownership", () => {
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
           getOpenAlertsNearPoint: vi.fn(async () => []),
+          cancelAlert: vi.fn(async () => 1),
         },
       }),
       communications: fakeCommunications(),
@@ -349,6 +351,7 @@ describe("sos resolveAlert ownership", () => {
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
           getOpenAlertsNearPoint: vi.fn(async () => []),
+          cancelAlert: vi.fn(async () => 1),
         },
       }),
       communications: fakeCommunications(),
@@ -375,6 +378,7 @@ describe("sos resolveAlert ownership", () => {
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
           getOpenAlertsNearPoint: vi.fn(async () => []),
+          cancelAlert: vi.fn(async () => 1),
         },
       }),
       communications: fakeCommunications(),
@@ -382,6 +386,131 @@ describe("sos resolveAlert ownership", () => {
 
     const result = await module.sos.resolveAlert("missing", "someone", false);
     expect(result).toEqual({ ok: false, reason: "NOT_FOUND" });
+  });
+});
+
+describe("sos cancelAlert while dispatching (§28)", () => {
+  it("lets the reporter cancel their own ACTIVE alert: expires offers, stops dispatch, records the timeline event", async () => {
+    const cancelAlert = vi.fn(async () => 1);
+    const expireOpenOffersForAlert = vi.fn(async () => ["responder-a", "responder-b"]);
+    const notify = notifyMock();
+    const timelineRecord = vi.fn(async () => undefined);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts, getAlertById: vi.fn(async () => sampleAlert({ userId: "reporter-1" })), cancelAlert } as any,
+        sosOffers: { ...emptyRepos().sosOffers, expireOpenOffersForAlert } as any,
+        sosTimeline: { ...emptyRepos().sosTimeline, record: timelineRecord } as any,
+        notifications: { notify },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.sos.cancelAlert("alert-1", "reporter-1", false, "No longer need help");
+
+    expect(result).toEqual({ ok: true });
+    expect(expireOpenOffersForAlert).toHaveBeenCalledWith("alert-1");
+    expect(cancelAlert).toHaveBeenCalledWith("alert-1", "reporter-1");
+    expect(timelineRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ alertId: "alert-1", type: "SOS_CANCELLED", actorId: "reporter-1" }),
+    );
+    // Every responder who had an outstanding offer is told the request is gone.
+    const notifiedIds = notify.mock.calls.map((c) => c[0]);
+    expect(notifiedIds).toEqual(expect.arrayContaining(["responder-a", "responder-b"]));
+  });
+
+  it("also cancels the assigned helper's active session when the alert was already assigned", async () => {
+    const cancelAlert = vi.fn(async () => 1);
+    const updateSessionStatus = vi.fn(async () => ({
+      id: "session-1",
+      alertId: "alert-1",
+      helperId: "helper-1",
+      riderId: "reporter-1",
+      status: "CANCELLED",
+      conversationId: null,
+      startedAt: new Date(),
+      helperArrivedAt: null,
+      assistanceStartedAt: null,
+      completedAt: null,
+      cancelledAt: new Date(),
+      cancelReason: "Rider cancelled",
+      rating: null,
+      ratingComment: null,
+    }));
+    const notify = notifyMock();
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: {
+          ...emptyRepos().sosAlerts,
+          getAlertById: vi.fn(async () =>
+            sampleAlert({ userId: "reporter-1", assignedHelperId: "helper-1" }),
+          ),
+          cancelAlert,
+        } as any,
+        sosSessions: { ...emptyRepos().sosSessions, getActiveSessionForAlert: vi.fn(async () => ({ id: "session-1" })), updateSessionStatus } as any,
+        notifications: { notify },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.sos.cancelAlert("alert-1", "reporter-1", false);
+
+    expect(result).toEqual({ ok: true });
+    expect(updateSessionStatus).toHaveBeenCalledWith("session-1", "CANCELLED", "SOS cancelled by rider");
+    // The assigned helper is among the notified recipients.
+    expect(notify.mock.calls.map((c) => c[0])).toContain("helper-1");
+  });
+
+  it("lets an admin cancel someone else's alert", async () => {
+    const cancelAlert = vi.fn(async () => 1);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: {
+          ...emptyRepos().sosAlerts,
+          getAlertById: vi.fn(async () => sampleAlert({ userId: "reporter-1" })),
+          cancelAlert,
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.sos.cancelAlert("alert-1", "admin-1", true);
+    expect(result).toEqual({ ok: true });
+  });
+
+  it("blocks a bystander from cancelling someone else's alert", async () => {
+    const cancelAlert = vi.fn(async () => 1);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: {
+          ...emptyRepos().sosAlerts,
+          getAlertById: vi.fn(async () => sampleAlert({ userId: "reporter-1" })),
+          cancelAlert,
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.sos.cancelAlert("alert-1", "bystander-1", false);
+    expect(result).toEqual({ ok: false, reason: "FORBIDDEN" });
+    expect(cancelAlert).not.toHaveBeenCalled();
+  });
+
+  it("returns ALERT_NOT_ACTIVE for an already-resolved alert", async () => {
+    const cancelAlert = vi.fn(async () => 0);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: {
+          ...emptyRepos().sosAlerts,
+          getAlertById: vi.fn(async () => sampleAlert({ userId: "reporter-1", status: "FALSE_ALARM" })),
+          cancelAlert,
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.sos.cancelAlert("alert-1", "reporter-1", false);
+    expect(result).toEqual({ ok: false, reason: "ALERT_NOT_ACTIVE" });
+    expect(cancelAlert).not.toHaveBeenCalled();
   });
 });
 
@@ -1247,5 +1376,101 @@ describe("session application — reputation wiring (ADR-033 Phase D)", () => {
     const result = await module.session.submitRating("session-1", "rider-1", 5, "Great help!");
     expect(result).toEqual({ ok: true });
     expect(reputationRepository.recordRating).toHaveBeenCalledWith("helper-1", 5);
+  });
+
+  it("writes a §25 ProviderReview when the rated helper has a Service Provider profile", async () => {
+    const addProviderReview = vi.fn(async () => true);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        partnerDispatch: {
+          ...emptyRepos().partnerDispatch,
+          getEligibilityFields: vi.fn(async () => ({
+            providerId: "provider-1",
+            isVerified: true,
+            isAvailable: true,
+            isGeneralResponder: false,
+            type: "MECHANIC",
+          })),
+        } as any,
+        providerReviews: { addProviderReview } as any,
+        sosSessions: {
+          ...emptyRepos().sosSessions,
+          getSessionById: vi.fn(async () => ({
+            id: "session-1",
+            alertId: "alert-1",
+            helperId: "helper-1",
+            riderId: "rider-1",
+            status: "COMPLETED",
+            conversationId: null,
+            startedAt: new Date(),
+            helperArrivedAt: null,
+            assistanceStartedAt: null,
+            completedAt: new Date(),
+            cancelledAt: null,
+            cancelReason: null,
+            rating: null,
+            ratingComment: null,
+            helper: { id: "helper-1", name: "Helper One", phone: "9000000000", email: "h@example.com" },
+            rider: { id: "rider-1", name: "Rider One", phone: "9000000001", email: "r@example.com" },
+          })),
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.session.submitRating("session-1", "rider-1", 4, "Quick fix!");
+    expect(result).toEqual({ ok: true });
+    expect(addProviderReview).toHaveBeenCalledWith({
+      providerId: "provider-1",
+      riderId: "rider-1",
+      sessionId: "session-1",
+      rating: 4,
+      comment: "Quick fix!",
+    });
+  });
+
+  it("skips the §25 ProviderReview when the helper is a nearby rider, not a Service Provider", async () => {
+    const addProviderReview = vi.fn(async () => true);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        partnerDispatch: {
+          ...emptyRepos().partnerDispatch,
+          getEligibilityFields: vi.fn(async () => ({
+            providerId: null,
+            isVerified: false,
+            isAvailable: false,
+            isGeneralResponder: false,
+            type: "MECHANIC",
+          })),
+        } as any,
+        providerReviews: { addProviderReview } as any,
+        sosSessions: {
+          ...emptyRepos().sosSessions,
+          getSessionById: vi.fn(async () => ({
+            id: "session-1",
+            alertId: "alert-1",
+            helperId: "helper-1",
+            riderId: "rider-1",
+            status: "COMPLETED",
+            conversationId: null,
+            startedAt: new Date(),
+            helperArrivedAt: null,
+            assistanceStartedAt: null,
+            completedAt: new Date(),
+            cancelledAt: null,
+            cancelReason: null,
+            rating: null,
+            ratingComment: null,
+            helper: { id: "helper-1", name: "Helper One", phone: "9000000000", email: "h@example.com" },
+            rider: { id: "rider-1", name: "Rider One", phone: "9000000001", email: "r@example.com" },
+          })),
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.session.submitRating("session-1", "rider-1", 5);
+    expect(result).toEqual({ ok: true });
+    expect(addProviderReview).not.toHaveBeenCalled();
   });
 });
