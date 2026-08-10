@@ -1,15 +1,19 @@
 # BIKIE — SOS Feature
 
 Membership-gated emergency / assistance alerts. A rider sends a **Red** or **Amber** alert with
-live GPS; BIKIE fans out in stages — emergency contacts and nearby riders immediately, service
-providers and admins as later escalation tiers — over **SMS / WhatsApp / Email / in-app** (only
-where each channel is configured and the recipient has the matching contact detail). A responder
-offers to help, the reporter accepts one offer, and the two of them run an assisted session
-(chat, status updates, rating) through to completion.
+live GPS; BIKIE fans out in stages — emergency contacts immediately, then nearby Riders and
+eligible Service Providers *together* as a shared, radius-widening candidate pool, admins as the
+terminal fallback (ADR-047) — over **SMS / WhatsApp / Email / in-app** (only where each channel is
+configured and the recipient has the matching contact detail). Exact contact info and GPS are
+withheld from every candidate responder until one of them is actually assigned (ADR-045, extended
+to every dispatch channel by ADR-048). A responder offers to help, the reporter accepts one offer
+(atomically locking assignment — every other pending offer is auto-expired and those responders
+are notified), and the two of them run an assisted session (chat, status updates, rating) through
+to completion.
 
 Related: `API.md` (routes), `PRODUCTION_INTEGRATIONS.md` (vendors), ADR-016 / ADR-018 / ADR-020 /
-ADR-028 / ADR-029 / ADR-030 / ADR-033 / ADR-036 / ADR-038 / ADR-042 / ADR-044 / ADR-045 in
-`DECISIONS.md`.
+ADR-028 / ADR-029 / ADR-030 / ADR-033 / ADR-036 / ADR-038 / ADR-042 / ADR-044 / ADR-045 / ADR-047 /
+ADR-048 in `DECISIONS.md`.
 
 ---
 
@@ -24,7 +28,7 @@ flowchart LR
   D --> E[Confirm modal]
   E --> F[POST /api/sos/alerts]
   F --> G[Alert saved + immediate fan-out]
-  G --> H[Staged escalation: community → nearby riders → service providers → admin]
+  G --> H[Staged escalation: community-first, then Riders + Service Providers together, then admin]
   H --> I[Someone offers to help]
   I --> J[Reporter accepts one offer]
   J --> K[Session: chat, status updates, rating]
@@ -78,7 +82,7 @@ sequenceDiagram
   API->>RT: publishGlobal sos_alert
   par
     API->>Fan: fanOut(alert) — emergency contacts + optional emergency-services number
-    API->>Esc: seedEscalation(alert) — tier-1 nearby riders (community-first if any share a group)
+    API->>Esc: seedEscalation(alert) — tier-1 nearby riders (community-first if any share a group)<br/>+ eligible Service Providers at the same starting radius (ADR-047)
   end
   API-->>UI: { alert, dispatch, profileWarning }
 ```
@@ -91,48 +95,47 @@ sentence (ADR-030).
 
 ## 4. Staged escalation (who gets notified, and when)
 
-Unlike an early version of this feature, service providers and admins are **not** notified at
-creation time — only emergency contacts, an optional configured emergency-services number, and a
-first tier of nearby riders go out immediately. A cron ticker (`GET /api/cron/sos-escalate`)
-widens the search over time if nobody has been assigned yet.
+Emergency contacts and an optional configured emergency-services number go out immediately at
+creation. Nearby Riders and eligible Service Providers go out **together**, as one shared,
+radius-widening candidate pool (ADR-047) — a Service Provider is a parallel responder type, not a
+later fallback reached only once every rider tier has timed out. A cron ticker
+(`GET /api/cron/sos-escalate`) widens the search over time if nobody has been assigned yet.
 
 ```mermaid
 flowchart TB
-  Create[Alert created] --> Immediate[Immediate: emergency contacts<br/>+ optional emergency services<br/>+ tier-1 nearby riders 5km]
+  Create[Alert created] --> Immediate[Immediate: emergency contacts<br/>+ optional emergency services<br/>+ tier-1 nearby riders 5km<br/>+ eligible Service Providers @ 5km]
   Immediate --> Zero{Any recipients<br/>found anywhere?}
   Zero -->|None| EscAdmin1[Escalate to admins immediately<br/>ADR-030 guarantee]
   Zero -->|Some| Wait[Wait for nextEscalationAt]
 
   Wait --> Tick[Cron tick: GET /api/cron/sos-escalate]
   Tick --> Community{Tier ==<br/>NEARBY_RIDERS_COMMUNITY?}
-  Community -->|Yes, timed out| General[Advance to NEARBY_RIDERS_GENERAL<br/>notify the rest of the nearby pool]
+  Community -->|Yes, timed out| General[Advance to NEARBY_RIDERS_GENERAL<br/>notify the rest of the nearby pool<br/>+ any newly-eligible Service Providers]
   Community -->|No| RiderTier{Tier ==<br/>NEARBY_RIDERS_GENERAL<br/>and radius not maxed?}
-  RiderTier -->|Yes| Widen[Widen radius +5km, notify newly-in-range riders]
-  RiderTier -->|No| NextTier[Advance one tier:<br/>GENERAL → SERVICE_PROVIDERS → ADMIN]
-
-  NextTier --> SP{Advancing to<br/>SERVICE_PROVIDERS?}
-  SP -->|Yes| Eligible[Dispatch to eligible partners only —<br/>verified + available + type-matched<br/>or general-responder + not at capacity,<br/>25km radius. ADR-044]
-  SP -->|No, ADMIN| EscAdmin2[Escalate to admins — terminal tier]
+  RiderTier -->|Yes| Widen[Widen radius +5km together —<br/>notify newly-in-range riders<br/>AND newly-in-range Service Providers]
+  RiderTier -->|No, radius maxed| EscAdmin2[Escalate to admins — terminal tier<br/>neither a rider nor a provider accepted]
 
   General --> Notify[notifyRecipients → SMS/WhatsApp/Email/in-app]
   Widen --> Notify
-  Eligible --> Notify
   EscAdmin1 --> Notify
   EscAdmin2 --> Notify
 ```
 
 **Community-first (ADR-033 Phase D).** If any nearby rider shares a Community/Club with the
-reporter, the tier starts at `NEARBY_RIDERS_COMMUNITY` (shorter timeout, notifies only that
-subset) before falling through to the full nearby pool at `NEARBY_RIDERS_GENERAL`. No shared
+reporter, the tier starts at `NEARBY_RIDERS_COMMUNITY` (shorter timeout, notifies only that rider
+subset — Service Providers aren't "community members," so they're dispatched in this same round
+regardless) before falling through to the full nearby pool at `NEARBY_RIDERS_GENERAL`. No shared
 group members nearby → starts at `NEARBY_RIDERS_GENERAL` directly.
 
-**Service-provider eligibility (ADR-044, fixed a real bug in ADR-045's predecessor).** A partner
-is only ever dispatched an alert if: verified, currently `isAvailable`, within 25km, category-
-matched (`partnerTypeForAlertType`) or opted in as `isGeneralResponder` for unmapped categories,
-and not already the assigned helper on another active session. There is **no** "broaden to
-anyone if the strict search comes up empty" fallback — a fuel-delivery partner will never receive
-a medical emergency. The alert never reaches nobody regardless: `tickEscalation` still advances
-`SERVICE_PROVIDERS → ADMIN` unconditionally after a timeout.
+**Service-provider eligibility (ADR-044, ordering corrected by ADR-047).** A partner is only ever
+dispatched an alert if: verified, currently `isAvailable`, within the **same widening radius the
+rider search is currently using** (previously a fixed, unrelated 25km — now shared, so "nearby"
+means one radius for both responder types at any given moment), category-matched
+(`partnerTypeForAlertType`) or opted in as `isGeneralResponder` for unmapped categories, and not
+already the assigned helper on another active session. There is **no** "broaden to anyone if the
+strict search comes up empty" fallback — a fuel-delivery partner will never receive a medical
+emergency. The alert never reaches nobody regardless: `tickEscalation` still advances to `ADMIN`
+unconditionally once radius is maxed with no acceptance from either pool.
 
 **Rider SOS opt-out (ADR-045).** A rider with `RiderLocation.receiveSosAlerts = false` never
 appears in the nearby-rider candidate pool (`findNearbyAroundPoint`'s SQL, alongside the existing
@@ -188,7 +191,9 @@ The reporter accepting an offer is one atomic transaction
 accepted offer to `ACCEPTED`, **expires every other still-`OFFERED` response on that alert in the
 same step**, and creates the `Conversation` + `SOSSession` — no orphaned `OFFERED` rows survive a
 successful accept, and a losing concurrent accept attempt gets `409`/a typed error, never a
-silent overwrite.
+silent overwrite. Every responder whose offer was just expired this way is notified directly
+("This assistance request has already been assigned to another responder," ADR-048) — they don't
+have to refresh to find out.
 
 **Decline (ADR-045).** A responder — typically a service provider browsing "Nearby Requests" —
 can decline without ever offering (`POST /api/sos/alerts/[id]/decline`). This is a real,
@@ -199,25 +204,38 @@ offering always was.
 
 ---
 
-## 6. PII redaction (ADR-045)
+## 6. PII redaction (ADR-045, extended to every dispatch channel by ADR-048)
 
-Before anyone is assigned, most of a reporter's identifying info is withheld from anyone browsing
-or viewing the alert who isn't the reporter, the eventually-assigned helper, or an admin.
+Before anyone is assigned, most of a reporter's identifying info is withheld from anyone browsing,
+viewing, **or being dispatched a notification about** the alert, if they aren't the reporter, the
+eventually-assigned helper, or an admin.
 
-| Field | Non-privileged viewer | Reporter / assigned helper / admin |
+| Field | Non-privileged viewer / dispatch recipient | Reporter / assigned helper / admin |
 |---|---|---|
 | `userName`, `type`, `severity`, `city`, `description` | visible | visible |
 | `userPhone`, `userEmail` | `null` | visible |
 | `latitude`, `longitude` | `null` | visible |
 | `placeName`, `area`, `formattedAddress` (reverse-geocoded) | `null` | visible |
-| `distanceMeters` (list endpoint only, viewer-computed) | visible | visible |
+| `distanceMeters` (viewer-computed) | visible | visible |
 
-Enforced in `sos.application.ts`'s `getActiveAlerts`/`getAlertById` via
-`redactAlertForViewer`/`isPrivilegedViewer` (`domain/pii-redaction.ts`) — applied once, right at
-the HTTP boundary. Every other internal consumer (dispatch, sessions, the partner dashboard)
-works with the always-raw `RawSOSAlertDTO` shape; redaction never leaks into business logic that
-doesn't need it. `distanceMeters` is deliberately never redacted — it's derived, not identifying,
-and is what keeps a redacted browse list usable ("2.8 km away" without exposing exactly where).
+Enforced at two boundaries, both funneling through the same `redactAlertForViewer`/
+`isPrivilegedViewer` (`domain/pii-redaction.ts`) — one rule, not two that could drift apart:
+
+- **Browse/detail API**: `sos.application.ts`'s `getActiveAlerts`/`getAlertById`, applied once at
+  the HTTP boundary.
+- **Outbound dispatch (ADR-048)**: `fan-out.application.ts`'s `dispatchToRecipient`, applied per
+  recipient — redacted only for `NEARBY_RIDER`/`SERVICE_PROVIDER` roles (`isCandidateResponder`).
+  The reporter's own emergency contacts, an emergency-services number, and platform admins are
+  trusted/designated recipients and always get the unredacted alert. SMS/email text omits the
+  GPS/map-link lines entirely when redacted (not just blanked) and shows a "shown once you're
+  assigned" note instead; WhatsApp's native exact-GPS location card is skipped outright for a
+  redacted recipient, since there's no approximate version of it worth sending.
+
+Every other internal consumer (sessions, the partner dashboard) still works with the always-raw
+`RawSOSAlertDTO` shape — redaction is applied only at these two outward-facing boundaries, never
+inside business logic that doesn't need it. `distanceMeters` is deliberately never redacted — it's
+derived, not identifying, and is what keeps a redacted view usable ("2.8 km away" without exposing
+exactly where).
 
 ---
 

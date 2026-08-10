@@ -6,10 +6,6 @@ import type { RawSOSAlertDTO, SafetyLocationPorts } from "../ports";
 import { dispatchToRecipient, emptySummary, type SOSDispatchSummary } from "./fan-out.application";
 
 const INITIAL_RADIUS_METERS = 5000;
-/** ADR-044 — real SOS-dispatch eligibility radius, matching the two existing precedents exactly
- * (`/api/partners/nearby`, ADR-036; the SOS-browse radius, ADR-042) so "nearby" means one thing
- * platform-wide. */
-const SOS_PARTNER_ELIGIBILITY_RADIUS_METERS = 25_000;
 const radiusStepMeters = () => Number(process.env.SOS_RADIUS_STEP_KM ?? "5") * 1000;
 const radiusMaxMeters = () => Number(process.env.SOS_RADIUS_MAX_KM ?? "20") * 1000;
 const tierTimeoutMs = () => Number(process.env.SOS_TIER_TIMEOUT_SECONDS ?? "300") * 1000;
@@ -17,7 +13,14 @@ const tierTimeoutMs = () => Number(process.env.SOS_TIER_TIMEOUT_SECONDS ?? "300"
 // first crack, not the only crack (ADR-033 Phase D).
 const communityTierTimeoutMs = () => Number(process.env.SOS_COMMUNITY_TIER_TIMEOUT_SECONDS ?? "120") * 1000;
 
-const TIER_ORDER = ["NEARBY_RIDERS_COMMUNITY", "NEARBY_RIDERS_GENERAL", "SERVICE_PROVIDERS", "ADMIN"] as const;
+// ADR-047: Service Providers are no longer a later-tier fallback reached only after Nearby
+// Riders are fully exhausted — they're dispatched together with riders at every radius step,
+// widening in lockstep (see `resolveServiceProviders`'s `radiusMeters` param below). `ADMIN`
+// remains the sole terminal tier once radius is maxed and nobody — rider or provider — has
+// accepted. `SERVICE_PROVIDERS` stays a valid `SOSEscalationTier` enum value (unused going
+// forward, harmless to leave — dropping a Postgres enum value needs a migration for zero gain)
+// but is never assigned by this module anymore.
+const TIER_ORDER = ["NEARBY_RIDERS_COMMUNITY", "NEARBY_RIDERS_GENERAL", "ADMIN"] as const;
 type Tier = (typeof TIER_ORDER)[number];
 
 function nextTier(tier: string): Tier | null {
@@ -48,28 +51,38 @@ async function resolveNearbyRiders(
 }
 
 /**
- * Which verified, available partners get dispatched an SOS (ADR-044). Used to broaden to
- * *every* partner type (even unverified) whenever the strict verified+type-matched search came
- * up empty ("better to reach someone than nobody") — that's exactly why a fuel-delivery partner
- * could receive a medical emergency. Replaced with real eligibility: a 25km radius around the
- * alert, verified + available + geotagged (`findEligibleForAlert`), category-matched
- * (`partnerMatchesAlertType` — an unmapped category like MEDICAL only reaches partners who've
- * explicitly opted in as a general responder), and not already at capacity
- * (`findActiveHelperUserIds`, the concurrency cap). No fallback that reaches an ineligible
- * partner "better than nobody" — `tickEscalation` already advances SERVICE_PROVIDERS → ADMIN
- * unconditionally after a timeout regardless of how many partners were found here, so the
- * "SOS must never reach nobody" guarantee (ADR-030) holds without one.
+ * Which verified, available partners get dispatched an SOS (ADR-044, ordering corrected by
+ * ADR-047). Used to broaden to *every* partner type (even unverified) whenever the strict
+ * verified+type-matched search came up empty ("better to reach someone than nobody") — that's
+ * exactly why a fuel-delivery partner could receive a medical emergency. Replaced with real
+ * eligibility: a radius around the alert (shared with, and widening in lockstep with, the
+ * nearby-rider search — see the `radiusMeters` param), verified + available + geotagged
+ * (`findEligibleForAlert`), category-matched (`partnerMatchesAlertType` — an unmapped category
+ * like MEDICAL only reaches partners who've explicitly opted in as a general responder), and not
+ * already at capacity (`findActiveHelperUserIds`, the concurrency cap). No fallback that reaches
+ * an ineligible partner "better than nobody" — `tickEscalation` still advances to ADMIN
+ * unconditionally once radius is maxed with no acceptance, so the "SOS must never reach nobody"
+ * guarantee (ADR-030) holds without one.
  */
 async function resolveServiceProviders(
   alert: Pick<RawSOSAlertDTO, "latitude" | "longitude" | "type">,
   ports: SafetyLocationPorts,
+  radiusMeters: number,
+  /** Partners already notified on an earlier, smaller radius this same alert — excluded here so
+   * a widening tick doesn't re-dispatch them (and, for the ones with a secondary contact-person
+   * phone that has no `userId` of its own to dedupe by, doesn't re-SMS that number on every
+   * subsequent tick either — dedup happens on the partner's account, before recipients are
+   * built, not on the generated recipient rows). */
+  excludeUserIds: Set<string> = new Set(),
 ): Promise<SOSRecipient[]> {
   const candidates = await ports.partnerDispatch.findEligibleForAlert({
     latitude: alert.latitude,
     longitude: alert.longitude,
-    radiusMeters: SOS_PARTNER_ELIGIBILITY_RADIUS_METERS,
+    radiusMeters,
   });
-  const typeMatched = candidates.filter((c) => partnerMatchesAlertType(c, alert.type));
+  const typeMatched = candidates.filter(
+    (c) => partnerMatchesAlertType(c, alert.type) && !excludeUserIds.has(c.userId),
+  );
   if (typeMatched.length === 0) return [];
 
   const atCapacity = await ports.sosSessions.findActiveHelperUserIds(typeMatched.map((c) => c.userId));
@@ -115,14 +128,20 @@ export type EscalationDeps = { communications?: CommunicationsPorts };
 export function createEscalationApplication(ports: SafetyLocationPorts) {
   /**
    * Called once, right after alert creation. If any nearby rider shares a Community/Club with
-   * the reporter (`CommunityMembershipPort`, ADR-033 Phase D), tier starts at
+   * the reporter (`CommunityMembershipPort`, ADR-033 Phase D), the rider tier starts at
    * NEARBY_RIDERS_COMMUNITY and notifies only that subset, on a shorter timeout — everyone else
    * nearby is reached once the tier advances to NEARBY_RIDERS_GENERAL, not left out. Otherwise
-   * tier starts at NEARBY_RIDERS_GENERAL exactly as before Phase D. Returns the tier-1 summary
-   * AND the *total* nearby-rider count found (not just who was notified this round) so the
-   * caller (sos.application.ts's createAlert) can fold zero-recipient detection across this leg
-   * together with the emergency-contacts leg, before deciding whether to escalate to admin
-   * immediately (ADR-030's guarantee, preserved even though the search is now staged).
+   * the rider tier starts at NEARBY_RIDERS_GENERAL exactly as before Phase D.
+   *
+   * ADR-047: eligible Service Providers are dispatched in this SAME round, at the same starting
+   * radius, regardless of which rider tier was chosen — they're a parallel responder pool, not a
+   * later fallback reached only once every rider tier has been exhausted (see `resolveServiceProviders`).
+   *
+   * Returns the tier-1 summary AND the *total* nearby-rider count found (not just who was
+   * notified this round) so the caller (sos.application.ts's createAlert) can fold
+   * zero-recipient detection across this leg together with the emergency-contacts leg, before
+   * deciding whether to escalate to admin immediately (ADR-030's guarantee, preserved even
+   * though the search is now staged).
    */
   async function seedEscalation(
     alert: RawSOSAlertDTO,
@@ -131,7 +150,10 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
     const communications = deps.communications ?? ports.communications;
     const availability = resolveChannelAvailability(communications);
 
-    const nearby = await resolveNearbyRiders(alert, ports, INITIAL_RADIUS_METERS);
+    const [nearby, providers] = await Promise.all([
+      resolveNearbyRiders(alert, ports, INITIAL_RADIUS_METERS),
+      resolveServiceProviders(alert, ports, INITIAL_RADIUS_METERS),
+    ]);
     const nearbyUserIds = nearby.filter((r): r is SOSRecipient & { userId: string } => Boolean(r.userId)).map((r) => r.userId);
     const communityIds = nearbyUserIds.length > 0
       ? await ports.community.findSharedGroupMemberIds(alert.userId, nearbyUserIds).catch(() => new Set<string>())
@@ -139,14 +161,16 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
 
     const tier: "NEARBY_RIDERS_COMMUNITY" | "NEARBY_RIDERS_GENERAL" =
       communityIds.size > 0 ? "NEARBY_RIDERS_COMMUNITY" : "NEARBY_RIDERS_GENERAL";
-    const toNotify = tier === "NEARBY_RIDERS_COMMUNITY" ? nearby.filter((r) => r.userId && communityIds.has(r.userId)) : nearby;
+    const ridersToNotify = tier === "NEARBY_RIDERS_COMMUNITY" ? nearby.filter((r) => r.userId && communityIds.has(r.userId)) : nearby;
     const timeoutMs = tier === "NEARBY_RIDERS_COMMUNITY" ? communityTierTimeoutMs() : tierTimeoutMs();
+    const toNotify = [...ridersToNotify, ...providers];
 
     const summary = await notifyRecipients(alert, toNotify, ports, communications, availability);
-    summary.nearbyRiders = toNotify.length;
+    summary.nearbyRiders = ridersToNotify.length;
+    summary.serviceProviders = providers.length;
 
     for (const r of toNotify) {
-      if (r.userId) await ports.sosTimeline.record({ alertId: alert.id, type: "HELPER_OFFERED", metadata: { candidateId: r.userId, tier } }).catch(() => undefined);
+      if (r.userId) await ports.sosTimeline.record({ alertId: alert.id, type: "HELPER_OFFERED", metadata: { candidateId: r.userId, role: r.role, tier } }).catch(() => undefined);
     }
 
     await ports.sosAlerts.updateEscalationState(alert.id, {
@@ -157,7 +181,7 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
 
     console.log(
       `[SOS][ESCALATE][SEED] alert=${alert.id} tier=${tier} radius=${INITIAL_RADIUS_METERS}m ` +
-        `notified=${toNotify.length} totalNearby=${nearby.length}`,
+        `ridersNotified=${ridersToNotify.length} providersNotified=${providers.length} totalNearby=${nearby.length}`,
     );
 
     return { summary, nearbyRiderCount: nearby.length };
@@ -175,19 +199,24 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
     const availability = resolveChannelAvailability(communications);
 
     // COMMUNITY is a one-shot window, not its own radius-widening cycle — once it times out,
-    // advance straight to GENERAL and notify the full nearby pool, minus whoever community
-    // already reached (de-duped via the same Notification-table lookup radius-widening uses).
+    // advance straight to GENERAL and notify the full nearby-rider pool, minus whoever community
+    // already reached. Service Providers were already dispatched in `seedEscalation` at this same
+    // starting radius (ADR-047) — re-resolved here too (deduped by `excludeUserIds`) only in case
+    // one newly became eligible (e.g. toggled Available) since the alert was created; normally
+    // this finds nothing new.
     if (alert.escalationTier === "NEARBY_RIDERS_COMMUNITY") {
-      const [nearby, alreadyNotified] = await Promise.all([
+      const alreadyNotified = await ports.sosAlerts.findNotifiedUserIdsForAlert(alert.id);
+      const [nearby, providers] = await Promise.all([
         resolveNearbyRiders(alert, ports, INITIAL_RADIUS_METERS),
-        ports.sosAlerts.findNotifiedUserIdsForAlert(alert.id),
+        resolveServiceProviders(alert, ports, INITIAL_RADIUS_METERS, alreadyNotified),
       ]);
-      const fresh = nearby.filter((r) => !r.userId || !alreadyNotified.has(r.userId));
+      const freshRiders = nearby.filter((r) => !r.userId || !alreadyNotified.has(r.userId));
+      const fresh = [...freshRiders, ...providers];
       const summary = await notifyRecipients(alert, fresh, ports, communications, availability);
       await ports.sosTimeline.record({
         alertId: alert.id,
         type: "RADIUS_EXPANDED", // community-only pool -> full nearby pool; closest existing event type
-        metadata: { tier: "NEARBY_RIDERS_GENERAL", notified: fresh.length },
+        metadata: { tier: "NEARBY_RIDERS_GENERAL", notifiedRiders: freshRiders.length, notifiedProviders: providers.length },
       });
       await ports.sosAlerts.updateEscalationState(alert.id, {
         escalationTier: "NEARBY_RIDERS_GENERAL",
@@ -195,27 +224,36 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
         nextEscalationAt: new Date(Date.now() + tierTimeoutMs()),
       });
       console.log(
-        `[SOS][ESCALATE][TIER] alert=${alert.id} tier=NEARBY_RIDERS_GENERAL (from COMMUNITY) notified=${fresh.length} ` +
-          `sms=${summary.smsSent}/${summary.smsAttempted}`,
+        `[SOS][ESCALATE][TIER] alert=${alert.id} tier=NEARBY_RIDERS_GENERAL (from COMMUNITY) ` +
+          `ridersNotified=${freshRiders.length} providersNotified=${providers.length} sms=${summary.smsSent}/${summary.smsAttempted}`,
       );
       return;
     }
 
     const isRiderTier = alert.escalationTier === "NEARBY_RIDERS_GENERAL";
 
+    // ADR-047: riders and eligible Service Providers widen together, on the same radius ladder —
+    // a provider is no longer a fallback reached only after riders exhaust every step.
     if (isRiderTier && alert.currentRadiusMeters < radiusMaxMeters()) {
       const widened = Math.min(alert.currentRadiusMeters + radiusStepMeters(), radiusMaxMeters());
-      const [nearby, alreadyNotified] = await Promise.all([
+      const alreadyNotified = await ports.sosAlerts.findNotifiedUserIdsForAlert(alert.id);
+      const [nearby, providers] = await Promise.all([
         resolveNearbyRiders(alert, ports, widened),
-        ports.sosAlerts.findNotifiedUserIdsForAlert(alert.id),
+        resolveServiceProviders(alert, ports, widened, alreadyNotified),
       ]);
-      const fresh = nearby.filter((r) => r.userId && !alreadyNotified.has(r.userId));
+      const freshRiders = nearby.filter((r) => r.userId && !alreadyNotified.has(r.userId));
+      const fresh = [...freshRiders, ...providers];
 
       const summary = await notifyRecipients(alert, fresh, ports, communications, availability);
       await ports.sosTimeline.record({
         alertId: alert.id,
         type: "RADIUS_EXPANDED",
-        metadata: { fromMeters: alert.currentRadiusMeters, toMeters: widened, newlyNotified: fresh.length },
+        metadata: {
+          fromMeters: alert.currentRadiusMeters,
+          toMeters: widened,
+          newlyNotifiedRiders: freshRiders.length,
+          newlyNotifiedProviders: providers.length,
+        },
       });
       await ports.sosAlerts.updateEscalationState(alert.id, {
         currentRadiusMeters: widened,
@@ -223,7 +261,7 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
       });
       console.log(
         `[SOS][ESCALATE][RADIUS] alert=${alert.id} tier=${alert.escalationTier} radius=${widened}m ` +
-          `newlyNotified=${fresh.length} sms=${summary.smsSent}/${summary.smsAttempted}`,
+          `newlyNotifiedRiders=${freshRiders.length} newlyNotifiedProviders=${providers.length} sms=${summary.smsSent}/${summary.smsAttempted}`,
       );
       return;
     }
@@ -235,27 +273,8 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
       return;
     }
 
-    if (advanceTo === "SERVICE_PROVIDERS") {
-      const providers = await resolveServiceProviders(alert, ports);
-      const summary = await notifyRecipients(alert, providers, ports, communications, availability);
-      await ports.sosTimeline.record({
-        alertId: alert.id,
-        type: "ESCALATED_SERVICE_PROVIDERS",
-        metadata: { notified: providers.length },
-      });
-      await ports.sosAlerts.updateEscalationState(alert.id, {
-        escalationTier: "SERVICE_PROVIDERS",
-        currentRadiusMeters: INITIAL_RADIUS_METERS,
-        nextEscalationAt: new Date(Date.now() + tierTimeoutMs()),
-      });
-      console.log(
-        `[SOS][ESCALATE][TIER] alert=${alert.id} tier=SERVICE_PROVIDERS notified=${providers.length} ` +
-          `sms=${summary.smsSent}/${summary.smsAttempted}`,
-      );
-      return;
-    }
-
-    // advanceTo === "ADMIN" — terminal tier, matches ADR-030's original escalation behavior.
+    // advanceTo === "ADMIN" — terminal tier, reached once radius is maxed with neither a rider
+    // nor a Service Provider having accepted (matches ADR-030's original escalation guarantee).
     const admins = await ports.escalation.findAdminContacts().catch(() => []);
     const adminRecipients: SOSRecipient[] = admins.map((a) => ({
       role: "PLATFORM_ADMIN" as const,

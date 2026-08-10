@@ -127,6 +127,13 @@ export async function acceptOffer(params: { alertId: string; offerId: string; ac
     });
     if (acceptedOffer.count === 0) throw new OfferNotAvailableError("Offer is no longer available");
 
+    // Captured before the bulk update below so the caller can tell every other pending
+    // responder their offer is now moot ("this request has already been assigned") — ADR-047.
+    const otherPendingOffers = await tx.sOSAlertResponse.findMany({
+      where: { alertId, id: { not: offerId }, status: "OFFERED" },
+      select: { responderId: true },
+    });
+
     await tx.sOSAlertResponse.updateMany({
       where: { alertId, id: { not: offerId }, status: "OFFERED" },
       data: { status: "EXPIRED" },
@@ -162,7 +169,7 @@ export async function acceptOffer(params: { alertId: string; offerId: string; ac
       },
     });
 
-    return session;
+    return { session, expiredResponderIds: otherPendingOffers.map((o) => o.responderId) };
   });
 }
 

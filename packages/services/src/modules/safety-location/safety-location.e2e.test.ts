@@ -58,7 +58,7 @@ import {
   type SosSessionRow,
 } from "./ports";
 import { createSafetyLocationModule } from "./public";
-import { emptyRepos, fakeCommunications, sampleAlert } from "./safety-location.test-support";
+import { emptyRepos, fakeCommunications, notifyMock, sampleAlert } from "./safety-location.test-support";
 
 type SessionRow = SosSessionRow & {
   helper: { id: string; name: string; phone: string | null; email: string };
@@ -166,8 +166,12 @@ function createFakePorts(alertOverrides: Partial<RawSOSAlertDTO> = {}) {
       offer.status = "ACCEPTED";
       // Mirrors sos-session.repository.ts's acceptOffer transaction: every other OFFERED
       // response on this alert is expired in the same step, not left dangling.
+      const expiredResponderIds: string[] = [];
       for (const o of offers.values()) {
-        if (o.alertId === alertId && o.id !== offerId && o.status === "OFFERED") o.status = "EXPIRED";
+        if (o.alertId === alertId && o.id !== offerId && o.status === "OFFERED") {
+          o.status = "EXPIRED";
+          expiredResponderIds.push(o.responderId);
+        }
       }
       session = {
         id: "session-1",
@@ -187,7 +191,7 @@ function createFakePorts(alertOverrides: Partial<RawSOSAlertDTO> = {}) {
         helper: { id: offer.responderId, name: offer.responder.name, phone: offer.responder.phone, email: offer.responder.email },
         rider: { id: alert.userId, name: alert.userName, phone: alert.userPhone, email: alert.userEmail },
       };
-      return session;
+      return { session, expiredResponderIds };
     }),
     getSessionById: vi.fn(async (id) => (session && session.id === id ? session : null)),
     getActiveSessionForAlert: vi.fn(async (alertId) => (session && session.alertId === alertId ? session : null)),
@@ -275,9 +279,10 @@ describe("SOS end-to-end (ADR-045)", () => {
       },
     });
 
-    // seedEscalation only handles the nearby-rider tier; this exercises the SERVICE_PROVIDERS
-    // resolver directly, the same function tickEscalation calls once nearby tiers exhaust.
-    const providers = await module.escalation.resolveEscalationServiceProviders(fake.getAlert(), module.ports);
+    // Exercises the Service Provider resolver directly — the same one seedEscalation/tickEscalation
+    // now call alongside the nearby-rider search at every radius step (ADR-047), not as a later
+    // fallback tier.
+    const providers = await module.escalation.resolveEscalationServiceProviders(fake.getAlert(), module.ports, 25_000);
     expect(providers.map((p) => p.name)).toEqual(["General Responders Co"]);
   });
 
@@ -307,20 +312,28 @@ describe("SOS end-to-end (ADR-045)", () => {
     expect(mismatched).toEqual({ ok: false, reason: "CATEGORY_MISMATCH" });
   });
 
-  it("Multiple responders + assignment locking: accepting one offer expires the others and blocks a second accept", async () => {
+  it("Multiple responders + assignment locking: accepting one offer expires the others, notifies them, and blocks a second accept", async () => {
     const fake = createFakePorts({ userId: "rider-reporter" });
-    const module = buildModule(fake.ports);
+    const notify = notifyMock();
+    const module = buildModule({ ...fake.ports, notifications: { notify } });
 
     const offerA = await module.session.offerHelp("alert-1", "helper-a");
     const offerB = await module.session.offerHelp("alert-1", "helper-b");
     const offerC = await module.session.offerHelp("alert-1", "helper-c");
     if (!offerA.ok || !offerB.ok || !offerC.ok) throw new Error("unreachable");
+    notify.mockClear(); // drop the 3 "someone offered to help" calls from offerHelp above
 
     const accept = await module.session.acceptOffer("alert-1", offerA.offer.id, "rider-reporter", false);
     expect(accept.ok).toBe(true);
 
     const others = fake.getOffers().filter((o) => o.id !== offerA.offer.id);
     expect(others.every((o) => o.status === "EXPIRED")).toBe(true);
+
+    // ADR-047 — every responder whose pending offer just got auto-expired is told directly,
+    // distinctly from the winner's own "You're confirmed" notification.
+    expect(notify.mock.calls.find((c) => c[0] === "helper-a")?.[2]).toBe("You're confirmed");
+    expect(notify.mock.calls.find((c) => c[0] === "helper-b")?.[2]).toBe("Request already assigned");
+    expect(notify.mock.calls.find((c) => c[0] === "helper-c")?.[2]).toBe("Request already assigned");
 
     // Assignment locking, sequential case: offer B was expired the instant A was accepted (same
     // step, see the fake's acceptOffer above, mirroring the real transaction), so a second accept
@@ -419,10 +432,11 @@ describe("SOS end-to-end (ADR-045)", () => {
     expect(fake.getSession()?.rating).toBe(4);
   });
 
-  it("Escalation: tiers advance community → general → service providers → admin in order, unaffected by ADR-045 changes", async () => {
-    const alert = sampleAlert({ userId: "rider-1", currentRadiusMeters: 20_000, escalationTier: "NEARBY_RIDERS_GENERAL" });
+  it("Escalation: tiers advance community → general (riders + providers together) → admin in order (ADR-047)", async () => {
+    const communityAlert = sampleAlert({ userId: "rider-1", currentRadiusMeters: 5000, escalationTier: "NEARBY_RIDERS_COMMUNITY" });
     const updateEscalationState = vi.fn(async () => undefined);
     const findAdminContacts = vi.fn(async () => [{ id: "admin-1", name: "Admin", email: "admin@bikie.app", phone: null }]);
+    const findEligibleForAlert = vi.fn(async () => []);
 
     const module = buildModule({
       sosAlerts: {
@@ -431,22 +445,21 @@ describe("SOS end-to-end (ADR-045)", () => {
         findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
       },
       riderLocation: { ...(emptyRepos().riderLocation as SafetyLocationPorts["riderLocation"]), findNearbyAroundPoint: vi.fn(async () => []) },
-      partnerDispatch: {
-        findByCity: vi.fn(async () => []),
-        findEligibleForAlert: vi.fn(async () => []),
-        getEligibilityFields: vi.fn(async () => null),
-      },
+      partnerDispatch: { findByCity: vi.fn(async () => []), findEligibleForAlert, getEligibilityFields: vi.fn(async () => null) },
       escalation: { findAdminContacts },
     });
 
-    // Radius already maxed and tier already GENERAL — tickEscalation must advance straight to
-    // SERVICE_PROVIDERS (no eligible partners found → empty dispatch, not a fallback broadening).
-    await module.escalation.tickEscalation(alert);
-    expect(updateEscalationState).toHaveBeenCalledWith("alert-1", expect.objectContaining({ escalationTier: "SERVICE_PROVIDERS" }));
+    // COMMUNITY's one-shot window times out — advances straight to GENERAL. Service Providers
+    // are searched in this same tick, at the same starting radius as riders (ADR-047) — no
+    // separate SERVICE_PROVIDERS tier to wait for.
+    await module.escalation.tickEscalation(communityAlert);
+    expect(findEligibleForAlert).toHaveBeenCalled();
+    expect(updateEscalationState).toHaveBeenCalledWith("alert-1", expect.objectContaining({ escalationTier: "NEARBY_RIDERS_GENERAL" }));
 
-    // From SERVICE_PROVIDERS with no eligible partners, the next tick escalates to ADMIN —
-    // the "never reach nobody" guarantee (ADR-030), unaffected by this pass's changes.
-    await module.escalation.tickEscalation({ ...alert, escalationTier: "SERVICE_PROVIDERS" });
+    // Once radius is maxed at GENERAL with nobody — rider or provider — having accepted, the
+    // only remaining tier is ADMIN (the "never reach nobody" guarantee, ADR-030).
+    findEligibleForAlert.mockClear();
+    await module.escalation.tickEscalation({ ...communityAlert, escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 20_000 });
     expect(findAdminContacts).toHaveBeenCalled();
     expect(updateEscalationState).toHaveBeenCalledWith("alert-1", expect.objectContaining({ escalationTier: "ADMIN" }));
   });

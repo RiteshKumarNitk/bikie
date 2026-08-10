@@ -15,8 +15,17 @@ import {
   type SOSRecipient,
 } from "../domain/dispatch-message";
 import { formatDistance, mapsNavigateUrl } from "../domain/maps";
-import type { RawSOSAlertDTO } from "../domain/pii-redaction";
+import { redactAlertForViewer, type RawSOSAlertDTO } from "../domain/pii-redaction";
 import type { SafetyLocationPorts } from "../ports";
+
+/** Which recipient roles are "candidate responder" pools who haven't agreed to anything yet —
+ * exact contact info/GPS is withheld from them until one of them is actually assigned (matches
+ * the existing in-app browse redaction, ADR-045, now applied consistently to every dispatch
+ * channel too). Trusted/designated recipients (the reporter's own emergency contacts, platform
+ * admins, emergency services) are unaffected — they're not "responders" in this sense. */
+function isCandidateResponder(role: SOSRecipient["role"]): boolean {
+  return role === "NEARBY_RIDER" || role === "SERVICE_PROVIDER";
+}
 
 export interface SOSDispatchSummary {
   nearbyRiders: number;
@@ -117,8 +126,16 @@ export async function dispatchToRecipient(
   availability: ChannelAvailability,
 ) {
   const channels = channelsForRecipient(recipient, availability);
-  const text = buildTextBody(alert, recipient);
-  const navigate = mapsNavigateUrl(alert.latitude, alert.longitude);
+  const isRedacted = isCandidateResponder(recipient.role);
+  // `redactAlertForViewer` already nulls phone/email/exact-GPS/precise-address for a
+  // non-privileged viewer (ADR-045) — reused as-is so dispatch text and the in-app browse API
+  // stay governed by the exact same rule, not two rules that could drift apart.
+  const dispatchAlert = redactAlertForViewer(alert, !isRedacted);
+  const text = buildTextBody(dispatchAlert, recipient);
+  const navigate =
+    dispatchAlert.latitude != null && dispatchAlert.longitude != null
+      ? mapsNavigateUrl(dispatchAlert.latitude, dispatchAlert.longitude)
+      : null;
   const distance = formatDistance(recipient.distanceMeters);
   const tasks: Promise<void>[] = [];
 
@@ -155,14 +172,19 @@ export async function dispatchToRecipient(
           .then(async (r) => {
             if (record("whatsapp", phone, r)) {
               summary.whatsappSent += 1;
-              await communications.whatsapp
-                .sendLocation(phone, {
-                  latitude: alert.latitude,
-                  longitude: alert.longitude,
-                  name: `${alert.userName} — SOS`,
-                  address: alert.city,
-                })
-                .catch(() => undefined);
+              // The native location card always carries exact GPS — there's no "approximate"
+              // version of it worth sending, so it's skipped entirely for a pre-assignment
+              // candidate responder rather than partially redacted.
+              if (!isRedacted) {
+                await communications.whatsapp
+                  .sendLocation(phone, {
+                    latitude: alert.latitude,
+                    longitude: alert.longitude,
+                    name: `${alert.userName} — SOS`,
+                    address: alert.city,
+                  })
+                  .catch(() => undefined);
+              }
             } else if (r.provider === "dev") {
               summary.whatsappClickToSend.push({
                 name: recipient.name,
@@ -193,7 +215,7 @@ export async function dispatchToRecipient(
         .send({
           to,
           subject: `BIKIE SOS: ${alert.type} in ${alert.city}`,
-          html: buildEmailHtml(alert, recipient),
+          html: buildEmailHtml(dispatchAlert, recipient),
         })
         .then((r) => {
           if (record("email", to, r)) summary.emailSent += 1;
@@ -220,7 +242,9 @@ export async function dispatchToRecipient(
       const kind = alertKind(alert.description);
       const distanceBit = distance ? ` You are ~${distance.replace(" away", "")} away.` : "";
       title = kind === "RED" ? "Red Alert nearby" : kind === "AMBER" ? "Amber Alert nearby" : "SOS Alert nearby";
-      body = `${alert.userName} needs help at ${describeLocation(alert)}.${distanceBit} Open Maps to navigate & see your distance: ${navigate}`;
+      body = `${dispatchAlert.userName} needs help at ${describeLocation(dispatchAlert)}.${distanceBit}${
+        navigate ? ` Open Maps to navigate & see your distance: ${navigate}` : " Open the app for details and to respond."
+      }`;
     }
     tasks.push(
       ports.notifications.notify(recipient.userId, "SOS_ALERT", title, body, "sos_alert", alert.id).catch(console.error),

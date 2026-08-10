@@ -34,6 +34,7 @@ vi.mock("../../../push.service", () => ({
 
 import { alertKind } from "./domain/alert-kind";
 import { buildEmailHtml, buildTextBody, describeLocation } from "./domain/dispatch-message";
+import { dispatchToRecipient, emptySummary } from "./application/fan-out.application";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "./domain/maps";
 import {
   channelsForRecipient,
@@ -455,8 +456,9 @@ describe("fan-out dispatch", () => {
     });
 
     expect(summary.nearbyRiders).toBe(1);
-    // Service providers are the SERVICE_PROVIDERS escalation tier now (ADR-033) — reached later
-    // via a cron tick if tier-1 nearby riders don't respond in time, not resolved at creation.
+    // Service Providers are resolved by escalation.seedEscalation (ADR-047 — same round as
+    // nearby riders), not by dispatch.fanOut, which only ever handles the "always fire"
+    // contacts/emergency-services/reporter-confirmation leg. Not exercised by this test.
     expect(summary.serviceProviders).toBe(0);
     expect(summary.emergencyContacts).toBe(1);
     expect(summary.smsAttempted).toBeGreaterThan(0);
@@ -851,7 +853,7 @@ describe("escalation application — tier advancement", () => {
     );
   });
 
-  it("advances to SERVICE_PROVIDERS once radius is maxed, dispatching only eligible partners (ADR-044)", async () => {
+  it("dispatches eligible Service Providers together with riders on a widening tick, not as a later fallback (ADR-047)", async () => {
     // sampleAlert() defaults to type "ACCIDENT", which has no natural PartnerType mapping — only
     // a general-responder partner is eligible, exactly the case ADR-044 was written to fix
     // (previously this would have broadened to *every* partner type via the removed fallback).
@@ -873,23 +875,30 @@ describe("escalation application — tier advancement", () => {
     ]);
     const findActiveHelperUserIds = vi.fn(async () => new Set<string>());
     const updateEscalationState = vi.fn(async () => undefined);
+    const notify = notifyMock();
     const module = createSafetyLocationModule({
       ...emptyRepos({
         partnerDispatch: { ...emptyRepos().partnerDispatch, findEligibleForAlert } as any,
         sosSessions: { ...emptyRepos().sosSessions, findActiveHelperUserIds } as any,
         sosAlerts: { ...emptyRepos().sosAlerts, updateEscalationState } as any,
+        notifications: { notify },
       }),
       communications: fakeCommunications(),
     });
 
+    // Still widening (currentRadiusMeters < max) — riders and providers are searched/notified
+    // in the SAME tick, at the SAME widened radius, not gated behind a separate later tier.
     await module.escalation.tickEscalation(
-      sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 20000 }),
+      sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
     );
 
-    expect(findEligibleForAlert).toHaveBeenCalled();
+    expect(findEligibleForAlert).toHaveBeenCalledWith(expect.objectContaining({ radiusMeters: 10000 }));
+    expect(notify.mock.calls.map((c) => c[0])).toContain("partner-1");
+    // The escalation tier stays NEARBY_RIDERS_GENERAL — no separate SERVICE_PROVIDERS tier exists
+    // to transition into anymore.
     expect(updateEscalationState).toHaveBeenCalledWith(
       "alert-1",
-      expect.objectContaining({ escalationTier: "SERVICE_PROVIDERS" }),
+      expect.objectContaining({ currentRadiusMeters: 10000 }),
     );
   });
 
@@ -922,10 +931,34 @@ describe("escalation application — tier advancement", () => {
     // type: "ACCIDENT" (sampleAlert's default) has no natural PartnerType — a non-general-
     // responder FUEL_DELIVERY partner must not be dispatched a medical/accident emergency.
     await module.escalation.tickEscalation(
-      sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 20000 }),
+      sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
     );
 
     expect(notify.mock.calls.map((c) => c[0])).not.toContain("fuel-partner");
+  });
+
+  it("advances straight from NEARBY_RIDERS_GENERAL to ADMIN once radius is maxed — no separate SERVICE_PROVIDERS tier", async () => {
+    const findEligibleForAlert = vi.fn(async () => []);
+    const findAdminContacts = vi.fn(async () => [{ id: "admin-1", name: "Admin", email: "a@bikie.app", phone: null }]);
+    const updateEscalationState = vi.fn(async () => undefined);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        partnerDispatch: { ...emptyRepos().partnerDispatch, findEligibleForAlert } as any,
+        escalation: { findAdminContacts },
+        sosAlerts: { ...emptyRepos().sosAlerts, updateEscalationState } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    await module.escalation.tickEscalation(
+      sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 20000 }),
+    );
+
+    // Providers already had their chance on every widening tick up to this point — the terminal
+    // step doesn't re-resolve them, it escalates straight to admins.
+    expect(findEligibleForAlert).not.toHaveBeenCalled();
+    expect(findAdminContacts).toHaveBeenCalled();
+    expect(updateEscalationState).toHaveBeenCalledWith("alert-1", expect.objectContaining({ escalationTier: "ADMIN" }));
   });
 
   it("does nothing but clear the timer when the alert already has an assigned helper", async () => {
@@ -945,6 +978,92 @@ describe("escalation application — tier advancement", () => {
     expect(findByCity).not.toHaveBeenCalled();
     expect(findEligibleForAlert).not.toHaveBeenCalled();
     expect(updateEscalationState).toHaveBeenCalledWith("alert-1", { nextEscalationAt: null });
+  });
+
+  it("seedEscalation dispatches eligible Service Providers in the very first round, alongside riders (ADR-047)", async () => {
+    const notify = notifyMock();
+    const findNearbyAroundPoint = vi.fn(async () => [
+      { id: "rider-near", name: "Rider", phone: null, email: "r@example.com", distanceMeters: 800 },
+    ]);
+    const findEligibleForAlert = vi.fn(async () => [
+      {
+        userId: "provider-near",
+        businessName: "Quick Fix Garage",
+        type: "MECHANIC",
+        isGeneralResponder: false,
+        contactPerson1Name: null,
+        contactPerson1Mobile: null,
+        contactPerson2Name: null,
+        contactPerson2Mobile: null,
+        latitude: 12.98,
+        longitude: 77.6,
+        user: { id: "provider-near", name: "Quick Fix Garage", email: "qf@example.com", phone: "9000000002" },
+        distanceMeters: 1000,
+      },
+    ]);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any,
+        partnerDispatch: { ...emptyRepos().partnerDispatch, findEligibleForAlert } as any,
+        notifications: { notify },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    // sampleAlert() defaults to type "BIKE_BREAKDOWN" via the fixture (a MECHANIC-mapped
+    // category) — no community members, so this seeds straight to NEARBY_RIDERS_GENERAL.
+    const result = await module.escalation.seedEscalation(sampleAlert({ type: "BIKE_BREAKDOWN" }));
+
+    expect(findEligibleForAlert).toHaveBeenCalledWith(expect.objectContaining({ radiusMeters: 5000 }));
+    const notifiedIds = notify.mock.calls.map((c) => c[0]);
+    expect(notifiedIds).toContain("rider-near");
+    expect(notifiedIds).toContain("provider-near");
+    expect(result.summary.serviceProviders).toBe(1);
+  });
+});
+
+describe("dispatch PII redaction (ADR-047)", () => {
+  it("withholds phone and exact GPS from a NEARBY_RIDER and a SERVICE_PROVIDER, but not an EMERGENCY_CONTACT", async () => {
+    const alert = sampleAlert({ userPhone: "9999999999", latitude: 12.9716, longitude: 77.5946 });
+    const communications = fakeCommunications();
+    const availability = resolveChannelAvailability(communications);
+    const ports = emptyRepos() as unknown as Parameters<typeof dispatchToRecipient>[4];
+
+    await dispatchToRecipient(
+      alert,
+      { role: "NEARBY_RIDER", name: "Nearby Rider", phone: "8888888888", email: "rider@example.com", userId: "rider-1" },
+      emptySummary(availability),
+      communications,
+      ports,
+      availability,
+    );
+    await dispatchToRecipient(
+      alert,
+      { role: "SERVICE_PROVIDER", name: "Garage", phone: "7777777777", email: "garage@example.com", userId: "provider-1" },
+      emptySummary(availability),
+      communications,
+      ports,
+      availability,
+    );
+    await dispatchToRecipient(
+      alert,
+      { role: "EMERGENCY_CONTACT", name: "Mom", phone: "6666666666", email: "mom@example.com" },
+      emptySummary(availability),
+      communications,
+      ports,
+      availability,
+    );
+
+    const riderText = (communications.sms.send as any).mock.calls.find((c: any[]) => c[0] === "+918888888888")?.[1];
+    const contactText = (communications.sms.send as any).mock.calls.find((c: any[]) => c[0] === "+916666666666")?.[1];
+
+    expect(riderText).not.toContain("9999999999");
+    expect(riderText).not.toContain("12.97160");
+    expect(riderText).not.toContain("maps.google.com");
+    expect(riderText).toContain(alert.userName); // name alone stays, matches the in-app browse redaction policy
+
+    expect(contactText).toContain("9999999999");
+    expect(contactText).toContain("12.97160");
   });
 });
 

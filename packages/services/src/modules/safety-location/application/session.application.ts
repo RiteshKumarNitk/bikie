@@ -128,10 +128,26 @@ export function createSessionApplication(ports: SafetyLocationPorts, deps: Sessi
       if (alert.userId !== actorId && !isAdmin) return { ok: false as const, reason: "FORBIDDEN" as const };
 
       try {
-        const session = await ports.sosSessions.acceptOffer({ alertId, offerId, actorId });
+        const { session, expiredResponderIds } = await ports.sosSessions.acceptOffer({ alertId, offerId, actorId });
         await ports.notifications
           .notify(session.helperId, "SOS_ALERT", "You're confirmed", "The rider accepted your offer to help. Open the SOS session to chat and navigate.", "sos_session", session.id)
           .catch(console.error);
+        // ADR-047 — every other responder whose offer was just auto-expired by this acceptance
+        // gets told directly, instead of only finding out by refreshing.
+        await Promise.all(
+          expiredResponderIds.map((responderId) =>
+            ports.notifications
+              .notify(
+                responderId,
+                "SOS_ALERT",
+                "Request already assigned",
+                "This assistance request has already been assigned to another responder.",
+                "sos_alert",
+                alertId,
+              )
+              .catch(console.error),
+          ),
+        );
         return { ok: true as const, session };
       } catch (err) {
         if (err instanceof AlreadyAssignedError) return { ok: false as const, reason: "ALREADY_ASSIGNED" as const };

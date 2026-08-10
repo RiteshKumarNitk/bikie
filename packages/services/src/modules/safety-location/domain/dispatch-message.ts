@@ -1,6 +1,14 @@
-import type { RawSOSAlertDTO } from "./pii-redaction";
+import type { SOSAlertDTO } from "@bikie/types";
 import { alertKind } from "./alert-kind";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "./maps";
+
+/** Accepts both the raw (privileged) alert and the redacted pre-assignment view — the only
+ * difference message-building cares about is whether latitude/longitude/userPhone are present,
+ * both already nullable on `SOSAlertDTO`. See `pii-redaction.ts`/`redactAlertForViewer`, applied
+ * by the caller (fan-out.application.ts) before these builders ever see a NEARBY_RIDER/
+ * SERVICE_PROVIDER recipient's alert — trusted recipients (emergency contacts, admins) pass the
+ * unredacted alert straight through. */
+type DispatchableAlert = SOSAlertDTO;
 
 export type SOSRecipientRole =
   | "NEARBY_RIDER"
@@ -32,13 +40,13 @@ export function humanizeSosType(type: string): string {
     .join(" ");
 }
 
-export function describeLocation(alert: RawSOSAlertDTO): string {
+export function describeLocation(alert: DispatchableAlert): string {
   if (alert.formattedAddress) return alert.formattedAddress;
   const parts = [alert.placeName, alert.area, alert.city].filter((p): p is string => Boolean(p));
   return parts.length > 0 ? parts.join(", ") : alert.city;
 }
 
-export function buildTextBody(alert: RawSOSAlertDTO, recipient: SOSRecipient): string {
+export function buildTextBody(alert: DispatchableAlert, recipient: SOSRecipient): string {
   const kind = alertKind(alert.description);
   const label =
     kind === "RED" ? "RED ALERT (Emergency)" : kind === "AMBER" ? "AMBER ALERT (Assistance)" : "SOS ALERT";
@@ -53,9 +61,11 @@ export function buildTextBody(alert: RawSOSAlertDTO, recipient: SOSRecipient): s
             ? "Escalation: this alert reached no nearby riders, providers, or emergency contacts."
             : "A fellow BIKIE rider nearby needs help.";
 
-  const pin = mapsPinUrl(alert.latitude, alert.longitude);
-  const navigate = mapsNavigateUrl(alert.latitude, alert.longitude);
   const distance = formatDistance(recipient.distanceMeters);
+  // `latitude`/`longitude` are null on the redacted pre-assignment view (fan-out.application.ts
+  // withholds exact GPS from NEARBY_RIDER/SERVICE_PROVIDER recipients until one of them is
+  // actually assigned) — the map links simply don't exist on that view, not just hidden.
+  const hasExactLocation = alert.latitude != null && alert.longitude != null;
 
   return [
     `BIKIE ${label}`,
@@ -64,22 +74,25 @@ export function buildTextBody(alert: RawSOSAlertDTO, recipient: SOSRecipient): s
     `Rider: ${alert.userName}${alert.userPhone ? ` (${alert.userPhone})` : ""}`,
     `Type: ${alert.type}${alert.description ? ` — ${alert.description}` : ""}`,
     `Location: ${describeLocation(alert)}`,
-    `GPS: ${alert.latitude.toFixed(5)}, ${alert.longitude.toFixed(5)}`,
-    `📍 Location pin: ${pin}`,
-    `🧭 Open in Maps (shows YOUR distance & route): ${navigate}`,
-    `Respond in the BIKIE app → Dashboard → SOS`,
+    hasExactLocation ? `GPS: ${alert.latitude!.toFixed(5)}, ${alert.longitude!.toFixed(5)}` : null,
+    hasExactLocation ? `📍 Location pin: ${mapsPinUrl(alert.latitude!, alert.longitude!)}` : null,
+    hasExactLocation
+      ? `🧭 Open in Maps (shows YOUR distance & route): ${mapsNavigateUrl(alert.latitude!, alert.longitude!)}`
+      : null,
+    `Respond in the BIKIE app → Dashboard → SOS${hasExactLocation ? "" : " (exact location shown once you're assigned)"}`,
   ]
     .filter(Boolean)
     .join("\n");
 }
 
-export function buildEmailHtml(alert: RawSOSAlertDTO, recipient: SOSRecipient): string {
-  const pin = mapsPinUrl(alert.latitude, alert.longitude);
-  const navigate = mapsNavigateUrl(alert.latitude, alert.longitude);
+export function buildEmailHtml(alert: DispatchableAlert, recipient: SOSRecipient): string {
   const distance = formatDistance(recipient.distanceMeters);
   const kind = alertKind(alert.description);
   const title =
     kind === "RED" ? "Red Alert — Emergency" : kind === "AMBER" ? "Amber Alert — Assistance" : "SOS Alert";
+  const hasExactLocation = alert.latitude != null && alert.longitude != null;
+  const pin = hasExactLocation ? mapsPinUrl(alert.latitude!, alert.longitude!) : null;
+  const navigate = hasExactLocation ? mapsNavigateUrl(alert.latitude!, alert.longitude!) : null;
 
   return `
     <div style="font-family:system-ui,sans-serif;max-width:560px;margin:0 auto;color:#111">
@@ -98,17 +111,22 @@ export function buildEmailHtml(alert: RawSOSAlertDTO, recipient: SOSRecipient): 
       ${distance ? `<p style="margin:0 0 12px"><strong>Approx. distance from you:</strong> ${distance}</p>` : ""}
       <p style="margin:0 0 4px"><strong>Rider:</strong> ${alert.userName}${alert.userPhone ? ` (${alert.userPhone})` : ""}</p>
       <p style="margin:0 0 4px"><strong>Type:</strong> ${alert.type}${alert.description ? ` — ${alert.description}` : ""}</p>
-      <p style="margin:0 0 16px"><strong>Location:</strong> ${describeLocation(alert)}<br/>
-         <strong>GPS:</strong> ${alert.latitude.toFixed(5)}, ${alert.longitude.toFixed(5)}</p>
-      <p style="margin:0 0 12px">
+      <p style="margin:0 0 16px"><strong>Location:</strong> ${describeLocation(alert)}${
+        hasExactLocation ? `<br/><strong>GPS:</strong> ${alert.latitude!.toFixed(5)}, ${alert.longitude!.toFixed(5)}` : ""
+      }</p>
+      ${
+        navigate
+          ? `<p style="margin:0 0 12px">
         <a href="${navigate}" style="display:inline-block;background:#ff4d1a;color:#fff;text-decoration:none;padding:12px 18px;border-radius:999px;font-weight:600">
           Open in Google Maps — see distance & route
         </a>
-      </p>
-      <p style="margin:0 0 16px;font-size:13px">
-        <a href="${pin}">View location pin</a>
-      </p>
-      <p style="margin:0;font-size:13px;color:#666">Respond in the BIKIE app → Dashboard → SOS</p>
+      </p>`
+          : ""
+      }
+      ${pin ? `<p style="margin:0 0 16px;font-size:13px"><a href="${pin}">View location pin</a></p>` : ""}
+      <p style="margin:0;font-size:13px;color:#666">Respond in the BIKIE app → Dashboard → SOS${
+        hasExactLocation ? "" : " (exact location shown once you're assigned)"
+      }</p>
     </div>
   `;
 }

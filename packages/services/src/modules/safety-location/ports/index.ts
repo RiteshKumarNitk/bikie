@@ -129,8 +129,15 @@ export type SosSessionWithParticipants = SosSessionRow & {
 };
 
 export interface SosSessionRepositoryPort {
-  /** The transactional accept — see sos-session.repository.ts for the concurrency guard. */
-  acceptOffer(params: { alertId: string; offerId: string; actorId: string }): Promise<SosSessionRow>;
+  /** The transactional accept — see sos-session.repository.ts for the concurrency guard.
+   * `expiredResponderIds` (ADR-047) is every other responder whose pending OFFERED offer was
+   * auto-invalidated by this acceptance, so the caller can tell them the request is no longer
+   * available. */
+  acceptOffer(params: {
+    alertId: string;
+    offerId: string;
+    actorId: string;
+  }): Promise<{ session: SosSessionRow; expiredResponderIds: string[] }>;
   getSessionById(sessionId: string): Promise<SosSessionWithParticipants | null>;
   getActiveSessionForAlert(alertId: string): Promise<SosSessionWithParticipants | null>;
   updateSessionStatus(

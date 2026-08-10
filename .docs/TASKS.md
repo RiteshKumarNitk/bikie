@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SOS dispatch corrected: simultaneous Rider+Provider dispatch, dispatch-wide PII redaction, already-assigned notice (2026-08-10, ADR-048)
+
+| Task | Status |
+|---|---|
+| Audit existing SOS implementation against the Uber/Ola-style dispatch spec before changing anything | Completed — most of the model already matched (assignment locking, decline persistence, offer expiry, session lifecycle, role-distinct push copy); 3 real gaps found |
+| Dispatch ordering: Service Providers notified together with Nearby Riders from the first round, sharing the same widening radius, instead of a later fallback tier reached only after both rider tiers exhausted | Completed — explicit user decision; `SOSEscalationTier.SERVICE_PROVIDERS` no longer assigned (enum value left in schema, unused) |
+| PII redaction (ADR-045) extended from the in-app browse API to every dispatch channel (SMS/WhatsApp/email/in-app push) for NEARBY_RIDER/SERVICE_PROVIDER recipients pre-assignment | Completed — explicit user decision; trusted recipients (emergency contacts, admins, emergency services) unaffected |
+| Notify other pending responders when one is accepted ("this request has already been assigned") | Completed — was silently missing; `acceptOffer` now returns `expiredResponderIds` |
+| New/updated tests: simultaneous dispatch (seed + widening tick), corrected terminal-tier transition, PII redaction across channels, already-assigned notification | Completed — 141/141 passing (was 133/133 before this session's two tasks combined) |
+| Backend: `pnpm turbo run typecheck` (8/9 — same pre-existing unrelated `razorpay.service.ts` error), `pnpm exec vitest run` (141/141, 15/15 files) | Completed |
+| Live two-device dispatch race, real FCM delivery, cross-city/radius leakage under real GPS | **Not done** — not verifiable in this environment, same caveat as every prior SOS-dispatch change in this project |
+| Mobile (Flutter) — no code changes needed; both responder screens already call the same shared backend APIs this ADR modified, so behavior changes automatically | Confirmed, not separately tested on-device |
+
 ## ADR-046b migration applied live; orphaned-account repair; fixed-number OTP bypass; 5 seed personas (2026-08-10, ADR-047)
 
 | Task | Status |

@@ -1,5 +1,18 @@
 # BIKIE — Roadmap
 
+## Fixed: SOS Dispatch Now Notifies Riders and Service Providers Together (2026-08-10, ADR-048)
+An audit against an "Uber/Ola-style" dispatch spec found the SOS system already implemented
+almost all of it — assignment locking, decline persistence, offer expiry, the full assistance
+session lifecycle, participant-gated chat. Two real gaps were fixed: Service Providers were
+previously a fallback tier reached only after both rider escalation tiers fully timed out (up to
+~20 minutes by default) — now they're dispatched in the same round as nearby riders, at the same
+widening radius, so a mechanic can be reached immediately for a bike breakdown instead of waiting
+behind two rider tiers. And the existing PII-redaction rule (phone/exact GPS withheld from anyone
+not yet assigned) — previously enforced only on the in-app alert-browsing API — now applies to
+every outbound channel (SMS, WhatsApp, email, push) too. A responder whose pending offer gets
+invalidated by someone else's acceptance is now told directly, instead of only finding out on
+refresh. See ADR-048.
+
 ## Fixed: ADR-046b Migration Applied Live; Test-Number OTP Bypass; Seed Personas (2026-08-10, ADR-047)
 ADR-046b's dual-capability model was fully built but never applied to the live database — this
 closes that gap and the related loose ends found while verifying it live. The migration was

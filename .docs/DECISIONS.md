@@ -1954,3 +1954,87 @@ changes:
   on verify and skip-MSG91/non-test-number-unaffected on send). `.env.example` documents the 3 new
   vars under a dedicated "TEST-ONLY" block; real dev-only values added to `apps/web/.env.local`.
 
+## ADR-048: SOS dispatch corrected to Uber/Ola-style simultaneous Rider+Provider dispatch, with pre-assignment PII redaction extended to every outbound channel
+
+- **Context.** A request to rebuild SOS as an "Uber/Ola-style assistance dispatch" turned out,
+  after inspecting the actual implementation rather than assuming a rewrite was needed, to already
+  have nearly every piece described: `SOSResponseStatus` (`OFFERED→ACCEPTED`/`DECLINED`/
+  `WITHDRAWN`/`EXPIRED`), a transactional accept that atomically locks assignment and auto-expires
+  every other pending offer (`sos-session.repository.ts`'s `acceptOffer`, `WHERE
+  assignedHelperId IS NULL`), persisted declines that never resurface, env-configurable
+  radius/timeout escalation (not hardcoded in Flutter), a full assistance-session lifecycle
+  (arrival → in-progress → complete → rating), participant-gated chat auto-created on assignment,
+  and role-distinct notification copy. None of that was rebuilt. Three real gaps were found and
+  fixed, one of which is a genuine dispatch-ordering/product decision made explicitly with the
+  user rather than inferred:
+- **Dispatch ordering corrected: Service Providers no longer wait behind two full rider tiers.**
+  Previously, `escalation.application.ts` treated `SERVICE_PROVIDERS` as a *fourth, later* tier
+  (`NEARBY_RIDERS_COMMUNITY → NEARBY_RIDERS_GENERAL → SERVICE_PROVIDERS → ADMIN`), reached only
+  after the community tier's window AND every radius-widening step of the general rider tier had
+  already timed out — with default env values, up to ~20 minutes before a mechanic could be
+  notified about a `BIKE_BREAKDOWN`, even though a professional is an obviously better match than
+  a random nearby rider for that category. Corrected, per explicit user decision, to dispatch both
+  responder pools *together*: `resolveServiceProviders` now takes the same widening `radiusMeters`
+  the nearby-rider search uses (previously a fixed, unrelated 25km) and is called alongside
+  `resolveNearbyRiders` in both `seedEscalation` (the very first round, regardless of whether that
+  round is the community or general rider subset) and every `tickEscalation` radius-widening step.
+  `SOSEscalationTier`'s `TIER_ORDER` shrinks to `[NEARBY_RIDERS_COMMUNITY, NEARBY_RIDERS_GENERAL,
+  ADMIN]` — `SERVICE_PROVIDERS` is never assigned by this module anymore (the enum value itself is
+  left in the schema; dropping it needs a migration for zero behavioral gain). `ADMIN` remains the
+  sole terminal tier, reached once radius is maxed with neither a rider nor a provider having
+  accepted — the "SOS must never reach nobody" guarantee (ADR-030) is unchanged. A provider already
+  notified at a smaller radius is excluded from later widening ticks via a new `excludeUserIds`
+  param on `resolveServiceProviders` (deduping on the partner's own account, not on the generated
+  recipient rows — needed because a partner's secondary contact-person phone has no `userId` of
+  its own to dedupe by via the existing `findNotifiedUserIdsForAlert` set, and would otherwise be
+  re-SMS'd on every subsequent radius step).
+- **PII redaction (ADR-045) extended from the in-app browse API to every dispatch channel,
+  per explicit user decision.** ADR-045's `redactAlertForViewer`/`isPrivilegedViewer` only ever
+  governed `GET /api/sos/alerts`'s JSON payload. The actual SMS/WhatsApp/email dispatch text
+  (`dispatch-message.ts`) and the in-app/FCM push body for nearby riders both independently built
+  their content straight from the unredacted `RawSOSAlertDTO` — sending the reporter's exact phone
+  number, exact GPS, a live map pin, and (over WhatsApp) a native location card to *every* nearby
+  rider and every eligible Service Provider, before any of them had been assigned. Fixed by
+  applying the same `redactAlertForViewer` function at the one shared boundary all of those
+  channels already pass through — `fan-out.application.ts`'s `dispatchToRecipient` — gated on a
+  new `isCandidateResponder(role)` check (`NEARBY_RIDER`/`SERVICE_PROVIDER` only; the reporter's
+  own emergency contacts, emergency-services number, and platform admins are trusted/designated
+  recipients, unaffected). `dispatch-message.ts`'s `buildTextBody`/`buildEmailHtml` widened their
+  parameter type from the always-non-null `RawSOSAlertDTO` to the nullable-field `SOSAlertDTO`
+  (a `RawSOSAlertDTO` is structurally a subtype, so unredacted call sites needed no changes) and
+  made every GPS/map-link line conditional on `latitude`/`longitude` being present, with a
+  "shown once you're assigned" note replacing them when absent. WhatsApp's native location-card
+  send is skipped outright for a redacted recipient — there's no partial/approximate version of an
+  exact-GPS location card worth sending. `userName`/`city`/`type`/`description` stay visible on
+  every channel (unchanged from ADR-045's original policy) — enough to judge whether an alert is
+  worth responding to, without exposing how to find or contact the reporter pre-assignment.
+- **New: outstanding responders are told when someone else is assigned.** The transactional accept
+  already auto-expired every other pending `OFFERED` response in the same commit, but nothing told
+  those responders — they'd only find out by refreshing. `sos-session.repository.ts`'s
+  `acceptOffer` now also captures those responder IDs (queried immediately before the bulk
+  `EXPIRED` update, inside the same transaction) and returns them alongside the session;
+  `session.application.ts`'s `acceptOffer` notifies each one ("This assistance request has already
+  been assigned to another responder"), distinct from the winner's own "You're confirmed" message.
+  Port/adapter/e2e-fake signatures updated to match (`SosSessionRepositoryPort.acceptOffer` now
+  returns `{ session, expiredResponderIds }`, not a bare session).
+- **Confirmed already correct, no change needed**: assignment locking (atomic transaction, race
+  loses cleanly with `AlreadyAssignedError`), decline persistence and non-resurfacing, offer
+  auto-expiry semantics, the full assistance-session status machine and its ownership rules
+  (helper drives arrival/in-progress, rider drives completion), participant-gated chat creation,
+  role-distinct push copy (Service Provider gets category/distance/city framing, not the generic
+  Red/Amber Alert copy), admin visibility (the existing `/admin/sos` feed plus drill-in via the
+  same session-detail page riders use, since admin already bypasses every ownership check —
+  no new admin-specific route was needed), and the SOS↔Trip separation (a `SOSSession` never was,
+  and remains, a wholly different model from `Trip`).
+- **Explicitly out of scope, by the user's own instruction**: no rewrite of SOS's core models or
+  session lifecycle; no changes to membership, verification, community, or messaging.
+- **Consequences.** `pnpm turbo run typecheck`: 8/9 clean (same pre-existing unrelated
+  `razorpay.service.ts` error as ADR-047). `pnpm exec vitest run`: 141/141 passing, 15/15 files —
+  net +8 new/rewritten tests covering simultaneous dispatch (both at `seedEscalation` and on a
+  widening `tickEscalation` tick), the corrected terminal-tier transition (straight to `ADMIN`,
+  no `SERVICE_PROVIDERS` stop), pre-assignment PII redaction across SMS/email text for both
+  responder roles vs. an unredacted emergency contact, and the new "already assigned" notification.
+  Not verified in this environment: a live two-device dispatch race, real FCM delivery, and
+  cross-city/cross-radius leakage under real GPS data — same caveat as every prior SOS-dispatch
+  ADR in this project.
+
