@@ -195,11 +195,20 @@ stateDiagram-v2
   Session --> COMPLETED: rider marks complete
   Session --> CANCELLED: either party cancels
   COMPLETED --> Rated: rider rates the helper (once)
+  COMPLETED --> RESOLVED: same call — resolves the parent alert immediately (ADR-052)
 
   ACTIVE --> RESOLVED: POST .../resolve (reporter, assigned helper, or admin)
   ACTIVE --> RESOLVED: Cron sos-resolve (stale ~120 min, cascades session cancellation)
   RESOLVED --> [*]: History via /history
 ```
+
+**Resolve reasons are distinguishable (ADR-052).** `SOSTimelineEvent`'s `SOS_RESOLVED` entry
+carries `metadata.reason`: `"session-completed"` when a rider marked assistance complete (the
+alert is resolved in that same call, not left `ACTIVE` for the cron to eventually catch),
+`"auto-resolve-timeout"` when the 120-minute `sos-resolve` cron closed a genuinely-abandoned
+alert nobody ever responded to, or absent when the reporter/admin used the explicit
+`POST .../resolve` endpoint. All three land on the same `SOSStatus.RESOLVED`, but the reason
+tells a successful rescue apart from a stale timeout after the fact.
 
 The reporter accepting an offer is one atomic transaction
 (`sos-session.repository.ts`'s `acceptOffer`): it claims `SOSAlert.assignedHelperId`, flips the

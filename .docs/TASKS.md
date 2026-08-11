@@ -23,6 +23,8 @@ duplicate-notify. No new infrastructure introduced — see ADR-052 for full reas
 | Docs: `SOS.md` §4b, `PRODUCTION_INTEGRATIONS.md` (cron table + manual-test curl + Hobby-plan caveat), `DECISIONS.md` ADR-052 | Completed |
 | Verified: full `vitest run` (184/184, 16 files), `apps/web` `tsc --noEmit` clean, full `next build` clean | Completed |
 | `vercel.json`'s Hobby-plan cron-frequency limit | **Not resolved** — billing/plan decision left to the user (upgrade to Pro, or move `sos-escalate`/`sos-resolve` to an external scheduler hitting the same URLs with the same bearer token) |
+| Follow-up: mapped current `SOSStatus`/`SOSSessionStatus`/`SOSEscalationTier` model against a proposed richer lifecycle — confirmed it already implements nearly all of it, denormalized differently | Completed |
+| Follow-up: `updateSessionStatus`'s `COMPLETED` branch now resolves the parent alert immediately (`reason: "session-completed"` in the timeline), instead of leaving it `ACTIVE` for the 120-min cron to mislabel as `"auto-resolve-timeout"` | Completed |
 
 ## Service Provider membership decoupled from Rider membership; mobile UX fixes; admin category control (2026-08-11, ADR-051)
 

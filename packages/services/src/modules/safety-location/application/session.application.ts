@@ -225,6 +225,18 @@ export function createSessionApplication(ports: SafetyLocationPorts, deps: Sessi
 
       if (status === "COMPLETED") {
         await reputation.recordAssist(updated.helperId).catch(console.error);
+        // A completed session means the emergency is over — resolve the parent alert right now
+        // instead of leaving it ACTIVE until the 120-minute stale-cron eventually catches it,
+        // which would otherwise mislabel a successful rescue with the same
+        // `reason: "auto-resolve-timeout"` a truly-abandoned alert gets (ADR-052).
+        await ports.sosAlerts.resolveAlert(updated.alertId, actorId);
+        await ports.sosTimeline.record({
+          alertId: updated.alertId,
+          sessionId,
+          type: "SOS_RESOLVED",
+          actorId,
+          metadata: { reason: "session-completed" },
+        });
       }
 
       const notifyUserId = isHelper ? updated.riderId : updated.helperId;

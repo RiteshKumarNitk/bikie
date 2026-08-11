@@ -1479,8 +1479,12 @@ describe("session application — reputation wiring (ADR-033 Phase D)", () => {
     };
     reputationRepository.recordAssist.mockClear();
 
+    const resolveAlert = vi.fn(async () => undefined);
+    const timelineRecord = vi.fn(async () => undefined);
     const module = createSafetyLocationModule({
       ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts, resolveAlert } as any,
+        sosTimeline: { ...emptyRepos().sosTimeline, record: timelineRecord } as any,
         sosSessions: {
           ...emptyRepos().sosSessions,
           getSessionById: vi.fn(async () => ({
@@ -1523,6 +1527,12 @@ describe("session application — reputation wiring (ADR-033 Phase D)", () => {
     const result = await module.session.updateSessionStatus("session-1", "COMPLETED", "rider-1", false);
     expect(result.ok).toBe(true);
     expect(reputationRepository.recordAssist).toHaveBeenCalledWith("helper-1");
+    // A completed session resolves its parent alert immediately (ADR-052) — it shouldn't have to
+    // wait for the 120-minute stale-cron, which would otherwise mislabel it as a timeout.
+    expect(resolveAlert).toHaveBeenCalledWith("alert-1", "rider-1");
+    expect(timelineRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ alertId: "alert-1", type: "SOS_RESOLVED", metadata: { reason: "session-completed" } }),
+    );
   });
 
   it("records a rating against the helper on submitRating", async () => {

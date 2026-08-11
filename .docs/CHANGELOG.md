@@ -15,6 +15,15 @@ conditions and for the cron routes' bearer-secret auth (none existed before). No
 infrastructure — Rider/Partner membership expiry needs no cron at all, it's already evaluated
 lazily at query time. See ADR-052.
 
+Follow-up in the same audit: mapped the current `SOSStatus`/`SOSSessionStatus`/`SOSEscalationTier`
+model against a proposed richer lifecycle diagram — found it already implements nearly all of it
+(just denormalized differently), except one real gap: marking a session `COMPLETED` never
+resolved the parent alert, so a successful rescue sat `ACTIVE` for up to 120 minutes until the
+cron mislabeled it `"auto-resolve-timeout"` — indistinguishable from a genuinely-abandoned alert.
+Fixed: `updateSessionStatus`'s `COMPLETED` branch now resolves the alert immediately and tags the
+timeline event `reason: "session-completed"`, so the two outcomes are queryable apart. See
+ADR-052 Decision 2.
+
 ## 2026-08-11 — Fix: Service Provider signup silently failed, landing new applicants on the Rider experience
 
 `apps/web/app/partner-onboarding/page.tsx` (the form right after signup when `?role=partner` /

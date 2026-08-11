@@ -2288,6 +2288,23 @@ changes:
     guard, not business logic already covered elsewhere). `vitest.config.ts`'s `include` widened
     to pick up `apps/web/app/api/cron/**/*.test.ts` — no route-handler test existed anywhere in
     `apps/web` before this.
+  - **Decision 2 (follow-up, same audit) — a completed session now resolves its alert
+    immediately.** Mapping the current `SOSStatus`/`SOSSessionStatus`/`SOSEscalationTier` state
+    machine against a proposed richer lifecycle (`DISPATCHING → ESCALATING → ASSIGNED → HELPING →
+    COMPLETED`, with `CANCELLED`/`FALSE_ALARM`/`EXPIRED`/`RESOLVED` as distinct terminal states)
+    found that the current model already implements nearly all of it — just denormalized (one
+    `SOSStatus.ACTIVE` value covers `DISPATCHING`/`ESCALATING`/`ASSIGNED`, with the real state
+    carried in `escalationTier`/`assignedHelperId`; `HELPING`/`COMPLETED` already exist as the
+    child `SOSSession`'s own status). One genuine gap: `updateSessionStatus(..., "COMPLETED")`
+    (rider-only, both platforms) only ever updated the session — nobody resolved the parent
+    `SOSAlert`. A successfully-completed SOS sat at `status: ACTIVE` until the 120-minute
+    `sos-resolve` cron eventually caught it and mislabeled it `reason: "auto-resolve-timeout"` —
+    indistinguishable after the fact from an alert nobody ever responded to. Fixed in
+    `session.application.ts`: the `COMPLETED` branch now also calls `ports.sosAlerts.resolveAlert`
+    and records a `SOS_RESOLVED` timeline event with `metadata: { reason: "session-completed" }`,
+    giving `EXPIRED`-vs-`RESOLVED` outcomes a real, queryable distinction without adding a new
+    `SOSStatus` enum value. New test assertion in `safety-location.test.ts` (reputation-wiring
+    describe block) covers it.
 - **Consequences.** No new infrastructure — everything stays inside the existing Prisma/Postgres
   connection, no Redis/queue required for this specific fix (Upstash Redis remains optional,
   already-existing, SOS-dispatch-idempotency infra per ADR-029, unrelated to this change).
