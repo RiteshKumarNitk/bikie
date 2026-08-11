@@ -1,5 +1,33 @@
 # Changelog
 
+## Fix — Production-readiness blockers: SOS cron scheduling, DB migrations, FCM config point
+- **CRON_SECRET wired** — generated and added to `apps/web/.env.local` (all three SOS cron
+  routes were already `Authorization: Bearer <CRON_SECRET>`-protected; the value was simply
+  missing, so every cron call would 401 in production).
+- **Cron schedules added to `vercel.json`** — this was the real gap: the routes existed but
+  nothing ever scheduled them, so SOS progressive dispatch would stall at tier 1 forever in
+  production. Now: `/api/cron/sos-escalate` every minute (matches the 300s/120s tier timeouts),
+  `/api/cron/sos-resolve` every 5 minutes, `/api/cron/rider-location-cleanup` every 15 minutes.
+  (Per-minute crons require a Vercel Pro plan; Hobby caps at daily.)
+- **Fixed two pending Prisma migrations that could never apply** — `20260810100000_partner_operations_fields`
+  and `20260810110000_provider_reviews` referenced the lowercase table `"partner"`, but the
+  `Partner` model has no `@@map`, so the real table is `"Partner"` (capital). `migrate deploy`
+  failed with `relation "partner" does not exist`. Corrected the casing in both files (including
+  the `provider_review` FK to `Partner`), marked the one failed attempt rolled back, and applied
+  **all 30 migrations** to the Neon database — `prisma migrate status` now reports
+  "Database schema is up to date!"
+- **Web dev server verified end-to-end** — `pnpm dev` (port 3000, matching
+  `BETTER_AUTH_URL`/`NEXT_PUBLIC_APP_URL`) serves `/welcome` 200 and `/api/auth/get-session` 200,
+  proving the Neon connection and auth stack work locally.
+- **Mobile API base URL doc fixed** — `app_config.dart`'s comment said port 4000 (stale); local
+  iteration is `--dart-define=API_BASE_URL=http://10.0.2.2:3000` (emulator) or the LAN IP for a
+  physical device; default remains the live `https://bikie.app`.
+- **Still required from the account owner**: the Firebase console's Android config
+  `google-services.json` (project `bikie-b9459`, package `com.bikie.mobile`) at
+  `apps/mobile/android/app/google-services.json` — the Gradle plugin is applied conditionally
+  (ADR-035), so builds pass without it but FCM cannot deliver until it exists. Then run the
+  two-account SOS + FCM device test plan.
+
 ## Change — Final Service Provider model: no admin approval to operate; unverified providers can accept SOS (ADR-050)
 - **Product correction applied** per the final spec: creating a Service Provider profile *is*
   capability — there is no admin approval step between "profile exists" and "provider operates."

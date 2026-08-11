@@ -4,6 +4,6 @@
 --   yearsOfExperience how long the business/person has been operating
 -- All additive and nullable; no backfill needed.
 
-ALTER TABLE "partner" ADD COLUMN "workingHours" TEXT;
-ALTER TABLE "partner" ADD COLUMN "serviceRadiusKm" INTEGER;
-ALTER TABLE "partner" ADD COLUMN "yearsOfExperience" INTEGER;
+ALTER TABLE "Partner" ADD COLUMN "workingHours" TEXT;
+ALTER TABLE "Partner" ADD COLUMN "serviceRadiusKm" INTEGER;
+ALTER TABLE "Partner" ADD COLUMN "yearsOfExperience" INTEGER;

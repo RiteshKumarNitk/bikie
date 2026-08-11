@@ -19,5 +19,5 @@ CREATE UNIQUE INDEX "provider_review_sessionId_key" ON "provider_review"("sessio
 CREATE INDEX "provider_review_providerId_idx" ON "provider_review"("providerId");
 CREATE INDEX "provider_review_riderId_idx" ON "provider_review"("riderId");
 
-ALTER TABLE "provider_review" ADD CONSTRAINT "provider_review_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "partner"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+ALTER TABLE "provider_review" ADD CONSTRAINT "provider_review_providerId_fkey" FOREIGN KEY ("providerId") REFERENCES "Partner"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "provider_review" ADD CONSTRAINT "provider_review_riderId_fkey" FOREIGN KEY ("riderId") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
