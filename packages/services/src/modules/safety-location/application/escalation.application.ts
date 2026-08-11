@@ -189,11 +189,13 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
 
   /** One cron-poll step for one alert that's due (GET /api/cron/sos-escalate). */
   async function tickEscalation(alert: RawSOSAlertDTO, deps: EscalationDeps = {}): Promise<void> {
-    if (alert.assignedHelperId) {
-      // Race between the cron query and processing — defensive no-op.
-      await ports.sosAlerts.updateEscalationState(alert.id, { nextEscalationAt: null });
-      return;
-    }
+    // Atomic claim, re-verified straight against the DB (not the possibly-stale `alert` snapshot
+    // findAlertsDueForEscalation returned) — see claimAlertForEscalation's doc comment. A false
+    // return means another process already claimed this tick, the alert got assigned, or it's no
+    // longer due; either way there's nothing left to do, including cleanup — whichever process
+    // won already left the row in a correct state.
+    const claimed = await ports.sosAlerts.claimAlertForEscalation(alert.id, new Date());
+    if (!claimed) return;
 
     const communications = deps.communications ?? ports.communications;
     const availability = resolveChannelAvailability(communications);

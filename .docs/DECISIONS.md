@@ -2237,3 +2237,65 @@ changes:
   paid), and the backfill migration has not been applied to the live Neon DB yet — needs explicit
   go-ahead before running against shared state, same posture as every prior schema change in this
   project.
+
+## ADR-052: Cron jobs claim before they act — closing a duplicate-notification race in SOS escalation and auto-resolve
+
+- **Context.** A full audit of BIKIE's background-processing architecture (all `/api/cron/*`
+  routes, `vercel.json`, SOS escalation/dispatch/session logic, membership expiry, idempotency)
+  found the event-driven SOS paths (create, dispatch, accept, decline, cancel) already correctly
+  synchronous and, in `acceptOffer`, already correctly transactional (an atomic conditional
+  `updateMany({ where: { assignedHelperId: null, status: "ACTIVE" } })` claim, `AlreadyAssignedError`
+  on conflict). The two cron-driven paths were not: `tickEscalation`
+  (`GET /api/cron/sos-escalate`) and `autoResolveStaleAlerts` (`GET /api/cron/sos-resolve`) both
+  queried candidate alerts, ran their notification/cascade side effects, and only updated state
+  (`nextEscalationAt`, `status`) at the very end. Two overlapping invocations of either route (a
+  slow SMS/WhatsApp call outlasting the 1-minute schedule, a retry, or simply the endpoint being
+  hit twice) could both select the same alert and both notify — duplicate SMS/WhatsApp/email/push,
+  duplicate `SOSTimelineEvent` rows, and a race on the final state write. No test existed for
+  either scenario, or for the cron routes' `Authorization: Bearer <CRON_SECRET>` guard itself.
+  Also found: Rider/Partner membership expiry needs no cron at all — both are evaluated lazily at
+  query time (`status: ACTIVE AND endDate >= now()`), so there's no lag to fix. `vercel.json`'s
+  cron schedules (`sos-escalate` every 1 min, `sos-resolve` every 5 min,
+  `rider-location-cleanup` every 15 min) exceed Vercel Hobby's once-per-day cron limit — a
+  billing/plan decision left to the user, not changed here.
+- **Decision.** Give both cron paths an atomic claim-before-act step, mirroring `acceptOffer`'s
+  existing pattern — a conditional `UPDATE ... WHERE ...` scoped to one alert, never a
+  transaction held across the whole request:
+  - `sos.repository.ts`: `claimAlertForEscalation(alertId, dueBefore, lockMs = 120_000)` —
+    atomically re-verifies `status: ACTIVE, assignedHelperId: null, nextEscalationAt <= dueBefore`
+    and stamps `nextEscalationAt` to "now + 2 minutes" (not cleared to `null`) so a crash mid-tick
+    self-heals within 2 minutes instead of leaving the alert permanently stuck — preserving
+    ADR-030's guarantee. Returns `true` only if this call performed the claim.
+  - `sos.repository.ts`: `claimStaleAlertForResolve(alertId)` — atomically transitions one alert
+    `ACTIVE -> RESOLVED`, returns `true` only if this call performed the transition. Replaces the
+    old `bulkResolve(alertIds[])`, which resolved everything in one unconditional batch at the end
+    instead of per-alert, first.
+  - `escalation.application.ts`'s `tickEscalation` now claims first; a `false` claim is a no-op
+    with **no separate cleanup call** — the old defensive `if (alert.assignedHelperId) { ...
+    updateEscalationState(null) }` branch is removed, since (a) it operated on the cron query's
+    possibly-stale in-memory snapshot rather than the DB, so it could never actually fire via the
+    real cron→tick call path, and (b) `acceptOffer`'s transaction already clears
+    `nextEscalationAt` itself the moment it sets `assignedHelperId`, so there's nothing left to
+    clean up once a claim fails for that reason.
+  - `sos.application.ts`'s `autoResolveStaleAlerts` now claims each stale alert first, then
+    cascades (cancel dangling session, timeline record, notify) only for alerts it actually
+    claimed, parallelized across alerts instead of a sequential loop.
+  - New tests: `safety-location.test.ts` — concurrent-claim-fails-safely cases for both
+    `tickEscalation` and `autoResolveStaleAlerts` (no notify/timeline/state-write when the claim
+    is lost), plus a claim-succeeds case for each. New `apps/web/app/api/cron/cron-auth.test.ts`
+    — valid secret, invalid secret, missing secret, and a plausible-but-wrong bearer token,
+    against all 3 cron routes (`@bikie/services` mocked out so this file only exercises the auth
+    guard, not business logic already covered elsewhere). `vitest.config.ts`'s `include` widened
+    to pick up `apps/web/app/api/cron/**/*.test.ts` — no route-handler test existed anywhere in
+    `apps/web` before this.
+- **Consequences.** No new infrastructure — everything stays inside the existing Prisma/Postgres
+  connection, no Redis/queue required for this specific fix (Upstash Redis remains optional,
+  already-existing, SOS-dispatch-idempotency infra per ADR-029, unrelated to this change).
+  `bulkResolve` is removed (superseded by `claimStaleAlertForResolve`, called per-alert instead of
+  in a final batch) — every call site and test mock updated in the same change. Full test suite
+  (184 tests, 16 files) and `apps/web` typecheck/`next build` verified clean. Not addressed here,
+  by design: `vercel.json`'s Hobby-plan cron-frequency conflict (a billing decision), and the
+  minor UX rough edge where a stale `OFFERED` `SOSAlertResponse` row from an earlier tier/radius
+  isn't proactively expired when a tick advances — `acceptOffer`'s existing atomic claim already
+  makes a late accept on it fail cleanly with "no longer available," so this is cosmetic, not a
+  correctness bug, and wasn't touched per "don't change SOS business rules absent a real bug."

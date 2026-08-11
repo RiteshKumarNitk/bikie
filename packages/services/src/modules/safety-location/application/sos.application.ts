@@ -144,39 +144,47 @@ export function createSosApplication(ports: SafetyLocationPorts) {
     /**
      * Cascades cleanup for stale alerts instead of a raw bulk update, so the timeline actually
      * captures why each one closed and any dangling active session doesn't linger assigned to
-     * a helper who never followed through.
+     * a helper who never followed through. Resolves each alert (`claimStaleAlertForResolve`)
+     * BEFORE cascading side effects, not after — see that port method's doc comment for why.
      */
     async autoResolveStaleAlerts(minutes: number): Promise<void> {
       const stale = await ports.sosAlerts.autoResolveStaleAlerts(minutes);
       if (stale.length === 0) return;
 
-      for (const { id: alertId, userId, assignedHelperId } of stale) {
-        const session = await ports.sosSessions.getActiveSessionForAlert(alertId).catch(() => null);
-        if (session) {
-          await ports.sosSessions
-            .updateSessionStatus(session.id, "CANCELLED", "SOS auto-resolved (timed out)")
-            .catch(() => undefined);
-        }
-        await ports.sosTimeline.record({ alertId, type: "SOS_RESOLVED", metadata: { reason: "auto-resolve-timeout" } });
+      await Promise.all(
+        stale.map(async ({ id: alertId, userId, assignedHelperId }) => {
+          // Atomic claim FIRST — resolving before cascading side effects (not after, as before)
+          // means two overlapping cron runs can't both cancel the session / record the timeline
+          // event / notify for the same alert. A false claim is always a safe no-op: someone else
+          // already resolved it in the meantime.
+          const claimed = await ports.sosAlerts.claimStaleAlertForResolve(alertId);
+          if (!claimed) return;
 
-        const recipients = assignedHelperId ? [userId, assignedHelperId] : [userId];
-        await Promise.all(
-          recipients.map((recipientId) =>
-            ports.notifications
-              .notify(
-                recipientId,
-                "SOS_ALERT",
-                "SOS closed",
-                "This SOS alert was automatically closed after 2 hours of inactivity.",
-                "sos_alert",
-                alertId,
-              )
-              .catch(console.error),
-          ),
-        );
-      }
+          const session = await ports.sosSessions.getActiveSessionForAlert(alertId).catch(() => null);
+          if (session) {
+            await ports.sosSessions
+              .updateSessionStatus(session.id, "CANCELLED", "SOS auto-resolved (timed out)")
+              .catch(() => undefined);
+          }
+          await ports.sosTimeline.record({ alertId, type: "SOS_RESOLVED", metadata: { reason: "auto-resolve-timeout" } });
 
-      await ports.sosAlerts.bulkResolve(stale.map((a) => a.id));
+          const recipients = assignedHelperId ? [userId, assignedHelperId] : [userId];
+          await Promise.all(
+            recipients.map((recipientId) =>
+              ports.notifications
+                .notify(
+                  recipientId,
+                  "SOS_ALERT",
+                  "SOS closed",
+                  "This SOS alert was automatically closed after 2 hours of inactivity.",
+                  "sos_alert",
+                  alertId,
+                )
+                .catch(console.error),
+            ),
+          );
+        }),
+      );
     },
 
     /**

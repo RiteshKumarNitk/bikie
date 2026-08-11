@@ -232,12 +232,18 @@ export async function autoResolveStaleAlerts(minutes: number) {
   });
 }
 
-export async function bulkResolve(alertIds: string[]) {
-  if (alertIds.length === 0) return;
-  await prisma.sOSAlert.updateMany({
-    where: { id: { in: alertIds } },
+/** Auto-resolve-cron claim — atomically transitions one alert ACTIVE -> RESOLVED and reports
+ * whether THIS call performed the transition (`count === 1`), so the caller
+ * (SosApplication.autoResolveStaleAlerts) only cascades session-cancel/timeline/notify side
+ * effects once even if two cron invocations overlap on the same stale alert. A `false` return is
+ * always a safe no-op — someone else already resolved it (or it stopped being ACTIVE some other
+ * way) in the meantime. */
+export async function claimStaleAlertForResolve(alertId: string): Promise<boolean> {
+  const result = await prisma.sOSAlert.updateMany({
+    where: { id: alertId, status: "ACTIVE" },
     data: { status: "RESOLVED", resolvedAt: new Date(), nextEscalationAt: null },
   });
+  return result.count === 1;
 }
 
 /** Cron-poll query key for GET /api/cron/sos-escalate. */
@@ -247,6 +253,26 @@ export async function findAlertsDueForEscalation(before: Date, take = 50) {
     take,
   });
   return alerts;
+}
+
+/** Escalation-cron claim — atomically re-verifies the alert is still ACTIVE/unassigned/due
+ * directly against the DB (not the possibly-stale snapshot `findAlertsDueForEscalation` returned)
+ * and stamps a short "in flight" `nextEscalationAt` before `tickEscalation` sends any
+ * notification. Two overlapping cron invocations (or a real concurrent `acceptOffer`) can't both
+ * process the same tick. The stamped lock self-heals: if this process crashes mid-tick, the alert
+ * becomes due again after `lockMs` instead of staying stuck forever (ADR-030's "never permanently
+ * stuck" guarantee). A `false` return is always a safe no-op — nothing needs cleanup, since
+ * whichever process/acceptance won the claim already left the row in a correct state. */
+export async function claimAlertForEscalation(
+  alertId: string,
+  dueBefore: Date,
+  lockMs = 120_000,
+): Promise<boolean> {
+  const result = await prisma.sOSAlert.updateMany({
+    where: { id: alertId, status: "ACTIVE", assignedHelperId: null, nextEscalationAt: { lte: dueBefore } },
+    data: { nextEscalationAt: new Date(Date.now() + lockMs) },
+  });
+  return result.count === 1;
 }
 
 export async function updateEscalationState(

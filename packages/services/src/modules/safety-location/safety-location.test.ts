@@ -291,8 +291,9 @@ describe("sos resolveAlert ownership", () => {
           respondToAlert: vi.fn(),
           getAlertHistory: vi.fn(async () => []),
           autoResolveStaleAlerts: vi.fn(async () => []),
-          bulkResolve: vi.fn(async () => undefined),
+          claimStaleAlertForResolve: vi.fn(async () => true),
           findAlertsDueForEscalation: vi.fn(async () => []),
+          claimAlertForEscalation: vi.fn(async () => true),
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
           getOpenAlertsNearPoint: vi.fn(async () => []),
@@ -319,8 +320,9 @@ describe("sos resolveAlert ownership", () => {
           respondToAlert: vi.fn(),
           getAlertHistory: vi.fn(async () => []),
           autoResolveStaleAlerts: vi.fn(async () => []),
-          bulkResolve: vi.fn(async () => undefined),
+          claimStaleAlertForResolve: vi.fn(async () => true),
           findAlertsDueForEscalation: vi.fn(async () => []),
+          claimAlertForEscalation: vi.fn(async () => true),
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
           getOpenAlertsNearPoint: vi.fn(async () => []),
@@ -346,8 +348,9 @@ describe("sos resolveAlert ownership", () => {
           respondToAlert: vi.fn(),
           getAlertHistory: vi.fn(async () => []),
           autoResolveStaleAlerts: vi.fn(async () => []),
-          bulkResolve: vi.fn(async () => undefined),
+          claimStaleAlertForResolve: vi.fn(async () => true),
           findAlertsDueForEscalation: vi.fn(async () => []),
+          claimAlertForEscalation: vi.fn(async () => true),
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
           getOpenAlertsNearPoint: vi.fn(async () => []),
@@ -373,8 +376,9 @@ describe("sos resolveAlert ownership", () => {
           respondToAlert: vi.fn(),
           getAlertHistory: vi.fn(async () => []),
           autoResolveStaleAlerts: vi.fn(async () => []),
-          bulkResolve: vi.fn(async () => undefined),
+          claimStaleAlertForResolve: vi.fn(async () => true),
           findAlertsDueForEscalation: vi.fn(async () => []),
+          claimAlertForEscalation: vi.fn(async () => true),
           updateEscalationState: vi.fn(async () => undefined),
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
           getOpenAlertsNearPoint: vi.fn(async () => []),
@@ -386,6 +390,68 @@ describe("sos resolveAlert ownership", () => {
 
     const result = await module.sos.resolveAlert("missing", "someone", false);
     expect(result).toEqual({ ok: false, reason: "NOT_FOUND" });
+  });
+});
+
+describe("sos autoResolveStaleAlerts (cron: GET /api/cron/sos-resolve)", () => {
+  it("claims a stale alert, cancels its dangling session, records the timeline, and notifies rider + helper", async () => {
+    const claimStaleAlertForResolve = vi.fn(async () => true);
+    const getActiveSessionForAlert = vi.fn(async () => ({ id: "session-1" }) as any);
+    const updateSessionStatus = vi.fn(async () => undefined);
+    const timelineRecord = vi.fn(async () => undefined);
+    const notify = notifyMock();
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: {
+          ...emptyRepos().sosAlerts,
+          autoResolveStaleAlerts: vi.fn(async () => [
+            { id: "alert-1", userId: "reporter-1", assignedHelperId: "helper-1" },
+          ]),
+          claimStaleAlertForResolve,
+        } as any,
+        sosSessions: { ...emptyRepos().sosSessions, getActiveSessionForAlert, updateSessionStatus } as any,
+        sosTimeline: { ...emptyRepos().sosTimeline, record: timelineRecord } as any,
+        notifications: { notify },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    await module.sos.autoResolveStaleAlerts(120);
+
+    expect(claimStaleAlertForResolve).toHaveBeenCalledWith("alert-1");
+    expect(updateSessionStatus).toHaveBeenCalledWith("session-1", "CANCELLED", "SOS auto-resolved (timed out)");
+    expect(timelineRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ alertId: "alert-1", type: "SOS_RESOLVED" }),
+    );
+    const notifiedIds = notify.mock.calls.map((c) => c[0]);
+    expect(notifiedIds).toEqual(expect.arrayContaining(["reporter-1", "helper-1"]));
+  });
+
+  it("skips every cascading side effect when the claim fails — a concurrent cron run already resolved it", async () => {
+    const claimStaleAlertForResolve = vi.fn(async () => false);
+    const getActiveSessionForAlert = vi.fn(async () => null);
+    const timelineRecord = vi.fn(async () => undefined);
+    const notify = notifyMock();
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: {
+          ...emptyRepos().sosAlerts,
+          autoResolveStaleAlerts: vi.fn(async () => [{ id: "alert-1", userId: "reporter-1", assignedHelperId: null }]),
+          claimStaleAlertForResolve,
+        } as any,
+        sosSessions: { ...emptyRepos().sosSessions, getActiveSessionForAlert } as any,
+        sosTimeline: { ...emptyRepos().sosTimeline, record: timelineRecord } as any,
+        notifications: { notify },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    await module.sos.autoResolveStaleAlerts(120);
+
+    expect(claimStaleAlertForResolve).toHaveBeenCalledWith("alert-1");
+    expect(getActiveSessionForAlert).not.toHaveBeenCalled();
+    expect(timelineRecord).not.toHaveBeenCalled();
+    expect(notify).not.toHaveBeenCalled();
   });
 });
 
@@ -1062,6 +1128,7 @@ describe("escalation application — tier advancement", () => {
           ],
     );
     const updateEscalationState = vi.fn(async () => undefined);
+    const claimAlertForEscalation = vi.fn(async () => true);
     const module = createSafetyLocationModule({
       ...emptyRepos({
         riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any,
@@ -1069,6 +1136,7 @@ describe("escalation application — tier advancement", () => {
         sosAlerts: {
           ...emptyRepos().sosAlerts,
           findNotifiedUserIdsForAlert: vi.fn(async () => new Set(["already-notified"])),
+          claimAlertForEscalation,
           updateEscalationState,
         } as any,
       }),
@@ -1079,6 +1147,9 @@ describe("escalation application — tier advancement", () => {
       sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
     );
 
+    // The atomic claim runs before any notification side effect (see claimAlertForEscalation's
+    // doc comment) — this is what makes overlapping cron invocations safe.
+    expect(claimAlertForEscalation).toHaveBeenCalledWith("alert-1", expect.any(Date));
     const notifiedIds = notify.mock.calls.map((c) => c[0]);
     expect(notifiedIds).toContain("fresh-rider");
     expect(notifiedIds).not.toContain("already-notified");
@@ -1196,23 +1267,29 @@ describe("escalation application — tier advancement", () => {
     expect(updateEscalationState).toHaveBeenCalledWith("alert-1", expect.objectContaining({ escalationTier: "ADMIN" }));
   });
 
-  it("does nothing but clear the timer when the alert already has an assigned helper", async () => {
+  it("does nothing when the atomic claim fails (already assigned, already claimed by a concurrent tick, or no longer due)", async () => {
+    // claimAlertForEscalation's WHERE clause excludes assignedHelperId != null in the real
+    // repository — a false return is the general "someone else already handled this" signal, and
+    // acceptOffer's transaction already clears nextEscalationAt itself, so there's nothing left
+    // for tickEscalation to clean up.
+    const claimAlertForEscalation = vi.fn(async () => false);
     const updateEscalationState = vi.fn(async () => undefined);
     const findByCity = vi.fn();
     const findEligibleForAlert = vi.fn(async () => []);
     const module = createSafetyLocationModule({
       ...emptyRepos({
         partnerDispatch: { ...emptyRepos().partnerDispatch, findByCity, findEligibleForAlert } as any,
-        sosAlerts: { ...emptyRepos().sosAlerts, updateEscalationState } as any,
+        sosAlerts: { ...emptyRepos().sosAlerts, claimAlertForEscalation, updateEscalationState } as any,
       }),
       communications: fakeCommunications(),
     });
 
     await module.escalation.tickEscalation(sampleAlert({ assignedHelperId: "helper-1" }));
 
+    expect(claimAlertForEscalation).toHaveBeenCalledWith("alert-1", expect.any(Date));
+    expect(updateEscalationState).not.toHaveBeenCalled();
     expect(findByCity).not.toHaveBeenCalled();
     expect(findEligibleForAlert).not.toHaveBeenCalled();
-    expect(updateEscalationState).toHaveBeenCalledWith("alert-1", { nextEscalationAt: null });
   });
 
   it("seedEscalation dispatches eligible Service Providers in the very first round, alongside riders (ADR-047)", async () => {

@@ -33,8 +33,9 @@ export function createSosAlertRepositoryAdapter(): SosAlertRepositoryPort {
       sosRepository.respondToAlert(alertId, responderId, message),
     getAlertHistory: (userId) => sosRepository.getAlertHistory(userId),
     autoResolveStaleAlerts: (minutes) => sosRepository.autoResolveStaleAlerts(minutes),
-    bulkResolve: (alertIds) => sosRepository.bulkResolve(alertIds),
+    claimStaleAlertForResolve: (alertId) => sosRepository.claimStaleAlertForResolve(alertId),
     findAlertsDueForEscalation: (before, take) => sosRepository.findAlertsDueForEscalation(before, take) as any,
+    claimAlertForEscalation: (alertId, dueBefore) => sosRepository.claimAlertForEscalation(alertId, dueBefore),
     updateEscalationState: (alertId, data) => sosRepository.updateEscalationState(alertId, data),
     findNotifiedUserIdsForAlert: (alertId) => sosRepository.findNotifiedUserIdsForAlert(alertId),
     getOpenAlertsNearPoint: (latitude, longitude, radiusMeters) =>

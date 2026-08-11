@@ -33,7 +33,7 @@ Alternatives are noted where useful.
 | 9 | Image / file uploads | Media CDN | **Cloudinary** | Freemium | No | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME` | Onboarding photo, chat attachments, admin uploads |
 | 10 | Realtime + rate limit + SOS idempotency | Redis REST | **Upstash Redis** | Freemium | No (managed). OSS alt: Redis | `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | SSE chat, typing, rate limits, duplicate SOS fan-out |
 | 11 | Message encryption at rest | App crypto | Self-managed key | N/A | **Yes** (AES-256-GCM in app) | `MESSAGE_ENCRYPTION_KEY` (`openssl rand -base64 32`) | Send/receive encrypted chat decrypts for participants |
-| 12 | Cron jobs | Scheduled HTTP | **Vercel Cron** (or Docker cron / external) | Freemium / Paid host | Scheduler depends on host | `CRON_SECRET` | `GET /api/cron/sos-resolve`, `GET /api/cron/rider-location-cleanup` with Bearer |
+| 12 | Cron jobs | Scheduled HTTP | **Vercel Cron** (or Docker cron / external) | Freemium / Paid host | Scheduler depends on host | `CRON_SECRET` | `GET /api/cron/sos-escalate`, `GET /api/cron/sos-resolve`, `GET /api/cron/rider-location-cleanup` with Bearer |
 | 13 | App hosting | Next.js deploy | **Vercel** or **Docker** (compose) | Freemium / Paid | Next.js: OSS; host: paid | Host secrets + `BETTER_AUTH_URL` / `NEXT_PUBLIC_APP_URL` matching public URL | Full site + `/api/*` + OpenAPI `GET /api/openapi` |
 | 14 | Maps deep links | Google Maps URLs | **Google Maps** (links only today) | Free for deep links | No | No key for `maps.google.com` links used in SOS | Pin + navigate links open correctly |
 | 15 | Payments *(future)* | Checkout | **Razorpay** | Paid | No | `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET` — **not wired yet** | Membership / booking pay (Milestone 4) |
@@ -97,7 +97,15 @@ Do in order:
 8. **Cloudinary** — unsigned/signed upload path used by `/api/upload`.
 9. **Firebase** — service account + web app + VAPID key for real push.
 10. **Google** — OAuth client + Places API key (restrict by IP / server).
-11. **Cron** — schedule both cron routes with `Authorization: Bearer <CRON_SECRET>`.
+11. **Cron** — schedule all 3 cron routes with `Authorization: Bearer <CRON_SECRET>`
+    (`sos-escalate` every 1 min, `sos-resolve` every 5 min, `rider-location-cleanup` every
+    15 min — see `vercel.json`). All 3 combined stay well under Vercel Hobby's cron-count limit,
+    but Hobby caps every cron at **once per day** — `sos-escalate`/`sos-resolve` need sub-daily
+    frequency to do their job, so a live SOS deployment needs Vercel Pro (or an external scheduler
+    hitting these same URLs with the same bearer token; see ADR-052).
+    Manual test: `curl -H "Authorization: Bearer $CRON_SECRET" https://<host>/api/cron/sos-escalate`
+    (swap the path for the other two) — expect `200` with a JSON body; `401` means the header or
+    secret is wrong.
 12. **Smoke** — `GET /api/openapi`, login, one booking read, one SOS in a controlled test city.
 
 `SHOW_OTP_TOAST` must stay **false** in production. As of ADR-034 it only affects mobile's dev
@@ -118,6 +126,7 @@ no equivalent dev-toast path.
 | Chat + SSE | Upstash + encryption key | Messages deliver; SSE events on web |
 | Upload photo | Cloudinary | Image URL stored and shown |
 | Push | Firebase Admin + client config | Browser receives push (after permission) |
+| Cron SOS escalate | Host cron + `CRON_SECRET`, sub-daily schedule | Unassigned alerts widen radius / advance tier on time |
 | Cron SOS resolve | Host cron + `CRON_SECRET` | Stale alerts auto-resolve |
 | Cron location cleanup | Same | Stale sharing disabled |
 | Admin export | Neon only | CSV download, ≤ 10k rows, formula-safe |

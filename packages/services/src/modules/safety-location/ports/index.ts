@@ -55,9 +55,16 @@ export interface SosAlertRepositoryPort {
   autoResolveStaleAlerts(
     minutes: number,
   ): Promise<Array<{ id: string; userId: string; assignedHelperId: string | null }>>;
-  bulkResolve(alertIds: string[]): Promise<void>;
+  /** Atomic claim (see sos.repository.ts) — `true` iff this call performed the ACTIVE -> RESOLVED
+   * transition; `false` means it was already resolved (e.g. by a concurrent cron run) and the
+   * caller must skip cascading side effects. */
+  claimStaleAlertForResolve(alertId: string): Promise<boolean>;
   /** Cron-poll query key for GET /api/cron/sos-escalate. */
   findAlertsDueForEscalation(before: Date, take?: number): Promise<RawSOSAlertDTO[]>;
+  /** Atomic claim (see sos.repository.ts) — `true` iff this call is the one that gets to process
+   * this tick; `false` means another process already claimed it, it got assigned, or it's no
+   * longer due, and the caller must do nothing further. */
+  claimAlertForEscalation(alertId: string, dueBefore: Date): Promise<boolean>;
   updateEscalationState(
     alertId: string,
     data: { escalationTier?: string; currentRadiusMeters?: number; nextEscalationAt: Date | null },

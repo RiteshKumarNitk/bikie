@@ -2,6 +2,28 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Background-processing audit: cron idempotency hardening (2026-08-11, ADR-052)
+
+Full audit of every `/api/cron/*` route, `vercel.json`, SOS escalation/dispatch/session/offer
+logic, membership expiry, and existing idempotency infra. Found the event-driven SOS paths and
+`acceptOffer`'s transactional accept already correct; found the two cron-driven paths
+(`sos-escalate`, `sos-resolve`) missing an atomic claim, so overlapping invocations could
+duplicate-notify. No new infrastructure introduced — see ADR-052 for full reasoning.
+
+| Task | Status |
+|---|---|
+| Audit: catalogued every cron job (purpose/frequency/required/what breaks without it) and confirmed event-driven SOS paths + `acceptOffer` need no changes | Completed |
+| Confirmed membership expiry (Rider + Partner) needs no cron — already evaluated lazily at query time | Completed |
+| `sos.repository.ts`: added `claimAlertForEscalation` (atomic claim + self-healing 2-min lock) and `claimStaleAlertForResolve` (atomic claim), removed `bulkResolve` | Completed |
+| `escalation.application.ts`: `tickEscalation` claims before any notification side effect; removed the old dead-code defensive `assignedHelperId` check it replaces | Completed |
+| `sos.application.ts`: `autoResolveStaleAlerts` claims each stale alert before cascading cleanup, parallelized across alerts | Completed |
+| Ports/adapter (`ports/index.ts`, `repositories.adapter.ts`) updated for both new claim methods | Completed |
+| New tests: concurrent-claim-fails-safely + claim-succeeds cases for both cron paths (`safety-location.test.ts`) | Completed |
+| New `apps/web/app/api/cron/cron-auth.test.ts` — valid/invalid/missing secret + plausible-but-wrong bearer, all 3 cron routes; `vitest.config.ts` widened to cover `apps/web/app/api/cron/**/*.test.ts` (no route-handler test existed anywhere in `apps/web` before this) | Completed |
+| Docs: `SOS.md` §4b, `PRODUCTION_INTEGRATIONS.md` (cron table + manual-test curl + Hobby-plan caveat), `DECISIONS.md` ADR-052 | Completed |
+| Verified: full `vitest run` (184/184, 16 files), `apps/web` `tsc --noEmit` clean, full `next build` clean | Completed |
+| `vercel.json`'s Hobby-plan cron-frequency limit | **Not resolved** — billing/plan decision left to the user (upgrade to Pro, or move `sos-escalate`/`sos-resolve` to an external scheduler hitting the same URLs with the same bearer token) |
+
 ## Service Provider membership decoupled from Rider membership; mobile UX fixes; admin category control (2026-08-11, ADR-051)
 
 | Task | Status |

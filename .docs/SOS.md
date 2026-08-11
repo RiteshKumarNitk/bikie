@@ -152,6 +152,21 @@ platform admins immediately, logs `[SOS][DISPATCH][NO-RECIPIENTS]`, and reports
 `escalatedToAdmins` in the summary. The reporter always receives an in-app notice regardless of
 provider configuration.
 
+### 4b. Cron idempotency (ADR-052)
+
+Both `GET /api/cron/sos-escalate` and `GET /api/cron/sos-resolve` claim an alert **before**
+sending any notification, not after — a short-lived, atomic conditional `UPDATE` scoped to that
+one alert (`claimAlertForEscalation` / `claimStaleAlertForResolve` in `sos.repository.ts`), not a
+row lock held across the whole request. Two overlapping cron invocations (a slow tick still
+running when the next minute fires, a retried request, anything hitting the endpoint twice) can
+never both process the same alert — the second one's claim simply fails and it does nothing,
+rather than sending a duplicate notification or writing a duplicate timeline event.
+
+The escalation claim stamps `nextEscalationAt` to "now + 2 minutes" instead of clearing it, so a
+crash mid-tick self-heals: the alert becomes due again within 2 minutes instead of staying stuck
+forever (this is what keeps ADR-030's "never silently reach nobody" guarantee intact — a claim
+failure is always a safe no-op, never a bug that quietly drops an alert).
+
 ---
 
 ## 5. Offer → accept → session lifecycle

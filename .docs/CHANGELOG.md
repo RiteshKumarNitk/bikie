@@ -1,5 +1,20 @@
 # BIKIE Changelog
 
+## 2026-08-11 — Background-processing audit: cron jobs now claim before they act (ADR-052)
+
+Audited every `/api/cron/*` route, `vercel.json`, SOS escalation/dispatch/session logic, and
+membership expiry. Event-driven SOS paths (create/dispatch/accept/decline/cancel) and
+`acceptOffer`'s transactional accept were already correct. Found and fixed a real gap: the two
+cron-driven paths queried candidate alerts, ran notifications, and only wrote the new state
+afterward — two overlapping invocations (a slow tick outlasting its 1-minute schedule, a retry)
+could both notify the same alert. Both now claim atomically before any side effect
+(`claimAlertForEscalation`, `claimStaleAlertForResolve` in `sos.repository.ts`), mirroring the
+pattern `acceptOffer` already used. The escalation claim self-heals within 2 minutes if a process
+crashes mid-tick, so no alert can get permanently stuck (ADR-030). Added tests for both race
+conditions and for the cron routes' bearer-secret auth (none existed before). No new
+infrastructure — Rider/Partner membership expiry needs no cron at all, it's already evaluated
+lazily at query time. See ADR-052.
+
 ## 2026-08-11 — Fix: Service Provider signup silently failed, landing new applicants on the Rider experience
 
 `apps/web/app/partner-onboarding/page.tsx` (the form right after signup when `?role=partner` /
