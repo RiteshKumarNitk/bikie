@@ -87,11 +87,19 @@ export const auth = betterAuth({
       // verification-state write (application submit/withdraw, admin approve/reject/etc.).
       // Exposes session.user.partnerStatus for cheap capability checks (middleware, route
       // guards) without a join, same mechanism as role/accountStatus above. `null` means no
-      // Partner application has ever been started ("NOT_APPLIED").
+      // Partner application has ever been started ("NOT_APPLIED"). ADR-053: means ONLY
+      // verification/trust status now — see accountType below for the routing/capability signal.
       partnerStatus: {
         type: "string",
         input: false,
         required: false,
+      },
+      // ADR-053 — server-authoritative, mutually-exclusive Rider/Service-Provider selector.
+      // Never client-writable; set only via identity-access's switchAccountType.
+      accountType: {
+        type: "string",
+        input: false,
+        defaultValue: "RIDER",
       },
       accountStatus: {
         type: "string",

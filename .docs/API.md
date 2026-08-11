@@ -255,6 +255,15 @@ Membership routes above, mirrored against `PartnerMembershipPlan`/`PartnerMember
 | `/api/referrals/me` | GET | Returns (and lazily creates) the caller's referral code, plus who they've referred. |
 | `/api/referrals/link` | POST | `{ code }` — links the caller as referred by the code owner. Tracking only, no auto-reward. |
 
+## Account Type Request (auth required, ADR-053)
+
+"I picked the wrong account type at signup" support ticket — Profile → Help & Support. `User.accountType` is never self-service; it's set once at registration (`PATCH /api/user/complete-phone-signup`, only within a short window of account creation) and otherwise changed only by an admin approving a request here (see the admin table above).
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/account-type-requests` | GET | The caller's own requests, newest first. `{ requests: AccountTypeChangeRequestDTO[] }`. |
+| `/api/account-type-requests` | POST | `{ requestedType: "RIDER" \| "SERVICE_PROVIDER", reason, supportingInfo? }`. `400 SAME_TYPE` if `requestedType` matches the caller's current `accountType`; `409 ALREADY_OPEN` if a `PENDING`/`MORE_INFORMATION_REQUIRED` request already exists — one open request per user at a time. |
+
 ## Messaging (auth required)
 
 Real-time delivery is Upstash Redis-backed SSE for web (see below); the REST surface
@@ -320,6 +329,9 @@ There is no dedicated "members" route — the room's real member list is the sam
 | `/api/admin/partners/[id]` | PATCH | ADR-046b, **replaces** the old `{isVerified: boolean}` toggle. Body: `{ action: "APPROVE" \| "REJECT" \| "REQUEST_INFO" \| "SUSPEND" \| "RESTORE", reason? }` (`reason` required for every action except `APPROVE`). Validated state transition — `409 { error: "INVALID_TRANSITION" }` if illegal for the current status. Notifies the applicant (`NotificationService`) and audit-logs (`{action}_PARTNER_APPLICATION`). |
 | `/api/admin/partners/[id]/type` | PATCH | ADR-051. Body: `{ type }` (`PartnerType` enum) — sets/changes a provider's service category, kept separate from the verification-decision route above. Audit-logs `UPDATE_PARTNER_TYPE`. |
 | `/api/admin/partner-membership/plans(/[id])` | see Partner Membership above | |
+| `/api/admin/account-type-requests` | GET | ADR-053. `?status=` filters (omit for all). `{ requests: AccountTypeChangeRequestDTO[] }`. |
+| `/api/admin/account-type-requests/[id]` | GET | ADR-053. Single request detail. |
+| `/api/admin/account-type-requests/[id]` | PATCH | ADR-053. Body: `{ decision: "APPROVED" \| "REJECTED" \| "MORE_INFORMATION_REQUIRED", adminRemarks? }` (`adminRemarks` required for everything except `APPROVED`). `APPROVED` atomically flips `User.accountType` — the only non-registration path that ever changes it, never a self-service switch. Notifies the applicant and audit-logs `{decision}_ACCOUNT_TYPE_REQUEST`. |
 | `/api/admin/bikes` | GET/POST | |
 | `/api/admin/bikes/[id]` | PATCH/DELETE | |
 | `/api/admin/bookings` | GET | |

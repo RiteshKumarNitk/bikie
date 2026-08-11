@@ -1,4 +1,5 @@
 import { isAccountRestricted } from "../domain/account-status";
+import { isServiceProviderAccountType } from "../domain/account-type";
 import { ALLOWED, denied, type AccessDecision } from "../domain/access-decision";
 import { hasPermission, type Permission } from "../domain/permissions";
 import { hasRole, isAdmin } from "../domain/roles";
@@ -45,16 +46,15 @@ export function createAccessApplication(ports: IdentityAccessPorts) {
     },
 
     /**
-     * ADR-049 — Service Provider CAPABILITY, decoupled from both `role` (ADR-046b) and from
-     * verification/`APPROVED` status. A Service Provider does not need admin verification to
-     * operate — only an active profile (a `Partner` row exists — created the moment a user
-     * completes "Join as Service Provider," never gated on admin review) and active membership.
-     * `SUSPENDED` is the one deliberate admin trust/safety action that also revokes capability,
-     * not just the verification badge; `DRAFT`/`PENDING_VERIFICATION`/`MORE_INFORMATION_REQUIRED`/
-     * `REJECTED`/`APPROVED` all keep full capability — verification stays a separately-displayed
-     * status, never a blanket blocker for provider operation. The SOS `requireAvailableAndCapacity`
-     * gate reads capability the same way (any non-SUSPENDED profile, not only APPROVED), so an
-     * unverified provider can accept assistance requests — verification is a trust badge only.
+     * ADR-049/053 — Service Provider CAPABILITY, decoupled from both `role` (ADR-046b) and from
+     * verification/`APPROVED` status. Three independent conditions, all required: (1) `accountType`
+     * is `SERVICE_PROVIDER` (ADR-053 — a Rider account, even one with a historical `Partner` row
+     * from a prior stint, must not operate as a provider; switching account type is the only way
+     * back in, never a bare API call); (2) an active profile exists and isn't admin-`SUSPENDED`
+     * (`DRAFT`/`PENDING_VERIFICATION`/`MORE_INFORMATION_REQUIRED`/`REJECTED`/`APPROVED` all keep
+     * full capability — verification stays a separately-displayed trust status, never a blanket
+     * blocker); (3) active membership. The SOS `requireAvailableAndCapacity` gate reads capability
+     * the same way, so an unverified-but-capable provider can still accept assistance requests.
      *
      * ADR-051 — the membership check reads the Partner's own `PartnerMembershipPort`, not the
      * Rider `MembershipPort` (`evaluateMembership` below still uses that one, unchanged) — Riders
@@ -66,6 +66,9 @@ export function createAccessApplication(ports: IdentityAccessPorts) {
     ): Promise<AccessDecision> {
       const sessionDecision = evaluateSession(session);
       if (!sessionDecision.allowed) return sessionDecision;
+      if (!isServiceProviderAccountType(session)) {
+        return denied("WRONG_ACCOUNT_TYPE");
+      }
       if (session!.partnerStatus == null || session!.partnerStatus === "SUSPENDED") {
         return denied("PARTNER_NOT_APPROVED");
       }
@@ -79,14 +82,18 @@ export function createAccessApplication(ports: IdentityAccessPorts) {
      * query per request isn't warranted. Mirrors the identical precedent Rider membership already
      * sets: reaching `/dashboard` never checks membership either, only specific actions do.
      * `evaluatePartnerCapability` above (async, membership-checked) is what actually gates every
-     * `/api/partner/**` route and the deliberate "Switch to Service Provider Mode" action.
+     * `/api/partner/**` route and the deliberate account-type-switch action.
      */
     hasPartnerCapabilitySync(session: SessionSnapshot | null | undefined): boolean {
       if (!session) return false;
       if (isAccountRestricted({ status: session.accountStatus, expiresAt: session.accountStatusExpiresAt })) {
         return false;
       }
-      return session.partnerStatus != null && session.partnerStatus !== "SUSPENDED";
+      return (
+        isServiceProviderAccountType(session) &&
+        session.partnerStatus != null &&
+        session.partnerStatus !== "SUSPENDED"
+      );
     },
 
     /** Admins bypass membership — they monitor the network without buying a plan. */

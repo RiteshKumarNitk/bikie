@@ -2316,3 +2316,96 @@ changes:
   isn't proactively expired when a tick advances — `acceptOffer`'s existing atomic claim already
   makes a late accept on it fail cleanly with "no longer available," so this is cosmetic, not a
   correctness bug, and wasn't touched per "don't change SOS business rules absent a real bug."
+
+## ADR-053: Rider/Service Provider `accountType` — mutually exclusive, set once at registration, changed only by admin-approved request
+
+- **Context.** The dual-capability model (ADR-046b through ADR-051) let one account hold Rider
+  capability (always on) and Service Provider capability at the same time, switchable via a
+  client-routing cookie/preference never trusted for authorization. This was carefully refined
+  across 6 ADRs, but it was the wrong business model: Service Provider is a distinct business/
+  provider type (puncture shop, mechanic, towing, roadside assistance), not something every
+  Rider can casually toggle into. It also had a concrete bug: picking "Service Provider" at
+  `/signup` with a phone number that already had a Rider account silently logged the user into
+  their existing Rider account and dropped their stated intent with zero explanation
+  (`onVerify`'s `exists === true` branch never looked at `selectedRole`); `/login` had the
+  opposite bug — it force-signed the user back out with a generic error. An initial plan to fix
+  this with a self-service "Change Account Type" switch (with an active-engagement guard against
+  switching mid-SOS/booking/ride) was scoped, partially built, and then explicitly rejected in
+  favor of a simpler model: **one mobile number = one account, one `accountType`, chosen once at
+  registration, changed only through an admin-reviewed support ticket** — never a bare API call,
+  never instant, never user-triggered.
+- **Decision.**
+  - **Schema**: new `AccountType` enum (`RIDER | SERVICE_PROVIDER`) and `User.accountType`
+    (`@default(RIDER)`), migration `20260811130000_account_type_model` backfills every existing
+    account from what the old `resolveActiveMode(partnerStatus)` formula would have resolved to
+    — zero behavior change for any account on deploy day. `partnerStatus` is **not renamed** —
+    it already only ever meant verification/trust status at every write site; it's just no
+    longer read as a capability/routing signal anywhere. `evaluatePartnerCapability`
+    (`identity-access`) now checks `accountType === "SERVICE_PROVIDER"` first, before
+    `partnerStatus`/membership — a Rider account with a *historical* Partner profile from a
+    prior stint must not operate as a provider.
+  - **Registration is the one free choice.** `PATCH /api/user/complete-phone-signup` applies
+    `accountType` — but only within a 10-minute window of account creation
+    (`UserService.completePhoneSignup`'s `SIGNUP_WINDOW_MS` guard), so this endpoint can never
+    become a delayed self-service switch against an established account even though it's a bare
+    authenticated API call.
+  - **`AccountTypeChangeRequest`** (new model, migration `20260811140000_account_type_change_request`)
+    — a support ticket: `currentType`/`requestedType` (snapshotted at submission so the request
+    stays meaningful if a later request changes the live value first), `reason`,
+    `supportingInfo`, `status` (`PENDING | MORE_INFORMATION_REQUIRED | APPROVED | REJECTED`),
+    `adminRemarks`, `reviewedBy`/`reviewedAt`. One open request per user at a time
+    (`findOpenRequestForUser`). `AccountTypeRequestService.review`'s `APPROVED` path atomically
+    writes the new `User.accountType` in the same transaction as the request's own status
+    (`accountTypeRequestRepository.reviewRequest`) — the only non-registration code path that
+    ever changes it. Every decision notifies the applicant (`ACCOUNT_TYPE_CHANGE_APPROVED/
+    REJECTED/INFO_REQUESTED`, new `NotificationType` values) and, at the API route layer, writes
+    an `AuditLog` entry via the existing `logAdminAction` helper — same pattern
+    `PATCH /api/admin/partners/[id]` already uses for verification decisions.
+  - **User-facing**: `/account-type-request` (web) and the mobile `AccountTypeRequestScreen`,
+    both reachable from Profile → Help & Support regardless of current account type — submit a
+    request, see it pending, see history. **Admin-facing**: `/admin/account-type-requests` (list,
+    status-filterable) → `/admin/account-type-requests/[id]` (full detail: requester, current vs.
+    requested type, reason, supporting info, previous requests from the same user,
+    Approve/Reject/Request-more-information with remarks) — mirrors `/admin/partners/[id]`'s
+    existing verification-decision UI pattern exactly.
+  - **Mismatch handling** (the bug this whole ADR traces back to): both `/signup` and `/login`
+    now compare the account's real `accountType` against what was picked at `/welcome`. A match
+    routes to that dashboard as before. A mismatch shows "This mobile number is already
+    registered with BIKIE as a Rider/Service Provider — Continue as X / Contact Support to
+    change account type" — never silently discarded (the old `/signup` bug), never a forced
+    sign-out (the old `/login` bug). Mobile mirrors this on `login_screen.dart`; mobile's
+    `signup_screen.dart` needed no equivalent fix — it already pre-blocks existing phone numbers
+    before ever sending an OTP, so the mismatch case is structurally unreachable from mobile
+    signup.
+  - **Closed a consistency gap found while wiring this up**: `PUT /api/partner/profile` was
+    `requireSession()`-only — any authenticated Rider could still call it directly and create a
+    Partner profile, bypassing the entire request/approval system. Now gated on
+    `accountType === "SERVICE_PROVIDER"`. `/partner-onboarding` (web) and its equivalent mobile
+    screen gained the same client-side guard (redirects a Rider to `/account-type-request`
+    instead of letting them fill out a form that would 400 on submit). `/partner/layout.tsx`
+    gates on `accountType` first, then falls back to `/partner-onboarding` (not a dead-end
+    `/login` redirect) for the edge case of a freshly-approved Service Provider with no profile
+    yet. The old self-service `/dashboard/become-provider` (web) and `/become-provider` (mobile)
+    — whose entire premise ("any Rider can start a Provider application") no longer holds — are
+    now thin redirects for any stale bookmark/deep link, not deleted outright (avoids a dead
+    404/500 for anyone with an old link).
+  - **Navigation**: `middleware.ts`, `Navbar.tsx`, `role_provider.dart`, `app_shell.dart`,
+    `app_router.dart` all read `accountType` directly now — `resolveActiveMode`,
+    `switchActiveMode`, the `activeMode` device preference (`AppPreferences`), and the
+    `SwitchModeResult` enum are deleted outright, not just deduplicated, since there's no "mode"
+    left to resolve once `accountType` is single-valued and server-authoritative.
+  - **Verification stays untouched.** `Partner.verificationStatus`
+    (`DRAFT/PENDING_VERIFICATION/MORE_INFORMATION_REQUIRED/APPROVED/REJECTED/SUSPENDED`) and the
+    entire admin verification-decision flow (ADR-046b/049/050) are unchanged — accountType
+    answers "which BIKIE experience does this account use," verification answers "has this
+    profile been reviewed," and they were already independent concerns.
+- **Consequences.** A real regression was caught and fixed during this work: importing
+  `isServiceProviderAccountType` from `@bikie/services`' barrel into `middleware.ts` pulled
+  Node-only code (message-crypto's `crypto`, razorpay) into the Edge Middleware bundle — fixed by
+  inlining the one-line check directly in `middleware.ts`, matching the file's existing
+  discipline around avoiding heavy imports (same reasoning as its local `getSession` helper
+  avoiding the `better-auth` server import). No new infrastructure. Full test suite (199 tests,
+  18 files, including new coverage for `AccountTypeRequestService` and the request API routes),
+  `apps/web` typecheck/`next build`, and `flutter analyze`/`flutter test` (112 tests) all verified
+  clean. Not addressed here: a bulk migration tool for admins to bypass the request flow for mass
+  corrections (not requested, and every case so far is a single misregistered user).

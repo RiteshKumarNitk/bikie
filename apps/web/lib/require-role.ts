@@ -46,16 +46,25 @@ function toResponse(reason: AccessDenialReason, context: "rider" | "partner" = "
         },
         { status: 403 },
       );
+    case "WRONG_ACCOUNT_TYPE":
+      return NextResponse.json(
+        {
+          error: "WRONG_ACCOUNT_TYPE",
+          message: "This requires an active Service Provider account.",
+        },
+        { status: 403 },
+      );
   }
 }
 
-function toSnapshot(session: NonNullable<SessionResult>): SessionSnapshot {
+export function toSnapshot(session: NonNullable<SessionResult>): SessionSnapshot {
   return {
     userId: session.user.id,
     role: session.user.role,
     accountStatus: session.user.accountStatus,
     accountStatusExpiresAt: session.user.accountStatusExpiresAt,
     partnerStatus: session.user.partnerStatus,
+    accountType: (session.user as { accountType?: string }).accountType,
   };
 }
 
@@ -101,13 +110,13 @@ export async function requireMembership() {
   return { session: null, error };
 }
 
-/** ADR-046b/ADR-049 — Service Provider CAPABILITY gate for `/api/partner/**`, replacing
- * `requireRole("PARTNER")`. Checks an active profile + active membership (never verification —
- * `Partner.verificationStatus` is a separate, optional trust badge, see DECISIONS.md ADR-049),
- * and never a client-supplied "active mode" — capability and mode are deliberately different
- * concerns (ADR-046b). The SOS `requireAvailableAndCapacity` gate (`POST /api/sos/alerts/[id]/offer`)
- * follows the same rule — any non-SUSPENDED profile, not only APPROVED, may accept assistance
- * requests (FINAL PRODUCT MODEL: verification never blocks provider operation). */
+/** ADR-046b/049/053 — Service Provider CAPABILITY gate for `/api/partner/**`, replacing
+ * `requireRole("PARTNER")`. Checks `accountType === "SERVICE_PROVIDER"` (ADR-053) + an active
+ * profile + active membership (never verification — `Partner.verificationStatus` is a separate,
+ * optional trust badge, see DECISIONS.md ADR-049). The SOS `requireAvailableAndCapacity` gate
+ * (`POST /api/sos/alerts/[id]/offer`) follows the same rule — any non-SUSPENDED profile, not only
+ * APPROVED, may accept assistance requests (FINAL PRODUCT MODEL: verification never blocks
+ * provider operation). */
 export async function requirePartnerCapability() {
   const session = await getServerSession();
   const { access } = getIdentityAccessModule();

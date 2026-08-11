@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
-import { SELECTED_ROLE_COOKIE, resolveActiveMode } from "@/lib/role";
+import { SELECTED_ROLE_COOKIE, type SelectedRole } from "@/lib/role";
 import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { useMsg91Widget } from "@/lib/use-msg91-widget";
@@ -13,22 +13,24 @@ import Link from "next/link";
 const inputClassName =
   "mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30";
 
-function readSelectedRoleCookie(): "RIDER" | "PARTNER" {
+function readSelectedRoleCookie(): SelectedRole {
   const match = document.cookie.match(new RegExp(`(?:^|; )${SELECTED_ROLE_COOKIE}=([^;]*)`));
-  return match?.[1] === "PARTNER" ? "PARTNER" : "RIDER";
+  return match?.[1] === "SERVICE_PROVIDER" ? "SERVICE_PROVIDER" : "RIDER";
 }
 
-/** ADMIN -> /admin; else by capability/active-mode (ADR-046b) — mirrors the local helper in
- * apps/web/components/layout/Navbar.tsx (a client component, so not directly importable). */
-function dashboardHrefForRole(role: string | undefined, partnerStatus: string | null | undefined) {
+/** ADMIN -> /admin; else by the account's real, server-authoritative `accountType` (ADR-053).
+ * Mirrors the local helper in apps/web/components/layout/Navbar.tsx (a client component, so not
+ * directly importable). */
+function dashboardHrefForRole(role: string | undefined, accountType: string | null | undefined) {
   if (role === "ADMIN") return "/admin";
-  return resolveActiveMode(partnerStatus) === "PARTNER" ? "/partner" : "/";
+  return accountType === "SERVICE_PROVIDER" ? "/partner" : "/";
 }
 
 export default function SignUpPage() {
-  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [step, setStep] = useState<"phone" | "otp" | "mismatch">("phone");
   const [serverError, setServerError] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<"RIDER" | "PARTNER">("RIDER");
+  const [selectedRole, setSelectedRole] = useState<SelectedRole>("RIDER");
+  const [mismatch, setMismatch] = useState<{ currentType: SelectedRole; requestedType: SelectedRole } | null>(null);
 
   const [localNumber, setLocalNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
@@ -50,7 +52,7 @@ export default function SignUpPage() {
     // whatever the selectedRole cookie currently says, since that link
     // expresses explicit intent even if the visitor is mid-Rider-session.
     const roleParam = params.get("role");
-    setSelectedRole(roleParam === "partner" ? "PARTNER" : readSelectedRoleCookie());
+    setSelectedRole(roleParam === "partner" ? "SERVICE_PROVIDER" : readSelectedRoleCookie());
   }, []);
 
   async function handleSendCode() {
@@ -108,28 +110,35 @@ export default function SignUpPage() {
 
       if (exists === false) {
         // Name isn't collected here — it's asked for on the onboarding/partner-onboarding
-        // form right after this. ADR-046b: this call no longer applies a role — every new
-        // account is a Rider; picking "Service Provider" on /welcome just seeds where we send
-        // them next (straight into the application flow) rather than instantly granting
-        // capability.
+        // form right after this. Registration is the ONLY moment accountType is chosen freely —
+        // once set, changing it later requires an admin-approved Account Type Change Request
+        // (ADR-053), never a self-service switch.
         await fetch("/api/user/complete-phone-signup", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({}),
+          body: JSON.stringify({ accountType: selectedRole }),
         });
 
         // Referral code is collected on the onboarding form itself now, not here —
         // forward it along as a query param so that step can prefill it.
-        const nextPath = selectedRole === "PARTNER" ? "/partner-onboarding" : "/onboarding";
+        const nextPath = selectedRole === "SERVICE_PROVIDER" ? "/partner-onboarding" : "/onboarding";
         window.location.href = referralCode.trim()
           ? `${nextPath}?ref=${encodeURIComponent(referralCode.trim())}`
           : nextPath;
         return;
       }
 
-      // This phone number already had an account — verify() just logged them into it.
+      // This phone number already had an account — verify() just logged them into it. ADR-053:
+      // never silently ignore a mismatch between what they picked here and their real account
+      // type, and never sign them back out either — show the choice explicitly.
       const { data: sessionData } = await authClient.getSession();
-      window.location.href = dashboardHrefForRole(sessionData?.user.role, sessionData?.user.partnerStatus);
+      const currentType: SelectedRole = sessionData?.user.accountType === "SERVICE_PROVIDER" ? "SERVICE_PROVIDER" : "RIDER";
+      if (currentType !== selectedRole) {
+        setMismatch({ currentType, requestedType: selectedRole });
+        setStep("mismatch");
+        return;
+      }
+      window.location.href = dashboardHrefForRole(sessionData?.user.role, currentType);
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Invalid or expired code. Please try again.");
     } finally {
@@ -146,15 +155,15 @@ export default function SignUpPage() {
         </Link>
         <div className="max-w-md">
           <h1 className="font-display text-4xl font-bold leading-tight text-white">
-            {selectedRole === "PARTNER" ? "Grow your business." : "Start your journey."}
+            {selectedRole === "SERVICE_PROVIDER" ? "Grow your business." : "Start your journey."}
           </h1>
           <p className="mt-4 text-lg text-white/60 leading-relaxed">
-            {selectedRole === "PARTNER"
+            {selectedRole === "SERVICE_PROVIDER"
               ? "List your bikes, connect with riders, and build your business with BIKIE."
               : "Join the community, discover new places, and rent the perfect ride."}
           </p>
           <div className="mt-8 flex gap-3">
-            {(selectedRole === "PARTNER" ? ["🔧", "📈", "🤝"] : ["🏍️", "🌄", "🌍"]).map((emoji, i) => (
+            {(selectedRole === "SERVICE_PROVIDER" ? ["🔧", "📈", "🤝"] : ["🏍️", "🌄", "🌍"]).map((emoji, i) => (
               <span key={i} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-xl backdrop-blur-sm">
                 {emoji}
               </span>
@@ -179,16 +188,18 @@ export default function SignUpPage() {
             </Link>
           </div>
 
-          <div className="mt-8 lg:mt-0">
-            <h2 className="font-display text-2xl font-semibold">
-              {selectedRole === "PARTNER" ? "Create your partner account" : "Create your rider account"}
-            </h2>
-            <p className="mt-1 text-sm text-foreground/50">
-              {selectedRole === "PARTNER"
-                ? "List your bikes, organize rides, and grow your business."
-                : "Join the community, book rides, and explore India."}
-            </p>
-          </div>
+          {step !== "mismatch" && (
+            <div className="mt-8 lg:mt-0">
+              <h2 className="font-display text-2xl font-semibold">
+                {selectedRole === "SERVICE_PROVIDER" ? "Create your partner account" : "Create your rider account"}
+              </h2>
+              <p className="mt-1 text-sm text-foreground/50">
+                {selectedRole === "SERVICE_PROVIDER"
+                  ? "List your bikes, organize rides, and grow your business."
+                  : "Join the community, book rides, and explore India."}
+              </p>
+            </div>
+          )}
 
           {step === "phone" && (
             <div className="mt-6 space-y-4">
@@ -277,12 +288,45 @@ export default function SignUpPage() {
             </form>
           )}
 
-          <p className="mt-6 text-center text-sm text-foreground/50">
-            Already have an account?{" "}
-            <Link href="/login" className="font-medium text-accent-text hover:text-accent-hover">
-              Log in
-            </Link>
-          </p>
+          {step === "mismatch" && mismatch && (
+            <div className="mt-8 lg:mt-0 space-y-4">
+              <h2 className="font-display text-2xl font-semibold">
+                Already registered as {mismatch.currentType === "SERVICE_PROVIDER" ? "a Service Provider" : "a Rider"}
+              </h2>
+              <p className="text-sm text-foreground/60">
+                This mobile number is already registered with BIKIE as{" "}
+                {mismatch.currentType === "SERVICE_PROVIDER" ? "a Service Provider" : "a Rider"}. Did you select{" "}
+                {mismatch.requestedType === "SERVICE_PROVIDER" ? "Service Provider" : "Rider"} by mistake?
+              </p>
+              <div className="space-y-3 pt-2">
+                <Button
+                  type="button"
+                  className="w-full"
+                  size="lg"
+                  onClick={() => {
+                    window.location.href = dashboardHrefForRole(undefined, mismatch.currentType);
+                  }}
+                >
+                  Continue as {mismatch.currentType === "SERVICE_PROVIDER" ? "Service Provider" : "Rider"}
+                </Button>
+                <Link
+                  href="/account-type-request"
+                  className="block w-full rounded-full border border-foreground/15 px-5 py-2.5 text-center text-sm font-medium hover:bg-foreground/5 transition-colors"
+                >
+                  Contact Support to change account type
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {step !== "mismatch" && (
+            <p className="mt-6 text-center text-sm text-foreground/50">
+              Already have an account?{" "}
+              <Link href="/login" className="font-medium text-accent-text hover:text-accent-hover">
+                Log in
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     </main>

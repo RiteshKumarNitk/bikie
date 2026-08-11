@@ -1,7 +1,33 @@
 {
-  "generatedAt": "2026-08-11T03:49:58.780Z",
-  "count": 139,
+  "generatedAt": "2026-08-11T11:27:13.497Z",
+  "count": 142,
   "routes": [
+    {
+      "path": "/api/account-type-requests",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/account-type-requests/route.ts"
+    },
+    {
+      "path": "/api/admin/account-type-requests/{id}",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/account-type-requests/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/account-type-requests",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/account-type-requests/route.ts"
+    },
     {
       "path": "/api/admin/audit-logs",
       "methods": [

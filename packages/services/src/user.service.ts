@@ -1,5 +1,10 @@
 import { userRepository } from "@bikie/database";
 
+/** ADR-053 — how long after account creation `completePhoneSignup` is still allowed to set
+ * `accountType`. Generous enough for a slow onboarding form, tight enough that it can't be used
+ * as a delayed self-service switch against an established account. */
+const SIGNUP_WINDOW_MS = 10 * 60 * 1000;
+
 export const UserService = {
   async phoneNumberExists(phoneNumber: string): Promise<{ exists: boolean; hasRealName: boolean }> {
     const user = await userRepository.findUserByPhoneNumber(phoneNumber);
@@ -24,20 +29,28 @@ export const UserService = {
    * same step).
    *
    * ADR-046b: no longer touches `role`. Every account is RENTER by default and stays that way —
-   * Service Provider capability is granted only through the Partner application/verification
-   * flow (`PartnerService.getApplication`/`submitApplication`, `AdminService
-   * .transitionPartnerVerification`), never by an instant role flip at signup. The `role` field
-   * some older/in-flight clients still send here is accepted and ignored.
+   * the `role` field some older/in-flight clients still send here is accepted and ignored.
+   *
+   * ADR-053: registration is the ONE free choice point for `accountType` — after this, changing
+   * it needs an admin-approved Account Type Change Request, never a bare API call. Guarded by
+   * account age (`SIGNUP_WINDOW_MS`) rather than a one-shot flag: this endpoint is only ever
+   * meant to fire once, in the same request flow as account creation, so a call against an
+   * account older than the window is treated as a (possibly malicious) replay against an
+   * *existing* account and its accountType is left untouched.
    */
   async completePhoneSignup(
     userId: string,
-    input: { name?: string },
+    input: { name?: string; accountType?: "RIDER" | "SERVICE_PROVIDER" },
   ): Promise<{ ok: true } | { ok: false; reason: "NOT_FOUND" }> {
     const user = await userRepository.findById(userId);
     if (!user) return { ok: false, reason: "NOT_FOUND" };
 
     if (input.name) {
       await userRepository.updateName(userId, input.name);
+    }
+    const isBrandNewAccount = Date.now() - user.createdAt.getTime() < SIGNUP_WINDOW_MS;
+    if (input.accountType && isBrandNewAccount) {
+      await userRepository.setAccountType(userId, input.accountType);
     }
     return { ok: true };
   },

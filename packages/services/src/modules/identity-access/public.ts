@@ -1,4 +1,5 @@
 import { createAccessApplication } from "./application/access.application";
+import { createAccountTypeApplication } from "./application/account-type.application";
 import { createOtpSendApplication } from "./application/otp-send.application";
 import { createOtpVerifyApplication } from "./application/otp-verify.application";
 import { createMembershipAdapter } from "./infrastructure/membership.adapter";
@@ -12,11 +13,15 @@ export type IdentityAccessModule = {
   ports: IdentityAccessPorts;
   access: ReturnType<typeof createAccessApplication>;
   otp: ReturnType<typeof createOtpSendApplication> & ReturnType<typeof createOtpVerifyApplication>;
+  accountType: ReturnType<typeof createAccountTypeApplication>;
 };
 
 export type IdentityAccessDeps = Partial<IdentityAccessPorts>;
 
-/** Composition root for identity-access — membership lookup, OTP send/verify (ADR-034), dev echo. */
+/** Composition root for identity-access — membership lookup, OTP send/verify (ADR-034), dev echo,
+ * accountType mismatch detection (ADR-053). `accountType` itself is only ever written by an
+ * admin-approved Account Type Change Request (see the `account-type-requests` service) — this
+ * module deliberately has no self-service switch/write path. */
 export function createIdentityAccessModule(overrides: IdentityAccessDeps = {}): IdentityAccessModule {
   const ports: IdentityAccessPorts = {
     membership: overrides.membership ?? createMembershipAdapter(),
@@ -30,6 +35,7 @@ export function createIdentityAccessModule(overrides: IdentityAccessDeps = {}): 
     ports,
     access: createAccessApplication(ports),
     otp: { ...createOtpSendApplication(ports), ...createOtpVerifyApplication(ports) },
+    accountType: createAccountTypeApplication(),
   };
 }
 
@@ -58,6 +64,9 @@ export type {
 export type { AccessDecision, AccessDenialReason } from "./domain/access-decision";
 export type { Permission } from "./domain/permissions";
 export type { Role } from "./domain/roles";
+export type { AccountType } from "./domain/account-type";
+export type { AccountTypeMismatch } from "./application/account-type.application";
 export { hasPermission, permissionsForRole } from "./domain/permissions";
 export { hasRole, isAdmin, ROLES } from "./domain/roles";
 export { isAccountRestricted } from "./domain/account-status";
+export { isServiceProviderAccountType, ACCOUNT_TYPES } from "./domain/account-type";

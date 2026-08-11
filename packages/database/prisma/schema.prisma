@@ -13,11 +13,21 @@ enum UserRole {
   ADMIN
 }
 
-/** ADR-046b — Partner (Service Provider) application/verification state, decoupled from
- * `User.role` so one account can hold Rider capability (always) and Service Provider capability
- * (only once APPROVED) at the same time. "NOT_APPLIED" isn't a stored value — it's represented by
- * the absence of a `Partner` row entirely; every reader that needs all 7 conceptual states surfaces
- * that as `status: "NOT_APPLIED"` at the API layer. */
+/** ADR-053 — which experience/dashboard an account currently sees: Rider or Service Provider,
+ * mutually exclusive, never both at once. Server-set only (identity-access's switchAccountType),
+ * never client-writable. Superseded the old "dual capability" model (ADR-046b–051) where
+ * `partnerStatus` non-null/non-SUSPENDED doubled as a routing signal — that conflation is exactly
+ * what this field removes. `partnerStatus` below now means ONLY verification/trust status. */
+enum AccountType {
+  RIDER
+  SERVICE_PROVIDER
+}
+
+/** ADR-046b/053 — Partner (Service Provider) verification/trust state. As of ADR-053 this is
+ * purely a trust signal (has this profile been reviewed?), never a capability or routing signal —
+ * `User.accountType` owns "which experience this account sees" now. "NOT_APPLIED" isn't a stored
+ * value — it's represented by the absence of a `Partner` row entirely; every reader that needs all
+ * 7 conceptual states surfaces that as `status: "NOT_APPLIED"` at the API layer. */
 enum PartnerVerificationStatus {
   DRAFT
   PENDING_VERIFICATION
@@ -245,6 +255,15 @@ enum ModerationActionType {
   DELETE_RIDE_ROOM
 }
 
+/** ADR-053 — an account's `accountType` (RIDER/SERVICE_PROVIDER) is set once at registration and
+ * changed only through this admin-reviewed support workflow, never self-service. */
+enum AccountTypeChangeRequestStatus {
+  PENDING
+  MORE_INFORMATION_REQUIRED
+  APPROVED
+  REJECTED
+}
+
 enum UserAccountStatus {
   ACTIVE
   WARNED
@@ -268,6 +287,10 @@ enum NotificationType {
   PARTNER_APPLICATION_REJECTED
   PARTNER_APPLICATION_INFO_REQUESTED
   PARTNER_APPLICATION_SUSPENDED
+  // --- ADR-053: Account Type Change Request decisions ---
+  ACCOUNT_TYPE_CHANGE_APPROVED
+  ACCOUNT_TYPE_CHANGE_REJECTED
+  ACCOUNT_TYPE_CHANGE_INFO_REQUESTED
 }
 
 // --- Better Auth core models ---
@@ -287,11 +310,17 @@ model User {
   phoneNumber         String?   @unique
   phoneNumberVerified Boolean?  @default(false)
   role          UserRole  @default(RENTER)
+  // ADR-053 — server-authoritative, mutually-exclusive UI selector: Rider or Service Provider.
+  // The one thing every routing/nav call site reads now (replacing the old dual-capability
+  // resolveActiveMode()-derived client cookie). Set only via identity-access's switchAccountType.
+  accountType   AccountType @default(RIDER)
   // ADR-046b — denormalized copy of `Partner.verificationStatus`, kept in sync on every write to
   // the `Partner` row (same pattern as `phone` mirroring the phone-number plugin's field). Exists
   // so a Better Auth session can expose `session.user.partnerStatus` cheaply (registered in
   // `packages/auth/src/server.ts`'s `additionalFields`, same mechanism as `role`/`accountStatus`)
   // without every route needing a second query. `Partner` itself remains the source of truth.
+  // ADR-053: means ONLY verification/trust status now — never read for capability/routing, see
+  // `accountType` above for that.
   partnerStatus PartnerVerificationStatus?
   accountStatus          UserAccountStatus @default(ACTIVE)
   accountStatusExpiresAt DateTime?
@@ -341,6 +370,8 @@ model User {
   riderProfile        RiderProfile?
   riderLocation       RiderLocation?
   pushSubscriptions   PushSubscription[]
+  accountTypeChangeRequests         AccountTypeChangeRequest[] @relation("AccountTypeChangeRequests")
+  accountTypeChangeRequestsReviewed AccountTypeChangeRequest[] @relation("AccountTypeChangeRequestsReviewed")
 
   @@map("user")
 }
@@ -916,6 +947,32 @@ model ModerationAction {
   @@index([targetUserId])
   @@index([reportId])
   @@map("moderation_action")
+}
+
+/** ADR-053 — "I picked the wrong account type at signup" support ticket. `accountType` is never
+ * self-service; this is the only path (besides initial registration) that changes it, and only
+ * once an admin approves. `currentType`/`requestedType` are snapshotted at submission time so the
+ * request stays meaningful even if the user's live accountType changes via a different, later
+ * request before this one is reviewed. */
+model AccountTypeChangeRequest {
+  id             String                         @id @default(cuid())
+  userId         String
+  user           User                           @relation("AccountTypeChangeRequests", fields: [userId], references: [id], onDelete: Cascade)
+  currentType    AccountType
+  requestedType  AccountType
+  reason         String
+  supportingInfo String?
+  status         AccountTypeChangeRequestStatus @default(PENDING)
+  adminRemarks   String?
+  reviewedById   String?
+  reviewedBy     User?                          @relation("AccountTypeChangeRequestsReviewed", fields: [reviewedById], references: [id])
+  reviewedAt     DateTime?
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@map("account_type_change_request")
 }
 
 model Notification {

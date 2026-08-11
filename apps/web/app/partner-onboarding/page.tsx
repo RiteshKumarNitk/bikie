@@ -18,6 +18,7 @@ const labelClassName = "text-sm font-medium";
 
 export default function PartnerOnboardingPage() {
   const router = useRouter();
+  const { data: session, isPending } = authClient.useSession();
 
   const [fullName, setFullName] = useState("");
   const [partnerDetails, setPartnerDetails] = useState<PartnerBusinessDetails>(
@@ -32,6 +33,20 @@ export default function PartnerOnboardingPage() {
     const ref = new URLSearchParams(window.location.search).get("ref");
     if (ref) setReferralCode(ref);
   }, []);
+
+  // ADR-053 — this form is Service-Provider-accountType only now; a Rider landing here (stale
+  // link, back button) is sent to request a change instead of filling out a form that would
+  // 400 on submit.
+  useEffect(() => {
+    if (isPending) return;
+    if (!session) {
+      router.replace("/login?next=/partner-onboarding");
+      return;
+    }
+    if (session.user.accountType !== "SERVICE_PROVIDER") {
+      router.replace("/account-type-request");
+    }
+  }, [isPending, session, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

@@ -14,9 +14,14 @@ class UserModel with _$UserModel {
     required String role,
     String? phone,
     String? image,
-    // ADR-046b — denormalized Partner.verificationStatus, decoupled from `role`. `null` means
-    // no Service Provider application has ever been started ("NOT_APPLIED").
+    // ADR-046b — denormalized Partner.verificationStatus. ADR-053: verification/trust status
+    // only now, never a capability/routing signal — see accountType below for that. `null`
+    // means no Service Provider profile has ever been created ("NOT_APPLIED").
     String? partnerStatus,
+    // ADR-053 — server-authoritative, mutually-exclusive Rider/Service-Provider selector. Set
+    // only at registration or by an admin-approved Account Type Change Request, never
+    // self-service. Defaults to RIDER to match the server's schema default.
+    @Default('RIDER') String accountType,
   }) = _UserModel;
 
   factory UserModel.fromJson(Map<String, dynamic> json) => _$UserModelFromJson(json);

@@ -10,7 +10,12 @@ export type AccessDenialReason =
   // ADR-046b — the caller has no APPROVED Partner application (never had one, or it was
   // rejected/suspended/still pending) — distinct from FORBIDDEN so callers can point the user
   // at the application flow instead of a bare "no access" message.
-  | "PARTNER_NOT_APPROVED";
+  | "PARTNER_NOT_APPROVED"
+  // ADR-053 — the caller's accountType isn't SERVICE_PROVIDER at all (a Rider account, possibly
+  // with a historical Partner profile from a prior stint). Distinct from PARTNER_NOT_APPROVED:
+  // this is "wrong account type," not "no application" — the fix is switching account type, not
+  // starting an application.
+  | "WRONG_ACCOUNT_TYPE";
 
 export type AccessDecision = { allowed: true } | { allowed: false; reason: AccessDenialReason };
 

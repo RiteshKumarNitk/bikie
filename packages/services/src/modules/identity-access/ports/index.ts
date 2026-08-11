@@ -6,8 +6,11 @@ export type SessionSnapshot = {
   role?: string | null;
   accountStatus?: string | null;
   accountStatusExpiresAt?: string | Date | null;
-  // ADR-046b — denormalized Partner.verificationStatus, decoupled from `role`.
+  // ADR-046b — denormalized Partner.verificationStatus. ADR-053: verification/trust status only,
+  // never a capability or routing signal — see accountType below for that.
   partnerStatus?: string | null;
+  // ADR-053 — server-authoritative, mutually-exclusive Rider/Service-Provider selector.
+  accountType?: string | null;
 };
 
 export interface MembershipPort {

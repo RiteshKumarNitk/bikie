@@ -27,9 +27,14 @@ mixin _$UserModel {
   String get role => throw _privateConstructorUsedError;
   String? get phone => throw _privateConstructorUsedError;
   String? get image =>
-      throw _privateConstructorUsedError; // ADR-046b — denormalized Partner.verificationStatus, decoupled from `role`. `null` means
-  // no Service Provider application has ever been started ("NOT_APPLIED").
-  String? get partnerStatus => throw _privateConstructorUsedError;
+      throw _privateConstructorUsedError; // ADR-046b — denormalized Partner.verificationStatus. ADR-053: verification/trust status
+  // only now, never a capability/routing signal — see accountType below for that. `null`
+  // means no Service Provider profile has ever been created ("NOT_APPLIED").
+  String? get partnerStatus =>
+      throw _privateConstructorUsedError; // ADR-053 — server-authoritative, mutually-exclusive Rider/Service-Provider selector. Set
+  // only at registration or by an admin-approved Account Type Change Request, never
+  // self-service. Defaults to RIDER to match the server's schema default.
+  String get accountType => throw _privateConstructorUsedError;
 
   /// Serializes this UserModel to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -54,6 +59,7 @@ abstract class $UserModelCopyWith<$Res> {
     String? phone,
     String? image,
     String? partnerStatus,
+    String accountType,
   });
 }
 
@@ -79,6 +85,7 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? phone = freezed,
     Object? image = freezed,
     Object? partnerStatus = freezed,
+    Object? accountType = null,
   }) {
     return _then(
       _value.copyWith(
@@ -110,6 +117,10 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
                 ? _value.partnerStatus
                 : partnerStatus // ignore: cast_nullable_to_non_nullable
                       as String?,
+            accountType: null == accountType
+                ? _value.accountType
+                : accountType // ignore: cast_nullable_to_non_nullable
+                      as String,
           )
           as $Val,
     );
@@ -133,6 +144,7 @@ abstract class _$$UserModelImplCopyWith<$Res>
     String? phone,
     String? image,
     String? partnerStatus,
+    String accountType,
   });
 }
 
@@ -157,6 +169,7 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? phone = freezed,
     Object? image = freezed,
     Object? partnerStatus = freezed,
+    Object? accountType = null,
   }) {
     return _then(
       _$UserModelImpl(
@@ -188,6 +201,10 @@ class __$$UserModelImplCopyWithImpl<$Res>
             ? _value.partnerStatus
             : partnerStatus // ignore: cast_nullable_to_non_nullable
                   as String?,
+        accountType: null == accountType
+            ? _value.accountType
+            : accountType // ignore: cast_nullable_to_non_nullable
+                  as String,
       ),
     );
   }
@@ -204,6 +221,7 @@ class _$UserModelImpl implements _UserModel {
     this.phone,
     this.image,
     this.partnerStatus,
+    this.accountType = 'RIDER',
   });
 
   factory _$UserModelImpl.fromJson(Map<String, dynamic> json) =>
@@ -221,14 +239,21 @@ class _$UserModelImpl implements _UserModel {
   final String? phone;
   @override
   final String? image;
-  // ADR-046b — denormalized Partner.verificationStatus, decoupled from `role`. `null` means
-  // no Service Provider application has ever been started ("NOT_APPLIED").
+  // ADR-046b — denormalized Partner.verificationStatus. ADR-053: verification/trust status
+  // only now, never a capability/routing signal — see accountType below for that. `null`
+  // means no Service Provider profile has ever been created ("NOT_APPLIED").
   @override
   final String? partnerStatus;
+  // ADR-053 — server-authoritative, mutually-exclusive Rider/Service-Provider selector. Set
+  // only at registration or by an admin-approved Account Type Change Request, never
+  // self-service. Defaults to RIDER to match the server's schema default.
+  @override
+  @JsonKey()
+  final String accountType;
 
   @override
   String toString() {
-    return 'UserModel(id: $id, name: $name, email: $email, role: $role, phone: $phone, image: $image, partnerStatus: $partnerStatus)';
+    return 'UserModel(id: $id, name: $name, email: $email, role: $role, phone: $phone, image: $image, partnerStatus: $partnerStatus, accountType: $accountType)';
   }
 
   @override
@@ -243,7 +268,9 @@ class _$UserModelImpl implements _UserModel {
             (identical(other.phone, phone) || other.phone == phone) &&
             (identical(other.image, image) || other.image == image) &&
             (identical(other.partnerStatus, partnerStatus) ||
-                other.partnerStatus == partnerStatus));
+                other.partnerStatus == partnerStatus) &&
+            (identical(other.accountType, accountType) ||
+                other.accountType == accountType));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -257,6 +284,7 @@ class _$UserModelImpl implements _UserModel {
     phone,
     image,
     partnerStatus,
+    accountType,
   );
 
   /// Create a copy of UserModel
@@ -282,6 +310,7 @@ abstract class _UserModel implements UserModel {
     final String? phone,
     final String? image,
     final String? partnerStatus,
+    final String accountType,
   }) = _$UserModelImpl;
 
   factory _UserModel.fromJson(Map<String, dynamic> json) =
@@ -298,10 +327,15 @@ abstract class _UserModel implements UserModel {
   @override
   String? get phone;
   @override
-  String? get image; // ADR-046b — denormalized Partner.verificationStatus, decoupled from `role`. `null` means
-  // no Service Provider application has ever been started ("NOT_APPLIED").
+  String? get image; // ADR-046b — denormalized Partner.verificationStatus. ADR-053: verification/trust status
+  // only now, never a capability/routing signal — see accountType below for that. `null`
+  // means no Service Provider profile has ever been created ("NOT_APPLIED").
   @override
-  String? get partnerStatus;
+  String? get partnerStatus; // ADR-053 — server-authoritative, mutually-exclusive Rider/Service-Provider selector. Set
+  // only at registration or by an admin-approved Account Type Change Request, never
+  // self-service. Defaults to RIDER to match the server's schema default.
+  @override
+  String get accountType;
 
   /// Create a copy of UserModel
   /// with the given fields replaced by the non-null parameter values.

@@ -5,7 +5,7 @@ export default defineConfig({
     include: [
       "packages/**/src/**/*.test.ts",
       "packages/**/src/**/*.spec.ts",
-      "apps/web/app/api/cron/**/*.test.ts",
+      "apps/web/app/api/**/*.test.ts",
     ],
     environment: "node",
     globals: false,

@@ -1,7 +1,13 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { SELECTED_ROLE_COOKIE, isSelectedRole, resolveActiveMode, type SelectedRole } from "@/lib/role";
+import { SELECTED_ROLE_COOKIE, isSelectedRole } from "@/lib/role";
 
-const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
+// Deliberately NOT imported from @bikie/services here (unlike other gates) — that package's
+// barrel export pulls in Node-only modules (message-crypto's `crypto`, razorpay) incompatible
+// with the Edge Middleware runtime. This one-line check is inlined instead, same reasoning as
+// the local `getSession` helper below avoiding the better-auth server import.
+function isServiceProviderAccountType(user: { accountType?: string | null } | null | undefined): boolean {
+  return user?.accountType === "SERVICE_PROVIDER";
+}
 
 // Helper to fetch session without importing better-auth server (prevents 1MB Edge Function bloat)
 async function getSession(request: NextRequest) {
@@ -19,11 +25,11 @@ async function getSession(request: NextRequest) {
   }
 }
 
-/** ADMIN -> /admin; else by capability/active-mode (ADR-046b) — a dual-capability account lands
- * wherever its current mode points, not a fixed role-derived home. */
-function dashboardHomeFor(role: string | undefined, activeMode: SelectedRole) {
+/** ADMIN -> /admin; else by `accountType` (ADR-053) — server-authoritative, mutually exclusive,
+ * never a client-routing cookie. */
+function dashboardHomeFor(role: string | undefined, accountType: string | undefined) {
   if (role === "ADMIN") return "/admin";
-  return activeMode === "PARTNER" ? "/partner" : "/dashboard";
+  return accountType === "SERVICE_PROVIDER" ? "/partner" : "/dashboard";
 }
 
 /** `pathname.startsWith("/partner")` also matches "/partners" — the public
@@ -53,55 +59,28 @@ export default async function middleware(request: NextRequest) {
   }
 
   const role = session.user.role as string | undefined;
-  // ADR-049 — Service Provider CAPABILITY, decoupled from both `role` (ADR-046b) and from
-  // verification/`APPROVED` status. Server-verified (read straight off the session, never
-  // trusted from a client-supplied cookie) — this is what every hard gate below (`/partner`)
-  // actually checks; the `selectedRole` cookie below is UX routing only (which of the two
-  // dashboards a *capable* account currently wants to see). A profile exists (`partnerStatus`
-  // set at all) and hasn't been admin-`SUSPENDED` — verification status doesn't matter here,
-  // deliberately: membership is additionally enforced server-side per `/api/partner/**` call
-  // (`evaluatePartnerCapability`) and by the explicit "Switch Mode" action, not on every
-  // navigation, matching how Rider membership already isn't checked on every `/dashboard` render.
-  const partnerStatus = session.user.partnerStatus as string | null | undefined;
-  const isCapableServiceProvider = partnerStatus != null && partnerStatus !== "SUSPENDED";
-
-  const cookieMode = request.cookies.get(SELECTED_ROLE_COOKIE)?.value;
-  const activeMode: SelectedRole = isSelectedRole(cookieMode) ? cookieMode : resolveActiveMode(partnerStatus);
+  const accountType = session.user.accountType as string | undefined;
+  // ADR-053 — `accountType` is server-authoritative and mutually exclusive: an account is Rider
+  // XOR Service Provider, never both, never client-routed. Replaces the old dual-capability
+  // `partnerStatus`-derived formula + `selectedRole` mode cookie (ADR-046b–051) — there's no
+  // "active mode" to resolve or imply anymore, this is the one check every gate below uses.
+  const isCapableServiceProvider = isServiceProviderAccountType(session.user);
 
   const isPartnerRoute = isPathOrSubpath(pathname, "/partner");
   const isAdminRoute = isPathOrSubpath(pathname, "/admin");
   const isDashboardRoute = isPathOrSubpath(pathname, "/dashboard");
 
   if (isPartnerRoute && !isCapableServiceProvider) {
-    return NextResponse.redirect(new URL(dashboardHomeFor(role, activeMode), url));
+    return NextResponse.redirect(new URL(dashboardHomeFor(role, accountType), url));
   }
   if (isAdminRoute && role !== "ADMIN") {
-    return NextResponse.redirect(new URL(dashboardHomeFor(role, activeMode), url));
+    return NextResponse.redirect(new URL(dashboardHomeFor(role, accountType), url));
   }
-  // A Service Provider currently in Service Provider mode must never land on the Rider
-  // dashboard — that's where SOS *creation* (Red/Amber panic cards) lives. Only a UX
-  // routing concern (not the capability gate above, hence also keyed on `activeMode`) — a
-  // dual-capability account in Rider mode is completely unaffected. ADMIN is intentionally
-  // exempt (see dashboardHomeFor above — admins get the rider experience outside of /admin by
-  // design).
-  if (isDashboardRoute && role !== "ADMIN" && isCapableServiceProvider && activeMode === "PARTNER") {
-    return NextResponse.redirect(new URL(dashboardHomeFor(role, activeMode), url));
-  }
-  // Entering either section while capable implicitly switches the active mode to match —
-  // navigating IS how a capable account switches, same as the explicit "Switch Mode" control.
-  // A full redirect (not just setting the cookie on a pass-through response) so the new cookie
-  // value is guaranteed visible to the page's own server-side `cookies()` read in this same
-  // navigation, not just the next one.
-  const impliedMode: SelectedRole | null = isPartnerRoute && isCapableServiceProvider ? "PARTNER" : isDashboardRoute ? "RIDER" : null;
-
-  if (!isSelectedRole(cookieMode) || (impliedMode && impliedMode !== cookieMode)) {
-    const response = NextResponse.redirect(url);
-    response.cookies.set(SELECTED_ROLE_COOKIE, impliedMode ?? activeMode, {
-      path: "/",
-      maxAge: ONE_YEAR_SECONDS,
-      sameSite: "lax",
-    });
-    return response;
+  // A Service Provider account must never land on the Rider dashboard — that's where SOS
+  // *creation* (Red/Amber panic cards) lives. ADMIN is intentionally exempt (see
+  // dashboardHomeFor above — admins get the rider experience outside of /admin by design).
+  if (isDashboardRoute && role !== "ADMIN" && isCapableServiceProvider) {
+    return NextResponse.redirect(new URL(dashboardHomeFor(role, accountType), url));
   }
 
   return NextResponse.next();

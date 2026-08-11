@@ -19,10 +19,9 @@ class ProfileScreen extends ConsumerWidget {
 
     if (user == null) return const SizedBox.shrink();
 
-    // ADR-049 — capability (an active, non-suspended profile), not verification/'APPROVED'.
-    final isCapableServiceProvider = user.partnerStatus != null && user.partnerStatus != 'SUSPENDED';
-    final storedMode = ref.watch(activeModeProvider);
-    final isPartnerMode = resolveActiveMode(user.partnerStatus, storedMode) == 'PARTNER';
+    // ADR-053 — server-authoritative, mutually exclusive: this account IS a Service Provider or
+    // it isn't, no "mode" to resolve.
+    final isPartnerMode = isServiceProviderAccountType(user.accountType);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -36,12 +35,6 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Center(child: Text(user.name, style: Theme.of(context).textTheme.titleLarge)),
           Center(child: Text(user.email, style: Theme.of(context).textTheme.bodyMedium)),
-          // Once in Service Provider mode, there's no UI path back to Rider mode — the
-          // underlying dual-capability model is unchanged, only this control is one-directional.
-          if (isCapableServiceProvider && !isPartnerMode) ...[
-            const SizedBox(height: 16),
-            const _ModeSwitch(),
-          ],
           const SizedBox(height: 24),
           _PhoneField(initialPhone: user.phone),
           const SizedBox(height: 24),
@@ -51,9 +44,14 @@ class ProfileScreen extends ConsumerWidget {
             badgeCount: unreadNotifications,
             onTap: () => context.push('/notifications'),
           ),
-          if (isPartnerMode) ...const [_PartnerProfileSection()] else ...[_RiderProfileSection(isCapableServiceProvider: isCapableServiceProvider)],
+          if (isPartnerMode) ...const [_PartnerProfileSection()] else ...const [_RiderProfileSection()],
           _ProfileTile(icon: Icons.chat_bubble_outline, label: 'Messages', onTap: () => context.push('/messages')),
           _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
+          _ProfileTile(
+            icon: Icons.help_outline,
+            label: 'Help & Support',
+            onTap: () => context.push('/account-type-request'),
+          ),
           const SizedBox(height: 24),
           const _SignOutButton(),
         ],
@@ -93,68 +91,9 @@ class _SignOutButtonState extends ConsumerState<_SignOutButton> {
   }
 }
 
-/// ADR-046b/ADR-049 — shown once the account has Service Provider CAPABILITY (an active,
-/// non-suspended profile — verification status irrelevant here) and is currently in Rider mode;
-/// mirrors web's Navbar "Switch Mode" control. Only offers Rider -> Service Provider — once in
-/// Service Provider mode there's no UI path back (see the gate at this widget's call site), the
-/// underlying dual-capability model is unaffected. Switching is server-verified (see
-/// [switchActiveMode], including a membership check) — this button being visible is a UX
-/// convenience, not the actual authorization.
-class _ModeSwitch extends ConsumerStatefulWidget {
-  const _ModeSwitch();
-
-  @override
-  ConsumerState<_ModeSwitch> createState() => _ModeSwitchState();
-}
-
-class _ModeSwitchState extends ConsumerState<_ModeSwitch> {
-  bool _busy = false;
-
-  Future<void> _handleSwitch() async {
-    setState(() => _busy = true);
-    final result = await switchActiveMode(ref, 'PARTNER');
-    if (!mounted) return;
-    setState(() => _busy = false);
-
-    switch (result) {
-      case SwitchModeResult.success:
-        // Replaces the stack root (not a push) so no Rider-mode screens linger underneath the
-        // new tab set, and lands on Home so the freshly-swapped tabs render immediately.
-        context.go('/');
-      case SwitchModeResult.notCapable:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("You don't have a Service Provider profile yet.")),
-        );
-        context.push('/become-provider');
-      case SwitchModeResult.membershipRequired:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('An active Service Provider membership is required for Service Provider mode.')),
-        );
-        context.push('/partner-membership');
-      case SwitchModeResult.networkError:
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Couldn't verify Service Provider status. Please try again.")),
-        );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return OutlinedButton.icon(
-      onPressed: _busy ? null : _handleSwitch,
-      icon: _busy
-          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-          : const Icon(Icons.swap_horiz),
-      label: Text(_busy ? 'Checking…' : 'Switch to Service Provider mode'),
-    );
-  }
-}
-
-/// The Rider-specific tiles, shown whenever the account is currently in Rider mode.
+/// The Rider-specific tiles, shown whenever the account's `accountType` is RIDER.
 class _RiderProfileSection extends StatelessWidget {
-  const _RiderProfileSection({required this.isCapableServiceProvider});
-
-  final bool isCapableServiceProvider;
+  const _RiderProfileSection();
 
   @override
   Widget build(BuildContext context) {

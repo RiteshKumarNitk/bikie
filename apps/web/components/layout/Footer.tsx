@@ -11,7 +11,7 @@ import { LogoMark } from "./LogoMark";
 import { SwitchRoleLink } from "./SwitchRoleLink";
 
 export function Footer({ role }: { role: SelectedRole | null }) {
-  const columns = [...(role === "PARTNER" ? partnerFooterColumns : riderFooterColumns), legalFooterColumn];
+  const columns = [...(role === "SERVICE_PROVIDER" ? partnerFooterColumns : riderFooterColumns), legalFooterColumn];
 
   return (
     <footer className="border-t border-foreground/10 bg-surface/50">

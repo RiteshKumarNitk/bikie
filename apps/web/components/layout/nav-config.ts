@@ -147,9 +147,9 @@ export const legalFooterColumn: NavColumn = {
 };
 
 export function otherRole(role: SelectedRole): SelectedRole {
-  return role === "PARTNER" ? "RIDER" : "PARTNER";
+  return role === "SERVICE_PROVIDER" ? "RIDER" : "SERVICE_PROVIDER";
 }
 
 export function switchRoleLabel(role: SelectedRole): string {
-  return role === "PARTNER" ? "Switch to Rider" : "Switch to Service Provider";
+  return role === "SERVICE_PROVIDER" ? "Switch to Rider" : "Switch to Service Provider";
 }

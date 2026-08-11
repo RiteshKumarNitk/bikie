@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/account_type_request/presentation/account_type_request_screen.dart';
 import '../../features/auth/domain/auth_controller.dart';
 import '../../features/auth/domain/auth_state.dart';
 import '../../features/auth/domain/role_provider.dart';
@@ -55,15 +56,13 @@ const _preAuthPaths = {'/intro', '/welcome', '/login', '/signup'};
 final routerProvider = Provider<GoRouter>((ref) {
   final authStatus = ref.watch(authControllerProvider.select((s) => s.status));
   final hasSeenIntro = ref.watch(hasSeenIntroProvider);
-  // ADR-044/046b: an approved Service Provider *currently in Partner mode* gets a purpose-built
-  // Emergency Assistance Dashboard instead of the renter marketplace Home/SOS screens — branched
-  // here rather than as a second parallel route tree, so every other route (bookings, messages,
-  // profile, …) stays reachable identically for both roles. Capability (`partnerStatus`) is
-  // server-verified on every API call regardless of what this local flag says; `activeMode` here
-  // only decides which screen renders.
-  final partnerStatus = ref.watch(authControllerProvider.select((s) => s.user?.partnerStatus));
-  final storedMode = ref.watch(activeModeProvider);
-  final isPartner = resolveActiveMode(partnerStatus, storedMode) == 'PARTNER';
+  // ADR-044/053: a Service Provider-accountType account gets a purpose-built Emergency
+  // Assistance Dashboard instead of the renter marketplace Home/SOS screens — branched here
+  // rather than as a second parallel route tree, so every other route (bookings, messages,
+  // profile, …) stays reachable identically for both roles. `accountType` is server-authoritative
+  // and mutually exclusive (ADR-053) — no local "mode" left to resolve, just this one flag.
+  final accountType = ref.watch(authControllerProvider.select((s) => s.user?.accountType));
+  final isPartner = isServiceProviderAccountType(accountType);
 
   final String initialLocation;
   if (authStatus == AuthStatus.authenticated) {
@@ -159,6 +158,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/membership', builder: (context, state) => const MembershipScreen()),
       GoRoute(path: '/partner-membership', builder: (context, state) => const PartnerMembershipScreen()),
       GoRoute(path: '/referrals', builder: (context, state) => const ReferralsScreen()),
+      GoRoute(path: '/account-type-request', builder: (context, state) => const AccountTypeRequestScreen()),
     ],
   );
 });

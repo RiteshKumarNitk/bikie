@@ -75,7 +75,7 @@ class WelcomeScreen extends ConsumerWidget {
                               'Rent a motorbike, create group trips, connect with riders, and access the BIKIE safety panic network.',
                           ctaLabel: 'Join as Rider',
                           onTap: () {
-                            ref.read(selectedRoleProvider.notifier).state = 'RENTER';
+                            ref.read(selectedRoleProvider.notifier).state = 'RIDER';
                             context.go('/login');
                           },
                         ),
@@ -88,7 +88,7 @@ class WelcomeScreen extends ConsumerWidget {
                               'List your bikes for rent, offer roadside assistance, create curated trips, and grow your business.',
                           ctaLabel: 'Join as Provider',
                           onTap: () {
-                            ref.read(selectedRoleProvider.notifier).state = 'PARTNER';
+                            ref.read(selectedRoleProvider.notifier).state = 'SERVICE_PROVIDER';
                             context.go('/login');
                           },
                         ),

@@ -26,7 +26,7 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownMixin<LoginScreen> {
   String _mode = 'phone'; // 'phone' | 'email'
-  String _step = 'phone'; // 'phone' | 'otp'
+  String _step = 'phone'; // 'phone' | 'otp' | 'mismatch'
 
   String _localNumber = '';
   String _phoneNumber = '';
@@ -41,6 +41,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
   bool _sendingOtp = false;
   bool _verifying = false;
   bool _signingIn = false;
+  // ADR-053 — populated when the signed-in account's real accountType doesn't match what was
+  // picked on /welcome; never sign the account back out over this, just show the choice.
+  String? _mismatchCurrentType;
 
   @override
   void dispose() {
@@ -108,16 +111,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       await ref.read(authControllerProvider.notifier).verifyOtp(phoneNumber: _phoneNumber, code: _otpController.text.trim());
       final user = ref.read(authControllerProvider).user;
       final selectedRole = ref.read(selectedRoleProvider);
-      
-      if (selectedRole == 'PARTNER' && user != null) {
-        final isCapable = user.partnerStatus != null && user.partnerStatus != 'SUSPENDED';
-        if (!isCapable) {
-          await ref.read(authControllerProvider.notifier).signOut();
-          setState(() => _error = 'You are a rider. Login as a rider. Change the role.');
-          return;
-        }
+
+      final currentType = user?.accountType ?? 'RIDER';
+      if (currentType != selectedRole) {
+        setState(() {
+          _mismatchCurrentType = currentType;
+          _step = 'mismatch';
+        });
+        return;
       }
-      
+
       if (mounted) context.go('/');
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -139,14 +142,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
           );
       final user = ref.read(authControllerProvider).user;
       final selectedRole = ref.read(selectedRoleProvider);
-      
-      if (selectedRole == 'PARTNER' && user != null) {
-        final isCapable = user.partnerStatus != null && user.partnerStatus != 'SUSPENDED';
-        if (!isCapable) {
-          await ref.read(authControllerProvider.notifier).signOut();
-          setState(() => _error = 'You are a rider. Login as a rider. Change the role.');
-          return;
-        }
+
+      final currentType = user?.accountType ?? 'RIDER';
+      if (currentType != selectedRole) {
+        setState(() {
+          _mismatchCurrentType = currentType;
+          _step = 'mismatch';
+        });
+        return;
       }
 
       if (mounted) context.go('/');
@@ -184,11 +187,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(letterSpacing: 1.2),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  selectedRole == 'PARTNER' ? 'Sign in to Service Provider' : 'Sign in to Rider',
-                  textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).hintColor),
-                ),
+                if (_step != 'mismatch')
+                  Text(
+                    selectedRole == 'SERVICE_PROVIDER' ? 'Sign in to Service Provider' : 'Sign in to Rider',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).hintColor),
+                  ),
                 const SizedBox(height: 28),
                 Container(
                   padding: const EdgeInsets.all(20),
@@ -199,6 +203,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      if (_step == 'mismatch' && _mismatchCurrentType != null) ...[
+                        Text(
+                          'Already registered as ${_mismatchCurrentType == 'SERVICE_PROVIDER' ? 'a Service Provider' : 'a Rider'}',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'This mobile number is already registered with BIKIE as '
+                          '${_mismatchCurrentType == 'SERVICE_PROVIDER' ? 'a Service Provider' : 'a Rider'}. '
+                          "Did you select ${selectedRole == 'SERVICE_PROVIDER' ? 'Service Provider' : 'Rider'} by mistake?",
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        const SizedBox(height: 20),
+                        ElevatedButton(
+                          onPressed: () => context.go('/'),
+                          child: Text(
+                            'Continue as ${_mismatchCurrentType == 'SERVICE_PROVIDER' ? 'Service Provider' : 'Rider'}',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        OutlinedButton(
+                          onPressed: () => context.push('/account-type-request'),
+                          child: const Text('Contact Support to change account type'),
+                        ),
+                      ],
                       if (_mode == 'phone' && _step == 'phone') ...[
                         Align(
                           alignment: Alignment.centerLeft,
@@ -332,7 +361,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                     ],
                   ),
                 ),
-                if (_mode == 'phone') ...[
+                if (_mode == 'phone' && _step != 'mismatch') ...[
                   const SizedBox(height: 20),
                   Center(
                     child: TextButton(

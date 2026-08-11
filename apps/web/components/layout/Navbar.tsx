@@ -5,7 +5,6 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import { authClient } from "@/lib/auth-client";
 import type { SelectedRole } from "@/lib/role";
-import { switchActiveMode } from "@/lib/actions/role-actions";
 import { LogoMark } from "./LogoMark";
 import { MegaMenu } from "./MegaMenu";
 import { NotificationBell } from "./NotificationBell";
@@ -16,12 +15,12 @@ import {
   riderPrimaryLinks,
 } from "./nav-config";
 
-/** ADMIN -> /admin; else by the current active mode (ADR-046b) — `activeMode` is the same
- * `selectedRole` cookie value the layout already reads to pick the nav variant, passed down as
- * this component's own `role` prop. */
-function dashboardHrefForRole(sessionRole: string | undefined, activeMode: SelectedRole | null) {
+/** ADMIN -> /admin; else by the account's actual, server-authoritative `accountType` (ADR-053) —
+ * never the pre-auth `role` prop (that's the `selectedRole` cookie, a signup/login copy
+ * preference only, unrelated to a signed-in account's real type). */
+function dashboardHrefForRole(sessionRole: string | undefined, accountType: string | undefined) {
   if (sessionRole === "ADMIN") return "/admin";
-  return activeMode === "PARTNER" ? "/partner" : "/dashboard";
+  return accountType === "SERVICE_PROVIDER" ? "/partner" : "/dashboard";
 }
 
 function UserAvatar({ name }: { name: string }) {
@@ -46,11 +45,18 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
   const userMenuRef = useRef<HTMLDivElement>(null);
   const userMenuButtonRef = useRef<HTMLButtonElement>(null);
 
-  // A visitor with no explicit role selection yet (every first-time visit, and every
-  // crawler) still needs a working nav — default that state to the rider/public
-  // experience rather than rendering an empty header. See DECISIONS.md.
-  const primaryLinks = role === "PARTNER" ? partnerPrimaryLinks : riderPrimaryLinks;
-  const megaMenuColumns = role === "PARTNER" ? partnerMegaMenuColumns : riderMegaMenuColumns;
+  // ADR-053 — for a signed-in account, the nav variant follows its real, server-authoritative
+  // `accountType`, never the pre-auth `role` prop (the `selectedRole` cookie — a signup/login
+  // copy preference that has no reason to track a signed-in account's actual type). A visitor
+  // with no session yet (every first-time visit, and every crawler) falls back to that cookie/
+  // default so there's still a working nav rather than an empty header. See DECISIONS.md.
+  const effectiveRole: SelectedRole = session
+    ? session.user.accountType === "SERVICE_PROVIDER"
+      ? "SERVICE_PROVIDER"
+      : "RIDER"
+    : (role ?? "RIDER");
+  const primaryLinks = effectiveRole === "SERVICE_PROVIDER" ? partnerPrimaryLinks : riderPrimaryLinks;
+  const megaMenuColumns = effectiveRole === "SERVICE_PROVIDER" ? partnerMegaMenuColumns : riderMegaMenuColumns;
 
   useEffect(() => {
     function onScroll() {
@@ -82,11 +88,7 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [userMenuOpen]);
 
-  const dashboardHref = dashboardHrefForRole(session?.user.role, role);
-  // ADR-049 — capability (an active, non-suspended profile), not verification/`APPROVED`; the
-  // "Switch Mode" click itself re-verifies (including membership) server-side in switchActiveMode.
-  const isCapableServiceProvider =
-    session?.user.partnerStatus != null && session.user.partnerStatus !== "SUSPENDED";
+  const dashboardHref = dashboardHrefForRole(session?.user.role, session?.user.accountType);
 
   const navLinkClass = "text-sm font-medium text-foreground/70 hover:text-foreground transition-colors";
 
@@ -162,28 +164,14 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                         </svg>
                         Dashboard
                       </Link>
-                      {/* Once in Service Provider mode, there's no UI path back to Rider mode —
-                          a Rider becoming a Service Provider is additive, not a toggle; the
-                          underlying dual-capability model is unchanged, only this control is
-                          one-directional now. */}
-                      {isCapableServiceProvider && role !== "PARTNER" && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setUserMenuOpen(false);
-                            switchActiveMode("PARTNER");
-                          }}
-                          role="menuitem"
-                          className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-foreground/5"
-                        >
-                          <svg className="h-4 w-4 text-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4" />
-                          </svg>
-                          Switch to Service Provider mode
-                        </button>
-                      )}
                       <Link
-                        href={session.user.role === "ADMIN" ? "/admin/settings" : role === "PARTNER" ? "/partner/settings" : "/dashboard/settings"}
+                        href={
+                          session.user.role === "ADMIN"
+                            ? "/admin/settings"
+                            : effectiveRole === "SERVICE_PROVIDER"
+                              ? "/partner/settings"
+                              : "/dashboard/settings"
+                        }
                         onClick={() => setUserMenuOpen(false)}
                         role="menuitem"
                         className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-foreground/5"
@@ -193,6 +181,19 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                         </svg>
                         Profile
                       </Link>
+                      {session.user.role !== "ADMIN" && (
+                        <Link
+                          href="/account-type-request"
+                          onClick={() => setUserMenuOpen(false)}
+                          role="menuitem"
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-foreground/5"
+                        >
+                          <svg className="h-4 w-4 text-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Help &amp; Support
+                        </Link>
+                      )}
                       <button
                         type="button"
                         onClick={async () => {

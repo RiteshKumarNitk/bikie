@@ -44,9 +44,8 @@ class AppShell extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final partnerStatus = ref.watch(authControllerProvider.select((s) => s.user?.partnerStatus));
-    final storedMode = ref.watch(activeModeProvider);
-    final isPartner = resolveActiveMode(partnerStatus, storedMode) == 'PARTNER';
+    final accountType = ref.watch(authControllerProvider.select((s) => s.user?.accountType));
+    final isPartner = isServiceProviderAccountType(accountType);
     final tabs = isPartner ? partnerTabs : riderTabs;
     final destinations = isPartner ? _partnerDestinations : _riderDestinations;
 

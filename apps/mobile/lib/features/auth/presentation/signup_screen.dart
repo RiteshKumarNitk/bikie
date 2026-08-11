@@ -104,19 +104,19 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
     try {
       await ref.read(authControllerProvider.notifier).verifyOtp(phoneNumber: _phoneNumber, code: _otpController.text.trim());
       if (_exists == false) {
-        final role = ref.read(selectedRoleProvider);
-        await ref.read(authRepositoryProvider).completePhoneSignup(role: role);
-        // completePhoneSignup() applies the chosen role server-side (RENTER -> PARTNER), but the
-        // AuthState this app already holds still carries the role from the OTP-verify response a
-        // moment ago (always RENTER for a brand-new account) — refresh it now so app_router.dart's
-        // `isPartner` check (and everything gated on it: Home, bottom nav, /sos/:id) is correct
-        // from the very first frame, instead of showing the Rider experience until the next
-        // restart/re-login.
+        final accountType = ref.read(selectedRoleProvider);
+        await ref.read(authRepositoryProvider).completePhoneSignup(accountType: accountType);
+        // completePhoneSignup() applies the chosen accountType server-side, but the AuthState
+        // this app already holds still carries the value from the OTP-verify response a moment
+        // ago (always the schema default RIDER for a brand-new account) — refresh it now so
+        // app_router.dart's `isPartner` check (and everything gated on it: Home, bottom nav,
+        // /sos/:id) is correct from the very first frame, instead of showing the Rider
+        // experience until the next restart/re-login.
         await ref.read(authControllerProvider.notifier).refreshSession();
         // Brand-new account: collect the same profile details the website gathers post-signup
         // (mirrors web's role-based redirect in apps/web/app/(auth)/signup/page.tsx) — rider
         // profile is skippable, partner profile is not. Existing users never reach this branch.
-        if (mounted) context.go(role == 'PARTNER' ? '/partner-onboarding' : '/onboarding');
+        if (mounted) context.go(accountType == 'SERVICE_PROVIDER' ? '/partner-onboarding' : '/onboarding');
         return;
       }
       if (mounted) context.go('/');
@@ -150,13 +150,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
                 const Center(child: AppLogo(size: 56, glow: true)),
                 const SizedBox(height: 18),
                 Text(
-                  selectedRole == 'PARTNER' ? 'Create your partner account' : 'Create your rider account',
+                  selectedRole == 'SERVICE_PROVIDER' ? 'Create your partner account' : 'Create your rider account',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  selectedRole == 'PARTNER'
+                  selectedRole == 'SERVICE_PROVIDER'
                       ? 'List your bikes, organize rides, and grow your business.'
                       : 'Join the community, book rides, and explore India.',
                   textAlign: TextAlign.center,

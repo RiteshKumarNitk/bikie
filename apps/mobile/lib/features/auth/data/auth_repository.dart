@@ -82,10 +82,12 @@ class AuthRepository {
   /// brand-new phone number's first successful OTP verification, to apply
   /// the role chosen on `/welcome`. Session-authed (the OTP verify call
   /// above already logged the caller in).
-  Future<bool> completePhoneSignup({required String role}) {
+  /// ADR-053 — `accountType` ('RIDER' | 'SERVICE_PROVIDER') is applied server-side only for a
+  /// brand-new account, within a short window of creation (see `UserService.completePhoneSignup`
+  /// on the backend) — this can never become a self-service switch against an existing account.
+  Future<void> completePhoneSignup({required String accountType}) {
     return apiGuard(() async {
-      final res = await _dio.patch('/api/user/complete-phone-signup', data: {'role': role});
-      return res.data['becamePartner'] as bool? ?? false;
+      await _dio.patch('/api/user/complete-phone-signup', data: {'accountType': accountType});
     });
   }
 

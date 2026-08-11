@@ -13,13 +13,23 @@ export async function GET() {
   return NextResponse.json({ profile });
 }
 
-/** ADR-046b — open to any authenticated user (not just approved partners): this is how a
- * Rider *starts* a Service Provider application (first call creates a DRAFT row) and how an
- * existing applicant edits it. Refuses (409) while PENDING_VERIFICATION/APPROVED/SUSPENDED —
- * those need an explicit transition (submit/reapply, or an admin action) first. */
+/** ADR-053 — open to any authenticated `accountType: SERVICE_PROVIDER` account (never membership-
+ * gated — profile creation and operational membership are separate concerns): this is how a
+ * Service Provider *starts* their business profile (first call creates a DRAFT row) and how an
+ * existing applicant edits it. A `RIDER`-accountType account can no longer reach this at all —
+ * changing account type first requires an admin-approved Account Type Change Request
+ * (`/account-type-request`), never a bare API call. Refuses (409) while
+ * PENDING_VERIFICATION/APPROVED/SUSPENDED — those need an explicit transition (submit/reapply, or
+ * an admin action) first. */
 export async function PUT(request: Request) {
   const { session, error } = await requireSession();
   if (error) return error;
+  if (session.user.accountType !== "SERVICE_PROVIDER") {
+    return NextResponse.json(
+      { error: "WRONG_ACCOUNT_TYPE", message: "This requires a Service Provider account." },
+      { status: 403 },
+    );
+  }
 
   const parsed = partnerProfileSchema.safeParse(await request.json());
   if (!parsed.success) {

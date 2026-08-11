@@ -34,6 +34,9 @@ function session(overrides: Partial<SessionSnapshot> = {}): SessionSnapshot {
     role: "RENTER",
     accountStatus: "ACTIVE",
     accountStatusExpiresAt: null,
+    // ADR-053 — matches the schema default. Tests exercising Service Provider capability pass
+    // accountType: "SERVICE_PROVIDER" explicitly so they're honest about what they exercise.
+    accountType: "RIDER",
     ...overrides,
   };
 }
@@ -182,7 +185,9 @@ describe("Service Provider capability, decoupled from verification (ADR-049)", (
 
   it("denies an account with no Partner profile at all", async () => {
     const { access } = createIdentityAccessModule(fakePorts());
-    await expect(access.evaluatePartnerCapability(session({ partnerStatus: null }))).resolves.toEqual({
+    await expect(
+      access.evaluatePartnerCapability(session({ accountType: "SERVICE_PROVIDER", partnerStatus: null })),
+    ).resolves.toEqual({
       allowed: false,
       reason: "PARTNER_NOT_APPROVED",
     });
@@ -192,19 +197,23 @@ describe("Service Provider capability, decoupled from verification (ADR-049)", (
     const { access } = createIdentityAccessModule(
       fakePorts({ partnerMembership: { hasActivePartnerMembership: vi.fn(async () => true) } }),
     );
-    await expect(access.evaluatePartnerCapability(session({ partnerStatus: "SUSPENDED" }))).resolves.toEqual({
+    await expect(
+      access.evaluatePartnerCapability(session({ accountType: "SERVICE_PROVIDER", partnerStatus: "SUSPENDED" })),
+    ).resolves.toEqual({
       allowed: false,
       reason: "PARTNER_NOT_APPROVED",
     });
   });
 
   it.each(["DRAFT", "PENDING_VERIFICATION", "MORE_INFORMATION_REQUIRED", "REJECTED", "APPROVED"])(
-    "grants capability for verificationStatus=%s as long as membership is active — verification is never the gate",
+    "grants capability for verificationStatus=%s as long as accountType is SERVICE_PROVIDER and membership is active — verification is never the gate",
     async (partnerStatus) => {
       const { access } = createIdentityAccessModule(
         fakePorts({ partnerMembership: { hasActivePartnerMembership: vi.fn(async () => true) } }),
       );
-      await expect(access.evaluatePartnerCapability(session({ partnerStatus }))).resolves.toEqual({
+      await expect(
+        access.evaluatePartnerCapability(session({ accountType: "SERVICE_PROVIDER", partnerStatus })),
+      ).resolves.toEqual({
         allowed: true,
       });
     },
@@ -214,7 +223,9 @@ describe("Service Provider capability, decoupled from verification (ADR-049)", (
     const { access } = createIdentityAccessModule(
       fakePorts({ partnerMembership: { hasActivePartnerMembership: vi.fn(async () => false) } }),
     );
-    await expect(access.evaluatePartnerCapability(session({ partnerStatus: "DRAFT" }))).resolves.toEqual({
+    await expect(
+      access.evaluatePartnerCapability(session({ accountType: "SERVICE_PROVIDER", partnerStatus: "DRAFT" })),
+    ).resolves.toEqual({
       allowed: false,
       reason: "MEMBERSHIP_REQUIRED",
     });
@@ -226,7 +237,9 @@ describe("Service Provider capability, decoupled from verification (ADR-049)", (
     const { access } = createIdentityAccessModule(
       fakePorts({ membership: { hasActiveMembership }, partnerMembership: { hasActivePartnerMembership } }),
     );
-    await expect(access.evaluatePartnerCapability(session({ partnerStatus: "APPROVED" }))).resolves.toEqual({
+    await expect(
+      access.evaluatePartnerCapability(session({ accountType: "SERVICE_PROVIDER", partnerStatus: "APPROVED" })),
+    ).resolves.toEqual({
       allowed: false,
       reason: "MEMBERSHIP_REQUIRED",
     });
@@ -234,23 +247,79 @@ describe("Service Provider capability, decoupled from verification (ADR-049)", (
     expect(hasActiveMembership).not.toHaveBeenCalled();
   });
 
+  describe("accountType gates first (ADR-053)", () => {
+    it("denies WRONG_ACCOUNT_TYPE for a RIDER account regardless of partnerStatus/membership", async () => {
+      const { access } = createIdentityAccessModule(
+        fakePorts({ partnerMembership: { hasActivePartnerMembership: vi.fn(async () => true) } }),
+      );
+      // A historical Partner profile from a prior stint must not grant capability once the
+      // account is back to RIDER — accountType is checked before partnerStatus/membership.
+      await expect(
+        access.evaluatePartnerCapability(session({ accountType: "RIDER", partnerStatus: "APPROVED" })),
+      ).resolves.toEqual({ allowed: false, reason: "WRONG_ACCOUNT_TYPE" });
+    });
+
+    it("hasPartnerCapabilitySync is also false for a RIDER account with a historical profile", () => {
+      const { access } = createIdentityAccessModule(fakePorts());
+      expect(
+        access.hasPartnerCapabilitySync(session({ accountType: "RIDER", partnerStatus: "APPROVED" })),
+      ).toBe(false);
+    });
+  });
+
   describe("hasPartnerCapabilitySync (cheap, session-only, for UI mode-routing)", () => {
     const { access } = createIdentityAccessModule(fakePorts());
 
     it("is false with no session, a restricted account, no profile, or SUSPENDED", () => {
       expect(access.hasPartnerCapabilitySync(null)).toBe(false);
-      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "APPROVED", accountStatus: "BANNED" }))).toBe(
-        false,
-      );
-      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: null }))).toBe(false);
-      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "SUSPENDED" }))).toBe(false);
+      expect(
+        access.hasPartnerCapabilitySync(
+          session({ accountType: "SERVICE_PROVIDER", partnerStatus: "APPROVED", accountStatus: "BANNED" }),
+        ),
+      ).toBe(false);
+      expect(
+        access.hasPartnerCapabilitySync(session({ accountType: "SERVICE_PROVIDER", partnerStatus: null })),
+      ).toBe(false);
+      expect(
+        access.hasPartnerCapabilitySync(session({ accountType: "SERVICE_PROVIDER", partnerStatus: "SUSPENDED" })),
+      ).toBe(false);
     });
 
-    it("is true for any non-null, non-SUSPENDED profile — no membership lookup involved", () => {
-      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "DRAFT" }))).toBe(true);
-      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "PENDING_VERIFICATION" }))).toBe(true);
-      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "REJECTED" }))).toBe(true);
-      expect(access.hasPartnerCapabilitySync(session({ partnerStatus: "APPROVED" }))).toBe(true);
+    it("is true for any non-null, non-SUSPENDED profile on a SERVICE_PROVIDER account — no membership lookup involved", () => {
+      expect(
+        access.hasPartnerCapabilitySync(session({ accountType: "SERVICE_PROVIDER", partnerStatus: "DRAFT" })),
+      ).toBe(true);
+      expect(
+        access.hasPartnerCapabilitySync(
+          session({ accountType: "SERVICE_PROVIDER", partnerStatus: "PENDING_VERIFICATION" }),
+        ),
+      ).toBe(true);
+      expect(
+        access.hasPartnerCapabilitySync(session({ accountType: "SERVICE_PROVIDER", partnerStatus: "REJECTED" })),
+      ).toBe(true);
+      expect(
+        access.hasPartnerCapabilitySync(session({ accountType: "SERVICE_PROVIDER", partnerStatus: "APPROVED" })),
+      ).toBe(true);
+    });
+  });
+});
+
+describe("account type mismatch detection (ADR-053)", () => {
+  it("detectAccountTypeMismatch reports a match or a mismatch with both types", () => {
+    const { accountType } = createIdentityAccessModule(fakePorts());
+    expect(accountType.detectAccountTypeMismatch({ accountType: "RIDER" }, "RIDER")).toEqual({
+      matches: true,
+    });
+    expect(accountType.detectAccountTypeMismatch({ accountType: "RIDER" }, "SERVICE_PROVIDER")).toEqual({
+      matches: false,
+      currentType: "RIDER",
+      requestedType: "SERVICE_PROVIDER",
+    });
+    // No accountType on the session at all defaults to RIDER, matching the schema default.
+    expect(accountType.detectAccountTypeMismatch({}, "SERVICE_PROVIDER")).toEqual({
+      matches: false,
+      currentType: "RIDER",
+      requestedType: "SERVICE_PROVIDER",
     });
   });
 });

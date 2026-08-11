@@ -27,3 +27,4 @@ export * as userRepository from "./repositories/user.repository";
 export * as riderLocationRepository from "./repositories/rider-location.repository";
 export * as pushSubscriptionRepository from "./repositories/push-subscription.repository";
 export * as reputationRepository from "./repositories/reputation.repository";
+export * as accountTypeRequestRepository from "./repositories/account-type-request.repository";

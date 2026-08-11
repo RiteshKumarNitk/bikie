@@ -315,19 +315,20 @@ void main() {
   });
 
   group('AuthRepository.completePhoneSignup', () {
-    test('PATCHes the chosen role and returns becamePartner', () async {
+    test('PATCHes the chosen accountType', () async {
       when(() => dio.patch(any(), data: any(named: 'data'))).thenAnswer(
         (_) async => Response(
           requestOptions: RequestOptions(path: '/api/user/complete-phone-signup'),
           statusCode: 200,
-          data: {'success': true, 'becamePartner': true},
+          data: {'success': true},
         ),
       );
 
-      final becamePartner = await repository.completePhoneSignup(role: 'PARTNER');
+      await repository.completePhoneSignup(accountType: 'SERVICE_PROVIDER');
 
-      expect(becamePartner, isTrue);
-      verify(() => dio.patch('/api/user/complete-phone-signup', data: {'role': 'PARTNER'})).called(1);
+      verify(
+        () => dio.patch('/api/user/complete-phone-signup', data: {'accountType': 'SERVICE_PROVIDER'}),
+      ).called(1);
     });
   });
 

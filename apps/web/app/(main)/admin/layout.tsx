@@ -21,6 +21,7 @@ const navGroups = [
     items: [
       { label: "SOS", href: "/admin/sos" },
       { label: "Moderation", href: "/admin/moderation" },
+      { label: "Account Type Requests", href: "/admin/account-type-requests" },
     ],
   },
   {

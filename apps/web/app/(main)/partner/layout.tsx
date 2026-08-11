@@ -18,11 +18,20 @@ const navItems = [
 
 export default async function PartnerLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession();
-  // ADR-046b/ADR-049 — capability gate, not a role check and not a verification check: any
-  // account with an active (non-SUSPENDED) Service Provider profile reaches this dashboard,
-  // regardless of `role` or verification status — mirrors middleware.ts's own gate exactly.
-  const partnerStatus = session?.user.partnerStatus;
-  if (!session || partnerStatus == null || partnerStatus === "SUSPENDED") redirect("/login?next=/partner");
+  if (!session) redirect("/login?next=/partner");
+
+  // ADR-053 — accountType is the first, hard gate: a RIDER-accountType account never reaches
+  // this dashboard at all, regardless of any historical Partner profile.
+  if (session.user.accountType !== "SERVICE_PROVIDER") redirect("/dashboard");
+
+  // ADR-046b/ADR-049 — capability gate: any SERVICE_PROVIDER-accountType account with an active
+  // (non-SUSPENDED) profile reaches this dashboard, regardless of verification status — mirrors
+  // middleware.ts's own gate exactly. `partnerStatus == null` (a freshly-approved Account Type
+  // Change Request, no profile created yet) goes to onboarding instead of a dead-end login
+  // redirect.
+  const partnerStatus = session.user.partnerStatus;
+  if (partnerStatus == null) redirect("/partner-onboarding");
+  if (partnerStatus === "SUSPENDED") redirect("/login?next=/partner");
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-10">

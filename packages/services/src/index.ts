@@ -11,6 +11,7 @@ export { AdminService } from "./admin.service";
 export { MessageService } from "./message.service";
 export { MembershipService } from "./membership.service";
 export { PartnerMembershipService } from "./partner-membership.service";
+export { AccountTypeRequestService } from "./account-type-request.service";
 export { RazorpayService } from "./razorpay.service";
 export { SOSService } from "./sos.service";
 export { SOSDispatchService } from "./sos-dispatch.service";
@@ -66,12 +67,16 @@ export {
   hasRole,
   isAccountRestricted,
   isAdmin,
+  isServiceProviderAccountType,
   permissionsForRole,
   ROLES,
+  ACCOUNT_TYPES,
 } from "./modules/identity-access/public";
 export type {
   AccessDecision,
   AccessDenialReason,
+  AccountType,
+  AccountTypeMismatch,
   IdentityAccessModule,
   IdentityAccessPorts,
   Permission,

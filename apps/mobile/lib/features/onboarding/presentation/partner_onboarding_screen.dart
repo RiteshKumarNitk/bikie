@@ -64,6 +64,16 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
   @override
   void initState() {
     super.initState();
+    // ADR-053 — this form is Service-Provider-accountType only now; a Rider landing here
+    // (stale deep link, back button) is sent to request a change instead of filling out a form
+    // that would 400 on submit (`PUT /api/partner/profile` is gated the same way server-side).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final user = ref.read(authControllerProvider).user;
+      if (user != null && user.accountType != 'SERVICE_PROVIDER') {
+        context.go('/account-type-request');
+      }
+    });
     final profile = widget.initialProfile;
     if (profile != null) {
       _businessName.text = profile.businessName;

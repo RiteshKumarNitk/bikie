@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
-import { SELECTED_ROLE_COOKIE } from "@/lib/role";
+import { SELECTED_ROLE_COOKIE, type SelectedRole } from "@/lib/role";
 import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { useMsg91Widget } from "@/lib/use-msg91-widget";
@@ -15,9 +15,9 @@ const inputClassName =
 
 const NO_ACCOUNT = "NO_ACCOUNT";
 
-function readSelectedRoleCookie(): "RIDER" | "PARTNER" {
+function readSelectedRoleCookie(): SelectedRole {
   const match = document.cookie.match(new RegExp(`(?:^|; )${SELECTED_ROLE_COOKIE}=([^;]*)`));
-  return match?.[1] === "PARTNER" ? "PARTNER" : "RIDER";
+  return match?.[1] === "SERVICE_PROVIDER" ? "SERVICE_PROVIDER" : "RIDER";
 }
 
 export default function LoginPage() {
@@ -27,9 +27,10 @@ export default function LoginPage() {
   // to sign in as admin. Better Auth's emailAndPassword sign-in was never disabled server-side
   // (packages/auth/src/server.ts), this just restores a UI path to it.
   const [mode, setMode] = useState<"phone" | "email">("phone");
-  const [step, setStep] = useState<"phone" | "otp">("phone");
+  const [step, setStep] = useState<"phone" | "otp" | "mismatch">("phone");
   const [serverError, setServerError] = useState<string | null>(null);
-  const [selectedRole, setSelectedRole] = useState<"RIDER" | "PARTNER">("RIDER");
+  const [selectedRole, setSelectedRole] = useState<SelectedRole>("RIDER");
+  const [mismatch, setMismatch] = useState<{ currentType: SelectedRole; requestedType: SelectedRole } | null>(null);
 
   useEffect(() => {
     setSelectedRole(readSelectedRoleCookie());
@@ -107,20 +108,20 @@ export default function LoginPage() {
         return;
       }
 
+      // ADR-053: never sign the account back out here — its real accountType is whatever it
+      // already is, this only decides which message/redirect to show.
       const { data: sessionData } = await authClient.getSession();
-      if (selectedRole === "PARTNER") {
-        const partnerStatus = (sessionData?.user as any)?.partnerStatus;
-        if (partnerStatus == null || partnerStatus === "SUSPENDED") {
-          await authClient.signOut();
-          setServerError("You are a rider. Login as a rider. Change the role.");
-          return;
-        }
+      const currentType: SelectedRole = sessionData?.user.accountType === "SERVICE_PROVIDER" ? "SERVICE_PROVIDER" : "RIDER";
+      if (currentType !== selectedRole) {
+        setMismatch({ currentType, requestedType: selectedRole });
+        setStep("mismatch");
+        return;
       }
 
       // Redirect to the originally requested page (if any) or the appropriate dashboard based on selected role
       const urlParams = new URLSearchParams(window.location.search);
       const nextUrl = urlParams.get("next");
-      window.location.href = nextUrl || (selectedRole === "PARTNER" ? "/partner" : "/dashboard");
+      window.location.href = nextUrl || (currentType === "SERVICE_PROVIDER" ? "/partner" : "/dashboard");
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Invalid or expired code. Please try again.");
     } finally {
@@ -139,19 +140,19 @@ export default function LoginPage() {
         return;
       }
 
+      // ADR-053: never sign the account back out here — its real accountType is whatever it
+      // already is, this only decides which message/redirect to show.
       const { data: sessionData } = await authClient.getSession();
-      if (selectedRole === "PARTNER") {
-        const partnerStatus = (sessionData?.user as any)?.partnerStatus;
-        if (partnerStatus == null || partnerStatus === "SUSPENDED") {
-          await authClient.signOut();
-          setServerError("You are a rider. Login as a rider. Change the role.");
-          return;
-        }
+      const currentType: SelectedRole = sessionData?.user.accountType === "SERVICE_PROVIDER" ? "SERVICE_PROVIDER" : "RIDER";
+      if (currentType !== selectedRole) {
+        setMismatch({ currentType, requestedType: selectedRole });
+        setStep("mismatch");
+        return;
       }
 
       const urlParams = new URLSearchParams(window.location.search);
       const nextUrl = urlParams.get("next");
-      window.location.href = nextUrl || (selectedRole === "PARTNER" ? "/partner" : "/dashboard");
+      window.location.href = nextUrl || (currentType === "SERVICE_PROVIDER" ? "/partner" : "/dashboard");
     } catch {
       setServerError("Something went wrong. Please try again.");
     } finally {
@@ -168,15 +169,15 @@ export default function LoginPage() {
         </Link>
         <div className="max-w-md">
           <h1 className="font-display text-4xl font-bold leading-tight text-white">
-            {selectedRole === "PARTNER" ? "Manage your business." : "Welcome back to the ride."}
+            {selectedRole === "SERVICE_PROVIDER" ? "Manage your business." : "Welcome back to the ride."}
           </h1>
           <p className="mt-4 text-lg text-white/60 leading-relaxed">
-            {selectedRole === "PARTNER"
+            {selectedRole === "SERVICE_PROVIDER"
               ? "Access your dashboard, manage your fleet, and oversee bookings — all from your partner account."
               : "Access your dashboard, manage bookings, or plan your next trip — all from one account."}
           </p>
           <div className="mt-8 flex gap-3">
-            {(selectedRole === "PARTNER" ? ["🔧", "📊", "🤝"] : ["🏍️", "🌄", "🛣️"]).map((emoji, i) => (
+            {(selectedRole === "SERVICE_PROVIDER" ? ["🔧", "📊", "🤝"] : ["🏍️", "🌄", "🛣️"]).map((emoji, i) => (
               <span key={i} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/5 text-xl backdrop-blur-sm">
                 {emoji}
               </span>
@@ -201,12 +202,14 @@ export default function LoginPage() {
             </Link>
           </div>
 
-          <div className="mt-8 lg:mt-0">
-            <h2 className="font-display text-2xl font-semibold">
-              {selectedRole === "PARTNER" ? "Sign in to Service Provider" : "Sign in to Rider"}
-            </h2>
-            <p className="mt-1 text-sm text-foreground/50">Log in to your account</p>
-          </div>
+          {step !== "mismatch" && (
+            <div className="mt-8 lg:mt-0">
+              <h2 className="font-display text-2xl font-semibold">
+                {selectedRole === "SERVICE_PROVIDER" ? "Sign in to Service Provider" : "Sign in to Rider"}
+              </h2>
+              <p className="mt-1 text-sm text-foreground/50">Log in to your account</p>
+            </div>
+          )}
 
           {mode === "phone" && step === "phone" && (
             <p className="mt-4">
@@ -371,7 +374,41 @@ export default function LoginPage() {
             </form>
           )}
 
-          {mode === "phone" && (
+          {step === "mismatch" && mismatch && (
+            <div className="mt-8 lg:mt-0 space-y-4">
+              <h2 className="font-display text-2xl font-semibold">
+                Already registered as {mismatch.currentType === "SERVICE_PROVIDER" ? "a Service Provider" : "a Rider"}
+              </h2>
+              <p className="text-sm text-foreground/60">
+                This mobile number is already registered with BIKIE as{" "}
+                {mismatch.currentType === "SERVICE_PROVIDER" ? "a Service Provider" : "a Rider"}. Did you select{" "}
+                {mismatch.requestedType === "SERVICE_PROVIDER" ? "Service Provider" : "Rider"} by mistake?
+              </p>
+              <div className="space-y-3 pt-2">
+                <Button
+                  type="button"
+                  className="w-full"
+                  size="lg"
+                  onClick={() => {
+                    const urlParams = new URLSearchParams(window.location.search);
+                    const nextUrl = urlParams.get("next");
+                    window.location.href =
+                      nextUrl || (mismatch.currentType === "SERVICE_PROVIDER" ? "/partner" : "/dashboard");
+                  }}
+                >
+                  Continue as {mismatch.currentType === "SERVICE_PROVIDER" ? "Service Provider" : "Rider"}
+                </Button>
+                <Link
+                  href="/account-type-request"
+                  className="block w-full rounded-full border border-foreground/15 px-5 py-2.5 text-center text-sm font-medium hover:bg-foreground/5 transition-colors"
+                >
+                  Contact Support to change account type
+                </Link>
+              </div>
+            </div>
+          )}
+
+          {mode === "phone" && step !== "mismatch" && (
             <p className="mt-6 text-center text-sm text-foreground/50">
               Don&apos;t have an account?{" "}
               <Link href="/signup" className="font-medium text-accent-text hover:text-accent-hover">

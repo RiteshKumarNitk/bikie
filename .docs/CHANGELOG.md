@@ -1,5 +1,25 @@
 # BIKIE Changelog
 
+## 2026-08-11 — Rider/Service Provider account type: mutually exclusive, admin-approved changes (ADR-053)
+
+Replaced the "dual capability" model (one account could be Rider + Service Provider at the same
+time, switchable via a client-routing cookie) with a single, server-authoritative `accountType`
+chosen once at registration. Changing it now requires an admin-approved "Account Type Change
+Request" — never a self-service switch, never a bare API call. This traces back to a real bug:
+picking "Service Provider" at signup with a phone number that already had a Rider account
+silently dropped the choice and logged into the Rider account instead, with zero explanation;
+`/login` had the opposite bug, force-signing the user out. Both are fixed — a mismatch now shows
+"Continue as X / Contact Support to change account type."
+
+New: `AccountTypeChangeRequest` model + full request/review workflow (`/account-type-request`
+web page and mobile screen to submit; `/admin/account-type-requests` list + detail page to
+approve/reject/request-more-info, with `AuditLog` + applicant notification on every decision).
+Closed a real gap found while wiring this up: `PUT /api/partner/profile` was session-only, so any
+Rider could bypass the whole request/approval system by calling it directly — now gated on
+`accountType`. Also fixed a real regression caught during the work: `middleware.ts` briefly
+imported from `@bikie/services`, pulling Node-only code into the Edge Middleware bundle — fixed
+by inlining the check. Full details in DECISIONS.md ADR-053.
+
 ## 2026-08-11 — Background-processing audit: cron jobs now claim before they act (ADR-052)
 
 Audited every `/api/cron/*` route, `vercel.json`, SOS escalation/dispatch/session logic, and

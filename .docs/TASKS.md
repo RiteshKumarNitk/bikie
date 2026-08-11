@@ -2,6 +2,34 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Rider/Service Provider `accountType`: mutually exclusive, admin-approved change requests (2026-08-11, ADR-053)
+
+Replaced the dual-capability model (ADR-046b–051, one account could be Rider + Service Provider
+simultaneously via a client-routing cookie) with a single, server-authoritative, mutually
+exclusive `accountType`, chosen once at registration and changed only through an admin-reviewed
+"Account Type Change Request" — never a self-service switch. Traces back to a real bug: picking
+"Service Provider" at signup with a phone number that already had a Rider account silently
+dropped the choice and logged into the Rider account instead.
+
+| Task | Status |
+|---|---|
+| Schema: `AccountType` enum + `User.accountType` (`@default(RIDER)`), migration `20260811130000_account_type_model` backfilling every existing account from the old `resolveActiveMode` formula — zero behavior change on deploy day | Completed |
+| `evaluatePartnerCapability`/`hasPartnerCapabilitySync` (identity-access) gate on `accountType === SERVICE_PROVIDER` first, before `partnerStatus`/membership | Completed |
+| `AccountTypeChangeRequest` model + `AccountTypeChangeRequestStatus` enum, migration `20260811140000_account_type_change_request`; repository (`accountTypeRequestRepository`) + facade service (`AccountTypeRequestService`) — approval atomically flips `User.accountType` in the same transaction as the request's own status | Completed |
+| `POST /api/account-type-requests` (submit, one open request per user), `GET /api/account-type-requests` (mine), `GET/PATCH /api/admin/account-type-requests(/[id])` (admin list + decide), `AuditLog` on every admin decision (`logAdminAction`), notification to the applicant on every decision | Completed |
+| Web `/account-type-request` page + mobile `AccountTypeRequestScreen`, reachable from Profile → Help & Support | Completed |
+| Admin `/admin/account-type-requests` list + `/admin/account-type-requests/[id]` detail/decision UI, mirroring `/admin/partners/[id]`'s existing pattern; new nav entry under Safety | Completed |
+| `PATCH /api/user/complete-phone-signup` applies `accountType` only within a 10-minute account-age window (`SIGNUP_WINDOW_MS`) — closes the gap where this endpoint could otherwise become a delayed self-service switch | Completed |
+| `/signup` and `/login` (web) + `login_screen.dart` (mobile): mismatch between selected role and the account's real `accountType` shows "Continue as X / Contact Support," never silently discarded (old `/signup` bug) or force-signed-out (old `/login` bug) | Completed |
+| Closed a real consistency gap found while wiring this up: `PUT /api/partner/profile` was session-only (any Rider could call it directly and bypass the whole request/approval system) — now gated on `accountType`. `/partner-onboarding` (both platforms) and `/partner/layout.tsx` gained matching guards; the freshly-approved-but-no-profile-yet edge case routes to onboarding instead of a dead-end login redirect | Completed |
+| Old self-service `/dashboard/become-provider` (web) / `/become-provider` (mobile) — premise no longer holds — turned into thin redirects for stale links, not deleted outright | Completed |
+| Navigation (`middleware.ts`, `Navbar.tsx`, `role_provider.dart`, `app_shell.dart`, `app_router.dart`) reads `accountType` directly; `resolveActiveMode`/`switchActiveMode`/the `activeMode` device preference/`SwitchModeResult` deleted outright (no "mode" left to resolve once accountType is single-valued) | Completed |
+| Fixed a real regression caught during this work: `middleware.ts` importing from `@bikie/services`' barrel pulled Node-only code (message-crypto, razorpay) into the Edge Middleware bundle — fixed by inlining the one-line `accountType` check directly in `middleware.ts` | Completed |
+| New tests: `AccountTypeRequestService` (submit/review logic, 6 cases), `POST/GET /api/account-type-requests` route auth+behavior (6 cases), `evaluatePartnerCapability`'s `WRONG_ACCOUNT_TYPE` gate (identity-access) | Completed |
+| Verified: `pnpm exec vitest run` (199/199, 18 files), `apps/web` `tsc --noEmit` + `next build` clean, `flutter analyze` (0 issues), `flutter test` (112/112). `pnpm openapi:generate` re-run (139 → 142 routes) | Completed |
+| Live end-to-end walkthrough (signup mismatch, submit a request, admin approve/reject, both platforms) | **Not done** — not verifiable in this environment, same caveat as every prior change |
+| Bulk migration tool for admins to correct many misregistered accounts at once | **Not built** — not requested; every case so far is a single-user correction through the request flow |
+
 ## Background-processing audit: cron idempotency hardening (2026-08-11, ADR-052)
 
 Full audit of every `/api/cron/*` route, `vercel.json`, SOS escalation/dispatch/session/offer

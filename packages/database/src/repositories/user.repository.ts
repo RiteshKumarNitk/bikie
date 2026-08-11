@@ -17,10 +17,15 @@ export async function syncPartnerStatus(userId: string, status: string | null) {
   await prisma.user.update({ where: { id: userId }, data: { partnerStatus: status as any } });
 }
 
+/** ADR-053 — the one write path for `User.accountType`. */
+export async function setAccountType(userId: string, accountType: "RIDER" | "SERVICE_PROVIDER") {
+  await prisma.user.update({ where: { id: userId }, data: { accountType } });
+}
+
 export async function findById(userId: string) {
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, name: true, phoneNumber: true, role: true },
+    select: { id: true, name: true, phoneNumber: true, role: true, accountType: true, createdAt: true },
   });
 }
 

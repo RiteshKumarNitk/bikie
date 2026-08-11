@@ -17,3 +17,4 @@ export * from "./partner.schema";
 export * from "./rider-location.schema";
 export * from "./places.schema";
 export * from "./push-subscription.schema";
+export * from "./account-type-request.schema";

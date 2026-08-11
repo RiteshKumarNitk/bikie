@@ -1,4 +1,5 @@
 export * from "./bike";
+export * from "./account-type-request";
 export * from "./destination";
 export * from "./category";
 export * from "./testimonial";

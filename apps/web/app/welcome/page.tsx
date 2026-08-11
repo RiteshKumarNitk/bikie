@@ -28,7 +28,7 @@ export default async function WelcomePage({
 
   async function choosePartner() {
     "use server";
-    await selectRole("PARTNER", next);
+    await selectRole("SERVICE_PROVIDER", next);
   }
 
   return (
