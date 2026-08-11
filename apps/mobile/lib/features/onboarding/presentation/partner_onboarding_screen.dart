@@ -83,6 +83,17 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
     }
   }
 
+  String _verificationLabel(String? status) {
+    switch (status) {
+      case 'APPROVED':
+        return 'Verification status: ✓ Verified';
+      case 'PENDING_VERIFICATION':
+        return 'Verification status: pending';
+      default:
+        return 'Verification status: unverified (fully operational)';
+    }
+  }
+
   @override
   void dispose() {
     for (final c in [
@@ -181,8 +192,11 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
               ),
               if (_isEditMode && widget.initialProfile != null) ...[
                 const SizedBox(height: 8),
+                // FINAL PRODUCT MODEL — verification is a separate trust badge: APPROVED =
+                // Verified, PENDING_VERIFICATION = pending, everything else = unverified (but
+                // fully operational).
                 Text(
-                  widget.initialProfile!.isVerified ? 'Verification status: Verified' : 'Verification status: Pending',
+                  _verificationLabel(widget.initialProfile!.verificationStatus),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],

@@ -28,14 +28,16 @@ export function createPartnerDashboardApplication(
   const reputation = deps.reputation ?? getReputationModule().reputation;
 
   /** A partner only ever sees requests they're actually eligible to respond to — offline or
-   * unverified partners get an empty list, not an error, since this also backs the dashboard's
-   * best-effort "activeRequests" count. */
+   * admin-SUSPENDED partners get an empty list, not an error, since this also backs the
+   * dashboard's best-effort "activeRequests" count. Verification is deliberately NOT a filter
+   * (FINAL PRODUCT MODEL): unverified providers operate the platform and can accept assistance
+   * requests; only a SUSPENDED profile loses the capability. */
   async function listNearbyOpenRequests(
     userId: string,
     location: { latitude: number; longitude: number },
   ): Promise<PartnerNearbyRequestDTO[]> {
     const partner = await ports.partnerDispatch.getEligibilityFields(userId);
-    if (!partner?.isVerified || !partner.isAvailable) return [];
+    if (!partner || partner.verificationStatus === "SUSPENDED" || !partner.isAvailable) return [];
 
     const open = await ports.sosAlerts.getOpenAlertsNearPoint(
       location.latitude,

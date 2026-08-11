@@ -37,6 +37,10 @@ mixin _$PartnerProfileInput {
   String? get governmentIdType =>
       throw _privateConstructorUsedError; // "AADHAAR" | "PASSPORT"
   String? get governmentIdNumber =>
+      throw _privateConstructorUsedError; // --- §6 (OPERATIONS) ---
+  String? get workingHours => throw _privateConstructorUsedError;
+  int? get serviceRadiusKm => throw _privateConstructorUsedError;
+  int? get yearsOfExperience =>
       throw _privateConstructorUsedError; // --- ADR-044 ---
   bool? get isGeneralResponder => throw _privateConstructorUsedError;
 
@@ -73,6 +77,9 @@ abstract class $PartnerProfileInputCopyWith<$Res> {
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    String? workingHours,
+    int? serviceRadiusKm,
+    int? yearsOfExperience,
     bool? isGeneralResponder,
   });
 }
@@ -107,6 +114,9 @@ class _$PartnerProfileInputCopyWithImpl<$Res, $Val extends PartnerProfileInput>
     Object? longitude = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
+    Object? workingHours = freezed,
+    Object? serviceRadiusKm = freezed,
+    Object? yearsOfExperience = freezed,
     Object? isGeneralResponder = freezed,
   }) {
     return _then(
@@ -171,6 +181,18 @@ class _$PartnerProfileInputCopyWithImpl<$Res, $Val extends PartnerProfileInput>
                 ? _value.governmentIdNumber
                 : governmentIdNumber // ignore: cast_nullable_to_non_nullable
                       as String?,
+            workingHours: freezed == workingHours
+                ? _value.workingHours
+                : workingHours // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            serviceRadiusKm: freezed == serviceRadiusKm
+                ? _value.serviceRadiusKm
+                : serviceRadiusKm // ignore: cast_nullable_to_non_nullable
+                      as int?,
+            yearsOfExperience: freezed == yearsOfExperience
+                ? _value.yearsOfExperience
+                : yearsOfExperience // ignore: cast_nullable_to_non_nullable
+                      as int?,
             isGeneralResponder: freezed == isGeneralResponder
                 ? _value.isGeneralResponder
                 : isGeneralResponder // ignore: cast_nullable_to_non_nullable
@@ -206,6 +228,9 @@ abstract class _$$PartnerProfileInputImplCopyWith<$Res>
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    String? workingHours,
+    int? serviceRadiusKm,
+    int? yearsOfExperience,
     bool? isGeneralResponder,
   });
 }
@@ -239,6 +264,9 @@ class __$$PartnerProfileInputImplCopyWithImpl<$Res>
     Object? longitude = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
+    Object? workingHours = freezed,
+    Object? serviceRadiusKm = freezed,
+    Object? yearsOfExperience = freezed,
     Object? isGeneralResponder = freezed,
   }) {
     return _then(
@@ -303,6 +331,18 @@ class __$$PartnerProfileInputImplCopyWithImpl<$Res>
             ? _value.governmentIdNumber
             : governmentIdNumber // ignore: cast_nullable_to_non_nullable
                   as String?,
+        workingHours: freezed == workingHours
+            ? _value.workingHours
+            : workingHours // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        serviceRadiusKm: freezed == serviceRadiusKm
+            ? _value.serviceRadiusKm
+            : serviceRadiusKm // ignore: cast_nullable_to_non_nullable
+                  as int?,
+        yearsOfExperience: freezed == yearsOfExperience
+            ? _value.yearsOfExperience
+            : yearsOfExperience // ignore: cast_nullable_to_non_nullable
+                  as int?,
         isGeneralResponder: freezed == isGeneralResponder
             ? _value.isGeneralResponder
             : isGeneralResponder // ignore: cast_nullable_to_non_nullable
@@ -331,6 +371,9 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
     this.longitude,
     this.governmentIdType,
     this.governmentIdNumber,
+    this.workingHours,
+    this.serviceRadiusKm,
+    this.yearsOfExperience,
     this.isGeneralResponder,
   });
 
@@ -368,13 +411,20 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
   // "AADHAAR" | "PASSPORT"
   @override
   final String? governmentIdNumber;
+  // --- §6 (OPERATIONS) ---
+  @override
+  final String? workingHours;
+  @override
+  final int? serviceRadiusKm;
+  @override
+  final int? yearsOfExperience;
   // --- ADR-044 ---
   @override
   final bool? isGeneralResponder;
 
   @override
   String toString() {
-    return 'PartnerProfileInput(businessName: $businessName, type: $type, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, isGeneralResponder: $isGeneralResponder)';
+    return 'PartnerProfileInput(businessName: $businessName, type: $type, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, workingHours: $workingHours, serviceRadiusKm: $serviceRadiusKm, yearsOfExperience: $yearsOfExperience, isGeneralResponder: $isGeneralResponder)';
   }
 
   @override
@@ -408,13 +458,19 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
                 other.governmentIdType == governmentIdType) &&
             (identical(other.governmentIdNumber, governmentIdNumber) ||
                 other.governmentIdNumber == governmentIdNumber) &&
+            (identical(other.workingHours, workingHours) ||
+                other.workingHours == workingHours) &&
+            (identical(other.serviceRadiusKm, serviceRadiusKm) ||
+                other.serviceRadiusKm == serviceRadiusKm) &&
+            (identical(other.yearsOfExperience, yearsOfExperience) ||
+                other.yearsOfExperience == yearsOfExperience) &&
             (identical(other.isGeneralResponder, isGeneralResponder) ||
                 other.isGeneralResponder == isGeneralResponder));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(
+  int get hashCode => Object.hashAll([
     runtimeType,
     businessName,
     type,
@@ -431,8 +487,11 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
     longitude,
     governmentIdType,
     governmentIdNumber,
+    workingHours,
+    serviceRadiusKm,
+    yearsOfExperience,
     isGeneralResponder,
-  );
+  ]);
 
   /// Create a copy of PartnerProfileInput
   /// with the given fields replaced by the non-null parameter values.
@@ -468,6 +527,9 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
     final double? longitude,
     final String? governmentIdType,
     final String? governmentIdNumber,
+    final String? workingHours,
+    final int? serviceRadiusKm,
+    final int? yearsOfExperience,
     final bool? isGeneralResponder,
   }) = _$PartnerProfileInputImpl;
 
@@ -503,7 +565,13 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
   @override
   String? get governmentIdType; // "AADHAAR" | "PASSPORT"
   @override
-  String? get governmentIdNumber; // --- ADR-044 ---
+  String? get governmentIdNumber; // --- §6 (OPERATIONS) ---
+  @override
+  String? get workingHours;
+  @override
+  int? get serviceRadiusKm;
+  @override
+  int? get yearsOfExperience; // --- ADR-044 ---
   @override
   bool? get isGeneralResponder;
 
@@ -541,6 +609,10 @@ mixin _$PartnerProfileSummary {
   double? get longitude => throw _privateConstructorUsedError;
   String? get governmentIdType => throw _privateConstructorUsedError;
   String? get governmentIdNumber =>
+      throw _privateConstructorUsedError; // --- §6 (OPERATIONS) ---
+  String? get workingHours => throw _privateConstructorUsedError;
+  int? get serviceRadiusKm => throw _privateConstructorUsedError;
+  int? get yearsOfExperience =>
       throw _privateConstructorUsedError; // --- ADR-046b: application/verification state ---
   String? get verificationStatus => throw _privateConstructorUsedError;
   String? get rejectionReason => throw _privateConstructorUsedError;
@@ -550,7 +622,10 @@ mixin _$PartnerProfileSummary {
   String? get profilePhotoUrl => throw _privateConstructorUsedError;
   List<String> get shopPhotoUrls => throw _privateConstructorUsedError;
   String? get identityDocumentUrl => throw _privateConstructorUsedError;
-  String? get businessDocumentUrl => throw _privateConstructorUsedError;
+  String? get businessDocumentUrl =>
+      throw _privateConstructorUsedError; // --- §25 - aggregates for the discovery card and reviews section ---
+  double get ratingAvg => throw _privateConstructorUsedError;
+  int get ratingCount => throw _privateConstructorUsedError;
 
   /// Serializes this PartnerProfileSummary to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -588,6 +663,9 @@ abstract class $PartnerProfileSummaryCopyWith<$Res> {
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    String? workingHours,
+    int? serviceRadiusKm,
+    int? yearsOfExperience,
     String? verificationStatus,
     String? rejectionReason,
     String? reviewNote,
@@ -597,6 +675,8 @@ abstract class $PartnerProfileSummaryCopyWith<$Res> {
     List<String> shopPhotoUrls,
     String? identityDocumentUrl,
     String? businessDocumentUrl,
+    double ratingAvg,
+    int ratingCount,
   });
 }
 
@@ -636,6 +716,9 @@ class _$PartnerProfileSummaryCopyWithImpl<
     Object? longitude = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
+    Object? workingHours = freezed,
+    Object? serviceRadiusKm = freezed,
+    Object? yearsOfExperience = freezed,
     Object? verificationStatus = freezed,
     Object? rejectionReason = freezed,
     Object? reviewNote = freezed,
@@ -645,6 +728,8 @@ class _$PartnerProfileSummaryCopyWithImpl<
     Object? shopPhotoUrls = null,
     Object? identityDocumentUrl = freezed,
     Object? businessDocumentUrl = freezed,
+    Object? ratingAvg = null,
+    Object? ratingCount = null,
   }) {
     return _then(
       _value.copyWith(
@@ -720,6 +805,18 @@ class _$PartnerProfileSummaryCopyWithImpl<
                 ? _value.governmentIdNumber
                 : governmentIdNumber // ignore: cast_nullable_to_non_nullable
                       as String?,
+            workingHours: freezed == workingHours
+                ? _value.workingHours
+                : workingHours // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            serviceRadiusKm: freezed == serviceRadiusKm
+                ? _value.serviceRadiusKm
+                : serviceRadiusKm // ignore: cast_nullable_to_non_nullable
+                      as int?,
+            yearsOfExperience: freezed == yearsOfExperience
+                ? _value.yearsOfExperience
+                : yearsOfExperience // ignore: cast_nullable_to_non_nullable
+                      as int?,
             verificationStatus: freezed == verificationStatus
                 ? _value.verificationStatus
                 : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -756,6 +853,14 @@ class _$PartnerProfileSummaryCopyWithImpl<
                 ? _value.businessDocumentUrl
                 : businessDocumentUrl // ignore: cast_nullable_to_non_nullable
                       as String?,
+            ratingAvg: null == ratingAvg
+                ? _value.ratingAvg
+                : ratingAvg // ignore: cast_nullable_to_non_nullable
+                      as double,
+            ratingCount: null == ratingCount
+                ? _value.ratingCount
+                : ratingCount // ignore: cast_nullable_to_non_nullable
+                      as int,
           )
           as $Val,
     );
@@ -790,6 +895,9 @@ abstract class _$$PartnerProfileSummaryImplCopyWith<$Res>
     double? longitude,
     String? governmentIdType,
     String? governmentIdNumber,
+    String? workingHours,
+    int? serviceRadiusKm,
+    int? yearsOfExperience,
     String? verificationStatus,
     String? rejectionReason,
     String? reviewNote,
@@ -799,6 +907,8 @@ abstract class _$$PartnerProfileSummaryImplCopyWith<$Res>
     List<String> shopPhotoUrls,
     String? identityDocumentUrl,
     String? businessDocumentUrl,
+    double ratingAvg,
+    int ratingCount,
   });
 }
 
@@ -835,6 +945,9 @@ class __$$PartnerProfileSummaryImplCopyWithImpl<$Res>
     Object? longitude = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
+    Object? workingHours = freezed,
+    Object? serviceRadiusKm = freezed,
+    Object? yearsOfExperience = freezed,
     Object? verificationStatus = freezed,
     Object? rejectionReason = freezed,
     Object? reviewNote = freezed,
@@ -844,6 +957,8 @@ class __$$PartnerProfileSummaryImplCopyWithImpl<$Res>
     Object? shopPhotoUrls = null,
     Object? identityDocumentUrl = freezed,
     Object? businessDocumentUrl = freezed,
+    Object? ratingAvg = null,
+    Object? ratingCount = null,
   }) {
     return _then(
       _$PartnerProfileSummaryImpl(
@@ -919,6 +1034,18 @@ class __$$PartnerProfileSummaryImplCopyWithImpl<$Res>
             ? _value.governmentIdNumber
             : governmentIdNumber // ignore: cast_nullable_to_non_nullable
                   as String?,
+        workingHours: freezed == workingHours
+            ? _value.workingHours
+            : workingHours // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        serviceRadiusKm: freezed == serviceRadiusKm
+            ? _value.serviceRadiusKm
+            : serviceRadiusKm // ignore: cast_nullable_to_non_nullable
+                  as int?,
+        yearsOfExperience: freezed == yearsOfExperience
+            ? _value.yearsOfExperience
+            : yearsOfExperience // ignore: cast_nullable_to_non_nullable
+                  as int?,
         verificationStatus: freezed == verificationStatus
             ? _value.verificationStatus
             : verificationStatus // ignore: cast_nullable_to_non_nullable
@@ -955,6 +1082,14 @@ class __$$PartnerProfileSummaryImplCopyWithImpl<$Res>
             ? _value.businessDocumentUrl
             : businessDocumentUrl // ignore: cast_nullable_to_non_nullable
                   as String?,
+        ratingAvg: null == ratingAvg
+            ? _value.ratingAvg
+            : ratingAvg // ignore: cast_nullable_to_non_nullable
+                  as double,
+        ratingCount: null == ratingCount
+            ? _value.ratingCount
+            : ratingCount // ignore: cast_nullable_to_non_nullable
+                  as int,
       ),
     );
   }
@@ -982,6 +1117,9 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
     this.longitude,
     this.governmentIdType,
     this.governmentIdNumber,
+    this.workingHours,
+    this.serviceRadiusKm,
+    this.yearsOfExperience,
     this.verificationStatus,
     this.rejectionReason,
     this.reviewNote,
@@ -991,6 +1129,8 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
     final List<String> shopPhotoUrls = const [],
     this.identityDocumentUrl,
     this.businessDocumentUrl,
+    this.ratingAvg = 0,
+    this.ratingCount = 0,
   }) : _shopPhotoUrls = shopPhotoUrls;
 
   factory _$PartnerProfileSummaryImpl.fromJson(Map<String, dynamic> json) =>
@@ -1032,6 +1172,13 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
   final String? governmentIdType;
   @override
   final String? governmentIdNumber;
+  // --- §6 (OPERATIONS) ---
+  @override
+  final String? workingHours;
+  @override
+  final int? serviceRadiusKm;
+  @override
+  final int? yearsOfExperience;
   // --- ADR-046b: application/verification state ---
   @override
   final String? verificationStatus;
@@ -1058,10 +1205,17 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
   final String? identityDocumentUrl;
   @override
   final String? businessDocumentUrl;
+  // --- §25 - aggregates for the discovery card and reviews section ---
+  @override
+  @JsonKey()
+  final double ratingAvg;
+  @override
+  @JsonKey()
+  final int ratingCount;
 
   @override
   String toString() {
-    return 'PartnerProfileSummary(businessName: $businessName, type: $type, isVerified: $isVerified, isAvailable: $isAvailable, isGeneralResponder: $isGeneralResponder, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, verificationStatus: $verificationStatus, rejectionReason: $rejectionReason, reviewNote: $reviewNote, submittedAt: $submittedAt, reviewedAt: $reviewedAt, profilePhotoUrl: $profilePhotoUrl, shopPhotoUrls: $shopPhotoUrls, identityDocumentUrl: $identityDocumentUrl, businessDocumentUrl: $businessDocumentUrl)';
+    return 'PartnerProfileSummary(businessName: $businessName, type: $type, isVerified: $isVerified, isAvailable: $isAvailable, isGeneralResponder: $isGeneralResponder, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, workingHours: $workingHours, serviceRadiusKm: $serviceRadiusKm, yearsOfExperience: $yearsOfExperience, verificationStatus: $verificationStatus, rejectionReason: $rejectionReason, reviewNote: $reviewNote, submittedAt: $submittedAt, reviewedAt: $reviewedAt, profilePhotoUrl: $profilePhotoUrl, shopPhotoUrls: $shopPhotoUrls, identityDocumentUrl: $identityDocumentUrl, businessDocumentUrl: $businessDocumentUrl, ratingAvg: $ratingAvg, ratingCount: $ratingCount)';
   }
 
   @override
@@ -1101,6 +1255,12 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
                 other.governmentIdType == governmentIdType) &&
             (identical(other.governmentIdNumber, governmentIdNumber) ||
                 other.governmentIdNumber == governmentIdNumber) &&
+            (identical(other.workingHours, workingHours) ||
+                other.workingHours == workingHours) &&
+            (identical(other.serviceRadiusKm, serviceRadiusKm) ||
+                other.serviceRadiusKm == serviceRadiusKm) &&
+            (identical(other.yearsOfExperience, yearsOfExperience) ||
+                other.yearsOfExperience == yearsOfExperience) &&
             (identical(other.verificationStatus, verificationStatus) ||
                 other.verificationStatus == verificationStatus) &&
             (identical(other.rejectionReason, rejectionReason) ||
@@ -1120,7 +1280,11 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
             (identical(other.identityDocumentUrl, identityDocumentUrl) ||
                 other.identityDocumentUrl == identityDocumentUrl) &&
             (identical(other.businessDocumentUrl, businessDocumentUrl) ||
-                other.businessDocumentUrl == businessDocumentUrl));
+                other.businessDocumentUrl == businessDocumentUrl) &&
+            (identical(other.ratingAvg, ratingAvg) ||
+                other.ratingAvg == ratingAvg) &&
+            (identical(other.ratingCount, ratingCount) ||
+                other.ratingCount == ratingCount));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -1145,6 +1309,9 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
     longitude,
     governmentIdType,
     governmentIdNumber,
+    workingHours,
+    serviceRadiusKm,
+    yearsOfExperience,
     verificationStatus,
     rejectionReason,
     reviewNote,
@@ -1154,6 +1321,8 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
     const DeepCollectionEquality().hash(_shopPhotoUrls),
     identityDocumentUrl,
     businessDocumentUrl,
+    ratingAvg,
+    ratingCount,
   ]);
 
   /// Create a copy of PartnerProfileSummary
@@ -1194,6 +1363,9 @@ abstract class _PartnerProfileSummary implements PartnerProfileSummary {
     final double? longitude,
     final String? governmentIdType,
     final String? governmentIdNumber,
+    final String? workingHours,
+    final int? serviceRadiusKm,
+    final int? yearsOfExperience,
     final String? verificationStatus,
     final String? rejectionReason,
     final String? reviewNote,
@@ -1203,6 +1375,8 @@ abstract class _PartnerProfileSummary implements PartnerProfileSummary {
     final List<String> shopPhotoUrls,
     final String? identityDocumentUrl,
     final String? businessDocumentUrl,
+    final double ratingAvg,
+    final int ratingCount,
   }) = _$PartnerProfileSummaryImpl;
 
   factory _PartnerProfileSummary.fromJson(Map<String, dynamic> json) =
@@ -1243,7 +1417,13 @@ abstract class _PartnerProfileSummary implements PartnerProfileSummary {
   @override
   String? get governmentIdType;
   @override
-  String? get governmentIdNumber; // --- ADR-046b: application/verification state ---
+  String? get governmentIdNumber; // --- §6 (OPERATIONS) ---
+  @override
+  String? get workingHours;
+  @override
+  int? get serviceRadiusKm;
+  @override
+  int? get yearsOfExperience; // --- ADR-046b: application/verification state ---
   @override
   String? get verificationStatus;
   @override
@@ -1261,7 +1441,11 @@ abstract class _PartnerProfileSummary implements PartnerProfileSummary {
   @override
   String? get identityDocumentUrl;
   @override
-  String? get businessDocumentUrl;
+  String? get businessDocumentUrl; // --- §25 - aggregates for the discovery card and reviews section ---
+  @override
+  double get ratingAvg;
+  @override
+  int get ratingCount;
 
   /// Create a copy of PartnerProfileSummary
   /// with the given fields replaced by the non-null parameter values.

@@ -310,8 +310,8 @@ describe("SOS end-to-end (ADR-045)", () => {
         findEligibleForAlert: vi.fn(async () => []),
         getEligibilityFields: vi.fn(async (userId: string) =>
           userId === "partner-offline"
-            ? { providerId: null, isVerified: true, isAvailable: false, isGeneralResponder: false, type: "MECHANIC" }
-            : { providerId: null, isVerified: true, isAvailable: true, isGeneralResponder: false, type: "FUEL_DELIVERY" },
+            ? { providerId: null, verificationStatus: "APPROVED", isAvailable: false, isGeneralResponder: false, type: "MECHANIC" }
+            : { providerId: null, verificationStatus: "APPROVED", isAvailable: true, isGeneralResponder: false, type: "FUEL_DELIVERY" },
         ),
       },
     });
@@ -373,7 +373,7 @@ describe("SOS end-to-end (ADR-045)", () => {
         findEligibleForAlert: vi.fn(async () => []),
         getEligibilityFields: vi.fn(async () => ({
           providerId: null,
-          isVerified: true,
+          verificationStatus: "APPROVED",
           isAvailable: true,
           isGeneralResponder: false,
           type: "FUEL_DELIVERY",

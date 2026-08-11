@@ -21,15 +21,17 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       ? { latitude: parsed.data.latitude, longitude: parsed.data.longitude }
       : undefined;
 
-  // ADR-044/046b — an approved Service Provider's "ACCEPT" reuses this exact endpoint, gated
-  // additively: verified, available, category-matched, and not already at capacity. Keyed off
-  // the server-verified `partnerStatus` (not `role`, which no longer indicates Partner capability
-  // under the dual-capability model — a backfilled ex-PARTNER account is `role: RENTER` now) and
-  // applied regardless of the caller's current UI "mode" — a dual-capability account offering
-  // help is always held to the stricter partner bar, deliberately not something the client-side
-  // mode preference can opt out of. Pure Riders are completely unaffected (no opts passed).
+  // FINAL PRODUCT MODEL — a Service Provider's "ACCEPT" reuses this exact endpoint, gated
+  // additively: any partner with a profile that isn't admin-SUSPENDED (capability, ADR-049),
+  // available, category-matched, and not already at capacity. Verification is NOT part of this
+  // gate — unverified providers operate the platform and can accept assistance requests;
+  // verification is a separate trust badge. Keyed off the server-verified `partnerStatus` (not
+  // `role`, which no longer indicates Partner capability under the dual-capability model — a
+  // backfilled ex-PARTNER account is `role: RENTER` now) and applied regardless of the caller's
+  // current UI "mode". Pure Riders are completely unaffected (no opts passed).
   const result = await SOSSessionService.offerHelp(id, session.user.id, location, parsed.data.message, {
-    requireAvailableAndCapacity: session.user.partnerStatus === "APPROVED",
+    requireAvailableAndCapacity:
+      session.user.partnerStatus != null && session.user.partnerStatus !== "SUSPENDED",
   });
   if (!result.ok) {
     const status =

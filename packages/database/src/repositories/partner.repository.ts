@@ -344,11 +344,15 @@ export async function setAvailability(userId: string, isAvailable: boolean) {
 /** Thin select for `offerHelp`'s eligibility gate and the nearby-requests filter (ADR-044) —
  * not the full `toDTO` shape, just what those callers actually need. `id` is included so the
  * session-rating path can decide "does this helper have a Service Provider profile at all" and,
- * if so, attach a §25 service review to exactly that provider. */
+ * if so, attach a §25 service review to exactly that provider. `verificationStatus` (not the
+ * derived `isVerified` boolean) is what the gate reads now — the FINAL PRODUCT MODEL makes
+ * capability a function of "profile exists and isn't SUSPENDED", with verification only a
+ * separate trust badge, so unverified-but-active providers must be able to accept assistance
+ * requests too. */
 export async function findPartnerEligibilityFields(userId: string) {
   const partner = await prisma.partner.findUnique({
     where: { userId },
-    select: { id: true, isVerified: true, isAvailable: true, isGeneralResponder: true, type: true },
+    select: { id: true, verificationStatus: true, isAvailable: true, isGeneralResponder: true, type: true },
   });
   return partner;
 }
@@ -404,16 +408,19 @@ export async function findProviderReviews(providerId: string, take = 50) {
 }
 
 /**
- * Real SOS-dispatch eligibility (ADR-044) — verified, available, geotagged partners within a
- * radius, same plain-Haversine shape as `findPartnersNearPoint` (reused, not reinvented) but
- * returning the fuller `PartnerDispatchRow`-compatible shape dispatch/offer-gating needs
- * (contact-person fields, `user`, `isGeneralResponder`). Type/general-responder *matching*
- * against a specific alert happens one layer up (`partnerMatchesAlertType`) — this stays a
- * plain geo+status query, same separation `findPartnersNearPoint` already has from its callers.
+ * Real SOS-dispatch eligibility (ADR-044, amended by the FINAL PRODUCT MODEL) — any active
+ * (non-SUSPENDED), available, geotagged partner within a radius is eligible to be dispatched,
+ * same plain-Haversine shape as `findPartnersNearPoint` (reused, not reinvented) but returning
+ * the fuller `PartnerDispatchRow`-compatible shape dispatch/offer-gating needs (contact-person
+ * fields, `user`, `isGeneralResponder`). Verification is deliberately NOT a dispatch gate:
+ * unverified providers operate the platform and can accept assistance requests — verification
+ * is a separate trust badge, not permission to exist. Type/general-responder *matching* against
+ * a specific alert happens one layer up (`partnerMatchesAlertType`) — this stays a plain
+ * geo+status query, same separation `findPartnersNearPoint` already has from its callers.
  */
 export async function findEligiblePartnersNearPoint(latitude: number, longitude: number, radiusMeters: number) {
   const partners = await prisma.partner.findMany({
-    where: { latitude: { not: null }, longitude: { not: null }, isVerified: true, isAvailable: true },
+    where: { latitude: { not: null }, longitude: { not: null }, verificationStatus: { not: "SUSPENDED" }, isAvailable: true },
     include: { user: { select: { id: true, name: true, email: true, phone: true } } },
   });
 

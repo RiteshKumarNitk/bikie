@@ -24,6 +24,9 @@ _$PartnerProfileInputImpl _$$PartnerProfileInputImplFromJson(
   longitude: (json['longitude'] as num?)?.toDouble(),
   governmentIdType: json['governmentIdType'] as String?,
   governmentIdNumber: json['governmentIdNumber'] as String?,
+  workingHours: json['workingHours'] as String?,
+  serviceRadiusKm: (json['serviceRadiusKm'] as num?)?.toInt(),
+  yearsOfExperience: (json['yearsOfExperience'] as num?)?.toInt(),
   isGeneralResponder: json['isGeneralResponder'] as bool?,
 );
 
@@ -45,6 +48,9 @@ Map<String, dynamic> _$$PartnerProfileInputImplToJson(
   'longitude': instance.longitude,
   'governmentIdType': instance.governmentIdType,
   'governmentIdNumber': instance.governmentIdNumber,
+  'workingHours': instance.workingHours,
+  'serviceRadiusKm': instance.serviceRadiusKm,
+  'yearsOfExperience': instance.yearsOfExperience,
   'isGeneralResponder': instance.isGeneralResponder,
 };
 
@@ -69,6 +75,9 @@ _$PartnerProfileSummaryImpl _$$PartnerProfileSummaryImplFromJson(
   longitude: (json['longitude'] as num?)?.toDouble(),
   governmentIdType: json['governmentIdType'] as String?,
   governmentIdNumber: json['governmentIdNumber'] as String?,
+  workingHours: json['workingHours'] as String?,
+  serviceRadiusKm: (json['serviceRadiusKm'] as num?)?.toInt(),
+  yearsOfExperience: (json['yearsOfExperience'] as num?)?.toInt(),
   verificationStatus: json['verificationStatus'] as String?,
   rejectionReason: json['rejectionReason'] as String?,
   reviewNote: json['reviewNote'] as String?,
@@ -82,6 +91,8 @@ _$PartnerProfileSummaryImpl _$$PartnerProfileSummaryImplFromJson(
       const [],
   identityDocumentUrl: json['identityDocumentUrl'] as String?,
   businessDocumentUrl: json['businessDocumentUrl'] as String?,
+  ratingAvg: (json['ratingAvg'] as num?)?.toDouble() ?? 0,
+  ratingCount: (json['ratingCount'] as num?)?.toInt() ?? 0,
 );
 
 Map<String, dynamic> _$$PartnerProfileSummaryImplToJson(
@@ -105,6 +116,9 @@ Map<String, dynamic> _$$PartnerProfileSummaryImplToJson(
   'longitude': instance.longitude,
   'governmentIdType': instance.governmentIdType,
   'governmentIdNumber': instance.governmentIdNumber,
+  'workingHours': instance.workingHours,
+  'serviceRadiusKm': instance.serviceRadiusKm,
+  'yearsOfExperience': instance.yearsOfExperience,
   'verificationStatus': instance.verificationStatus,
   'rejectionReason': instance.rejectionReason,
   'reviewNote': instance.reviewNote,
@@ -114,6 +128,8 @@ Map<String, dynamic> _$$PartnerProfileSummaryImplToJson(
   'shopPhotoUrls': instance.shopPhotoUrls,
   'identityDocumentUrl': instance.identityDocumentUrl,
   'businessDocumentUrl': instance.businessDocumentUrl,
+  'ratingAvg': instance.ratingAvg,
+  'ratingCount': instance.ratingCount,
 };
 
 _$PartnerApplicationImpl _$$PartnerApplicationImplFromJson(

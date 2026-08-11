@@ -76,11 +76,12 @@ export default function PartnerOnboardingPage() {
         throw new Error(data.error || "Failed to save partner profile");
       }
 
-      // ADR-046b: saving no longer grants capability — submit straight for verification (this
-      // is the "I'm done" moment of a brand-new signup) and land on the status page instead of
-      // the (now capability-gated) Partner Dashboard itself.
-      await fetch("/api/partner/application/submit", { method: "POST" }).catch(() => {});
-      router.push("/dashboard/become-provider");
+      // FINAL PRODUCT MODEL — creating the profile IS the onboarding: capability activates the
+      // moment the profile exists (ADR-049), with no admin approval in between. Verification is
+      // a separate, optional trust step requested later from the provider dashboard, so a
+      // brand-new signup lands directly on the Service Provider dashboard, not a "pending
+      // review" status page.
+      router.push("/partner");
     } catch (err: any) {
       setError(err.message || "Something went wrong saving your details. Please try again.");
     } finally {
@@ -110,10 +111,11 @@ export default function PartnerOnboardingPage() {
             </span>
           </div>
           <h1 className="mt-6 font-display text-3xl font-bold text-foreground md:text-4xl">
-            Complete your Partner Profile
+            Complete your Service Provider Profile
           </h1>
           <p className="mt-3 max-w-md text-base text-foreground/70">
-            Tell us about your business. This helps us set up your fleet and payouts.
+            Tell us about your business. Your profile becomes active immediately — no admin
+            approval needed. Getting verified is an optional trust step.
           </p>
         </div>
 

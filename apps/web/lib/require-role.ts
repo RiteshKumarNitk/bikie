@@ -96,12 +96,11 @@ export async function requireMembership() {
 
 /** ADR-046b/ADR-049 — Service Provider CAPABILITY gate for `/api/partner/**`, replacing
  * `requireRole("PARTNER")`. Checks an active profile + active membership (never verification —
- * `Partner.verificationStatus === "APPROVED"` is a separate, optional trust badge, see
- * DECISIONS.md ADR-049), and never a client-supplied "active mode" — capability and mode are
- * deliberately different concerns (ADR-046b). The one exception, by design, is the SOS
- * `requireAvailableAndCapacity` gate (`POST /api/sos/alerts/[id]/offer`), which legitimately does
- * need verification for that one high-trust action and reads `partnerStatus === "APPROVED"`
- * directly — not through this function. */
+ * `Partner.verificationStatus` is a separate, optional trust badge, see DECISIONS.md ADR-049),
+ * and never a client-supplied "active mode" — capability and mode are deliberately different
+ * concerns (ADR-046b). The SOS `requireAvailableAndCapacity` gate (`POST /api/sos/alerts/[id]/offer`)
+ * follows the same rule — any non-SUSPENDED profile, not only APPROVED, may accept assistance
+ * requests (FINAL PRODUCT MODEL: verification never blocks provider operation). */
 export async function requirePartnerCapability() {
   const session = await getServerSession();
   const { access } = getIdentityAccessModule();

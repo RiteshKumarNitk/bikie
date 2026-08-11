@@ -14,6 +14,10 @@ _$NearbyPartnerImpl _$$NearbyPartnerImplFromJson(Map<String, dynamic> json) =>
       city: json['city'] as String,
       latitude: (json['latitude'] as num).toDouble(),
       longitude: (json['longitude'] as num).toDouble(),
+      verificationStatus: json['verificationStatus'] as String,
+      isAvailable: json['isAvailable'] as bool,
+      ratingAvg: (json['ratingAvg'] as num).toDouble(),
+      ratingCount: (json['ratingCount'] as num).toInt(),
       distanceMeters: (json['distanceMeters'] as num).toDouble(),
     );
 
@@ -25,5 +29,9 @@ Map<String, dynamic> _$$NearbyPartnerImplToJson(_$NearbyPartnerImpl instance) =>
       'city': instance.city,
       'latitude': instance.latitude,
       'longitude': instance.longitude,
+      'verificationStatus': instance.verificationStatus,
+      'isAvailable': instance.isAvailable,
+      'ratingAvg': instance.ratingAvg,
+      'ratingCount': instance.ratingCount,
       'distanceMeters': instance.distanceMeters,
     };

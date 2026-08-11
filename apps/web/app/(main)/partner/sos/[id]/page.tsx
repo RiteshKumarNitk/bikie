@@ -63,7 +63,7 @@ const ERROR_LABEL: Record<string, string> = {
   ALREADY_ASSIGNED: "Someone else already accepted this request.",
   ALREADY_RESPONDED: "You've already responded to this request.",
   ALERT_NOT_ACTIVE: "This request is no longer active.",
-  NOT_VERIFIED: "Your partner account isn't verified yet.",
+  NOT_VERIFIED: "Your Service Provider profile is inactive or suspended.",
   PARTNER_OFFLINE: "You're offline — go available to respond.",
   CATEGORY_MISMATCH: "This request isn't in your service category.",
   AT_CAPACITY: "You're already assisting someone else.",

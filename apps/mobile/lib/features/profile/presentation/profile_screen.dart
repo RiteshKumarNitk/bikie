@@ -178,7 +178,20 @@ class _PartnerProfileSection extends ConsumerWidget {
           icon: Icons.storefront_outlined,
           label: 'Business Profile',
           subtitle: profileAsync.when(
-            data: (p) => p == null ? null : (p.isVerified ? 'Verified' : 'Verification pending'),
+            // FINAL PRODUCT MODEL — verification status is a separate, optional trust layer:
+            // only an APPROVED profile is "Verified", only a submitted one is "Verification
+            // pending"; everything else is plainly "Unverified" (and still fully operational).
+            data: (p) {
+              if (p == null) return null;
+              switch (p.verificationStatus) {
+                case 'APPROVED':
+                  return '✓ Verified';
+                case 'PENDING_VERIFICATION':
+                  return 'Verification pending';
+                default:
+                  return 'Unverified — fully operational';
+              }
+            },
             loading: () => null,
             error: (_, __) => null,
           ),
@@ -190,19 +203,13 @@ class _PartnerProfileSection extends ConsumerWidget {
             }
           },
         ),
-        profileAsync.whenOrNull(
-          data: (p) {
-            if (p == null || p.ratingCount == 0) return const SizedBox.shrink();
-            return _ProfileTile(
-              icon: Icons.star_outline,
-              label: 'Service Reviews',
-              subtitle: p.ratingCount > 0
-                  ? '⭐ ${p.ratingAvg.toStringAsFixed(1)} (${p.ratingCount})'
-                  : null,
-              onTap: () => context.push('/partner/reviews'),
-            );
-          },
-        ),
+        if (profileAsync.valueOrNull case final p? when p.ratingCount > 0)
+          _ProfileTile(
+            icon: Icons.star_outline,
+            label: 'Service Reviews',
+            subtitle: '⭐ ${p.ratingAvg.toStringAsFixed(1)} (${p.ratingCount})',
+            onTap: () => context.push('/partner/reviews'),
+          ),
       ],
     );
   }

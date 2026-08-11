@@ -191,7 +191,7 @@ export function createPartnerDispatchAdapter(): PartnerDispatchPort {
     getEligibilityFields: async (userId) => {
       const row = await partnerRepository.findPartnerEligibilityFields(userId);
       if (!row) return null;
-      return { providerId: row.id, isVerified: row.isVerified, isAvailable: row.isAvailable, isGeneralResponder: row.isGeneralResponder, type: row.type };
+      return { providerId: row.id, verificationStatus: row.verificationStatus, isAvailable: row.isAvailable, isGeneralResponder: row.isGeneralResponder, type: row.type };
     },
   };
 }

@@ -119,23 +119,24 @@ class _BecomeProviderScreenState extends ConsumerState<BecomeProviderScreen> {
           context,
           title: 'Tell us about your business',
           body:
-              'Complete a short profile, then submit it for verification. An admin reviews '
-              'every application before Service Provider capabilities activate — you\'ll keep '
-              'full Rider access the whole time.',
-          action: ElevatedButton(onPressed: _startOrEdit, child: const Text('Start application')),
+              'Create your Service Provider profile and start operating right away — no admin '
+              'approval needed. Verification is an optional trust step you can request anytime '
+              'to earn the ✓ BIKIE Verified badge.',
+          action: ElevatedButton(onPressed: _startOrEdit, child: const Text('Create my Service Provider profile')),
         );
       case 'DRAFT':
         return _card(
           context,
-          title: 'Application in progress',
-          body: 'Finish your business details, then submit for verification.',
+          title: 'Your profile is live',
+          body: 'Your Service Provider profile is already active. Add details anytime, and get '
+              'verified whenever you want the ✓ BIKIE Verified badge.',
           action: Wrap(
             spacing: 12,
             children: [
               OutlinedButton(onPressed: _startOrEdit, child: const Text('Edit details')),
               ElevatedButton(
                 onPressed: _busy ? null : _submit,
-                child: Text(_busy ? 'Please wait…' : 'Submit for verification'),
+                child: Text(_busy ? 'Please wait…' : 'Get Verified'),
               ),
             ],
           ),
@@ -144,7 +145,7 @@ class _BecomeProviderScreenState extends ConsumerState<BecomeProviderScreen> {
         return _card(
           context,
           title: 'More information needed',
-          body: profile?.reviewNote ?? 'Please review and update your application.',
+          body: profile?.reviewNote ?? 'Please review and update your profile.',
           action: Wrap(
             spacing: 12,
             children: [
@@ -159,19 +160,20 @@ class _BecomeProviderScreenState extends ConsumerState<BecomeProviderScreen> {
       case 'PENDING_VERIFICATION':
         return _card(
           context,
-          title: 'Application submitted',
-          body: 'Your Service Provider application has been submitted and is awaiting '
-              'verification.${profile?.submittedAt != null ? ' Submitted ${DateTime.parse(profile!.submittedAt!).toLocal().toString().split(' ').first}.' : ''}',
+          title: 'Verification pending — you can operate now',
+          body: 'Your profile is already live. You\'re not blocked while an admin reviews your '
+              'optional verification.${profile?.submittedAt != null ? ' Submitted ${DateTime.parse(profile!.submittedAt!).toLocal().toString().split(' ').first}.' : ''}',
         );
       case 'REJECTED':
         return _card(
           context,
-          title: 'Application not approved',
+          title: 'Verification not approved',
           titleColor: Theme.of(context).colorScheme.error,
-          body: profile?.rejectionReason ?? 'Your Service Provider application was rejected.',
+          body:
+              '${profile?.rejectionReason != null ? '${profile!.rejectionReason} ' : ''}Your profile stays active — you can keep operating as an unverified Service Provider.',
           action: ElevatedButton(
             onPressed: _busy ? null : _reapply,
-            child: Text(_busy ? 'Please wait…' : 'Re-apply'),
+            child: Text(_busy ? 'Please wait…' : 'Re-apply for verification'),
           ),
         );
       case 'SUSPENDED':

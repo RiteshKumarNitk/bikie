@@ -33,7 +33,12 @@ export function createSessionApplication(ports: SafetyLocationPorts, deps: Sessi
 
       if (opts?.requireAvailableAndCapacity) {
         const partner = await ports.partnerDispatch.getEligibilityFields(responderId);
-        if (!partner?.isVerified) return { ok: false as const, reason: "NOT_VERIFIED" as const };
+        // FINAL PRODUCT MODEL — capability = a profile that exists and isn't admin-SUSPENDED;
+        // verification is a separate trust badge and does NOT gate accepting assistance requests.
+        // An unverified (DRAFT/PENDING/REJECTED) but available, type-matched provider passes.
+        if (!partner || partner.verificationStatus === "SUSPENDED") {
+          return { ok: false as const, reason: "NOT_VERIFIED" as const };
+        }
         if (!partner.isAvailable) return { ok: false as const, reason: "PARTNER_OFFLINE" as const };
         if (!partnerMatchesAlertType(partner, alert.type)) {
           return { ok: false as const, reason: "CATEGORY_MISMATCH" as const };

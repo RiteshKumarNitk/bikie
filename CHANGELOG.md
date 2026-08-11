@@ -1,5 +1,38 @@
 # Changelog
 
+## Change — Final Service Provider model: no admin approval to operate; unverified providers can accept SOS (ADR-050)
+- **Product correction applied** per the final spec: creating a Service Provider profile *is*
+  capability — there is no admin approval step between "profile exists" and "provider operates."
+  Admin approves **verification** (a separate trust layer), never existence. The backend already
+  implemented this (ADR-049: capability = profile exists + not SUSPENDED + active membership), so
+  this pass removed the residual differences, all in UI flow/copy plus one functional gate:
+- **Functional change**: SOS assistance acceptance is no longer verification-gated. Per explicit
+  user decision, *any* capable, available, type-matched Service Provider can accept an SOS
+  assistance request — not just BIKIE-Verified ones. Removed `isVerified` from the dispatch
+  eligibility query (`findEligiblePartnersNearPoint`), the `offerHelp` gate (now: profile exists
+  + not SUSPENDED + available + category-matched + not at capacity), the offer route's opt-in
+  (`requireAvailableAndCapacity` now keys off `partnerStatus != null && !== "SUSPENDED"`), and
+  the partner dashboard's nearby-requests filter. Verification remains a trust badge only.
+- **Eligibility port reshaped**: `getEligibilityFields` now returns `verificationStatus` (the
+  enum) instead of the derived `isVerified` boolean, so the gate can distinguish SUSPENDED from
+  merely-unverified — the one status that revokes capability.
+- **Web copy/flow fixed**: `/dashboard/become-provider` no longer says "an admin reviews every
+  application before capabilities activate" (now: profile is live immediately, verification is
+  optional) and routes capable users straight to `/partner` regardless of verification status;
+  `/dashboard/settings` dropped its "admin will review it" copy; `/partner-onboarding` no longer
+  auto-submits for verification on save or lands the user on a status page — it saves the profile
+  and goes to the provider dashboard. New `PartnerVerificationBanner` on the partner home shows
+  ✓ BIKIE VERIFIED / ⚠ Unverified Provider / pending / rejected states with a Get-Verified action.
+- **Mobile parity**: `become_provider_screen.dart` copy corrected ("your profile is already live —
+  you're not blocked while an admin reviews your verification"), `profile_screen.dart` labels
+  non-verified profiles "Unverified Provider" (not the misleading "Verification pending"),
+  `partner_onboarding_screen.dart` edit-mode label fixed, and the stale freezed/json codegen was
+  regenerated (the production-readiness audit's C1 — the mobile app no longer compiles against
+  stale generated models).
+- Backend: 9/9 typecheck, **163/163 vitest passing** (3 new: unverified-provider-can-accept-SOS,
+  plus reshaped eligibility mocks). Web: `next build` clean. Mobile: `flutter analyze` clean,
+  `flutter test` 113/113 passing.
+
 ## New — Rider ⇄ Service Provider dual capability (ADR-046b)
 - **New**: one BIKIE account can now be a Rider and an approved Service Provider at the same
   time. Becoming a Service Provider is a real application (fill out a business profile, submit,

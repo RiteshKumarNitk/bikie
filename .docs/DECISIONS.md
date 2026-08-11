@@ -2098,9 +2098,12 @@ changes:
   `role_provider.dart` (`resolveActiveMode`/`switchActiveMode`) +
   `profile_screen.dart` (`isCapableServiceProvider`, mode-switch result handling). All 11
   `/api/partner/**` route files renamed their import from `requireApprovedPartner` to
-  `requirePartnerCapability`. `POST /api/sos/alerts/[id]/offer` was read-verified unchanged —
-  confirmed it never went through any of the renamed functions, since it inlines its own
-  `partnerStatus === "APPROVED"` check for the one legitimately verification-gated action.
+  `requirePartnerCapability`.
+- **Superseded (ADR-050): the one `APPROVED` gate.** This ADR deliberately left `POST
+  /api/sos/alerts/[id]/offer`'s `partnerStatus === "APPROVED"` check in place as "the one
+  legitimately verification-gated action." Per explicit product decision, that gate was removed
+  too: verification is a trust badge, not a permission-to-operate gate, and an unverified but
+  capable, available, type-matched provider can accept assistance requests. See ADR-050.
 - **Consequences.** `pnpm turbo run typecheck`: 8/9 clean (same pre-existing unrelated
   `razorpay.service.ts` error). `pnpm exec vitest run`: 152/152 passing, 15/15 files — 11 new
   tests covering the full capability matrix (no profile / SUSPENDED / each non-suspended
@@ -2112,3 +2115,47 @@ changes:
   browser/device session, and a live membership-lapse-mid-session scenario — same caveat as every
   prior architecture change in this project without a browser/device harness available.
 
+## ADR-050: Final Service Provider model — profile creation IS capability (no admin approval); unverified providers can accept SOS
+
+- **Context.** The final product spec makes two corrections to the model built by ADR-046b/049:
+  1. There must be **no admin approval between "Service Provider profile exists" and "provider
+     operates."** The old onboarding copy and flows still described the discarded
+     "submit application → admin reviews → capabilities activate" model, even though the backend
+     capability engine (ADR-049) had already landed the correct rule.
+  2. **Verification must not gate SOS acceptance.** ADR-049 deliberately kept
+     `POST /api/sos/alerts/[id]/offer` gated on `partnerStatus === "APPROVED"` as "the one
+     legitimately verification-gated action." The product rule is that verification is a trust
+     badge — never a permission-to-operate gate — so an unverified but capable, available,
+     type-matched provider must be able to accept assistance requests.
+- **Decision 1 — capability stays derived (ADR-049), UI/flow corrected to match.**
+  - Web `/dashboard/become-provider`: NOT_APPLIED/PENDING copy no longer claims admin approval is
+    required; the page routes anyone with capability (any non-null, non-SUSPENDED `partnerStatus`)
+    straight to `/partner` instead of only `APPROVED` users.
+  - Web `/dashboard/settings`: removed "Complete a short application and an admin will review it."
+  - Web `/partner-onboarding`: no longer auto-submits for verification on save; saving lands the
+    user on the provider dashboard, not a "status" page. Verification is a separate, optional,
+    explicit "Get Verified" action (new `PartnerVerificationBanner` on the partner home shows
+    ✓ BIKIE VERIFIED / ⚠ Unverified Provider / Pending / Rejected states and links to it).
+  - Mobile: `become_provider_screen.dart` and `profile_screen.dart` copy corrected — a non-verified
+    profile reads "Unverified Provider", not the misleading "Verification pending"; the stale
+    freezed/json codegen was regenerated so the app compiles.
+- **Decision 2 — verification removed from the SOS acceptance gate.**
+  - `partner.repository.ts` `findEligiblePartnersNearPoint`: dropped the `isVerified: true`
+    filter; eligibility is now `verificationStatus !== "SUSPENDED"` + `isAvailable` +
+    `isGeneralResponder`/type-match + not at capacity.
+  - `safety-location` `getEligibilityFields` port/adapter: returns `verificationStatus` (enum)
+    instead of the derived `isVerified` boolean, so the gate can distinguish SUSPENDED (revokes
+    capability) from merely-unverified (does not).
+  - `session.application.ts` `offerHelp`: `requireAvailableAndCapacity` now fails only when the
+    profile is missing or SUSPENDED, offline, category-mismatched, or at capacity.
+  - `apps/web/app/api/sos/alerts/[id]/offer/route.ts`: opts in whenever
+    `partnerStatus != null && !== "SUSPENDED"` (was `=== "APPROVED"`).
+  - `partner-dashboard.application.ts` `listNearbyOpenRequests`: same eligibility, so unverified
+    providers see and accept nearby requests. The `NOT_VERIFIED` wire reason is retained as a
+    legacy code path (now only reachable for missing/SUSPENDED profiles) to avoid client churn.
+- **Consequences.** Verification now purely affects the trust badge and any *future*
+  verified-only privileges — nothing in the provider platform or SOS flow blocks on it. New tests:
+  unverified-provider-accepts-SOS plus reshaped eligibility mocks. Validation: 9/9 backend
+  typecheck, 163/163 vitest (15 files), web `next build` clean, `flutter analyze` clean,
+  `flutter test` 113/113. Not verified in this environment (as always): real-device/two-account
+  end-to-end SOS acceptance by an unverified provider against a live deployment.

@@ -55,7 +55,14 @@ export default function BecomeProviderPage() {
       });
     }
     setLoading(false);
-    if (data.status === "APPROVED") router.replace("/partner");
+    // FINAL PRODUCT MODEL — capability is active the moment a profile exists (ADR-049): any
+    // non-SUSPENDED status (DRAFT/PENDING_VERIFICATION/MORE_INFORMATION_REQUIRED/REJECTED/
+    // APPROVED) can operate the provider platform, so land capable users on the provider
+    // dashboard. Only a never-started (NOT_APPLIED) or admin-suspended (SUSPENDED) account
+    // stays on this page.
+    if (data.status !== "NOT_APPLIED" && data.status !== "SUSPENDED") {
+      router.replace("/partner");
+    }
   }
 
   useEffect(() => {
@@ -162,16 +169,17 @@ export default function BecomeProviderPage() {
           <div className="rounded-3xl bg-card p-6">
             <p className="font-semibold">Tell us about your business</p>
             <p className="mt-2 text-sm text-foreground/60">
-              Complete a short profile, then submit it for verification. An admin reviews every
-              application before Service Provider capabilities activate — you'll keep full Rider
-              access the whole time.
+              Complete a short Service Provider profile and you can start operating right away —
+              no admin approval needed. Verification is an optional trust step you can request
+              anytime to earn the ✓ BIKIE Verified badge. You'll keep full Rider access the whole
+              time.
             </p>
             <button
               type="button"
               onClick={() => setStarted(true)}
               className="mt-4 rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-accent-hover"
             >
-              Start application
+              Create my Service Provider profile
             </button>
           </div>
         )}
@@ -185,9 +193,10 @@ export default function BecomeProviderPage() {
 
         {status === "PENDING_VERIFICATION" && (
           <div className="rounded-3xl bg-card p-6">
-            <p className="font-semibold">Application submitted</p>
+            <p className="font-semibold">Verification requested — you can operate now</p>
             <p className="mt-2 text-sm text-foreground/60">
-              Your Service Provider application has been submitted and is awaiting verification.
+              Your Service Provider profile is already live. You're not blocked while an admin
+              reviews your optional verification.
               {application.profile?.submittedAt &&
                 ` Submitted ${new Date(application.profile.submittedAt).toLocaleDateString()}.`}
             </p>
@@ -196,17 +205,20 @@ export default function BecomeProviderPage() {
 
         {status === "REJECTED" && (
           <div className="rounded-3xl bg-card p-6">
-            <p className="font-semibold text-red-400">Application not approved</p>
+            <p className="font-semibold text-red-400">Verification not approved</p>
             {application.profile?.rejectionReason && (
               <p className="mt-2 text-sm text-foreground/60">{application.profile.rejectionReason}</p>
             )}
+            <p className="mt-2 text-sm text-foreground/60">
+              Your profile stays active — you can keep operating as an unverified Service Provider.
+            </p>
             <button
               type="button"
               onClick={handleReapply}
               disabled={saving}
               className="mt-4 rounded-full bg-accent px-6 py-2.5 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
             >
-              {saving ? "Please wait…" : "Re-apply"}
+              {saving ? "Please wait…" : "Re-apply for verification"}
             </button>
           </div>
         )}

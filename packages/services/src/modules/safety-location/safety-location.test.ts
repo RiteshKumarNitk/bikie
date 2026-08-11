@@ -942,6 +942,112 @@ describe("session application — offer/accept/reject", () => {
     const asRider = await module.session.updateSessionStatus("session-1", "HELPER_ARRIVED", "rider-1", false);
     expect(asRider).toEqual({ ok: false, reason: "FORBIDDEN" });
   });
+
+  it("FINAL PRODUCT MODEL: an UNVERIFIED provider (DRAFT) who is available + type-matched can accept a SOS assistance request", async () => {
+    const createOffer = vi.fn(
+      async (_params: { alertId: string; responderId: string; distanceMeters?: number; etaMinutes?: number; message?: string }) => ({
+        id: "offer-1",
+        alertId: "alert-1",
+        responderId: "unverified-provider",
+        responder: { id: "unverified-provider", name: "Mahesh Bike Service", phone: "9000000000", email: "m@example.com" },
+        status: "OFFERED",
+        distanceMeters: null,
+        etaMinutes: null,
+        message: null,
+        createdAt: new Date(),
+      }),
+    );
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts, getAlertById: vi.fn(async () => sampleAlert({ userId: "reporter-1", type: "BIKE_BREAKDOWN" })) } as any,
+        sosOffers: { ...emptyRepos().sosOffers, createOffer } as any,
+        partnerDispatch: {
+          ...emptyRepos().partnerDispatch,
+          getEligibilityFields: vi.fn(async () => ({
+            providerId: "partner-unverified",
+            verificationStatus: "DRAFT",
+            isAvailable: true,
+            isGeneralResponder: false,
+            type: "MECHANIC",
+          })),
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    // Verification must NOT be a blocker: a DRAFT (never admin-reviewed) provider passes the
+    // capability + availability + type-match gate and the offer is created.
+    const result = await module.session.offerHelp("alert-1", "unverified-provider", undefined, undefined, {
+      requireAvailableAndCapacity: true,
+    });
+    expect(result).toEqual({ ok: true, offer: expect.objectContaining({ responderId: "unverified-provider" }) });
+    expect(createOffer).toHaveBeenCalledWith(expect.objectContaining({ alertId: "alert-1", responderId: "unverified-provider" }));
+  });
+
+  it("FINAL PRODUCT MODEL: a REJECTED (verification) provider who is available + type-matched can also accept — rejection is not suspension", async () => {
+    const createOffer = vi.fn(
+      async (_params: { alertId: string; responderId: string }) => ({
+        id: "offer-1",
+        alertId: "alert-1",
+        responderId: "rejected-provider",
+        responder: { id: "rejected-provider", name: "Rejected Garage", phone: "9000000000", email: "r@example.com" },
+        status: "OFFERED",
+        distanceMeters: null,
+        etaMinutes: null,
+        message: null,
+        createdAt: new Date(),
+      }),
+    );
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts, getAlertById: vi.fn(async () => sampleAlert({ userId: "reporter-1", type: "BIKE_BREAKDOWN" })) } as any,
+        sosOffers: { ...emptyRepos().sosOffers, createOffer } as any,
+        partnerDispatch: {
+          ...emptyRepos().partnerDispatch,
+          getEligibilityFields: vi.fn(async () => ({
+            providerId: "partner-rejected",
+            verificationStatus: "REJECTED",
+            isAvailable: true,
+            isGeneralResponder: false,
+            type: "MECHANIC",
+          })),
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.session.offerHelp("alert-1", "rejected-provider", undefined, undefined, {
+      requireAvailableAndCapacity: true,
+    });
+    expect(result.ok).toBe(true);
+  });
+
+  it("FINAL PRODUCT MODEL: a SUSPENDED provider is still refused — suspension (not verification) is what revokes capability", async () => {
+    const createOffer = vi.fn();
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts, getAlertById: vi.fn(async () => sampleAlert({ userId: "reporter-1", type: "BIKE_BREAKDOWN" })) } as any,
+        sosOffers: { ...emptyRepos().sosOffers, createOffer } as any,
+        partnerDispatch: {
+          ...emptyRepos().partnerDispatch,
+          getEligibilityFields: vi.fn(async () => ({
+            providerId: "partner-suspended",
+            verificationStatus: "SUSPENDED",
+            isAvailable: true,
+            isGeneralResponder: false,
+            type: "MECHANIC",
+          })),
+        } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const result = await module.session.offerHelp("alert-1", "suspended-provider", undefined, undefined, {
+      requireAvailableAndCapacity: true,
+    });
+    expect(result).toEqual({ ok: false, reason: "NOT_VERIFIED" });
+    expect(createOffer).not.toHaveBeenCalled();
+  });
 });
 
 describe("escalation application — tier advancement", () => {
@@ -1386,7 +1492,7 @@ describe("session application — reputation wiring (ADR-033 Phase D)", () => {
           ...emptyRepos().partnerDispatch,
           getEligibilityFields: vi.fn(async () => ({
             providerId: "provider-1",
-            isVerified: true,
+            verificationStatus: "APPROVED",
             isAvailable: true,
             isGeneralResponder: false,
             type: "MECHANIC",
@@ -1437,7 +1543,7 @@ describe("session application — reputation wiring (ADR-033 Phase D)", () => {
           ...emptyRepos().partnerDispatch,
           getEligibilityFields: vi.fn(async () => ({
             providerId: null,
-            isVerified: false,
+            verificationStatus: "DRAFT",
             isAvailable: false,
             isGeneralResponder: false,
             type: "MECHANIC",

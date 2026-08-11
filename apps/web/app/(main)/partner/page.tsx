@@ -3,6 +3,7 @@ import type { PartnerDashboardStatsDTO } from "@bikie/types";
 import { getJson } from "@/lib/api";
 import { getServerSession } from "@/lib/get-session";
 import { StatCard } from "@/components/dashboard/StatCard";
+import { PartnerVerificationBanner } from "@/components/partner/PartnerVerificationBanner";
 import { formatCurrency } from "@bikie/utils";
 
 export const metadata: Metadata = { title: "Partner Dashboard" };
@@ -15,6 +16,10 @@ export default async function PartnerOverviewPage() {
     <div>
       <h1 className="text-2xl font-semibold">Welcome back, {session?.user.name.split(" ")[0]}</h1>
       <p className="mt-1 text-foreground/60">Here&apos;s how your fleet is performing.</p>
+
+      {/* FINAL PRODUCT MODEL — verification status is a separate, optional trust layer shown
+      here, never a gate: the profile is already live and operational. */}
+      <PartnerVerificationBanner />
 
       <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Total Bikes" value={stats.totalBikes} />

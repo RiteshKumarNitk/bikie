@@ -52,9 +52,9 @@ export function createAccessApplication(ports: IdentityAccessPorts) {
      * `SUSPENDED` is the one deliberate admin trust/safety action that also revokes capability,
      * not just the verification badge; `DRAFT`/`PENDING_VERIFICATION`/`MORE_INFORMATION_REQUIRED`/
      * `REJECTED`/`APPROVED` all keep full capability — verification stays a separately-displayed
-     * status, checked on its own only by the specific actions that legitimately need it (e.g. the
-     * stricter SOS `requireAvailableAndCapacity` gate, which reads `partnerStatus === "APPROVED"`
-     * directly and is intentionally untouched by this function).
+     * status, never a blanket blocker for provider operation. The SOS `requireAvailableAndCapacity`
+     * gate reads capability the same way (any non-SUSPENDED profile, not only APPROVED), so an
+     * unverified provider can accept assistance requests — verification is a trust badge only.
      */
     async evaluatePartnerCapability(
       session: SessionSnapshot | null | undefined,

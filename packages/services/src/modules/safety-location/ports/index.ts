@@ -277,7 +277,11 @@ export interface PartnerDispatchPort {
   ): Promise<{
     /** null when this user has no Partner profile at all (pure rider). */
     providerId: string | null;
-    isVerified: boolean;
+    /** FINAL PRODUCT MODEL — the gate is "profile exists and isn't SUSPENDED", not verification.
+     * Unverified providers can operate and accept assistance requests; `verificationStatus`
+     * (not the derived `isVerified` boolean) is what the offer gate and nearby-requests filter
+     * read, so DRAFT/PENDING/REJECTED providers stay eligible. */
+    verificationStatus: string;
     isAvailable: boolean;
     isGeneralResponder: boolean;
     type: string;

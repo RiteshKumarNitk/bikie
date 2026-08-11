@@ -27,6 +27,10 @@ mixin _$NearbyPartner {
   String get city => throw _privateConstructorUsedError;
   double get latitude => throw _privateConstructorUsedError;
   double get longitude => throw _privateConstructorUsedError;
+  String get verificationStatus => throw _privateConstructorUsedError;
+  bool get isAvailable => throw _privateConstructorUsedError;
+  double get ratingAvg => throw _privateConstructorUsedError;
+  int get ratingCount => throw _privateConstructorUsedError;
   double get distanceMeters => throw _privateConstructorUsedError;
 
   /// Serializes this NearbyPartner to a JSON map.
@@ -53,6 +57,10 @@ abstract class $NearbyPartnerCopyWith<$Res> {
     String city,
     double latitude,
     double longitude,
+    String verificationStatus,
+    bool isAvailable,
+    double ratingAvg,
+    int ratingCount,
     double distanceMeters,
   });
 }
@@ -78,6 +86,10 @@ class _$NearbyPartnerCopyWithImpl<$Res, $Val extends NearbyPartner>
     Object? city = null,
     Object? latitude = null,
     Object? longitude = null,
+    Object? verificationStatus = null,
+    Object? isAvailable = null,
+    Object? ratingAvg = null,
+    Object? ratingCount = null,
     Object? distanceMeters = null,
   }) {
     return _then(
@@ -106,6 +118,22 @@ class _$NearbyPartnerCopyWithImpl<$Res, $Val extends NearbyPartner>
                 ? _value.longitude
                 : longitude // ignore: cast_nullable_to_non_nullable
                       as double,
+            verificationStatus: null == verificationStatus
+                ? _value.verificationStatus
+                : verificationStatus // ignore: cast_nullable_to_non_nullable
+                      as String,
+            isAvailable: null == isAvailable
+                ? _value.isAvailable
+                : isAvailable // ignore: cast_nullable_to_non_nullable
+                      as bool,
+            ratingAvg: null == ratingAvg
+                ? _value.ratingAvg
+                : ratingAvg // ignore: cast_nullable_to_non_nullable
+                      as double,
+            ratingCount: null == ratingCount
+                ? _value.ratingCount
+                : ratingCount // ignore: cast_nullable_to_non_nullable
+                      as int,
             distanceMeters: null == distanceMeters
                 ? _value.distanceMeters
                 : distanceMeters // ignore: cast_nullable_to_non_nullable
@@ -132,6 +160,10 @@ abstract class _$$NearbyPartnerImplCopyWith<$Res>
     String city,
     double latitude,
     double longitude,
+    String verificationStatus,
+    bool isAvailable,
+    double ratingAvg,
+    int ratingCount,
     double distanceMeters,
   });
 }
@@ -156,6 +188,10 @@ class __$$NearbyPartnerImplCopyWithImpl<$Res>
     Object? city = null,
     Object? latitude = null,
     Object? longitude = null,
+    Object? verificationStatus = null,
+    Object? isAvailable = null,
+    Object? ratingAvg = null,
+    Object? ratingCount = null,
     Object? distanceMeters = null,
   }) {
     return _then(
@@ -184,6 +220,22 @@ class __$$NearbyPartnerImplCopyWithImpl<$Res>
             ? _value.longitude
             : longitude // ignore: cast_nullable_to_non_nullable
                   as double,
+        verificationStatus: null == verificationStatus
+            ? _value.verificationStatus
+            : verificationStatus // ignore: cast_nullable_to_non_nullable
+                  as String,
+        isAvailable: null == isAvailable
+            ? _value.isAvailable
+            : isAvailable // ignore: cast_nullable_to_non_nullable
+                  as bool,
+        ratingAvg: null == ratingAvg
+            ? _value.ratingAvg
+            : ratingAvg // ignore: cast_nullable_to_non_nullable
+                  as double,
+        ratingCount: null == ratingCount
+            ? _value.ratingCount
+            : ratingCount // ignore: cast_nullable_to_non_nullable
+                  as int,
         distanceMeters: null == distanceMeters
             ? _value.distanceMeters
             : distanceMeters // ignore: cast_nullable_to_non_nullable
@@ -203,6 +255,10 @@ class _$NearbyPartnerImpl implements _NearbyPartner {
     required this.city,
     required this.latitude,
     required this.longitude,
+    required this.verificationStatus,
+    required this.isAvailable,
+    required this.ratingAvg,
+    required this.ratingCount,
     required this.distanceMeters,
   });
 
@@ -222,11 +278,19 @@ class _$NearbyPartnerImpl implements _NearbyPartner {
   @override
   final double longitude;
   @override
+  final String verificationStatus;
+  @override
+  final bool isAvailable;
+  @override
+  final double ratingAvg;
+  @override
+  final int ratingCount;
+  @override
   final double distanceMeters;
 
   @override
   String toString() {
-    return 'NearbyPartner(id: $id, businessName: $businessName, type: $type, city: $city, latitude: $latitude, longitude: $longitude, distanceMeters: $distanceMeters)';
+    return 'NearbyPartner(id: $id, businessName: $businessName, type: $type, city: $city, latitude: $latitude, longitude: $longitude, verificationStatus: $verificationStatus, isAvailable: $isAvailable, ratingAvg: $ratingAvg, ratingCount: $ratingCount, distanceMeters: $distanceMeters)';
   }
 
   @override
@@ -243,6 +307,14 @@ class _$NearbyPartnerImpl implements _NearbyPartner {
                 other.latitude == latitude) &&
             (identical(other.longitude, longitude) ||
                 other.longitude == longitude) &&
+            (identical(other.verificationStatus, verificationStatus) ||
+                other.verificationStatus == verificationStatus) &&
+            (identical(other.isAvailable, isAvailable) ||
+                other.isAvailable == isAvailable) &&
+            (identical(other.ratingAvg, ratingAvg) ||
+                other.ratingAvg == ratingAvg) &&
+            (identical(other.ratingCount, ratingCount) ||
+                other.ratingCount == ratingCount) &&
             (identical(other.distanceMeters, distanceMeters) ||
                 other.distanceMeters == distanceMeters));
   }
@@ -257,6 +329,10 @@ class _$NearbyPartnerImpl implements _NearbyPartner {
     city,
     latitude,
     longitude,
+    verificationStatus,
+    isAvailable,
+    ratingAvg,
+    ratingCount,
     distanceMeters,
   );
 
@@ -282,6 +358,10 @@ abstract class _NearbyPartner implements NearbyPartner {
     required final String city,
     required final double latitude,
     required final double longitude,
+    required final String verificationStatus,
+    required final bool isAvailable,
+    required final double ratingAvg,
+    required final int ratingCount,
     required final double distanceMeters,
   }) = _$NearbyPartnerImpl;
 
@@ -300,6 +380,14 @@ abstract class _NearbyPartner implements NearbyPartner {
   double get latitude;
   @override
   double get longitude;
+  @override
+  String get verificationStatus;
+  @override
+  bool get isAvailable;
+  @override
+  double get ratingAvg;
+  @override
+  int get ratingCount;
   @override
   double get distanceMeters;
 
