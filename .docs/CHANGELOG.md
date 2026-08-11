@@ -1,5 +1,24 @@
 # BIKIE Changelog
 
+## 2026-08-11 — Fix: Service Provider signup silently failed, landing new applicants on the Rider experience
+
+`apps/web/app/partner-onboarding/page.tsx` (the form right after signup when `?role=partner` /
+the `/welcome` PARTNER choice is active) builds its own `PUT /api/partner/profile` request body
+by hand instead of reusing `PartnerBusinessFields`' full field set. It was never updated when
+`businessMobile`/`businessEmail` became required fields on `partnerProfileSchema` — every
+submission got a 400, the `Partner` row (and `User.partnerStatus`) never got created, and the
+error was swallowed into an unhelpful `"[object Object]"` message (the fallback didn't guard
+against `data.error` being the `flatten()` object, not a string). Net effect: signing up as a
+Service Provider silently failed and the account was left indistinguishable from a plain Rider —
+`resolveActiveMode` had nothing to key "PARTNER" mode off of, so every subsequent screen showed
+the Rider experience.
+
+Fixed by giving this page the same client-side `partnerProfileSchema.safeParse` +
+`formatZodError` pattern `become-provider`/`PartnerSettingsForm` already use — it now submits the
+exact validated field set (including `businessMobile`/`businessEmail`) and shows a real message
+on failure instead of guessing. Mobile's `partner_onboarding_screen.dart` already had this
+correctly wired in the same original commit, so this was web-only.
+
 ## 2026-08-11 — Fix: business contact fields build breakage; Vercel deploy unblocked
 
 The last 2 pushes weren't showing up on Vercel because `next build` was failing for two

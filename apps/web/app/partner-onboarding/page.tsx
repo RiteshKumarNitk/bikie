@@ -3,6 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
+import { partnerProfileSchema } from "@bikie/validation";
+import { formatZodError } from "@/lib/format-zod-error";
 import {
   PartnerBusinessFields,
   emptyPartnerBusinessDetails,
@@ -35,6 +37,32 @@ export default function PartnerOnboardingPage() {
     e.preventDefault();
     setError(null);
 
+    const parsed = partnerProfileSchema.safeParse({
+      businessName: partnerDetails.businessName,
+      type: partnerDetails.type,
+      city: partnerDetails.city,
+      businessMobile: partnerDetails.businessMobile.trim(),
+      businessEmail: partnerDetails.businessEmail.trim(),
+      contactPerson1Name: partnerDetails.contactPerson1Name.trim() || undefined,
+      contactPerson1Mobile: partnerDetails.contactPerson1Mobile.trim() || undefined,
+      contactPerson2Name: partnerDetails.contactPerson2Name.trim() || undefined,
+      contactPerson2Mobile: partnerDetails.contactPerson2Mobile.trim() || undefined,
+      addressLine: partnerDetails.addressLine.trim() || undefined,
+      area: partnerDetails.area.trim() || undefined,
+      pincode: partnerDetails.pincode.trim() || undefined,
+      latitude: partnerDetails.latitude ?? undefined,
+      longitude: partnerDetails.longitude ?? undefined,
+      governmentIdType: partnerDetails.governmentIdType || undefined,
+      governmentIdNumber: partnerDetails.governmentIdNumber.trim() || undefined,
+      workingHours: partnerDetails.workingHours.trim() || undefined,
+      serviceRadiusKm: partnerDetails.serviceRadiusKm.trim() || undefined,
+      yearsOfExperience: partnerDetails.yearsOfExperience.trim() || undefined,
+    });
+    if (!parsed.success) {
+      setError(formatZodError(parsed.error).join(" "));
+      return;
+    }
+
     setSaving(true);
     try {
       if (fullName.trim()) {
@@ -50,30 +78,12 @@ export default function PartnerOnboardingPage() {
       const res = await fetch("/api/partner/profile", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          businessName: partnerDetails.businessName,
-          type: partnerDetails.type,
-          city: partnerDetails.city,
-          contactPerson1Name: partnerDetails.contactPerson1Name.trim() || undefined,
-          contactPerson1Mobile: partnerDetails.contactPerson1Mobile.trim() || undefined,
-          contactPerson2Name: partnerDetails.contactPerson2Name.trim() || undefined,
-          contactPerson2Mobile: partnerDetails.contactPerson2Mobile.trim() || undefined,
-          addressLine: partnerDetails.addressLine.trim() || undefined,
-          area: partnerDetails.area.trim() || undefined,
-          pincode: partnerDetails.pincode.trim() || undefined,
-          latitude: partnerDetails.latitude ?? undefined,
-          longitude: partnerDetails.longitude ?? undefined,
-          governmentIdType: partnerDetails.governmentIdType || undefined,
-          governmentIdNumber: partnerDetails.governmentIdNumber.trim() || undefined,
-          workingHours: partnerDetails.workingHours.trim() || undefined,
-          serviceRadiusKm: partnerDetails.serviceRadiusKm.trim() || undefined,
-          yearsOfExperience: partnerDetails.yearsOfExperience.trim() || undefined,
-        }),
+        body: JSON.stringify(parsed.data),
       });
-      
+
       if (!res.ok) {
         const data = await res.json().catch(() => ({}) as { error?: string });
-        throw new Error(data.error || "Failed to save partner profile");
+        throw new Error(typeof data.error === "string" ? data.error : "Failed to save partner profile");
       }
 
       // FINAL PRODUCT MODEL — creating the profile IS the onboarding: capability activates the

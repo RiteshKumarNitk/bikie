@@ -21,6 +21,22 @@ Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 | Apply the pending migration (with its backfill) to the live DB | Completed — applied 2026-08-11 with explicit user go-ahead, alongside the business-contact-fields migration below |
 | Live browser/device test of the new membership purchase flow (free + paid plan), admin category edit, and all four mobile UX fixes | **Not done** — not verifiable in this environment, same caveat as every prior change |
 
+## Fix: Service Provider signup silently landed new applicants on the Rider experience (2026-08-11)
+
+`apps/web/app/partner-onboarding/page.tsx` built its `PUT /api/partner/profile` body by hand and
+was never updated when `businessMobile`/`businessEmail` became required — every post-signup
+Service Provider application 400'd, the `Partner` row never got created, and the error was
+swallowed into an unhelpful `"[object Object]"` message. Result: a user picking "Service
+Provider" at signup ended up on the plain Rider experience with no visible explanation why.
+
+| Task | Status |
+|---|---|
+| `partner-onboarding/page.tsx` now runs `partnerProfileSchema.safeParse` client-side (same pattern as `become-provider`/`PartnerSettingsForm`) and submits `parsed.data`, so `businessMobile`/`businessEmail` (and any future required field) can never silently drop out of the request again | Completed |
+| Error fallback now checks `typeof data.error === "string"` before displaying it, instead of stringifying the `flatten()` object into `"[object Object]"` | Completed |
+| Confirmed mobile's `partner_onboarding_screen.dart` was unaffected — it already sent both fields correctly from the same original commit | Completed |
+| Verified: `tsc --noEmit` clean, full `next build` clean | Completed |
+| Live signup-as-Service-Provider test in a browser | **Not done** — not verifiable in this environment; please confirm on your end |
+
 ## Fix: business contact fields build breakage; Vercel deploy unblocked (2026-08-11)
 
 Two independent build breaks on the last 2 pushes were preventing Vercel from shipping anything:
