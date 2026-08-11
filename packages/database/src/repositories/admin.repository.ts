@@ -237,6 +237,12 @@ export async function deletePartner(partnerId: string) {
   await prisma.partner.delete({ where: { id: partnerId } });
 }
 
+/** Admin sets/changes a provider's service category — independent of the verification-decision
+ * transition above, no status/notification side effects. */
+export async function updatePartnerType(partnerId: string, type: string) {
+  return prisma.partner.update({ where: { id: partnerId }, data: { type: type as any } });
+}
+
 export async function findAllBookingsAdmin() {
   const bookings = await prisma.booking.findMany({
     orderBy: { createdAt: "desc" },
@@ -407,6 +413,54 @@ export async function updateMembershipPlan(
 
 export async function deleteMembershipPlan(id: string) {
   await prisma.membershipPlan.delete({ where: { id } });
+}
+
+// --- Partner (Service Provider) Membership Plans — ADR-051, separate from the Rider plans above ---
+
+export async function findAllPartnerPlansAdmin() {
+  const plans = await prisma.partnerMembershipPlan.findMany({ orderBy: { sortOrder: "asc" } });
+  return plans.map(mapPlan);
+}
+
+export async function createPartnerMembershipPlan(data: {
+  name: string;
+  description: string;
+  price: number;
+  durationDays: number;
+  benefits: string[];
+  sortOrder?: number;
+}) {
+  const plan = await prisma.partnerMembershipPlan.create({
+    data: {
+      name: data.name,
+      description: data.description,
+      price: data.price,
+      durationDays: data.durationDays,
+      benefits: data.benefits,
+      sortOrder: data.sortOrder ?? 0,
+    },
+  });
+  return mapPlan(plan);
+}
+
+export async function updatePartnerMembershipPlan(
+  id: string,
+  data: Partial<{
+    name: string;
+    description: string;
+    price: number;
+    durationDays: number;
+    benefits: string[];
+    isActive: boolean;
+    sortOrder: number;
+  }>,
+) {
+  const plan = await prisma.partnerMembershipPlan.update({ where: { id }, data });
+  return mapPlan(plan);
+}
+
+export async function deletePartnerMembershipPlan(id: string) {
+  await prisma.partnerMembershipPlan.delete({ where: { id } });
 }
 
 // --- Trips ---

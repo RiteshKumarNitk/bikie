@@ -29,6 +29,7 @@ import '../../features/partner_dashboard/presentation/partner_history_screen.dar
 import '../../features/partner_dashboard/presentation/partner_home_screen.dart';
 import '../../features/partner_dashboard/presentation/partner_requests_screen.dart';
 import '../../features/partner_dashboard/presentation/partner_sos_request_screen.dart';
+import '../../features/partner_membership/presentation/partner_membership_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/referrals/presentation/referrals_screen.dart';
 import '../../features/ride_room/presentation/ride_room_screen.dart';
@@ -103,6 +104,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
           GoRoute(path: '/partner/requests', builder: (context, state) => const PartnerRequestsScreen()),
           GoRoute(path: '/partner/active', builder: (context, state) => const PartnerActiveScreen()),
+          GoRoute(path: '/messages', builder: (context, state) => const ConversationsListScreen()),
+          GoRoute(
+            path: '/messages/:id',
+            builder: (context, state) => ConversationThreadScreen(conversationId: state.pathParameters['id']!),
+          ),
         ],
       ),
       GoRoute(
@@ -151,12 +157,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       // APPROVED/REJECTED/SUSPENDED), reachable from Profile regardless of current mode.
       GoRoute(path: '/become-provider', builder: (context, state) => const BecomeProviderScreen()),
       GoRoute(path: '/membership', builder: (context, state) => const MembershipScreen()),
+      GoRoute(path: '/partner-membership', builder: (context, state) => const PartnerMembershipScreen()),
       GoRoute(path: '/referrals', builder: (context, state) => const ReferralsScreen()),
-      GoRoute(path: '/messages', builder: (context, state) => const ConversationsListScreen()),
-      GoRoute(
-        path: '/messages/:id',
-        builder: (context, state) => ConversationThreadScreen(conversationId: state.pathParameters['id']!),
-      ),
     ],
   );
 });

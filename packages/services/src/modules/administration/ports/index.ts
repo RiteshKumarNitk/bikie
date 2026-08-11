@@ -21,6 +21,7 @@ export interface AdminRepositoryPort {
     opts: { reason?: string; adminUserId: string },
   ): Promise<any>;
   deletePartner(partnerId: string): Promise<any>;
+  updatePartnerType(partnerId: string, type: string): Promise<any>;
   findAllBookingsAdmin(): Promise<any[]>;
   updateBookingStatus(bookingId: string, status: string): Promise<any>;
   deleteBooking(bookingId: string): Promise<any>;
@@ -36,6 +37,10 @@ export interface AdminRepositoryPort {
   createMembershipPlan(data: Record<string, unknown>): Promise<any>;
   updateMembershipPlan(id: string, data: Record<string, unknown>): Promise<any>;
   deleteMembershipPlan(id: string): Promise<any>;
+  findAllPartnerPlansAdmin(): Promise<any[]>;
+  createPartnerMembershipPlan(data: Record<string, unknown>): Promise<any>;
+  updatePartnerMembershipPlan(id: string, data: Record<string, unknown>): Promise<any>;
+  deletePartnerMembershipPlan(id: string): Promise<any>;
   findAllReferrals(): Promise<any[]>;
   findAllTripsAdmin(): Promise<any[]>;
   updateTripAdmin(tripId: string, data: Record<string, unknown>): Promise<any>;

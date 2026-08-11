@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@bikie/database", () => ({
   membershipRepository: { getActiveMembership: vi.fn(async () => null) },
+  partnerMembershipRepository: { getActiveMembership: vi.fn(async () => null) },
 }));
 
 import { isAccountRestricted } from "./domain/account-status";
@@ -14,6 +15,7 @@ import type { IdentityAccessPorts, SessionSnapshot } from "./ports";
 function fakePorts(overrides: Partial<IdentityAccessPorts> = {}): IdentityAccessPorts {
   return {
     membership: { hasActiveMembership: vi.fn(async () => false) },
+    partnerMembership: { hasActivePartnerMembership: vi.fn(async () => false) },
     otpEcho: { remember: vi.fn(async () => undefined), recall: vi.fn(async () => null) },
     msg91NativeOtp: {
       send: vi.fn(async (): Promise<ChannelResult> => ({ ok: true, provider: "msg91" })),
@@ -188,7 +190,7 @@ describe("Service Provider capability, decoupled from verification (ADR-049)", (
 
   it("denies a SUSPENDED profile — the one verification state that also revokes capability", async () => {
     const { access } = createIdentityAccessModule(
-      fakePorts({ membership: { hasActiveMembership: vi.fn(async () => true) } }),
+      fakePorts({ partnerMembership: { hasActivePartnerMembership: vi.fn(async () => true) } }),
     );
     await expect(access.evaluatePartnerCapability(session({ partnerStatus: "SUSPENDED" }))).resolves.toEqual({
       allowed: false,
@@ -200,7 +202,7 @@ describe("Service Provider capability, decoupled from verification (ADR-049)", (
     "grants capability for verificationStatus=%s as long as membership is active — verification is never the gate",
     async (partnerStatus) => {
       const { access } = createIdentityAccessModule(
-        fakePorts({ membership: { hasActiveMembership: vi.fn(async () => true) } }),
+        fakePorts({ partnerMembership: { hasActivePartnerMembership: vi.fn(async () => true) } }),
       );
       await expect(access.evaluatePartnerCapability(session({ partnerStatus }))).resolves.toEqual({
         allowed: true,
@@ -210,12 +212,26 @@ describe("Service Provider capability, decoupled from verification (ADR-049)", (
 
   it("still requires active membership, independent of profile/verification state", async () => {
     const { access } = createIdentityAccessModule(
-      fakePorts({ membership: { hasActiveMembership: vi.fn(async () => false) } }),
+      fakePorts({ partnerMembership: { hasActivePartnerMembership: vi.fn(async () => false) } }),
     );
     await expect(access.evaluatePartnerCapability(session({ partnerStatus: "DRAFT" }))).resolves.toEqual({
       allowed: false,
       reason: "MEMBERSHIP_REQUIRED",
     });
+  });
+
+  it("evaluatePartnerCapability reads the Partner membership port, not the Rider one (ADR-051)", async () => {
+    const hasActiveMembership = vi.fn(async () => true);
+    const hasActivePartnerMembership = vi.fn(async () => false);
+    const { access } = createIdentityAccessModule(
+      fakePorts({ membership: { hasActiveMembership }, partnerMembership: { hasActivePartnerMembership } }),
+    );
+    await expect(access.evaluatePartnerCapability(session({ partnerStatus: "APPROVED" }))).resolves.toEqual({
+      allowed: false,
+      reason: "MEMBERSHIP_REQUIRED",
+    });
+    expect(hasActivePartnerMembership).toHaveBeenCalledWith("user-1");
+    expect(hasActiveMembership).not.toHaveBeenCalled();
   });
 
   describe("hasPartnerCapabilitySync (cheap, session-only, for UI mode-routing)", () => {

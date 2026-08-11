@@ -34,6 +34,9 @@ export const AdminService = {
   deletePartner(partnerId: string) {
     return getAdministrationModule().admin.deletePartner(partnerId);
   },
+  updatePartnerType(partnerId: string, type: string) {
+    return getAdministrationModule().admin.updatePartnerType(partnerId, type);
+  },
   getAllBookings() {
     return getAdministrationModule().admin.getAllBookings();
   },
@@ -102,6 +105,25 @@ export const AdminService = {
   },
   deleteMembershipPlan(id: string) {
     return getAdministrationModule().admin.deleteMembershipPlan(id);
+  },
+  getAllPartnerMembershipPlans() {
+    return getAdministrationModule().admin.getAllPartnerMembershipPlans();
+  },
+  createPartnerMembershipPlan(data: {
+    name: string;
+    description: string;
+    price: number;
+    durationDays: number;
+    benefits: string[];
+    sortOrder?: number;
+  }) {
+    return getAdministrationModule().admin.createPartnerMembershipPlan(data);
+  },
+  updatePartnerMembershipPlan(id: string, data: Record<string, unknown>) {
+    return getAdministrationModule().admin.updatePartnerMembershipPlan(id, data);
+  },
+  deletePartnerMembershipPlan(id: string) {
+    return getAdministrationModule().admin.deletePartnerMembershipPlan(id);
   },
   getAllReferrals() {
     return getAdministrationModule().admin.getAllReferrals();

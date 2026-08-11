@@ -2,6 +2,7 @@ import { createAccessApplication } from "./application/access.application";
 import { createOtpSendApplication } from "./application/otp-send.application";
 import { createOtpVerifyApplication } from "./application/otp-verify.application";
 import { createMembershipAdapter } from "./infrastructure/membership.adapter";
+import { createPartnerMembershipAdapter } from "./infrastructure/partner-membership.adapter";
 import { createOtpEchoAdapter } from "./infrastructure/otp-echo.adapter";
 import { createMsg91NativeOtpAdapter } from "./infrastructure/msg91-native-otp.adapter";
 import { createMsg91WidgetVerifyAdapter } from "./infrastructure/msg91-widget-verify.adapter";
@@ -19,6 +20,7 @@ export type IdentityAccessDeps = Partial<IdentityAccessPorts>;
 export function createIdentityAccessModule(overrides: IdentityAccessDeps = {}): IdentityAccessModule {
   const ports: IdentityAccessPorts = {
     membership: overrides.membership ?? createMembershipAdapter(),
+    partnerMembership: overrides.partnerMembership ?? createPartnerMembershipAdapter(),
     otpEcho: overrides.otpEcho ?? createOtpEchoAdapter(),
     msg91NativeOtp: overrides.msg91NativeOtp ?? createMsg91NativeOtpAdapter(),
     msg91WidgetVerify: overrides.msg91WidgetVerify ?? createMsg91WidgetVerifyAdapter(),
@@ -47,6 +49,7 @@ export function setIdentityAccessModuleForTests(module: IdentityAccessModule | n
 export type {
   IdentityAccessPorts,
   MembershipPort,
+  PartnerMembershipPort,
   OtpEchoStorePort,
   Msg91NativeOtpPort,
   Msg91WidgetVerifyPort,

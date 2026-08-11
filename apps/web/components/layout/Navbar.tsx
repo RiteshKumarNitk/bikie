@@ -162,12 +162,16 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                         </svg>
                         Dashboard
                       </Link>
-                      {isCapableServiceProvider && (
+                      {/* Once in Service Provider mode, there's no UI path back to Rider mode —
+                          a Rider becoming a Service Provider is additive, not a toggle; the
+                          underlying dual-capability model is unchanged, only this control is
+                          one-directional now. */}
+                      {isCapableServiceProvider && role !== "PARTNER" && (
                         <button
                           type="button"
                           onClick={() => {
                             setUserMenuOpen(false);
-                            switchActiveMode(role === "PARTNER" ? "RIDER" : "PARTNER");
+                            switchActiveMode("PARTNER");
                           }}
                           role="menuitem"
                           className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-sm hover:bg-foreground/5"
@@ -175,7 +179,7 @@ export function Navbar({ role }: { role: SelectedRole | null }) {
                           <svg className="h-4 w-4 text-foreground/50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4M16 17H4m0 0l4 4m-4-4l4-4" />
                           </svg>
-                          Switch to {role === "PARTNER" ? "Rider" : "Service Provider"} mode
+                          Switch to Service Provider mode
                         </button>
                       )}
                       <Link

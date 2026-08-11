@@ -10,6 +10,7 @@ export * from "./partner";
 export * from "./admin";
 export * from "./message";
 export * from "./membership";
+export * from "./partner-membership";
 export * from "./sos";
 export * from "./referral";
 export * from "./notification";

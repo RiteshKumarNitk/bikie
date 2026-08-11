@@ -36,9 +36,11 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Center(child: Text(user.name, style: Theme.of(context).textTheme.titleLarge)),
           Center(child: Text(user.email, style: Theme.of(context).textTheme.bodyMedium)),
-          if (isCapableServiceProvider) ...[
+          // Once in Service Provider mode, there's no UI path back to Rider mode — the
+          // underlying dual-capability model is unchanged, only this control is one-directional.
+          if (isCapableServiceProvider && !isPartnerMode) ...[
             const SizedBox(height: 16),
-            _ModeSwitch(isPartnerMode: isPartnerMode),
+            const _ModeSwitch(),
           ],
           const SizedBox(height: 24),
           _PhoneField(initialPhone: user.phone),
@@ -53,27 +55,53 @@ class ProfileScreen extends ConsumerWidget {
           _ProfileTile(icon: Icons.chat_bubble_outline, label: 'Messages', onTap: () => context.push('/messages')),
           _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
           const SizedBox(height: 24),
-          OutlinedButton.icon(
-            onPressed: () => ref.read(authControllerProvider.notifier).signOut(),
-            icon: const Icon(Icons.logout),
-            label: const Text('Sign out'),
-          ),
+          const _SignOutButton(),
         ],
       ),
     );
   }
 }
 
-/// ADR-046b/ADR-049 — shown once the account has Service Provider CAPABILITY (an active,
-/// non-suspended profile — verification status irrelevant here); mirrors web's Navbar
-/// "Switch Mode" control. Switching to Partner mode is server-verified (see [switchActiveMode],
-/// including a membership check) — this button being visible is a UX convenience, not the actual
-/// authorization, so a since-suspended account or one that let membership lapse still gets turned
-/// back at the door.
-class _ModeSwitch extends ConsumerStatefulWidget {
-  const _ModeSwitch({required this.isPartnerMode});
+/// Non-critical cleanup (push-token unregister) is fired-and-forgotten by
+/// `AuthController.signOut()` itself, so the only await left on this button's critical path is
+/// the sign-out call — this busy state is just feedback while that runs.
+class _SignOutButton extends ConsumerStatefulWidget {
+  const _SignOutButton();
 
-  final bool isPartnerMode;
+  @override
+  ConsumerState<_SignOutButton> createState() => _SignOutButtonState();
+}
+
+class _SignOutButtonState extends ConsumerState<_SignOutButton> {
+  bool _busy = false;
+
+  Future<void> _handleSignOut() async {
+    setState(() => _busy = true);
+    await ref.read(authControllerProvider.notifier).signOut();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: _busy ? null : _handleSignOut,
+      icon: _busy
+          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.logout),
+      label: Text(_busy ? 'Signing out…' : 'Sign out'),
+    );
+  }
+}
+
+/// ADR-046b/ADR-049 — shown once the account has Service Provider CAPABILITY (an active,
+/// non-suspended profile — verification status irrelevant here) and is currently in Rider mode;
+/// mirrors web's Navbar "Switch Mode" control. Only offers Rider -> Service Provider — once in
+/// Service Provider mode there's no UI path back (see the gate at this widget's call site), the
+/// underlying dual-capability model is unaffected. Switching is server-verified (see
+/// [switchActiveMode], including a membership check) — this button being visible is a UX
+/// convenience, not the actual authorization.
+class _ModeSwitch extends ConsumerStatefulWidget {
+  const _ModeSwitch();
 
   @override
   ConsumerState<_ModeSwitch> createState() => _ModeSwitchState();
@@ -84,7 +112,7 @@ class _ModeSwitchState extends ConsumerState<_ModeSwitch> {
 
   Future<void> _handleSwitch() async {
     setState(() => _busy = true);
-    final result = await switchActiveMode(ref, widget.isPartnerMode ? 'RIDER' : 'PARTNER');
+    final result = await switchActiveMode(ref, 'PARTNER');
     if (!mounted) return;
     setState(() => _busy = false);
 
@@ -100,9 +128,9 @@ class _ModeSwitchState extends ConsumerState<_ModeSwitch> {
         context.push('/become-provider');
       case SwitchModeResult.membershipRequired:
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('An active membership is required for Service Provider mode.')),
+          const SnackBar(content: Text('An active Service Provider membership is required for Service Provider mode.')),
         );
-        context.push('/membership');
+        context.push('/partner-membership');
       case SwitchModeResult.networkError:
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Couldn't verify Service Provider status. Please try again.")),
@@ -117,7 +145,7 @@ class _ModeSwitchState extends ConsumerState<_ModeSwitch> {
       icon: _busy
           ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
           : const Icon(Icons.swap_horiz),
-      label: Text(_busy ? 'Checking…' : 'Switch to ${widget.isPartnerMode ? 'Rider' : 'Service Provider'} mode'),
+      label: Text(_busy ? 'Checking…' : 'Switch to Service Provider mode'),
     );
   }
 }
@@ -165,11 +193,35 @@ class _RiderProfileSection extends StatelessWidget {
 /// Business Profile tile (verification badge, opens the same business-details form onboarding
 /// uses, pre-filled for editing) plus the Available/Offline toggle already surfaced persistently
 /// in `PartnerAvailabilityBanner` above every partner screen — not duplicated here, just linked.
-class _PartnerProfileSection extends ConsumerWidget {
+class _PartnerProfileSection extends ConsumerStatefulWidget {
   const _PartnerProfileSection();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PartnerProfileSection> createState() => _PartnerProfileSectionState();
+}
+
+class _PartnerProfileSectionState extends ConsumerState<_PartnerProfileSection> {
+  bool _loading = false;
+
+  Future<void> _openBusinessProfile() async {
+    setState(() => _loading = true);
+    try {
+      final profile = await ref.read(partnerProfileRepositoryProvider).getProfile();
+      if (mounted) {
+        await context.push('/partner-onboarding', extra: profile);
+        ref.invalidate(partnerProfileSummaryProvider);
+      }
+    } on ApiException catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final profileAsync = ref.watch(partnerProfileSummaryProvider);
 
     return Column(
@@ -177,31 +229,28 @@ class _PartnerProfileSection extends ConsumerWidget {
         _ProfileTile(
           icon: Icons.storefront_outlined,
           label: 'Business Profile',
-          subtitle: profileAsync.when(
-            // FINAL PRODUCT MODEL — verification status is a separate, optional trust layer:
-            // only an APPROVED profile is "Verified", only a submitted one is "Verification
-            // pending"; everything else is plainly "Unverified" (and still fully operational).
-            data: (p) {
-              if (p == null) return null;
-              switch (p.verificationStatus) {
-                case 'APPROVED':
-                  return '✓ Verified';
-                case 'PENDING_VERIFICATION':
-                  return 'Verification pending';
-                default:
-                  return 'Unverified — fully operational';
-              }
-            },
-            loading: () => null,
-            error: (_, __) => null,
-          ),
-          onTap: () async {
-            final profile = await ref.read(partnerProfileRepositoryProvider).getProfile();
-            if (context.mounted) {
-              await context.push('/partner-onboarding', extra: profile);
-              ref.invalidate(partnerProfileSummaryProvider);
-            }
-          },
+          subtitle: _loading
+              ? 'Loading…'
+              : profileAsync.when(
+                  // FINAL PRODUCT MODEL — verification status is a separate, optional trust
+                  // layer: only an APPROVED profile is "Verified", only a submitted one is
+                  // "Verification pending"; everything else is plainly "Unverified" (and still
+                  // fully operational).
+                  data: (p) {
+                    if (p == null) return null;
+                    switch (p.verificationStatus) {
+                      case 'APPROVED':
+                        return '✓ Verified';
+                      case 'PENDING_VERIFICATION':
+                        return 'Verification pending';
+                      default:
+                        return 'Unverified — fully operational';
+                    }
+                  },
+                  loading: () => null,
+                  error: (_, __) => null,
+                ),
+          onTap: _loading ? () {} : _openBusinessProfile,
         ),
         if (profileAsync.valueOrNull case final p? when p.ratingCount > 0)
           _ProfileTile(
@@ -210,6 +259,11 @@ class _PartnerProfileSection extends ConsumerWidget {
             subtitle: '⭐ ${p.ratingAvg.toStringAsFixed(1)} (${p.ratingCount})',
             onTap: () => context.push('/partner/reviews'),
           ),
+        _ProfileTile(
+          icon: Icons.workspace_premium_outlined,
+          label: 'Membership',
+          onTap: () => context.push('/partner-membership'),
+        ),
       ],
     );
   }

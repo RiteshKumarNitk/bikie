@@ -12,12 +12,23 @@ type Plan = {
   isActive: boolean;
 };
 
-export function MembershipPlansManager({ initial }: { initial: Plan[] }) {
+/** `basePath` defaults to the Rider membership plans API; the Partner Membership admin page
+ * (ADR-051) passes `/api/admin/partner-membership/plans` to reuse this manager unchanged
+ * against its own separate plan table. */
+export function MembershipPlansManager({
+  initial,
+  basePath = "/api/admin/membership/plans",
+  defaultDurationDays = 30,
+}: {
+  initial: Plan[];
+  basePath?: string;
+  defaultDurationDays?: number;
+}) {
   const [list, setList] = useState<Plan[]>(initial);
   const [showForm, setShowForm] = useState(false);
 
   async function toggleActive(p: Plan) {
-    await fetch(`/api/admin/membership/plans/${p.id}`, {
+    await fetch(`${basePath}/${p.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !p.isActive }),
@@ -26,7 +37,7 @@ export function MembershipPlansManager({ initial }: { initial: Plan[] }) {
   }
 
   async function deletePlan(id: string) {
-    await fetch(`/api/admin/membership/plans/${id}`, { method: "DELETE" });
+    await fetch(`${basePath}/${id}`, { method: "DELETE" });
     setList((prev) => prev.filter((x) => x.id !== id));
   }
 
@@ -36,7 +47,13 @@ export function MembershipPlansManager({ initial }: { initial: Plan[] }) {
         {showForm ? "Cancel" : "Add Plan"}
       </button>
 
-      {showForm && <PlanForm onCreated={(p) => { setList((prev) => [...prev, p]); setShowForm(false); }} />}
+      {showForm && (
+        <PlanForm
+          basePath={basePath}
+          defaultDurationDays={defaultDurationDays}
+          onCreated={(p) => { setList((prev) => [...prev, p]); setShowForm(false); }}
+        />
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         {list.map((p) => (
@@ -46,7 +63,7 @@ export function MembershipPlansManager({ initial }: { initial: Plan[] }) {
                 <p className="font-medium">{p.name}</p>
                 <p className="text-xs text-white/50">{p.description}</p>
               </div>
-              <p className="text-lg font-semibold text-gold">₹{p.price}</p>
+              <p className="text-lg font-semibold text-gold">{p.price === 0 ? "Free" : `₹${p.price}`}</p>
             </div>
             <p className="mt-2 text-xs text-white/50">{p.durationDays} days</p>
             <ul className="mt-2 space-y-1">
@@ -72,18 +89,26 @@ export function MembershipPlansManager({ initial }: { initial: Plan[] }) {
   );
 }
 
-function PlanForm({ onCreated }: { onCreated: (p: Plan) => void }) {
+function PlanForm({
+  basePath,
+  defaultDurationDays,
+  onCreated,
+}: {
+  basePath: string;
+  defaultDurationDays: number;
+  onCreated: (p: Plan) => void;
+}) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [price, setPrice] = useState(999);
-  const [durationDays, setDurationDays] = useState(30);
+  const [price, setPrice] = useState(0);
+  const [durationDays, setDurationDays] = useState(defaultDurationDays);
   const [benefits, setBenefits] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const res = await fetch("/api/admin/membership/plans", {
+    const res = await fetch(basePath, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -104,7 +129,7 @@ function PlanForm({ onCreated }: { onCreated: (p: Plan) => void }) {
       <div className="grid gap-3 sm:grid-cols-2">
         <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Plan name" required className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white placeholder-white/30" />
         <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description" required className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white placeholder-white/30" />
-        <input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} placeholder="Price (₹)" className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white" />
+        <input type="number" min={0} value={price} onChange={(e) => setPrice(Number(e.target.value))} placeholder="Price (₹, 0 = free)" className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white" />
         <input type="number" min={1} value={durationDays} onChange={(e) => setDurationDays(Number(e.target.value))} placeholder="Duration (days)" className="rounded-lg bg-white/10 px-3 py-2 text-sm text-white" />
       </div>
       <textarea

@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers.dart';
-import '../../membership/data/membership_repository.dart';
+import '../../partner_membership/data/partner_membership_repository.dart';
 import 'auth_controller.dart';
 
 /// Mirrors the web's `SELECTED_ROLE_COOKIE` (`lib/role.ts`) — a pre-auth UI
@@ -64,7 +64,8 @@ Future<SwitchModeResult> switchActiveMode(WidgetRef ref, String mode) async {
     }
 
     try {
-      final membership = await ref.read(membershipRepositoryProvider).getActive();
+      // ADR-051 — a Service Provider's own membership, not the Rider one.
+      final membership = await ref.read(partnerMembershipRepositoryProvider).getActive();
       if (membership == null) {
         return SwitchModeResult.membershipRequired;
       }

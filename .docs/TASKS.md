@@ -2,6 +2,25 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Service Provider membership decoupled from Rider membership; mobile UX fixes; admin category control (2026-08-11, ADR-051)
+
+| Task | Status |
+|---|---|
+| Mobile: slow logout — `signOut()` now fires-and-forgets push-token unregister (matches `forceLogout()`'s existing pattern), busy state added to the button | Completed |
+| Mobile: Messages tab had no back button — `/messages`/`/messages/:id` moved inside the `ShellRoute` route tree, matching every other bottom-nav destination | Completed |
+| Mobile: "Business Profile" tile silently failed on error — try/catch/loading added | Completed |
+| Mobile: availability toggle rendered under the status bar — `AppShell`'s body wrapped in `SafeArea` | Completed |
+| Admin: new `PATCH /api/admin/partners/[id]/type` + "Category" card on `/admin/partners/[id]` — admin can now set/change a provider's service category (previously self-service only) | Completed |
+| New Partner Membership: schema (`PartnerMembershipPlan`/`PartnerMembership`/`PartnerMembershipStatus`, migration `20260811100000_partner_membership_model`, additive + backfill), repository/service/types/validation mirroring the Rider membership stack, new `PartnerMembershipPort` wired into `evaluatePartnerCapability` (`evaluateMembership`/Rider gate untouched) | Completed |
+| New routes: `/api/partner-membership/{active,plans,checkout,purchase}`, `/api/admin/partner-membership/plans(/[id])` — free (price 0) plans skip Razorpay entirely, server-side price is always the source of truth | Completed |
+| Web UI: `/partner/membership` (reuses `PaymentModal`, now parameterized with checkout/purchase URLs), `/admin/partner-membership` (reuses `MembershipPlansManager`, now parameterized with a `basePath`); `switchActiveMode`'s `MEMBERSHIP_REQUIRED` redirect repointed from `/membership` to `/partner/membership` | Completed |
+| Mobile UI: new `features/partner_membership/` (model/repository/providers/screen) mirroring `features/membership/`; `role_provider.dart`/`profile_screen.dart` repointed at it | Completed |
+| "Switch to Rider Mode" hidden once already in Service Provider mode (web Navbar dropdown, mobile `_ModeSwitch`) — explicit product decision to keep the underlying dual-capability model (ADR-046b/047/048/049) fully intact, UI-only change; pre-auth `Footer`/`SwitchRoleLink` marketing toggle deliberately left alone (also serves logged-out visitors) | Completed |
+| New tests: `evaluatePartnerCapability` reads the Partner membership port not the Rider one (regression guard for separability); administration module CRUD coverage for the new partner membership plans | Completed |
+| Backend: `pnpm turbo run typecheck` (9/9), `pnpm exec vitest run` (167/167, 15/15 files), `pnpm openapi:generate` re-run (132 → 139 routes). Mobile: `flutter analyze` (0 issues), `flutter test` (113/113) | Completed |
+| Apply the pending migration (with its backfill) to the live DB | **Not done** — needs explicit user go-ahead, not run automatically against shared state, same posture as every prior schema change in this project |
+| Live browser/device test of the new membership purchase flow (free + paid plan), admin category edit, and all four mobile UX fixes | **Not done** — not verifiable in this environment, same caveat as every prior change |
+
 ## Master Spec gap-fill: SOS cancel, discovery badges, admin stats, ops fields, reviews, admin chat read (2026-08-10)
 
 Six gaps identified in a comprehensive gap-analysis pass against the master product spec (§1–56),

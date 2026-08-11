@@ -168,6 +168,12 @@ enum MembershipStatus {
   CANCELLED
 }
 
+enum PartnerMembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
 // --- Community Platform v2 (Milestone 8, ADR-011) ---
 
 enum GroupType {
@@ -304,6 +310,7 @@ model User {
   conversations ConversationParticipant[]
   messagesSent  Message[]
   membership    UserMembership[]
+  partnerMembership PartnerMembership[]
   sosAlerts     SOSAlert[]
   sosResponses  SOSAlertResponse[]
   providerReviewsWritten ProviderReview[] @relation("ProviderReviewRider")
@@ -961,6 +968,45 @@ model UserMembership {
   @@index([userId])
   @@index([status])
   @@map("user_membership")
+}
+
+// --- Partner (Service Provider) Membership ---
+// ADR-051: a Partner's own membership, entirely separate from the Rider `MembershipPlan`/
+// `UserMembership` above — different audience, different plans, admin-managed. Mirrors the
+// Rider membership shape deliberately (same field set, same dynamic/DB-backed plan model) so
+// the two systems stay easy to reason about side by side, but shares zero types/tables with it.
+
+model PartnerMembershipPlan {
+  id           String                  @id @default(cuid())
+  name         String
+  description  String
+  price        Decimal                 @db.Decimal(10, 2) // 0 = free tier
+  durationDays Int                     @default(365) // admin-configurable; defaults to 1 year
+  benefits     String[]
+  isActive     Boolean                 @default(true)
+  sortOrder    Int                     @default(0)
+  createdAt    DateTime                @default(now())
+  memberships  PartnerMembership[]
+
+  @@map("partner_membership_plan")
+}
+
+model PartnerMembership {
+  id        String                   @id @default(cuid())
+  userId    String
+  user      User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId    String
+  plan      PartnerMembershipPlan    @relation(fields: [planId], references: [id])
+  startDate DateTime
+  endDate   DateTime
+  status    PartnerMembershipStatus  @default(ACTIVE)
+  paymentId String?
+  razorpayOrderId String?
+  createdAt DateTime                 @default(now())
+
+  @@index([userId])
+  @@index([status])
+  @@map("partner_membership")
 }
 
 // --- SOS / Emergency ---

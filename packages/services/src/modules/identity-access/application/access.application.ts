@@ -55,6 +55,11 @@ export function createAccessApplication(ports: IdentityAccessPorts) {
      * status, never a blanket blocker for provider operation. The SOS `requireAvailableAndCapacity`
      * gate reads capability the same way (any non-SUSPENDED profile, not only APPROVED), so an
      * unverified provider can accept assistance requests — verification is a trust badge only.
+     *
+     * ADR-051 — the membership check reads the Partner's own `PartnerMembershipPort`, not the
+     * Rider `MembershipPort` (`evaluateMembership` below still uses that one, unchanged) — Riders
+     * and Service Providers are different roles with different membership plans/pricing, not one
+     * shared subscription.
      */
     async evaluatePartnerCapability(
       session: SessionSnapshot | null | undefined,
@@ -64,7 +69,7 @@ export function createAccessApplication(ports: IdentityAccessPorts) {
       if (session!.partnerStatus == null || session!.partnerStatus === "SUSPENDED") {
         return denied("PARTNER_NOT_APPROVED");
       }
-      const activeMembership = await ports.membership.hasActiveMembership(session!.userId);
+      const activeMembership = await ports.partnerMembership.hasActivePartnerMembership(session!.userId);
       return activeMembership ? ALLOWED : denied("MEMBERSHIP_REQUIRED");
     },
 

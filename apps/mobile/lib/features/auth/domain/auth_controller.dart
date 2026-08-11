@@ -80,7 +80,7 @@ class AuthController extends StateNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
-    await _push.unregisterCurrentDevice();
+    unawaited(_push.unregisterCurrentDevice());
     await _repository.signOut();
     state = const AuthState.unauthenticated();
   }

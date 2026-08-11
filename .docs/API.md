@@ -232,6 +232,22 @@ mirrors the same mapping client-side for the foreground case (`push_channels.dar
 | `/api/admin/membership/plans` | GET/POST | Role: ADMIN. Same shape as above but includes inactive plans and allows creation. |
 | `/api/admin/membership/plans/[id]` | PATCH/DELETE | Role: ADMIN |
 
+## Partner (Service Provider) Membership — ADR-051, separate from Rider Membership above
+
+A Service Provider's own membership — different plans/pricing, admin-managed, gates
+`evaluatePartnerCapability` instead of the Rider `MembershipPort`. Same shapes/semantics as the
+Membership routes above, mirrored against `PartnerMembershipPlan`/`PartnerMembership` instead of
+`MembershipPlan`/`UserMembership` — only the differences are called out below.
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/partner-membership/active` | GET | Auth required. `{ membership: PartnerMembershipDTO \| null }` |
+| `/api/partner-membership/plans` | GET | Public. `{ plans: PartnerMembershipPlanDTO[] }` |
+| `/api/partner-membership/checkout` | POST | Body: `{ planId }`. A plan whose server-side `price` is `0` (free tier) returns `{ razorpayConfigured: false, free: true }` without ever reaching Razorpay — the client purchases directly with no payment step. Otherwise identical to `/api/membership/checkout`. |
+| `/api/partner-membership/purchase` | POST | Same two body shapes as `/api/membership/purchase`, plus: if the resolved plan's server-side `price` is `0`, the membership activates immediately regardless of what the client sent (never a client-asserted "this is free" flag). |
+| `/api/admin/partner-membership/plans` | GET/POST | Role: ADMIN. |
+| `/api/admin/partner-membership/plans/[id]` | PATCH/DELETE | Role: ADMIN. |
+
 ## Referrals (auth required)
 
 | Route | Method | Notes |
@@ -302,6 +318,8 @@ There is no dedicated "members" route — the room's real member list is the sam
 | `/api/admin/partners` | GET | `{ partners: AdminPartnerRowDTO[] }` — now includes `verificationStatus` (ADR-046b), not a boolean. |
 | `/api/admin/partners/[id]` | GET | ADR-046b. `AdminPartnerDetailDTO` — full profile, owning user, and `AuditLog`-backed verification history. |
 | `/api/admin/partners/[id]` | PATCH | ADR-046b, **replaces** the old `{isVerified: boolean}` toggle. Body: `{ action: "APPROVE" \| "REJECT" \| "REQUEST_INFO" \| "SUSPEND" \| "RESTORE", reason? }` (`reason` required for every action except `APPROVE`). Validated state transition — `409 { error: "INVALID_TRANSITION" }` if illegal for the current status. Notifies the applicant (`NotificationService`) and audit-logs (`{action}_PARTNER_APPLICATION`). |
+| `/api/admin/partners/[id]/type` | PATCH | ADR-051. Body: `{ type }` (`PartnerType` enum) — sets/changes a provider's service category, kept separate from the verification-decision route above. Audit-logs `UPDATE_PARTNER_TYPE`. |
+| `/api/admin/partner-membership/plans(/[id])` | see Partner Membership above | |
 | `/api/admin/bikes` | GET/POST | |
 | `/api/admin/bikes/[id]` | PATCH/DELETE | |
 | `/api/admin/bookings` | GET | |

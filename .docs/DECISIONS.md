@@ -2159,3 +2159,81 @@ changes:
   typecheck, 163/163 vitest (15 files), web `next build` clean, `flutter analyze` clean,
   `flutter test` 113/113. Not verified in this environment (as always): real-device/two-account
   end-to-end SOS acceptance by an unverified provider against a live deployment.
+
+## ADR-051: Service Provider gets its own membership — decoupled from the Rider membership; admin category control; mobile UX fixes
+
+- **Context.** Four mobile UX bugs were reported in the Service Provider app (slow logout,
+  missing back navigation on Messages, a silently-broken Business Profile tile, and the
+  availability toggle rendering under the phone's status bar), alongside two product corrections:
+  1. `evaluatePartnerCapability` (ADR-049) required an active **Rider** `UserMembership` before a
+     Service Provider profile could operate — but Riders and Service Providers are different
+     roles with different plans/pricing; Service Providers don't have a membership feature of
+     their own to buy, yet were being asked to subscribe to the Rider one. Explicit product
+     decision: give Service Providers their **own** membership — a separate, admin-managed plan
+     (yearly by default, admin sets price; 0 = free) — and gate capability on that instead.
+  2. Admin could not set/change a provider's service category (`Partner.type`) — only the
+     provider could self-edit it.
+- **Decision 1 — mobile UX fixes** (`apps/mobile`):
+  - `auth_controller.dart`'s `signOut()` now fires-and-forgets the push-token unregister step
+    (mirrors the pre-existing `forceLogout()` pattern) instead of awaiting it on the critical
+    path; `profile_screen.dart`'s sign-out button gained a busy/disabled state.
+  - `/messages` and `/messages/:id` moved from top-level `GoRoute`s into the `ShellRoute` in
+    `app_router.dart`, matching every other bottom-nav destination — fixes both the missing back
+    arrow (the screen was previously the un-poppable root of its own stack whenever reached via
+    the bottom-nav tab) and the bottom nav disappearing on that screen.
+  - `profile_screen.dart`'s `_PartnerProfileSection` "Business Profile" tap handler gained
+    try/catch/loading state — a thrown `ApiException` (e.g. the capability 403 this ADR's
+    Decision 2 also fixes) previously failed with zero visible symptom.
+  - `app_shell.dart`'s Scaffold body (availability banner + tab content) is now wrapped in
+    `SafeArea(top: true, bottom: false, ...)` — it was the one appbar-less Scaffold in the app not
+    already doing this, so the availability toggle rendered under the status bar/notch.
+- **Decision 2 — separate Partner Membership** (new, fully independent of the Rider
+  `MembershipPlan`/`UserMembership` system):
+  - Schema: `PartnerMembershipPlan`/`PartnerMembership`/`PartnerMembershipStatus` (migration
+    `20260811100000_partner_membership_model`), mirroring the Rider shape field-for-field but a
+    genuinely separate table/enum — `price` of `0` is a first-class free tier, `durationDays`
+    defaults to 365 but stays admin-configurable per plan.
+  - **Backfill in the same migration**: every existing non-`SUSPENDED` `Partner` row is granted an
+    ACTIVE membership against a seeded "Standard (Legacy)" free plan with a ~100-year window, so
+    no currently-capable provider is locked out the instant this ships — same precedent as ADR-047's
+    account-repair backfill for a prior breaking capability change.
+  - `evaluatePartnerCapability` (`identity-access` module) now reads a new `PartnerMembershipPort`
+    instead of the Rider `MembershipPort`; `evaluateMembership` (Rider trip-booking gate) is
+    untouched — the two systems share zero types/tables/ports beyond mirroring the same shape.
+  - New routes mirroring the Rider membership API 1:1: `GET/POST /api/partner-membership/{active,
+    plans,checkout,purchase}`, `GET/POST /api/admin/partner-membership/plans`,
+    `PATCH/DELETE /api/admin/partner-membership/plans/[id]`. A free plan (server-side price `0`,
+    never a client-supplied flag) skips Razorpay entirely in both `checkout` and `purchase`.
+  - Web UI: `/admin/partner-membership` (reuses `MembershipPlansManager`, parameterized with a
+    `basePath` prop rather than forked), `/partner/membership` (reuses `PaymentModal`,
+    parameterized with `checkoutUrl`/`purchaseUrl` props for the same reason). `switchActiveMode`'s
+    `MEMBERSHIP_REQUIRED` redirect now goes to `/partner/membership`, not `/membership`.
+  - Mobile: new `features/partner_membership/` (model/repository/providers/screen) mirroring
+    `features/membership/`; `role_provider.dart`'s `switchActiveMode` and `profile_screen.dart`'s
+    membership-required handling repointed at it.
+- **Decision 3 — admin sets a provider's category.** New `PATCH /api/admin/partners/[id]/type`
+  (kept as a dedicated route rather than folded into the existing verification-decision endpoint,
+  which has its own action/reason schema and audit semantics), wired through the standard 4-layer
+  administration module, audit-logged as `UPDATE_PARTNER_TYPE`. Web `/admin/partners/[id]` gained
+  a "Category" card. The `partnerTypeEnum` used by onboarding/settings/admin/the public nearby-
+  partners filter was consolidated into one shared export in `partner.schema.ts` so the four never
+  drift apart.
+- **Decision 4 — "Switch to Rider Mode" hidden once in Partner mode, dual-capability model
+  otherwise untouched.** Explicit product decision: keep the ADR-046b/047/048/049 dual-capability
+  architecture (separate `User`/`Partner` tables, SOS dispatching to both pools, the additive
+  Rider→Partner "Become a Service Provider" flow) fully intact — only the UI path *from* Partner
+  mode *back to* Rider mode is removed. `Navbar.tsx`'s mode-switch button and mobile's
+  `_ModeSwitch` now render only when **not** currently in Partner mode; `evaluatePartnerCapability`,
+  `resolveActiveMode`, `switchActiveMode`'s authorization logic, `hasPartnerCapabilitySync`, and
+  SOS dispatch are unchanged. The pre-auth `Footer`/`SwitchRoleLink` marketing toggle (used by
+  logged-out visitors on `/welcome`, unrelated to an authenticated session's mode) was deliberately
+  left alone — collapsing it into this rule would have hidden it for anonymous Partner-marketing
+  visitors too.
+- **Consequences.** Backend: `pnpm turbo run typecheck` 9/9 clean, `pnpm exec vitest run` 167/167
+  passing (15/15 files) — new coverage for `evaluatePartnerCapability` reading the Partner port
+  (not the Rider one) and for the new admin plan CRUD. `pnpm openapi:generate` re-run (132 → 139
+  routes). Mobile: `flutter analyze` clean, `flutter test` 113/113. Not verified in this
+  environment: a live browser/device walkthrough of the new membership purchase flow (free and
+  paid), and the backfill migration has not been applied to the live Neon DB yet — needs explicit
+  go-ahead before running against shared state, same posture as every prior schema change in this
+  project.

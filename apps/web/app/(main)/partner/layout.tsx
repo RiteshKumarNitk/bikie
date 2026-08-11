@@ -12,6 +12,7 @@ const navItems = [
   { label: "Trips", href: "/partner/trips" },
   { label: "Reviews", href: "/partner/reviews" },
   { label: "Payouts", href: "/partner/payouts" },
+  { label: "Membership", href: "/partner/membership" },
   { label: "Settings", href: "/partner/settings" },
 ];
 

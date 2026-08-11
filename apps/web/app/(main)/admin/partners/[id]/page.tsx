@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { AdminPartnerDetailDTO } from "@bikie/types";
+import { partnerTypes } from "@/components/auth/PartnerBusinessFields";
 
 type Action = "APPROVE" | "REJECT" | "REQUEST_INFO" | "SUSPEND" | "RESTORE";
 
@@ -29,12 +30,40 @@ export default function AdminPartnerDetailPage() {
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [category, setCategory] = useState("");
+  const [categoryBusy, setCategoryBusy] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   async function load() {
     setLoading(true);
     const res = await fetch(`/api/admin/partners/${id}`);
-    if (res.ok) setDetail(await res.json());
+    if (res.ok) {
+      const data: AdminPartnerDetailDTO = await res.json();
+      setDetail(data);
+      setCategory(data.profile.type);
+    }
     setLoading(false);
+  }
+
+  async function saveCategory() {
+    setCategoryBusy(true);
+    setCategoryError(null);
+    try {
+      const res = await fetch(`/api/admin/partners/${id}/type`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: category }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}) as { error?: string });
+        throw new Error(typeof data.error === "string" ? data.error : "Could not update the category.");
+      }
+      await load();
+    } catch (err) {
+      setCategoryError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setCategoryBusy(false);
+    }
   }
 
   useEffect(() => {
@@ -113,6 +142,30 @@ export default function AdminPartnerDetailPage() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="rounded-3xl bg-card p-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">Category</p>
+        {categoryError && <div className="mt-3 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">{categoryError}</div>}
+        <div className="mt-3 flex items-center gap-3">
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none focus:border-accent"
+          >
+            {partnerTypes.map((t) => (
+              <option key={t} value={t}>{t.replace(/_/g, " ")}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={saveCategory}
+            disabled={categoryBusy || category === profile.type}
+            className="rounded-full bg-accent px-5 py-2 text-sm font-semibold text-white hover:bg-accent-hover disabled:opacity-50"
+          >
+            {categoryBusy ? "Saving…" : "Save"}
+          </button>
+        </div>
       </section>
 
       {actions.length > 0 && (

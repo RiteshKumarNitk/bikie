@@ -75,10 +75,16 @@ export function PaymentModal({
   plan,
   onClose,
   onSuccess,
+  checkoutUrl = "/api/membership/checkout",
+  purchaseUrl = "/api/membership/purchase",
 }: {
   plan: Plan;
   onClose: () => void;
   onSuccess: () => void;
+  /** ADR-051 — the Partner Membership page passes the `/api/partner-membership/*` pair to reuse
+   * this component unchanged against the separate Partner plan/checkout routes. */
+  checkoutUrl?: string;
+  purchaseUrl?: string;
 }) {
   const [checkoutMode, setCheckoutMode] = useState<"loading" | "simulated" | "razorpay" | "unavailable">("loading");
   const [razorpayOrder, setRazorpayOrder] = useState<RazorpayOrder | null>(null);
@@ -93,7 +99,7 @@ export function PaymentModal({
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/membership/checkout", {
+    fetch(checkoutUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ planId: plan.id }),
@@ -116,7 +122,7 @@ export function PaymentModal({
     return () => {
       cancelled = true;
     };
-  }, [plan.id]);
+  }, [plan.id, checkoutUrl]);
 
   async function openRazorpay() {
     if (!razorpayOrder) return;
@@ -140,7 +146,7 @@ export function PaymentModal({
       name: "BIKIE",
       description: `${plan.name} membership`,
       handler: async (response: RazorpaySuccessResponse) => {
-        const res = await fetch("/api/membership/purchase", {
+        const res = await fetch(purchaseUrl, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -185,7 +191,7 @@ export function PaymentModal({
     await new Promise((resolve) => setTimeout(resolve, 1400));
 
     const paymentId = `DUMMY-${crypto.randomUUID()}`;
-    const res = await fetch("/api/membership/purchase", {
+    const res = await fetch(purchaseUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ planId: plan.id, paymentId }),

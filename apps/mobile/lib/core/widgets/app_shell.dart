@@ -54,11 +54,15 @@ class AppShell extends ConsumerWidget {
     final currentIndex = indexForTab(tabs, location);
 
     return Scaffold(
-      body: Column(
-        children: [
-          if (isPartner) const PartnerAvailabilityBanner(),
-          Expanded(child: child),
-        ],
+      body: SafeArea(
+        top: true,
+        bottom: false,
+        child: Column(
+          children: [
+            if (isPartner) const PartnerAvailabilityBanner(),
+            Expanded(child: child),
+          ],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: currentIndex,

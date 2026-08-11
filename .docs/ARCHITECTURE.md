@@ -104,15 +104,19 @@ account's Rider standing or requires a second login. Four previously-conflated c
 are now separate:
 
 - **Account tier** — `User.role` (`RENTER`/`ADMIN`), unaffected by Partner capability.
-- **Partner CAPABILITY** (ADR-049) — whether the account can operate as a Service Provider
-  at all: an active `Partner` profile (a row exists) + active membership + not admin-
-  `SUSPENDED`. Does **not** depend on verification — `DRAFT`/`PENDING_VERIFICATION`/
-  `MORE_INFORMATION_REQUIRED`/`REJECTED`/`APPROVED` all grant full capability, matching the
-  product rule "Service Provider ≠ Verified Service Provider." Only `SUSPENDED` (a
-  deliberate admin trust/safety action) revokes it. Gated by `evaluatePartnerCapability`
-  (async — checks membership) for actual API access, or the cheaper `hasPartnerCapabilitySync`
-  (session-only, no membership lookup) for UI mode-routing paths evaluated on every
-  request/render (middleware, tab bar).
+- **Partner CAPABILITY** (ADR-049, membership source corrected by ADR-051) — whether the
+  account can operate as a Service Provider at all: an active `Partner` profile (a row exists)
+  + active **Partner** membership + not admin-`SUSPENDED`. Does **not** depend on verification —
+  `DRAFT`/`PENDING_VERIFICATION`/`MORE_INFORMATION_REQUIRED`/`REJECTED`/`APPROVED` all grant full
+  capability, matching the product rule "Service Provider ≠ Verified Service Provider." Only
+  `SUSPENDED` (a deliberate admin trust/safety action) revokes it. Gated by
+  `evaluatePartnerCapability` (async — checks membership) for actual API access, or the cheaper
+  `hasPartnerCapabilitySync` (session-only, no membership lookup) for UI mode-routing paths
+  evaluated on every request/render (middleware, tab bar). The membership check reads
+  `PartnerMembershipPort` → `PartnerMembership`/`PartnerMembershipPlan` (ADR-051) — a Service
+  Provider's own admin-managed, yearly, free-or-paid membership, entirely separate from the Rider
+  `MembershipPort` → `UserMembership`/`MembershipPlan` used by `evaluateMembership` (the Rider
+  trip-booking gate). The two systems share zero types/tables, only the same mirrored shape.
 - **Partner VERIFICATION** — `Partner.verificationStatus` (`DRAFT → PENDING_VERIFICATION →
   APPROVED`, or `MORE_INFORMATION_REQUIRED`/`REJECTED`/`SUSPENDED`), reached through a real,
   **optional** application + admin-review workflow (`PartnerService.submitApplication`,

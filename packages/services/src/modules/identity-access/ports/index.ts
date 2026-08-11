@@ -14,6 +14,12 @@ export interface MembershipPort {
   hasActiveMembership(userId: string): Promise<boolean>;
 }
 
+/** ADR-051 — a Service Provider's own membership, checked by `evaluatePartnerCapability`
+ * instead of the Rider `MembershipPort` above. */
+export interface PartnerMembershipPort {
+  hasActivePartnerMembership(userId: string): Promise<boolean>;
+}
+
 /**
  * Opt-in dev echo so the OTP can be surfaced in the UI instead of the server console
  * (SHOW_OTP_TOAST, never in production). Also doubles as the dev-mode bypass for the MSG91
@@ -43,6 +49,7 @@ export interface Msg91WidgetVerifyPort {
 
 export interface IdentityAccessPorts {
   membership: MembershipPort;
+  partnerMembership: PartnerMembershipPort;
   otpEcho: OtpEchoStorePort;
   msg91NativeOtp: Msg91NativeOtpPort;
   msg91WidgetVerify: Msg91WidgetVerifyPort;

@@ -39,6 +39,7 @@ const navGroups = [
     label: "Growth",
     items: [
       { label: "Membership Plans", href: "/admin/membership" },
+      { label: "Service Provider Membership", href: "/admin/partner-membership" },
       { label: "Referrals", href: "/admin/referrals" },
     ],
   },

@@ -52,7 +52,8 @@ export async function switchActiveMode(mode: SelectedRole) {
       partnerStatus: session.user.partnerStatus,
     });
     if (!decision.allowed) {
-      redirect(decision.reason === "MEMBERSHIP_REQUIRED" ? "/membership" : "/dashboard/become-provider");
+      // ADR-051 — Service Providers have their own membership, not the Rider one.
+      redirect(decision.reason === "MEMBERSHIP_REQUIRED" ? "/partner/membership" : "/dashboard/become-provider");
     }
   }
 

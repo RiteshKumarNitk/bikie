@@ -1,5 +1,19 @@
 # BIKIE — Roadmap
 
+## New: Separate Service Provider Membership; Mobile UX Fixes; Admin Category Control (2026-08-11, ADR-051)
+Service Providers were being required to hold an active **Rider** membership to operate — a
+mismatch, since the two are different roles with different plans/pricing and Service Providers
+had no membership feature of their own to buy. `evaluatePartnerCapability` now checks a brand-new,
+fully separate, admin-managed Partner Membership (`PartnerMembershipPlan`/`PartnerMembership`) —
+yearly by default, admin sets the price, `0` is a first-class free tier that activates with no
+payment step. Every existing capable Partner is grandfathered onto a free legacy plan in the same
+migration so nobody loses capability at ship time. Alongside this: four mobile UX bugs fixed
+(slow logout, no back button on Messages, a silently-broken Business Profile tile, the
+availability toggle rendering under the status bar), admin can now set/change a provider's
+service category, and "Switch to Rider Mode" no longer appears once already in Service Provider
+mode — the underlying dual-capability architecture (ADR-046b/047/048/049) is otherwise untouched,
+per explicit product decision. See ADR-051.
+
 ## Fixed: Pending-Verification Service Providers Can Now Actually Use the Platform (2026-08-10, ADR-049)
 A Service Provider whose verification was still `PENDING` could not toggle Available/Offline,
 view their own dashboard, manage bikes/bookings/reviews, or see nearby SOS requests — every

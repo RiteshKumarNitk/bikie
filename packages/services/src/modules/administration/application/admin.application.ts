@@ -67,6 +67,7 @@ export function createAdminApplication(ports: AdministrationPorts) {
       return result;
     },
     deletePartner: (partnerId: string) => ports.admin.deletePartner(partnerId),
+    updatePartnerType: (partnerId: string, type: string) => ports.admin.updatePartnerType(partnerId, type),
     getAllBookings: () => ports.admin.findAllBookingsAdmin(),
     updateBookingStatus: (bookingId: string, status: string) =>
       ports.admin.updateBookingStatus(bookingId, status),
@@ -109,6 +110,18 @@ export function createAdminApplication(ports: AdministrationPorts) {
     updateMembershipPlan: (id: string, data: Record<string, unknown>) =>
       ports.admin.updateMembershipPlan(id, data),
     deleteMembershipPlan: (id: string) => ports.admin.deleteMembershipPlan(id),
+    getAllPartnerMembershipPlans: () => ports.admin.findAllPartnerPlansAdmin(),
+    createPartnerMembershipPlan: (data: {
+      name: string;
+      description: string;
+      price: number;
+      durationDays: number;
+      benefits: string[];
+      sortOrder?: number;
+    }) => ports.admin.createPartnerMembershipPlan(data),
+    updatePartnerMembershipPlan: (id: string, data: Record<string, unknown>) =>
+      ports.admin.updatePartnerMembershipPlan(id, data),
+    deletePartnerMembershipPlan: (id: string) => ports.admin.deletePartnerMembershipPlan(id),
     getAllReferrals: () => ports.admin.findAllReferrals(),
     getAllTrips: () => ports.admin.findAllTripsAdmin(),
     updateTrip: (

@@ -15,7 +15,11 @@ type SessionResult = Awaited<ReturnType<typeof getServerSession>>;
  * module (ADR-023). These status codes and bodies are part of the public API contract
  * consumed by the web app and the Flutter client, so they must not drift.
  */
-function toResponse(reason: AccessDenialReason) {
+/** ADR-051 — `MEMBERSHIP_REQUIRED` is returned by two different gates reading two different
+ * membership systems (Rider `requireMembership` vs. Service Provider `requirePartnerCapability`)
+ * that share this one `AccessDenialReason`; `context` picks the right message/copy without
+ * changing the `error` code either caller's client-side handling already checks against. */
+function toResponse(reason: AccessDenialReason, context: "rider" | "partner" = "rider") {
   switch (reason) {
     case "UNAUTHENTICATED":
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -25,7 +29,10 @@ function toResponse(reason: AccessDenialReason) {
       return NextResponse.json(
         {
           error: "MEMBERSHIP_REQUIRED",
-          message: "This is a BIKIE Membership perk. Join a plan to continue.",
+          message:
+            context === "partner"
+              ? "This requires an active Service Provider membership. Join a plan to continue."
+              : "This is a BIKIE Membership perk. Join a plan to continue.",
         },
         { status: 403 },
       );
@@ -107,7 +114,10 @@ export async function requirePartnerCapability() {
   const decision = await access.evaluatePartnerCapability(session ? toSnapshot(session) : null);
 
   if (!decision.allowed || !session) {
-    return { session: null, error: toResponse(decision.allowed ? "UNAUTHENTICATED" : decision.reason) };
+    return {
+      session: null,
+      error: toResponse(decision.allowed ? "UNAUTHENTICATED" : decision.reason, "partner"),
+    };
   }
 
   return { session, error: null };

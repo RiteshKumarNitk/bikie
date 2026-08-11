@@ -14,6 +14,7 @@ export function createAdminRepositoryAdapter(): AdminRepositoryPort {
     transitionPartnerVerification: (partnerId, action, opts) =>
       adminRepository.transitionPartnerVerification(partnerId, action, opts),
     deletePartner: (partnerId) => adminRepository.deletePartner(partnerId),
+    updatePartnerType: (partnerId, type) => adminRepository.updatePartnerType(partnerId, type),
     findAllBookingsAdmin: () => adminRepository.findAllBookingsAdmin(),
     updateBookingStatus: (bookingId, status) => adminRepository.updateBookingStatus(bookingId, status),
     deleteBooking: (bookingId) => adminRepository.deleteBooking(bookingId),
@@ -29,6 +30,10 @@ export function createAdminRepositoryAdapter(): AdminRepositoryPort {
     createMembershipPlan: (data) => adminRepository.createMembershipPlan(data as never),
     updateMembershipPlan: (id, data) => adminRepository.updateMembershipPlan(id, data as never),
     deleteMembershipPlan: (id) => adminRepository.deleteMembershipPlan(id),
+    findAllPartnerPlansAdmin: () => adminRepository.findAllPartnerPlansAdmin(),
+    createPartnerMembershipPlan: (data) => adminRepository.createPartnerMembershipPlan(data as never),
+    updatePartnerMembershipPlan: (id, data) => adminRepository.updatePartnerMembershipPlan(id, data as never),
+    deletePartnerMembershipPlan: (id) => adminRepository.deletePartnerMembershipPlan(id),
     findAllReferrals: () => adminRepository.findAllReferrals(),
     findAllTripsAdmin: () => adminRepository.findAllTripsAdmin(),
     updateTripAdmin: (tripId, data) => adminRepository.updateTripAdmin(tripId, data as never),

@@ -16,19 +16,25 @@ function optionalPattern(max: number, pattern: RegExp, message: string) {
   return z.preprocess(emptyToUndefined, z.string().max(max).regex(pattern, message).optional());
 }
 
+/** Shared across provider self-service onboarding, admin category edits, and the public
+ * nearby-partners type filter — kept as one list so the three never drift apart. */
+export const partnerTypeEnum = z.enum([
+  "RENTAL",
+  "MECHANIC",
+  "FUEL_DELIVERY",
+  "TOUR_GUIDE",
+  "HOTEL",
+  "CAMPING",
+  "ACCESSORIES",
+  "PHOTOGRAPHY",
+]);
+
+export type PartnerType = z.infer<typeof partnerTypeEnum>;
+
 export const partnerProfileSchema = z
   .object({
     businessName: z.string().min(1).max(120),
-    type: z.enum([
-      "RENTAL",
-      "MECHANIC",
-      "FUEL_DELIVERY",
-      "TOUR_GUIDE",
-      "HOTEL",
-      "CAMPING",
-      "ACCESSORIES",
-      "PHOTOGRAPHY",
-    ]),
+    type: partnerTypeEnum,
     city: z.string().min(1).max(100),
     description: z.string().max(1000).optional(),
     contactPerson1Name: z.string().max(100).optional(),
@@ -122,13 +128,19 @@ export const partnerVerificationActionSchema = z
 
 export type PartnerVerificationActionInput = z.infer<typeof partnerVerificationActionSchema>;
 
+/** PATCH /api/admin/partners/[id]/type — admin sets/changes a provider's service category,
+ * independent of the verification-decision endpoint above. */
+export const updatePartnerTypeSchema = z.object({
+  type: partnerTypeEnum,
+});
+
+export type UpdatePartnerTypeInput = z.infer<typeof updatePartnerTypeSchema>;
+
 /** GET /api/partners/nearby query params — public "find a service provider" (ADR-036). */
 export const nearbyPartnersQuerySchema = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
-  type: z
-    .enum(["RENTAL", "MECHANIC", "FUEL_DELIVERY", "TOUR_GUIDE", "HOTEL", "CAMPING", "ACCESSORIES", "PHOTOGRAPHY"])
-    .optional(),
+  type: partnerTypeEnum.optional(),
 });
 
 export type NearbyPartnersQueryInput = z.infer<typeof nearbyPartnersQuerySchema>;

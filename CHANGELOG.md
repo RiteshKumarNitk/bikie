@@ -1,5 +1,32 @@
 # Changelog
 
+## Feature/Fix — Service Provider gets its own membership (ADR-051); mobile UX fixes; admin category control
+- **New: separate Partner Membership**, replacing the Rider membership requirement Service
+  Providers were incorrectly gated on. New `PartnerMembershipPlan`/`PartnerMembership` schema
+  (migration `20260811100000_partner_membership_model`, with a backfill granting every existing
+  non-suspended Partner a free "Standard (Legacy)" membership so nobody is locked out at ship
+  time — **not yet applied to the live DB**, needs explicit go-ahead). `evaluatePartnerCapability`
+  now reads this instead of the Rider `UserMembership`. New routes mirroring the Rider membership
+  API (`/api/partner-membership/*`, `/api/admin/partner-membership/plans*`), new web pages
+  (`/partner/membership`, `/admin/partner-membership`), new mobile feature
+  (`features/partner_membership/`). A plan priced `0` is a first-class free tier — activates
+  immediately, no Razorpay step.
+- **Fix: admin can now set/change a Partner's service category** — new
+  `PATCH /api/admin/partners/[id]/type`, a "Category" card on `/admin/partners/[id]`.
+- **Fix: mobile logout was slow** — push-token unregister is now fire-and-forget instead of
+  blocking the sign-out button, matching the existing `forceLogout()` pattern.
+- **Fix: mobile Messages tab had no back button** — `/messages`/`/messages/:id` moved inside the
+  app shell's route tree like every other bottom-nav destination.
+- **Fix: mobile "Business Profile" tile silently did nothing on error** — now shows the real
+  error instead of failing invisibly.
+- **Fix: mobile availability toggle rendered under the phone's status bar** — wrapped in
+  `SafeArea`.
+- **Change: "Switch to Rider Mode" no longer offered once in Service Provider mode** — the
+  underlying dual-capability architecture (ADR-046b/047/048/049) is unchanged; only this one
+  UI control is now one-directional (web Navbar + mobile Profile).
+- See ADR-051 for full details. Backend: 9/9 typecheck, 167/167 vitest, OpenAPI regenerated
+  (132 → 139 routes). Mobile: `flutter analyze` clean, 113/113 tests passing.
+
 ## Fix — Production-readiness blockers: SOS cron scheduling, DB migrations, FCM config point
 - **CRON_SECRET wired** — generated and added to `apps/web/.env.local` (all three SOS cron
   routes were already `Authorization: Bearer <CRON_SECRET>`-protected; the value was simply

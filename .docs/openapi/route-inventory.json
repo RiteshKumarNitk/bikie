@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-10T16:39:57.614Z",
-  "count": 132,
+  "generatedAt": "2026-08-11T03:49:58.780Z",
+  "count": 139,
   "routes": [
     {
       "path": "/api/admin/audit-logs",
@@ -201,6 +201,24 @@
       "file": "apps/web/app/api/admin/overview/route.ts"
     },
     {
+      "path": "/api/admin/partner-membership/plans/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/partner-membership/plans/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/partner-membership/plans",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/partner-membership/plans/route.ts"
+    },
+    {
       "path": "/api/admin/partners/{id}",
       "methods": [
         "GET",
@@ -209,6 +227,14 @@
       ],
       "auth": "admin",
       "file": "apps/web/app/api/admin/partners/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/partners/{id}/type",
+      "methods": [
+        "PATCH"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/partners/[id]/type/route.ts"
     },
     {
       "path": "/api/admin/partners",
@@ -551,6 +577,38 @@
       ],
       "auth": "public-or-unclassified",
       "file": "apps/web/app/api/otp/mobile/send/route.ts"
+    },
+    {
+      "path": "/api/partner-membership/active",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner-membership/active/route.ts"
+    },
+    {
+      "path": "/api/partner-membership/checkout",
+      "methods": [
+        "POST"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner-membership/checkout/route.ts"
+    },
+    {
+      "path": "/api/partner-membership/plans",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner-membership/plans/route.ts"
+    },
+    {
+      "path": "/api/partner-membership/purchase",
+      "methods": [
+        "POST"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner-membership/purchase/route.ts"
     },
     {
       "path": "/api/partner/application/reapply",
