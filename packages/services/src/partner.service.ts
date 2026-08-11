@@ -6,6 +6,8 @@ export type PartnerProfileWriteInput = {
   businessName: string;
   type: string;
   city: string;
+  businessMobile: string;
+  businessEmail: string;
   description?: string;
   contactPerson1Name?: string;
   contactPerson1Mobile?: string;

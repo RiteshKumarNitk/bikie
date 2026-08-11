@@ -20,6 +20,8 @@ export interface PartnerProfileDTO {
   isVerified: boolean;
   ratingAvg: number;
   ratingCount: number;
+  businessMobile: string | null;
+  businessEmail: string | null;
   // --- ADR-014 ---
   contactPerson1Name: string | null;
   contactPerson1Mobile: string | null;

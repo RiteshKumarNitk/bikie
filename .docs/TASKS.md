@@ -18,8 +18,28 @@ Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 | "Switch to Rider Mode" hidden once already in Service Provider mode (web Navbar dropdown, mobile `_ModeSwitch`) — explicit product decision to keep the underlying dual-capability model (ADR-046b/047/048/049) fully intact, UI-only change; pre-auth `Footer`/`SwitchRoleLink` marketing toggle deliberately left alone (also serves logged-out visitors) | Completed |
 | New tests: `evaluatePartnerCapability` reads the Partner membership port not the Rider one (regression guard for separability); administration module CRUD coverage for the new partner membership plans | Completed |
 | Backend: `pnpm turbo run typecheck` (9/9), `pnpm exec vitest run` (167/167, 15/15 files), `pnpm openapi:generate` re-run (132 → 139 routes). Mobile: `flutter analyze` (0 issues), `flutter test` (113/113) | Completed |
-| Apply the pending migration (with its backfill) to the live DB | **Not done** — needs explicit user go-ahead, not run automatically against shared state, same posture as every prior schema change in this project |
+| Apply the pending migration (with its backfill) to the live DB | Completed — applied 2026-08-11 with explicit user go-ahead, alongside the business-contact-fields migration below |
 | Live browser/device test of the new membership purchase flow (free + paid plan), admin category edit, and all four mobile UX fixes | **Not done** — not verifiable in this environment, same caveat as every prior change |
+
+## Fix: business contact fields build breakage; Vercel deploy unblocked (2026-08-11)
+
+Two independent build breaks on the last 2 pushes were preventing Vercel from shipping anything:
+`businessMobile`/`businessEmail` were added to `Partner.schema.prisma` and to two form pages
+(`become-provider`, `PartnerSettingsForm`) but never threaded through `PartnerProfileDTO`
+(`@bikie/types`), the partner-module write-input types, or `partner.repository.ts`'s
+`toPartnerDTO`/`toUpsertData` — a hard TypeScript error under `next build`'s type-checking step.
+Separately, the `20260811100000_partner_membership_model` migration (from the entry above) had
+never been applied to the database `next build` queries at prerender time, so the new
+`/api/partner-membership/plans` route (`revalidate = 300`, statically evaluated at build time)
+failed with `P2021: table does not exist` — the same failure mode noted in Milestone 3a below
+("commit is on `origin/master`" but production hadn't picked it up).
+
+| Task | Status |
+|---|---|
+| `businessMobile`/`businessEmail` threaded through `PartnerProfileDTO`, `PartnerProfileInput`/`PartnerProfileWriteInput` (services layer, both copies), and `partner.repository.ts` (`toPartnerDTO` param type + mapping, `toUpsertData`) | Completed |
+| New migration `20260811120000_partner_business_contact` (additive, 2 nullable columns) — the schema field existed with no corresponding migration | Completed |
+| Applied both pending migrations (`20260811100000_partner_membership_model`, `20260811120000_partner_business_contact`) to the live Neon DB that `apps/web/.env.local` points to | Completed — explicit user go-ahead obtained first |
+| Verified: `tsc --noEmit` clean (0 errors), full `next build` (Turbopack) completes with no errors, all pages generate including the previously-failing `/api/partner-membership/plans` | Completed |
 
 ## Master Spec gap-fill: SOS cancel, discovery badges, admin stats, ops fields, reviews, admin chat read (2026-08-10)
 

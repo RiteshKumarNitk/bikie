@@ -1,5 +1,15 @@
 # BIKIE — Roadmap
 
+## Fixed: Vercel Deploy Unblocked — Business Contact Fields Build Breakage (2026-08-11)
+The two most recent pushes weren't appearing on Vercel because `next build` failed outright: the
+`businessMobile`/`businessEmail` fields added to the partner forms were never threaded through
+`PartnerProfileDTO`/the services layer/the repository (a hard TypeScript error), and separately
+the prior commit's `PartnerMembershipPlan`/`PartnerMembership` migration had never been applied to
+the database `next build` queries at prerender time, so the new membership-plans route failed with
+"table does not exist". Both are fixed: the fields are now threaded through every layer, a missing
+migration for the business-contact columns was added, and both pending migrations were applied to
+the live database. `tsc --noEmit` and a full local `next build` now both pass cleanly.
+
 ## New: Separate Service Provider Membership; Mobile UX Fixes; Admin Category Control (2026-08-11, ADR-051)
 Service Providers were being required to hold an active **Rider** membership to operate — a
 mismatch, since the two are different roles with different plans/pricing and Service Providers

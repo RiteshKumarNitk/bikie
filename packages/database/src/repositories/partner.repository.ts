@@ -12,6 +12,8 @@ export function toPartnerDTO(partner: {
   isVerified: boolean;
   ratingAvg: { toNumber(): number };
   ratingCount: number;
+  businessMobile: string | null;
+  businessEmail: string | null;
   contactPerson1Name: string | null;
   contactPerson1Mobile: string | null;
   contactPerson2Name: string | null;
@@ -48,6 +50,8 @@ export function toPartnerDTO(partner: {
     isVerified: partner.isVerified,
     ratingAvg: partner.ratingAvg.toNumber(),
     ratingCount: partner.ratingCount,
+    businessMobile: partner.businessMobile,
+    businessEmail: partner.businessEmail,
     contactPerson1Name: partner.contactPerson1Name,
     contactPerson1Mobile: partner.contactPerson1Mobile,
     contactPerson2Name: partner.contactPerson2Name,
@@ -91,6 +95,8 @@ export type PartnerProfileWriteInput = {
   businessName: string;
   type: string;
   city: string;
+  businessMobile: string;
+  businessEmail: string;
   description?: string;
   contactPerson1Name?: string;
   contactPerson1Mobile?: string;
@@ -122,6 +128,8 @@ function toUpsertData(data: PartnerProfileWriteInput) {
     businessName: data.businessName,
     type: data.type as any,
     city: data.city,
+    businessMobile: data.businessMobile,
+    businessEmail: data.businessEmail,
     description: data.description,
     contactPerson1Name: data.contactPerson1Name,
     contactPerson1Mobile: data.contactPerson1Mobile,

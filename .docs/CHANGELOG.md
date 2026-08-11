@@ -1,5 +1,25 @@
 # BIKIE Changelog
 
+## 2026-08-11 — Fix: business contact fields build breakage; Vercel deploy unblocked
+
+The last 2 pushes weren't showing up on Vercel because `next build` was failing for two
+independent reasons:
+
+- **TS error**: `businessMobile`/`businessEmail` were added to the Prisma schema and to the
+  `become-provider`/`PartnerSettingsForm` pages, but never threaded through `PartnerProfileDTO`
+  (`@bikie/types`), the partner-module write-input types (`ports/index.ts`, `partner.service.ts`),
+  or `partner.repository.ts` (`toPartnerDTO`, `toUpsertData`). Fixed by adding the fields to all
+  four layers.
+- **Missing migration**: `businessMobile`/`businessEmail` had a schema change but no migration
+  file — added `20260811120000_partner_business_contact`.
+- **Un-applied migration**: the prior `20260811100000_partner_membership_model` migration had
+  never been run against the database `next build` prerenders against, so the new
+  `/api/partner-membership/plans` route (statically evaluated via `revalidate = 300`) failed with
+  `P2021: table does not exist`. Applied both pending migrations to the live Neon DB (with
+  explicit user go-ahead).
+- Verified with a clean `tsc --noEmit` and a full local `next build` — no errors, all routes
+  generate.
+
 ## 2026-08-10 — Master Spec gap-fill pass
 
 Six gaps identified against the master product spec (§1–56), all implemented in one pass.
