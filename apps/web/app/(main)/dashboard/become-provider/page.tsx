@@ -52,6 +52,8 @@ export default function BecomeProviderPage() {
         workingHours: data.profile.workingHours ?? "",
         serviceRadiusKm: data.profile.serviceRadiusKm != null ? String(data.profile.serviceRadiusKm) : "",
         yearsOfExperience: data.profile.yearsOfExperience != null ? String(data.profile.yearsOfExperience) : "",
+        businessMobile: data.profile.businessMobile ?? "",
+        businessEmail: data.profile.businessEmail ?? "",
       });
     }
     setLoading(false);
@@ -92,6 +94,8 @@ export default function BecomeProviderPage() {
       workingHours: details.workingHours.trim() || undefined,
       serviceRadiusKm: details.serviceRadiusKm.trim() || undefined,
       yearsOfExperience: details.yearsOfExperience.trim() || undefined,
+      businessMobile: details.businessMobile.trim(),
+      businessEmail: details.businessEmail.trim(),
     });
     if (!parsed.success) {
       setError(formatZodError(parsed.error).join(" "));
