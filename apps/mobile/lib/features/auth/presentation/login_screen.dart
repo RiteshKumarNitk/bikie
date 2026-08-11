@@ -106,6 +106,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
     });
     try {
       await ref.read(authControllerProvider.notifier).verifyOtp(phoneNumber: _phoneNumber, code: _otpController.text.trim());
+      final user = ref.read(authControllerProvider).user;
+      final selectedRole = ref.read(selectedRoleProvider);
+      
+      if (selectedRole == 'PARTNER' && user != null) {
+        final isCapable = user.partnerStatus != null && user.partnerStatus != 'SUSPENDED';
+        if (!isCapable) {
+          await ref.read(authControllerProvider.notifier).signOut();
+          setState(() => _error = 'You are a rider. Login as a rider. Change the role.');
+          return;
+        }
+      }
+      
       if (mounted) context.go('/');
     } on ApiException catch (e) {
       setState(() => _error = e.message);
@@ -125,6 +137,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
             email: _emailController.text.trim(),
             password: _passwordController.text,
           );
+      final user = ref.read(authControllerProvider).user;
+      final selectedRole = ref.read(selectedRoleProvider);
+      
+      if (selectedRole == 'PARTNER' && user != null) {
+        final isCapable = user.partnerStatus != null && user.partnerStatus != 'SUSPENDED';
+        if (!isCapable) {
+          await ref.read(authControllerProvider.notifier).signOut();
+          setState(() => _error = 'You are a rider. Login as a rider. Change the role.');
+          return;
+        }
+      }
+
       if (mounted) context.go('/');
     } on ApiException catch (e) {
       setState(() => _error = e.message);

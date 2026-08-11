@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -33,6 +36,8 @@ class PartnerOnboardingScreen extends ConsumerStatefulWidget {
 class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScreen> {
   final _fullName = TextEditingController();
   final _businessName = TextEditingController();
+  final _businessMobile = TextEditingController();
+  final _businessEmail = TextEditingController();
   final _city = TextEditingController();
   final _addressLine = TextEditingController();
   final _area = TextEditingController();
@@ -62,6 +67,8 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
     final profile = widget.initialProfile;
     if (profile != null) {
       _businessName.text = profile.businessName;
+      _businessMobile.text = profile.businessMobile ?? '';
+      _businessEmail.text = profile.businessEmail ?? '';
       _type = profile.type;
       _city.text = profile.city ?? '';
       _addressLine.text = profile.addressLine ?? '';
@@ -99,6 +106,8 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
     for (final c in [
       _fullName,
       _businessName,
+      _businessMobile,
+      _businessEmail,
       _city,
       _addressLine,
       _area,
@@ -134,6 +143,8 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       }
       await ref.read(partnerProfileRepositoryProvider).save(PartnerProfileInput(
             businessName: _businessName.text.trim(),
+            businessMobile: _businessMobile.text.trim().isEmpty ? null : _businessMobile.text.trim(),
+            businessEmail: _businessEmail.text.trim().isEmpty ? null : _businessEmail.text.trim(),
             type: _type,
             city: _city.text.trim(),
             contactPerson1Name: _contactPerson1Name.text,
@@ -215,6 +226,18 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                     label: 'Business name',
                     hint: 'e.g. Goa Moto Rentals',
                   ),
+                  OnboardingTextField(
+                    controller: _businessMobile,
+                    label: 'Business mobile (optional)',
+                    hint: '10-digit number',
+                    keyboardType: TextInputType.phone,
+                  ),
+                  OnboardingTextField(
+                    controller: _businessEmail,
+                    label: 'Business email (optional)',
+                    hint: 'e.g. hello@goamoto.com',
+                    keyboardType: TextInputType.emailAddress,
+                  ),
                   OnboardingDropdown(
                     label: 'Service type',
                     value: _type,
@@ -245,7 +268,34 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                   const SizedBox(height: 8),
                   LocationPickerField(
                     value: _location,
-                    onChanged: (position) => setState(() => _location = position),
+                    onChanged: (position) async {
+                      setState(() => _location = position);
+                      try {
+                        final uri = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}&zoom=18&addressdetails=1');
+                        final response = await http.get(uri);
+                        if (response.statusCode == 200) {
+                          final data = jsonDecode(response.body);
+                          final addr = data['address'] as Map<String, dynamic>?;
+                          if (addr != null && mounted) {
+                            setState(() {
+                              final city = addr['city'] ?? addr['town'] ?? addr['village'] ?? addr['county'];
+                              if (city != null) _city.text = city;
+                              
+                              final area = addr['suburb'] ?? addr['neighbourhood'] ?? addr['residential'];
+                              if (area != null) _area.text = area;
+                              
+                              final postcode = addr['postcode'];
+                              if (postcode != null) _pincode.text = postcode.toString();
+                              
+                              final road = addr['road'];
+                              if (road != null) _addressLine.text = road;
+                            });
+                          }
+                        }
+                      } catch (_) {
+                        // Ignore reverse geocoding errors (network fail, etc)
+                      }
+                    },
                   ),
                 ],
               ),

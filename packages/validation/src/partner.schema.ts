@@ -37,6 +37,8 @@ export const partnerProfileSchema = z
     type: partnerTypeEnum,
     city: z.string().min(1).max(100),
     description: z.string().max(1000).optional(),
+    businessMobile: z.string().min(10).max(20),
+    businessEmail: z.string().email(),
     contactPerson1Name: z.string().max(100).optional(),
     contactPerson1Mobile: z.string().max(20).optional(),
     contactPerson2Name: z.string().max(100).optional(),

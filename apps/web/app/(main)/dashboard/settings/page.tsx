@@ -66,25 +66,6 @@ export default async function DashboardSettingsPage() {
         </div>
       </section>
 
-      {session?.user.partnerStatus == null && (
-        <section className="mt-6 rounded-3xl bg-card p-6">
-          <p className="font-semibold">Become a Service Provider</p>
-          <p className="mt-2 text-sm text-foreground/60">
-            Run a motorcycle service business — puncture shop, mechanic, repair centre, roadside
-            assistance and more — and offer it through BIKIE. Create your Service Provider
-            profile and start operating right away. No admin approval needed; getting verified is
-            an optional trust step.
-          </p>
-          <div className="mt-4">
-            <Link
-              href="/dashboard/become-provider"
-              className="inline-block rounded-xl border border-accent/30 bg-accent/[0.04] px-5 py-2.5 text-sm font-medium text-accent-text transition-colors hover:bg-accent/10"
-            >
-              Become a Service Provider
-            </Link>
-          </div>
-        </section>
-      )}
     </div>
   );
 }

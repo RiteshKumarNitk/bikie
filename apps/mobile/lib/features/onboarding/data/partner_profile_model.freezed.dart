@@ -29,6 +29,8 @@ mixin _$PartnerProfileInput {
   String? get contactPerson1Mobile => throw _privateConstructorUsedError;
   String? get contactPerson2Name => throw _privateConstructorUsedError;
   String? get contactPerson2Mobile => throw _privateConstructorUsedError;
+  String? get businessMobile => throw _privateConstructorUsedError;
+  String? get businessEmail => throw _privateConstructorUsedError;
   String? get addressLine => throw _privateConstructorUsedError;
   String? get area => throw _privateConstructorUsedError;
   String? get pincode => throw _privateConstructorUsedError;
@@ -70,6 +72,8 @@ abstract class $PartnerProfileInputCopyWith<$Res> {
     String? contactPerson1Mobile,
     String? contactPerson2Name,
     String? contactPerson2Mobile,
+    String? businessMobile,
+    String? businessEmail,
     String? addressLine,
     String? area,
     String? pincode,
@@ -107,6 +111,8 @@ class _$PartnerProfileInputCopyWithImpl<$Res, $Val extends PartnerProfileInput>
     Object? contactPerson1Mobile = freezed,
     Object? contactPerson2Name = freezed,
     Object? contactPerson2Mobile = freezed,
+    Object? businessMobile = freezed,
+    Object? businessEmail = freezed,
     Object? addressLine = freezed,
     Object? area = freezed,
     Object? pincode = freezed,
@@ -152,6 +158,14 @@ class _$PartnerProfileInputCopyWithImpl<$Res, $Val extends PartnerProfileInput>
             contactPerson2Mobile: freezed == contactPerson2Mobile
                 ? _value.contactPerson2Mobile
                 : contactPerson2Mobile // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            businessMobile: freezed == businessMobile
+                ? _value.businessMobile
+                : businessMobile // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            businessEmail: freezed == businessEmail
+                ? _value.businessEmail
+                : businessEmail // ignore: cast_nullable_to_non_nullable
                       as String?,
             addressLine: freezed == addressLine
                 ? _value.addressLine
@@ -221,6 +235,8 @@ abstract class _$$PartnerProfileInputImplCopyWith<$Res>
     String? contactPerson1Mobile,
     String? contactPerson2Name,
     String? contactPerson2Mobile,
+    String? businessMobile,
+    String? businessEmail,
     String? addressLine,
     String? area,
     String? pincode,
@@ -257,6 +273,8 @@ class __$$PartnerProfileInputImplCopyWithImpl<$Res>
     Object? contactPerson1Mobile = freezed,
     Object? contactPerson2Name = freezed,
     Object? contactPerson2Mobile = freezed,
+    Object? businessMobile = freezed,
+    Object? businessEmail = freezed,
     Object? addressLine = freezed,
     Object? area = freezed,
     Object? pincode = freezed,
@@ -302,6 +320,14 @@ class __$$PartnerProfileInputImplCopyWithImpl<$Res>
         contactPerson2Mobile: freezed == contactPerson2Mobile
             ? _value.contactPerson2Mobile
             : contactPerson2Mobile // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        businessMobile: freezed == businessMobile
+            ? _value.businessMobile
+            : businessMobile // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        businessEmail: freezed == businessEmail
+            ? _value.businessEmail
+            : businessEmail // ignore: cast_nullable_to_non_nullable
                   as String?,
         addressLine: freezed == addressLine
             ? _value.addressLine
@@ -364,6 +390,8 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
     this.contactPerson1Mobile,
     this.contactPerson2Name,
     this.contactPerson2Mobile,
+    this.businessMobile,
+    this.businessEmail,
     this.addressLine,
     this.area,
     this.pincode,
@@ -397,6 +425,10 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
   @override
   final String? contactPerson2Mobile;
   @override
+  final String? businessMobile;
+  @override
+  final String? businessEmail;
+  @override
   final String? addressLine;
   @override
   final String? area;
@@ -424,7 +456,7 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
 
   @override
   String toString() {
-    return 'PartnerProfileInput(businessName: $businessName, type: $type, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, workingHours: $workingHours, serviceRadiusKm: $serviceRadiusKm, yearsOfExperience: $yearsOfExperience, isGeneralResponder: $isGeneralResponder)';
+    return 'PartnerProfileInput(businessName: $businessName, type: $type, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, businessMobile: $businessMobile, businessEmail: $businessEmail, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, workingHours: $workingHours, serviceRadiusKm: $serviceRadiusKm, yearsOfExperience: $yearsOfExperience, isGeneralResponder: $isGeneralResponder)';
   }
 
   @override
@@ -446,6 +478,10 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
                 other.contactPerson2Name == contactPerson2Name) &&
             (identical(other.contactPerson2Mobile, contactPerson2Mobile) ||
                 other.contactPerson2Mobile == contactPerson2Mobile) &&
+            (identical(other.businessMobile, businessMobile) ||
+                other.businessMobile == businessMobile) &&
+            (identical(other.businessEmail, businessEmail) ||
+                other.businessEmail == businessEmail) &&
             (identical(other.addressLine, addressLine) ||
                 other.addressLine == addressLine) &&
             (identical(other.area, area) || other.area == area) &&
@@ -480,6 +516,8 @@ class _$PartnerProfileInputImpl implements _PartnerProfileInput {
     contactPerson1Mobile,
     contactPerson2Name,
     contactPerson2Mobile,
+    businessMobile,
+    businessEmail,
     addressLine,
     area,
     pincode,
@@ -520,6 +558,8 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
     final String? contactPerson1Mobile,
     final String? contactPerson2Name,
     final String? contactPerson2Mobile,
+    final String? businessMobile,
+    final String? businessEmail,
     final String? addressLine,
     final String? area,
     final String? pincode,
@@ -552,6 +592,10 @@ abstract class _PartnerProfileInput implements PartnerProfileInput {
   String? get contactPerson2Name;
   @override
   String? get contactPerson2Mobile;
+  @override
+  String? get businessMobile;
+  @override
+  String? get businessEmail;
   @override
   String? get addressLine;
   @override
@@ -602,6 +646,8 @@ mixin _$PartnerProfileSummary {
   String? get contactPerson1Mobile => throw _privateConstructorUsedError;
   String? get contactPerson2Name => throw _privateConstructorUsedError;
   String? get contactPerson2Mobile => throw _privateConstructorUsedError;
+  String? get businessMobile => throw _privateConstructorUsedError;
+  String? get businessEmail => throw _privateConstructorUsedError;
   String? get addressLine => throw _privateConstructorUsedError;
   String? get area => throw _privateConstructorUsedError;
   String? get pincode => throw _privateConstructorUsedError;
@@ -656,6 +702,8 @@ abstract class $PartnerProfileSummaryCopyWith<$Res> {
     String? contactPerson1Mobile,
     String? contactPerson2Name,
     String? contactPerson2Mobile,
+    String? businessMobile,
+    String? businessEmail,
     String? addressLine,
     String? area,
     String? pincode,
@@ -709,6 +757,8 @@ class _$PartnerProfileSummaryCopyWithImpl<
     Object? contactPerson1Mobile = freezed,
     Object? contactPerson2Name = freezed,
     Object? contactPerson2Mobile = freezed,
+    Object? businessMobile = freezed,
+    Object? businessEmail = freezed,
     Object? addressLine = freezed,
     Object? area = freezed,
     Object? pincode = freezed,
@@ -776,6 +826,14 @@ class _$PartnerProfileSummaryCopyWithImpl<
             contactPerson2Mobile: freezed == contactPerson2Mobile
                 ? _value.contactPerson2Mobile
                 : contactPerson2Mobile // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            businessMobile: freezed == businessMobile
+                ? _value.businessMobile
+                : businessMobile // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            businessEmail: freezed == businessEmail
+                ? _value.businessEmail
+                : businessEmail // ignore: cast_nullable_to_non_nullable
                       as String?,
             addressLine: freezed == addressLine
                 ? _value.addressLine
@@ -888,6 +946,8 @@ abstract class _$$PartnerProfileSummaryImplCopyWith<$Res>
     String? contactPerson1Mobile,
     String? contactPerson2Name,
     String? contactPerson2Mobile,
+    String? businessMobile,
+    String? businessEmail,
     String? addressLine,
     String? area,
     String? pincode,
@@ -938,6 +998,8 @@ class __$$PartnerProfileSummaryImplCopyWithImpl<$Res>
     Object? contactPerson1Mobile = freezed,
     Object? contactPerson2Name = freezed,
     Object? contactPerson2Mobile = freezed,
+    Object? businessMobile = freezed,
+    Object? businessEmail = freezed,
     Object? addressLine = freezed,
     Object? area = freezed,
     Object? pincode = freezed,
@@ -1005,6 +1067,14 @@ class __$$PartnerProfileSummaryImplCopyWithImpl<$Res>
         contactPerson2Mobile: freezed == contactPerson2Mobile
             ? _value.contactPerson2Mobile
             : contactPerson2Mobile // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        businessMobile: freezed == businessMobile
+            ? _value.businessMobile
+            : businessMobile // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        businessEmail: freezed == businessEmail
+            ? _value.businessEmail
+            : businessEmail // ignore: cast_nullable_to_non_nullable
                   as String?,
         addressLine: freezed == addressLine
             ? _value.addressLine
@@ -1110,6 +1180,8 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
     this.contactPerson1Mobile,
     this.contactPerson2Name,
     this.contactPerson2Mobile,
+    this.businessMobile,
+    this.businessEmail,
     this.addressLine,
     this.area,
     this.pincode,
@@ -1158,6 +1230,10 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
   final String? contactPerson2Name;
   @override
   final String? contactPerson2Mobile;
+  @override
+  final String? businessMobile;
+  @override
+  final String? businessEmail;
   @override
   final String? addressLine;
   @override
@@ -1215,7 +1291,7 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
 
   @override
   String toString() {
-    return 'PartnerProfileSummary(businessName: $businessName, type: $type, isVerified: $isVerified, isAvailable: $isAvailable, isGeneralResponder: $isGeneralResponder, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, workingHours: $workingHours, serviceRadiusKm: $serviceRadiusKm, yearsOfExperience: $yearsOfExperience, verificationStatus: $verificationStatus, rejectionReason: $rejectionReason, reviewNote: $reviewNote, submittedAt: $submittedAt, reviewedAt: $reviewedAt, profilePhotoUrl: $profilePhotoUrl, shopPhotoUrls: $shopPhotoUrls, identityDocumentUrl: $identityDocumentUrl, businessDocumentUrl: $businessDocumentUrl, ratingAvg: $ratingAvg, ratingCount: $ratingCount)';
+    return 'PartnerProfileSummary(businessName: $businessName, type: $type, isVerified: $isVerified, isAvailable: $isAvailable, isGeneralResponder: $isGeneralResponder, city: $city, description: $description, contactPerson1Name: $contactPerson1Name, contactPerson1Mobile: $contactPerson1Mobile, contactPerson2Name: $contactPerson2Name, contactPerson2Mobile: $contactPerson2Mobile, businessMobile: $businessMobile, businessEmail: $businessEmail, addressLine: $addressLine, area: $area, pincode: $pincode, latitude: $latitude, longitude: $longitude, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, workingHours: $workingHours, serviceRadiusKm: $serviceRadiusKm, yearsOfExperience: $yearsOfExperience, verificationStatus: $verificationStatus, rejectionReason: $rejectionReason, reviewNote: $reviewNote, submittedAt: $submittedAt, reviewedAt: $reviewedAt, profilePhotoUrl: $profilePhotoUrl, shopPhotoUrls: $shopPhotoUrls, identityDocumentUrl: $identityDocumentUrl, businessDocumentUrl: $businessDocumentUrl, ratingAvg: $ratingAvg, ratingCount: $ratingCount)';
   }
 
   @override
@@ -1243,6 +1319,10 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
                 other.contactPerson2Name == contactPerson2Name) &&
             (identical(other.contactPerson2Mobile, contactPerson2Mobile) ||
                 other.contactPerson2Mobile == contactPerson2Mobile) &&
+            (identical(other.businessMobile, businessMobile) ||
+                other.businessMobile == businessMobile) &&
+            (identical(other.businessEmail, businessEmail) ||
+                other.businessEmail == businessEmail) &&
             (identical(other.addressLine, addressLine) ||
                 other.addressLine == addressLine) &&
             (identical(other.area, area) || other.area == area) &&
@@ -1302,6 +1382,8 @@ class _$PartnerProfileSummaryImpl implements _PartnerProfileSummary {
     contactPerson1Mobile,
     contactPerson2Name,
     contactPerson2Mobile,
+    businessMobile,
+    businessEmail,
     addressLine,
     area,
     pincode,
@@ -1356,6 +1438,8 @@ abstract class _PartnerProfileSummary implements PartnerProfileSummary {
     final String? contactPerson1Mobile,
     final String? contactPerson2Name,
     final String? contactPerson2Mobile,
+    final String? businessMobile,
+    final String? businessEmail,
     final String? addressLine,
     final String? area,
     final String? pincode,
@@ -1404,6 +1488,10 @@ abstract class _PartnerProfileSummary implements PartnerProfileSummary {
   String? get contactPerson2Name;
   @override
   String? get contactPerson2Mobile;
+  @override
+  String? get businessMobile;
+  @override
+  String? get businessEmail;
   @override
   String? get addressLine;
   @override

@@ -107,12 +107,20 @@ export default function LoginPage() {
         return;
       }
 
-      // ADR-046b: picking "Service Provider" on /welcome no longer triggers an instant
-      // self-service role upgrade here — every account logs into whatever it already is, and
-      // Service Provider capability only ever comes from the application/verification flow
-      // (Dashboard → "Become a Service Provider"). Preserve the pre-existing behavior of this
-      // page otherwise: always redirect home regardless of role.
-      window.location.href = "/";
+      const { data: sessionData } = await authClient.getSession();
+      if (selectedRole === "PARTNER") {
+        const partnerStatus = (sessionData?.user as any)?.partnerStatus;
+        if (partnerStatus == null || partnerStatus === "SUSPENDED") {
+          await authClient.signOut();
+          setServerError("You are a rider. Login as a rider. Change the role.");
+          return;
+        }
+      }
+
+      // Redirect to the originally requested page (if any) or the appropriate dashboard based on selected role
+      const urlParams = new URLSearchParams(window.location.search);
+      const nextUrl = urlParams.get("next");
+      window.location.href = nextUrl || (selectedRole === "PARTNER" ? "/partner" : "/dashboard");
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Invalid or expired code. Please try again.");
     } finally {
@@ -130,7 +138,20 @@ export default function LoginPage() {
         setServerError(error.message ?? "Invalid email or password.");
         return;
       }
-      window.location.href = "/";
+
+      const { data: sessionData } = await authClient.getSession();
+      if (selectedRole === "PARTNER") {
+        const partnerStatus = (sessionData?.user as any)?.partnerStatus;
+        if (partnerStatus == null || partnerStatus === "SUSPENDED") {
+          await authClient.signOut();
+          setServerError("You are a rider. Login as a rider. Change the role.");
+          return;
+        }
+      }
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const nextUrl = urlParams.get("next");
+      window.location.href = nextUrl || (selectedRole === "PARTNER" ? "/partner" : "/dashboard");
     } catch {
       setServerError("Something went wrong. Please try again.");
     } finally {

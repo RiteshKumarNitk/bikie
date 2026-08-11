@@ -165,14 +165,6 @@ class _RiderProfileSection extends StatelessWidget {
           label: 'Rider Details',
           onTap: () => context.push('/onboarding'),
         ),
-        // ADR-046b — an already-approved partner uses the mode switch above instead; this tile
-        // is for starting/resuming/checking an application.
-        if (!isCapableServiceProvider)
-          _ProfileTile(
-            icon: Icons.storefront_outlined,
-            label: 'Become a Service Provider',
-            onTap: () => context.push('/become-provider'),
-          ),
         _ProfileTile(
           icon: Icons.storefront_outlined,
           label: 'Service Providers',

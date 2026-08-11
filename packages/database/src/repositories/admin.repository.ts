@@ -56,12 +56,32 @@ export async function findAllUsers() {
 }
 
 export async function updateUserRole(userId: string, role: string) {
-  const user = await prisma.user.update({
-    where: { id: userId },
-    data: { role: role as any },
-    select: { id: true, name: true, email: true, role: true, createdAt: true, image: true },
+  return prisma.$transaction(async (tx) => {
+    if (role === "PARTNER") {
+      const existing = await tx.partner.findUnique({ where: { userId } });
+      if (!existing) {
+        const user = await tx.user.findUnique({ where: { id: userId } });
+        await tx.partner.create({
+          data: {
+            userId,
+            businessName: `${user?.name || "User"}'s Business`,
+            type: "MECHANIC",
+            city: "Pending",
+            verificationStatus: "DRAFT",
+            isVerified: false,
+          },
+        });
+        await tx.user.update({ where: { id: userId }, data: { partnerStatus: "DRAFT" } });
+      }
+    }
+
+    const user = await tx.user.update({
+      where: { id: userId },
+      data: { role: role as any },
+      select: { id: true, name: true, email: true, role: true, createdAt: true, image: true },
+    });
+    return { ...user, createdAt: user.createdAt.toISOString() };
   });
-  return { ...user, createdAt: user.createdAt.toISOString() };
 }
 
 export async function deleteUser(userId: string): Promise<{ ok: true } | { ok: false; reason: "HAS_DEPENDENCIES" }> {

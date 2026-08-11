@@ -36,7 +36,11 @@ export default function PartnerMembershipPage() {
   useEffect(() => {
     fetch("/api/partner-membership/plans")
       .then((r) => r.json())
-      .then((data) => setPlans(data.plans))
+      .then((data) => setPlans(data.plans || []))
+      .catch((err) => {
+        console.error("Failed to load plans:", err);
+        setPlans([]);
+      })
       .finally(() => setLoading(false));
   }, []);
 
