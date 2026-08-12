@@ -34,6 +34,13 @@ export default function PartnerOnboardingPage() {
     if (ref) setReferralCode(ref);
   }, []);
 
+  // Pre-fill from the existing account — a common path here is an approved Account Type Change
+  // Request (Rider -> Service Provider), where the name is already known; no reason to ask again.
+  useEffect(() => {
+    if (session?.user.name && !fullName) setFullName(session.user.name);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session]);
+
   // ADR-053 — this form is Service-Provider-accountType only now; a Rider landing here (stale
   // link, back button) is sent to request a change instead of filling out a form that would
   // 400 on submit.
@@ -141,6 +148,10 @@ export default function PartnerOnboardingPage() {
           <p className="mt-3 max-w-md text-base text-foreground/70">
             Tell us about your business. Your profile becomes active immediately — no admin
             approval needed. Getting verified is an optional trust step.
+          </p>
+          <p className="mt-2 max-w-md text-sm text-foreground/50">
+            Only the fields marked <span className="text-red-500">*</span> are required to get
+            started — everything else can be added anytime from Settings.
           </p>
         </div>
 

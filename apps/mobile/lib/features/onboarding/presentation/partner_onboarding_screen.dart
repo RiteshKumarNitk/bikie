@@ -74,6 +74,11 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
         context.go('/account-type-request');
       }
     });
+    // Pre-fill from the existing account — a common path here is an approved Account Type
+    // Change Request (Rider -> Service Provider), where the name is already known.
+    final accountName = ref.read(authControllerProvider).user?.name;
+    if (accountName != null && accountName.isNotEmpty) _fullName.text = accountName;
+
     final profile = widget.initialProfile;
     if (profile != null) {
       _businessName.text = profile.businessName;
@@ -243,7 +248,7 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                 children: [
                   OnboardingTextField(
                     controller: _businessName,
-                    label: 'Business name',
+                    label: 'Business name *',
                     hint: 'e.g. Goa Moto Rentals',
                   ),
                   OnboardingTextField(
@@ -259,13 +264,13 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                     keyboardType: TextInputType.emailAddress,
                   ),
                   OnboardingDropdown(
-                    label: 'Service type',
+                    label: 'Service type *',
                     value: _type,
                     options: partnerTypes,
                     optionLabels: {for (final t in partnerTypes) t: t.replaceAll('_', ' ')},
                     onChanged: (v) => setState(() => _type = v ?? partnerTypes.first),
                   ),
-                  OnboardingTextField(controller: _city, label: 'City', hint: 'e.g. Goa'),
+                  OnboardingTextField(controller: _city, label: 'City *', hint: 'e.g. Goa'),
                 ],
               ),
               OnboardingSection(
@@ -365,16 +370,16 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                 ],
               ),
               OnboardingSection(
-                title: 'Contact person',
+                title: 'Contact person (optional)',
                 children: [
                   OnboardingTextField(
                     controller: _contactPerson1Name,
-                    label: 'Name',
+                    label: 'Name (optional)',
                     hint: 'e.g. Rahul Sharma',
                   ),
                   OnboardingTextField(
                     controller: _contactPerson1Mobile,
-                    label: 'Mobile number',
+                    label: 'Mobile number (optional)',
                     hint: '10-digit mobile number',
                     keyboardType: TextInputType.phone,
                   ),

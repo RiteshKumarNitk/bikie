@@ -160,7 +160,7 @@ export function PartnerBusinessFields({
 
         <div>
           <label className="text-sm font-medium" htmlFor={`${idPrefix}-addressLine`}>
-            Street address <span className="text-red-500">*</span>
+            Street address <span className="font-normal text-foreground/40">(optional)</span>
           </label>
           <input
             id={`${idPrefix}-addressLine`}
@@ -174,7 +174,7 @@ export function PartnerBusinessFields({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
             <label className="text-sm font-medium" htmlFor={`${idPrefix}-area`}>
-              Area <span className="text-red-500">*</span>
+              Area <span className="font-normal text-foreground/40">(optional)</span>
             </label>
             <input
               id={`${idPrefix}-area`}
@@ -198,7 +198,7 @@ export function PartnerBusinessFields({
           </div>
           <div>
             <label className="text-sm font-medium" htmlFor={`${idPrefix}-pincode`}>
-              Pin code <span className="text-red-500">*</span>
+              Pin code <span className="font-normal text-foreground/40">(optional)</span>
             </label>
             <input
               id={`${idPrefix}-pincode`}
@@ -243,7 +243,7 @@ export function PartnerBusinessFields({
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="text-sm font-medium" htmlFor={`${idPrefix}-governmentIdNumber`}>
-              Aadhaar number <span className="text-red-500">*</span>
+              Aadhaar number <span className="font-normal text-foreground/40">(optional)</span>
             </label>
             <input
               id={`${idPrefix}-governmentIdNumber`}
@@ -347,11 +347,13 @@ export function PartnerBusinessFields({
         <p className="text-xs font-semibold uppercase tracking-wider text-foreground/40 mb-2">Contact Persons</p>
         
         <div className="rounded-xl border border-foreground/10 p-5 space-y-4 bg-foreground/[0.02]">
-          <p className="text-xs font-bold tracking-wider text-foreground/60 uppercase">Contact Person 1 <span className="text-red-500">*</span></p>
+          <p className="text-xs font-bold tracking-wider text-foreground/60 uppercase">
+            Contact Person 1 <span className="font-normal normal-case text-foreground/40">(optional)</span>
+          </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="text-sm font-medium" htmlFor={`${idPrefix}-contactPerson1Name`}>
-                Name <span className="text-red-500">*</span>
+                Name
               </label>
               <input
                 id={`${idPrefix}-contactPerson1Name`}
@@ -363,7 +365,7 @@ export function PartnerBusinessFields({
             </div>
             <div>
               <label className="text-sm font-medium" htmlFor={`${idPrefix}-contactPerson1Mobile`}>
-                Mobile <span className="text-red-500">*</span>
+                Mobile
               </label>
               <input
                 id={`${idPrefix}-contactPerson1Mobile`}
