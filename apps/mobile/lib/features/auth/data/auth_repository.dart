@@ -11,8 +11,10 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(ref.watch(dioProvider), ref.watch(secureStorageProvider));
 });
 
-/// `{ exists, hasRealName }` from `GET /api/auth-helpers/phone-exists`.
-typedef PhoneExistsResult = ({bool exists, bool hasRealName});
+/// `{ exists, hasRealName, accountType }` from `GET /api/auth-helpers/phone-exists`.
+/// ADR-053 — `accountType` ('RIDER' | 'SERVICE_PROVIDER') is null when `exists` is false; lets
+/// the caller catch a Rider-vs-Service-Provider mismatch before ever sending an OTP.
+typedef PhoneExistsResult = ({bool exists, bool hasRealName, String? accountType});
 
 class AuthRepository {
   AuthRepository(this._dio, this._storage);
@@ -74,7 +76,11 @@ class AuthRepository {
   Future<PhoneExistsResult> phoneExists(String phoneNumber) {
     return apiGuard(() async {
       final res = await _dio.get('/api/auth-helpers/phone-exists', queryParameters: {'phone': phoneNumber});
-      return (exists: res.data['exists'] as bool, hasRealName: res.data['hasRealName'] as bool);
+      return (
+        exists: res.data['exists'] as bool,
+        hasRealName: res.data['hasRealName'] as bool,
+        accountType: res.data['accountType'] as String?,
+      );
     });
   }
 

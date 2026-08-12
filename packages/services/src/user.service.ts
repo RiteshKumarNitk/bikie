@@ -6,10 +6,16 @@ import { userRepository } from "@bikie/database";
 const SIGNUP_WINDOW_MS = 10 * 60 * 1000;
 
 export const UserService = {
-  async phoneNumberExists(phoneNumber: string): Promise<{ exists: boolean; hasRealName: boolean }> {
+  /** `accountType` lets the login/signup UI detect a Rider-vs-Service-Provider mismatch and show
+   * the "already registered as X" choice BEFORE ever sending an OTP (ADR-053) — no reason to
+   * text a code just to find out the selection doesn't match the account. `null` when the number
+   * has no account yet. */
+  async phoneNumberExists(
+    phoneNumber: string,
+  ): Promise<{ exists: boolean; hasRealName: boolean; accountType: "RIDER" | "SERVICE_PROVIDER" | null }> {
     const user = await userRepository.findUserByPhoneNumber(phoneNumber);
-    if (!user) return { exists: false, hasRealName: false };
-    return { exists: true, hasRealName: user.name !== phoneNumber };
+    if (!user) return { exists: false, hasRealName: false, accountType: null };
+    return { exists: true, hasRealName: user.name !== phoneNumber, accountType: user.accountType };
   },
 
   async updatePhone(userId: string, phone: string | null): Promise<void> {

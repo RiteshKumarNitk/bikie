@@ -6,7 +6,7 @@ import { prisma } from "../client";
 export async function findUserByPhoneNumber(phoneNumber: string) {
   return prisma.user.findUnique({
     where: { phoneNumber },
-    select: { id: true, name: true, role: true },
+    select: { id: true, name: true, role: true, accountType: true },
   });
 }
 

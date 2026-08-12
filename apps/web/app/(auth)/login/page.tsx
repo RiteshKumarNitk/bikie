@@ -31,6 +31,10 @@ export default function LoginPage() {
   const [serverError, setServerError] = useState<string | null>(null);
   const [selectedRole, setSelectedRole] = useState<SelectedRole>("RIDER");
   const [mismatch, setMismatch] = useState<{ currentType: SelectedRole; requestedType: SelectedRole } | null>(null);
+  // Pre-auth mismatch (caught before any OTP is sent) has no session yet — "Continue as X" there
+  // means "actually log me in as that type," not "redirect me, I'm already signed in." Post-verify
+  // mismatch (defensive fallback, session already exists) means the opposite. ADR-053.
+  const [mismatchHasSession, setMismatchHasSession] = useState(false);
 
   useEffect(() => {
     setSelectedRole(readSelectedRoleCookie());
@@ -49,25 +53,13 @@ export default function LoginPage() {
   const resendTimer = useResendCountdown(60);
   const widget = useMsg91Widget();
 
-  async function handleSendCode() {
-    setServerError(null);
-    const normalized = composePhoneNumber(localNumber);
-    if (!normalized) {
-      setServerError("Enter a 10-digit phone number.");
-      return;
-    }
+  /** The actual "text me a code" step, factored out so both the normal phone-entry submit and
+   * the pre-auth mismatch screen's "Continue as X" button (which needs to resume login, not
+   * redirect — there's no session yet at that point) can reach it without duplicating the
+   * MSG91 call. */
+  async function sendOtpTo(normalized: string) {
     setSendingOtp(true);
     try {
-      // Check existence up front, before sending any OTP — since the backend
-      // auto-creates an account on any successful OTP verification (ADR-013), a
-      // login page shouldn't text a code to a number with no account at all.
-      const existsRes = await fetch(`/api/auth-helpers/phone-exists?phone=${encodeURIComponent(normalized)}`);
-      const existsData: { exists: boolean; hasRealName: boolean } = await existsRes.json();
-      if (!existsData.exists) {
-        setServerError(NO_ACCOUNT);
-        return;
-      }
-
       await widget.sendOtp(normalized);
       setPhoneNumber(normalized);
       setStep("otp");
@@ -76,6 +68,47 @@ export default function LoginPage() {
       setServerError(err instanceof Error ? err.message : "Could not send the verification code. Please try again.");
     } finally {
       setSendingOtp(false);
+    }
+  }
+
+  async function handleSendCode() {
+    setServerError(null);
+    const normalized = composePhoneNumber(localNumber);
+    if (!normalized) {
+      setServerError("Enter a 10-digit phone number.");
+      return;
+    }
+    setSendingOtp(true);
+    let proceeded = false;
+    try {
+      // Check existence up front, before sending any OTP — since the backend
+      // auto-creates an account on any successful OTP verification (ADR-013), a
+      // login page shouldn't text a code to a number with no account at all.
+      const existsRes = await fetch(`/api/auth-helpers/phone-exists?phone=${encodeURIComponent(normalized)}`);
+      const existsData: { exists: boolean; hasRealName: boolean; accountType: SelectedRole | null } =
+        await existsRes.json();
+      if (!existsData.exists) {
+        setServerError(NO_ACCOUNT);
+        return;
+      }
+      // ADR-053 — same reasoning: don't text a code just to find out afterward that the
+      // selected role doesn't match this account. Caught here, before any OTP is sent.
+      if (existsData.accountType && existsData.accountType !== selectedRole) {
+        setPhoneNumber(normalized);
+        setMismatchHasSession(false);
+        setMismatch({ currentType: existsData.accountType, requestedType: selectedRole });
+        setStep("mismatch");
+        return;
+      }
+
+      proceeded = true;
+      await sendOtpTo(normalized);
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : "Could not send the verification code. Please try again.");
+    } finally {
+      // sendOtpTo manages its own sendingOtp lifecycle once control passes to it — only reset
+      // here for the paths that returned before reaching it (NO_ACCOUNT, mismatch, error).
+      if (!proceeded) setSendingOtp(false);
     }
   }
 
@@ -109,10 +142,14 @@ export default function LoginPage() {
       }
 
       // ADR-053: never sign the account back out here — its real accountType is whatever it
-      // already is, this only decides which message/redirect to show.
+      // already is, this only decides which message/redirect to show. This is a defensive
+      // fallback path now (the phone-exists check in handleSendCode already catches the mismatch
+      // before an OTP is ever sent) — reachable only if accountType changed in the brief window
+      // between that check and this verify.
       const { data: sessionData } = await authClient.getSession();
       const currentType: SelectedRole = sessionData?.user.accountType === "SERVICE_PROVIDER" ? "SERVICE_PROVIDER" : "RIDER";
       if (currentType !== selectedRole) {
+        setMismatchHasSession(true);
         setMismatch({ currentType, requestedType: selectedRole });
         setStep("mismatch");
         return;
@@ -389,14 +426,27 @@ export default function LoginPage() {
                   type="button"
                   className="w-full"
                   size="lg"
+                  disabled={sendingOtp}
                   onClick={() => {
-                    const urlParams = new URLSearchParams(window.location.search);
-                    const nextUrl = urlParams.get("next");
-                    window.location.href =
-                      nextUrl || (mismatch.currentType === "SERVICE_PROVIDER" ? "/partner" : "/dashboard");
+                    if (mismatchHasSession) {
+                      // Already logged in (defensive fallback path) — just go there.
+                      const urlParams = new URLSearchParams(window.location.search);
+                      const nextUrl = urlParams.get("next");
+                      window.location.href =
+                        nextUrl || (mismatch.currentType === "SERVICE_PROVIDER" ? "/partner" : "/dashboard");
+                      return;
+                    }
+                    // Not logged in yet (the common path) — resume login as the account's real
+                    // type instead of the one originally selected.
+                    setSelectedRole(mismatch.currentType);
+                    setMismatch(null);
+                    setStep("phone");
+                    void sendOtpTo(phoneNumber);
                   }}
                 >
-                  Continue as {mismatch.currentType === "SERVICE_PROVIDER" ? "Service Provider" : "Rider"}
+                  {sendingOtp
+                    ? "Sending code..."
+                    : `Continue as ${mismatch.currentType === "SERVICE_PROVIDER" ? "Service Provider" : "Rider"}`}
                 </Button>
                 <Link
                   href="/account-type-request"

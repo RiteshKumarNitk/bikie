@@ -41,9 +41,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
   bool _sendingOtp = false;
   bool _verifying = false;
   bool _signingIn = false;
-  // ADR-053 — populated when the signed-in account's real accountType doesn't match what was
-  // picked on /welcome; never sign the account back out over this, just show the choice.
+  // ADR-053 — populated when the account's real accountType doesn't match what was picked on
+  // /welcome; never sign the account back out over this, just show the choice.
   String? _mismatchCurrentType;
+  // True only for the defensive post-verify fallback (a session already exists then) — the
+  // common case is caught in _sendCode before any OTP is sent, where there's no session yet, so
+  // "Continue as X" there means "resume login as that type," not "go to that dashboard."
+  bool _mismatchHasSession = false;
 
   @override
   void dispose() {
@@ -74,6 +78,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       final result = await repo.phoneExists(normalized);
       if (!result.exists) {
         setState(() => _error = _noAccountError);
+        return;
+      }
+      // ADR-053 — same reasoning: don't text a code just to find out afterward that the
+      // selected role doesn't match this account. Caught here, before any OTP is sent.
+      final selectedRole = ref.read(selectedRoleProvider);
+      if (result.accountType != null && result.accountType != selectedRole) {
+        setState(() {
+          _phoneNumber = normalized;
+          _mismatchHasSession = false;
+          _mismatchCurrentType = result.accountType;
+          _step = 'mismatch';
+        });
         return;
       }
       await repo.sendOtp(normalized);
@@ -114,7 +130,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
 
       final currentType = user?.accountType ?? 'RIDER';
       if (currentType != selectedRole) {
+        // Defensive fallback now (_sendCode's phoneExists check already catches this before an
+        // OTP is ever sent) — reachable only if accountType changed in the brief window since.
         setState(() {
+          _mismatchHasSession = true;
           _mismatchCurrentType = currentType;
           _step = 'mismatch';
         });
@@ -146,6 +165,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       final currentType = user?.accountType ?? 'RIDER';
       if (currentType != selectedRole) {
         setState(() {
+          _mismatchHasSession = true;
           _mismatchCurrentType = currentType;
           _step = 'mismatch';
         });
@@ -217,9 +237,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                         ),
                         const SizedBox(height: 20),
                         ElevatedButton(
-                          onPressed: () => context.go('/'),
+                          onPressed: _sendingOtp
+                              ? null
+                              : () {
+                                  if (_mismatchHasSession) {
+                                    // Already logged in (defensive fallback path) — just go there.
+                                    context.go('/');
+                                    return;
+                                  }
+                                  // Not logged in yet (the common path) — resume login as the
+                                  // account's real type instead of the one originally selected.
+                                  ref.read(selectedRoleProvider.notifier).state = _mismatchCurrentType!;
+                                  setState(() => _step = 'phone');
+                                  _sendCode();
+                                },
                           child: Text(
-                            'Continue as ${_mismatchCurrentType == 'SERVICE_PROVIDER' ? 'Service Provider' : 'Rider'}',
+                            _sendingOtp
+                                ? 'Sending code...'
+                                : 'Continue as ${_mismatchCurrentType == 'SERVICE_PROVIDER' ? 'Service Provider' : 'Rider'}',
                           ),
                         ),
                         const SizedBox(height: 12),
