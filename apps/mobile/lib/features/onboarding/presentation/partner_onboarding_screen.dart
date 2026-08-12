@@ -136,9 +136,19 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
     super.dispose();
   }
 
+  static final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
   Future<void> _save() async {
     if (_businessName.text.trim().isEmpty || _city.text.trim().isEmpty) {
       setState(() => _error = 'Business name and city are required.');
+      return;
+    }
+    if (_businessMobile.text.trim().length < 10) {
+      setState(() => _error = 'Enter a valid business mobile number.');
+      return;
+    }
+    if (!_emailRegex.hasMatch(_businessEmail.text.trim())) {
+      setState(() => _error = 'Enter a valid business email address.');
       return;
     }
 
@@ -238,13 +248,13 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                   ),
                   OnboardingTextField(
                     controller: _businessMobile,
-                    label: 'Business mobile (optional)',
+                    label: 'Business mobile *',
                     hint: '10-digit number',
                     keyboardType: TextInputType.phone,
                   ),
                   OnboardingTextField(
                     controller: _businessEmail,
-                    label: 'Business email (optional)',
+                    label: 'Business email *',
                     hint: 'e.g. hello@goamoto.com',
                     keyboardType: TextInputType.emailAddress,
                   ),

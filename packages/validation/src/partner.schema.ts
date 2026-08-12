@@ -33,12 +33,15 @@ export type PartnerType = z.infer<typeof partnerTypeEnum>;
 
 export const partnerProfileSchema = z
   .object({
-    businessName: z.string().min(1).max(120),
+    businessName: z.string({ error: "Business name is required" }).min(1).max(120),
     type: partnerTypeEnum,
-    city: z.string().min(1).max(100),
+    city: z.string({ error: "City is required" }).min(1).max(100),
     description: z.string().max(1000).optional(),
-    businessMobile: z.string().min(10).max(20),
-    businessEmail: z.string().email(),
+    businessMobile: z
+      .string({ error: "Business mobile number is required" })
+      .min(10, "Enter a valid mobile number")
+      .max(20),
+    businessEmail: z.string({ error: "Business email is required" }).email("Enter a valid email address"),
     contactPerson1Name: z.string().max(100).optional(),
     contactPerson1Mobile: z.string().max(20).optional(),
     contactPerson2Name: z.string().max(100).optional(),

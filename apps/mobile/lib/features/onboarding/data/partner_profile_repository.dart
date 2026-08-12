@@ -61,6 +61,12 @@ class PartnerProfileRepository {
       'businessName': input.businessName,
       'type': input.type,
       'city': input.city,
+      // Required server-side (partnerProfileSchema) — always sent, never conditional like the
+      // optional fields below. Previously dropped entirely when this map was last widened,
+      // which made every submission fail server-side validation with a raw "expected string,
+      // received undefined" for both fields (ADR-053 follow-up fix).
+      'businessMobile': input.businessMobile,
+      'businessEmail': input.businessEmail,
       if (_notBlank(input.description)) 'description': input.description,
       if (_notBlank(input.contactPerson1Name)) 'contactPerson1Name': input.contactPerson1Name,
       if (_notBlank(input.contactPerson1Mobile)) 'contactPerson1Mobile': input.contactPerson1Mobile,
@@ -73,6 +79,9 @@ class PartnerProfileRepository {
       if (input.longitude != null) 'longitude': input.longitude,
       if (_notBlank(input.governmentIdType)) 'governmentIdType': input.governmentIdType,
       if (_notBlank(input.governmentIdNumber)) 'governmentIdNumber': input.governmentIdNumber,
+      if (_notBlank(input.workingHours)) 'workingHours': input.workingHours,
+      if (input.serviceRadiusKm != null) 'serviceRadiusKm': input.serviceRadiusKm,
+      if (input.yearsOfExperience != null) 'yearsOfExperience': input.yearsOfExperience,
       if (input.isGeneralResponder != null) 'isGeneralResponder': input.isGeneralResponder,
     };
   }
