@@ -164,6 +164,17 @@ class _PartnerProfileSectionState extends ConsumerState<_PartnerProfileSection> 
   bool _loading = false;
 
   Future<void> _openBusinessProfile() async {
+    // No Partner row yet (freshly-approved Account Type Change Request, or an abandoned signup
+    // onboarding) — `getProfile()` hits the capability-gated `/api/partner/profile`, which 403s
+    // with "requires an active Service Provider profile" for exactly this case. Skip the network
+    // call entirely and go straight to the (empty) creation form instead of surfacing that error.
+    final partnerStatus = ref.read(authControllerProvider).user?.partnerStatus;
+    if (partnerStatus == null) {
+      await context.push('/partner-onboarding');
+      ref.invalidate(partnerProfileSummaryProvider);
+      return;
+    }
+
     setState(() => _loading = true);
     try {
       final profile = await ref.read(partnerProfileRepositoryProvider).getProfile();

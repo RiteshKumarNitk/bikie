@@ -53,6 +53,13 @@ import '../widgets/app_shell.dart';
 /// before anything else, not offer a free-browse path around it.
 const _preAuthPaths = {'/intro', '/welcome', '/login', '/signup'};
 
+/// Mirrors `apps/web/app/(main)/partner/layout.tsx`'s gate: these screens all call
+/// capability-gated `/api/partner/**` routes (`requirePartnerCapability`, needs an existing,
+/// non-SUSPENDED `Partner` row), so a SERVICE_PROVIDER-accountType account with no profile yet
+/// — freshly approved via an Account Type Change Request, or a brand-new signup who abandoned
+/// the onboarding form — must be sent to create one first, not shown a raw 403 from one of these.
+const _partnerOperationalPaths = {'/', '/partner/requests', '/partner/active', '/sos', '/partner/history'};
+
 final routerProvider = Provider<GoRouter>((ref) {
   final authStatus = ref.watch(authControllerProvider.select((s) => s.status));
   final hasSeenIntro = ref.watch(hasSeenIntroProvider);
@@ -63,6 +70,8 @@ final routerProvider = Provider<GoRouter>((ref) {
   // and mutually exclusive (ADR-053) — no local "mode" left to resolve, just this one flag.
   final accountType = ref.watch(authControllerProvider.select((s) => s.user?.accountType));
   final isPartner = isServiceProviderAccountType(accountType);
+  final partnerStatus = ref.watch(authControllerProvider.select((s) => s.user?.partnerStatus));
+  final needsPartnerOnboarding = isPartner && partnerStatus == null;
 
   final String initialLocation;
   if (authStatus == AuthStatus.authenticated) {
@@ -85,6 +94,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
       if (isAuthenticated && isPreAuthPath) {
         return '/';
+      }
+      final isPartnerOperationalPath = _partnerOperationalPaths.contains(path) || path.startsWith('/sos/');
+      if (needsPartnerOnboarding && isPartnerOperationalPath && path != '/partner-onboarding') {
+        return '/partner-onboarding';
       }
       return null;
     },
