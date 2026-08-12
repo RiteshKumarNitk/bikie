@@ -47,11 +47,6 @@ class ProfileScreen extends ConsumerWidget {
           if (isPartnerMode) ...const [_PartnerProfileSection()] else ...const [_RiderProfileSection()],
           _ProfileTile(icon: Icons.chat_bubble_outline, label: 'Messages', onTap: () => context.push('/messages')),
           _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
-          _ProfileTile(
-            icon: Icons.help_outline,
-            label: 'Help & Support',
-            onTap: () => context.push('/account-type-request'),
-          ),
           const SizedBox(height: 24),
           const _SignOutButton(),
         ],
@@ -114,6 +109,12 @@ class _RiderProfileSection extends StatelessWidget {
           icon: Icons.workspace_premium_outlined,
           label: 'Membership',
           onTap: () => context.push('/membership'),
+        ),
+        _ProfileTile(
+          icon: Icons.support_agent_outlined,
+          label: 'Customer Support',
+          subtitle: 'Request an account type change',
+          onTap: () => context.push('/account-type-request'),
         ),
       ],
     );
@@ -194,6 +195,12 @@ class _PartnerProfileSectionState extends ConsumerState<_PartnerProfileSection> 
           icon: Icons.workspace_premium_outlined,
           label: 'Membership',
           onTap: () => context.push('/partner-membership'),
+        ),
+        _ProfileTile(
+          icon: Icons.support_agent_outlined,
+          label: 'Customer Support',
+          subtitle: 'Request an account type change',
+          onTap: () => context.push('/account-type-request'),
         ),
       ],
     );
