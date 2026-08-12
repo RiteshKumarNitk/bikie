@@ -1,4 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "corepack pnpm install --frozen-lockfile"
+  "installCommand": "corepack pnpm install --frozen-lockfile",
+  "crons": [
+    {
+      "path": "/api/cron/sos-escalate",
+      "schedule": "*/1 * * * *"
+    },
+    {
+      "path": "/api/cron/sos-resolve",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/rider-location-cleanup",
+      "schedule": "*/15 * * * *"
+    }
+  ]
 }
