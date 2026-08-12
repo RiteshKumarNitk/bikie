@@ -8,7 +8,7 @@ import { authClient } from "@/lib/auth-client";
  * ADR-053 — this page's old job ("any Rider can self-service start a Service Provider
  * application") no longer exists: accountType is fixed at registration and only ever changed by
  * an admin-approved Account Type Change Request. Kept only as a redirect for any stale
- * bookmark/link, so nobody hits a dead page.
+ * bookmark/link, sss so nobody hits a dead page.
  */
 export default function BecomeProviderRedirectPage() {
   const router = useRouter();
