@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../auth/domain/auth_controller.dart';
@@ -49,8 +50,35 @@ class ProfileScreen extends ConsumerWidget {
           _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
           const SizedBox(height: 24),
           const _SignOutButton(),
+          const SizedBox(height: 16),
+          const _AppVersionFooter(),
         ],
       ),
+    );
+  }
+}
+
+/// So a build can be identified from inside the running app itself — `flutter --release`
+/// installs and Play Store updates don't otherwise expose this anywhere the user can see.
+/// `PackageInfo` reads it straight from the platform (App Info on Android), not `pubspec.yaml`
+/// at runtime, so it always matches the actual installed build.
+class _AppVersionFooter extends StatelessWidget {
+  const _AppVersionFooter();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<PackageInfo>(
+      future: PackageInfo.fromPlatform(),
+      builder: (context, snapshot) {
+        final info = snapshot.data;
+        final label = info == null ? '' : 'Version ${info.version} (build ${info.buildNumber})';
+        return Center(
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).colorScheme.outline),
+          ),
+        );
+      },
     );
   }
 }
