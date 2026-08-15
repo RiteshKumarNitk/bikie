@@ -329,7 +329,7 @@ export default function SignUpPage() {
                 Already registered as {mismatch.currentType === "SERVICE_PROVIDER" ? "a Service Provider" : "a Rider"}
               </h2>
               <p className="text-sm text-foreground/60">
-                This mobile number is already registered with BIKIE as{" "}
+                This account is already registered with BIKIE as{" "}
                 {mismatch.currentType === "SERVICE_PROVIDER" ? "a Service Provider" : "a Rider"}. Did you select{" "}
                 {mismatch.requestedType === "SERVICE_PROVIDER" ? "Service Provider" : "Rider"} by mistake?
               </p>

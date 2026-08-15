@@ -147,7 +147,19 @@ export default function LoginPage() {
       // before an OTP is ever sent) — reachable only if accountType changed in the brief window
       // between that check and this verify.
       const { data: sessionData } = await authClient.getSession();
+      
+      const currentRole = sessionData?.user.role;
       const currentType: SelectedRole = sessionData?.user.accountType === "SERVICE_PROVIDER" ? "SERVICE_PROVIDER" : "RIDER";
+      
+      // ADMIN is not a Rider/Service Provider routing choice.
+      // Always send an authenticated ADMIN directly to the admin dashboard.
+      if (currentRole === "ADMIN") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const nextUrl = urlParams.get("next");
+        window.location.href = nextUrl || "/admin";
+        return;
+      }
+
       if (currentType !== selectedRole) {
         setMismatchHasSession(true);
         setMismatch({ currentType, requestedType: selectedRole });
@@ -180,7 +192,19 @@ export default function LoginPage() {
       // ADR-053: never sign the account back out here — its real accountType is whatever it
       // already is, this only decides which message/redirect to show.
       const { data: sessionData } = await authClient.getSession();
+
+      const currentRole = sessionData?.user.role;
       const currentType: SelectedRole = sessionData?.user.accountType === "SERVICE_PROVIDER" ? "SERVICE_PROVIDER" : "RIDER";
+      
+      // ADMIN is not a Rider/Service Provider routing choice.
+      // Always send an authenticated ADMIN directly to the admin dashboard.
+      if (currentRole === "ADMIN") {
+        const urlParams = new URLSearchParams(window.location.search);
+        const nextUrl = urlParams.get("next");
+        window.location.href = nextUrl || "/admin";
+        return;
+      }
+
       if (currentType !== selectedRole) {
         setMismatch({ currentType, requestedType: selectedRole });
         setStep("mismatch");
@@ -417,7 +441,7 @@ export default function LoginPage() {
                 Already registered as {mismatch.currentType === "SERVICE_PROVIDER" ? "a Service Provider" : "a Rider"}
               </h2>
               <p className="text-sm text-foreground/60">
-                This mobile number is already registered with BIKIE as{" "}
+                This account is already registered with BIKIE as{" "}
                 {mismatch.currentType === "SERVICE_PROVIDER" ? "a Service Provider" : "a Rider"}. Did you select{" "}
                 {mismatch.requestedType === "SERVICE_PROVIDER" ? "Service Provider" : "Rider"} by mistake?
               </p>
