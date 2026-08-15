@@ -27,15 +27,14 @@ COPY docker ./docker
 RUN pnpm install --frozen-lockfile
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Needed at build time because Next prerenders some /api routes against the DB
-ARG DATABASE_URL
-ARG DIRECT_URL
+# DATABASE_URL/DIRECT_URL are deliberately NOT build args: DB-backed route handlers
+# now render at request time (see apps/web/app/api/categories/route.ts), so `next build`
+# never touches Postgres. Runtime connectivity comes from the "postgres" Compose service,
+# supplied via docker-compose.yml's env_file at container start, after `docker compose up`.
 ARG BETTER_AUTH_SECRET
 ARG BETTER_AUTH_URL=http://localhost:3000
 ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
 ARG MESSAGE_ENCRYPTION_KEY
-ENV DATABASE_URL=$DATABASE_URL
-ENV DIRECT_URL=$DIRECT_URL
 ENV BETTER_AUTH_SECRET=$BETTER_AUTH_SECRET
 ENV BETTER_AUTH_URL=$BETTER_AUTH_URL
 ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL

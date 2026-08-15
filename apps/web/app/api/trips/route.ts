@@ -3,7 +3,9 @@ import { createTripSchema, tripsQuerySchema } from "@bikie/validation";
 import { TripService } from "@bikie/services";
 import { requireMembership } from "@/lib/require-role";
 
-export const revalidate = 60;
+// DB-backed — must render at request time, not prerendered at build (see
+// apps/web/app/api/categories/route.ts for why).
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const parsed = tripsQuerySchema.safeParse(Object.fromEntries(req.nextUrl.searchParams));

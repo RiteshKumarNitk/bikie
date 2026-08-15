@@ -2,6 +2,24 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Docker production build: DB-backed API routes no longer prerendered at build time (2026-08-15, ADR-054)
+
+Production Postgres moved from Neon to a `postgres` Docker Compose service (not running during
+`docker build`). `next build` was still trying to statically prerender fixed-path GET routes that
+had `export const revalidate = N` (an ISR opt-in), invoking their Prisma queries during the image
+build and failing with P1001 `Can't reach database server at postgres`. Full audit of every route
+under `apps/web/app/api` — see ADR-054 for the reasoning on why only these 9 were affected.
+
+| Task | Status |
+|---|---|
+| Audited all 81 `GET` route handlers under `apps/web/app/api` for build-time DB access risk | Completed |
+| Switched the 9 fixed-path, DB-backed, `revalidate`-only routes (`categories`, `bikes`, `bikes/featured`, `partner-membership/plans`, `membership/plans`, `trips`, `destinations`, `destinations/popular`, `testimonials`) from `revalidate` to `export const dynamic = "force-dynamic"` | Completed |
+| Confirmed dynamic-segment routes (`bikes/[slug]`, `bikes/[slug]/reviews`, `trips/[slug]`, `destinations/[slug]`) are unaffected — no `generateStaticParams`, so `dynamicParams` (default `true`) already defers them to request time; left their `revalidate` config as-is | Completed |
+| Removed `DATABASE_URL`/`DIRECT_URL` from the Dockerfile builder stage's `ARG`/`ENV` and from `docker-compose.yml`'s `build.args` (build no longer touches Postgres); confirmed `prisma.config.ts` already tolerates their absence at `prisma generate` time | Completed |
+| Removed `DATABASE_URL`/`DIRECT_URL` from `turbo.json`'s `build` task `env` list (no longer a build-output input, avoids needless cache invalidation) | Completed |
+| Verified: `pnpm db:generate`, `apps/web` `tsc --noEmit` clean, `pnpm build --filter=web` completes (162/162 pages) with `DATABASE_URL` pointing at an unreachable host — matching the real Docker build environment | Completed |
+| `docker/entrypoint.sh` already runs `prisma migrate deploy` at container **startup** (before `pnpm --filter web start`) — no change needed, this was already the correct runtime-migration pattern | Verified, no change needed |
+
 ## Rider/Service Provider `accountType`: mutually exclusive, admin-approved change requests (2026-08-11, ADR-053)
 
 Replaced the dual-capability model (ADR-046b–051, one account could be Rider + Service Provider

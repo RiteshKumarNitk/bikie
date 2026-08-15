@@ -2,7 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { featuredTestimonialsQuerySchema } from "@bikie/validation";
 import { TestimonialService } from "@bikie/services";
 
-export const revalidate = 300;
+// DB-backed — must render at request time, not prerendered at build (see
+// apps/web/app/api/categories/route.ts for why).
+export const dynamic = "force-dynamic";
 
 export async function GET(req: NextRequest) {
   const parsed = featuredTestimonialsQuerySchema.safeParse(

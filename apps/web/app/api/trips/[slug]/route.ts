@@ -3,9 +3,11 @@ import { TripService } from "@bikie/services";
 import { updateTripSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
 
-// Public, read-only ride detail — matches the revalidate window used by the
-// sibling list route (GET /api/trips). PATCH below is a mutation and is never
-// cached regardless of this setting.
+// Public, read-only ride detail with a dynamic `[slug]` segment — not eagerly
+// prerendered at build (no generateStaticParams), so a bare `revalidate` here is
+// enough for ISR without the build-time DB risk that fixed-path list routes have
+// (see apps/web/app/api/categories/route.ts). PATCH below is a mutation and is
+// never cached regardless of this setting.
 export const revalidate = 60;
 
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {

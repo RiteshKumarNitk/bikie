@@ -2409,3 +2409,65 @@ changes:
   `apps/web` typecheck/`next build`, and `flutter analyze`/`flutter test` (112 tests) all verified
   clean. Not addressed here: a bulk migration tool for admins to bypass the request flow for mass
   corrections (not requested, and every case so far is a single misregistered user).
+
+## ADR-054: Docker production build must not require Postgres reachable at image-build time
+
+- **Context.** Production Postgres moved from Neon (always internet-reachable, including during a
+  Vercel/Docker build) to a `postgres` Docker Compose service, which only exists once
+  `docker compose up` starts it — it is never running during `docker compose build`. `next build`
+  was failing at "Generating static pages" with `P1001 Can't reach database server at postgres`
+  while prerendering `/api/categories`. Root cause: fixed-path (non-`[slug]`) `GET` route handlers
+  that set `export const revalidate = <number>` with no other dynamic signal (no `headers()`/
+  `cookies()`/`request.url`/`request.headers` access) are treated by Next 16's classic ("previous
+  model," no `cacheComponents` flag — this repo doesn't set it) route-segment-config algorithm as
+  ISR-eligible, which requires generating the initial static snapshot once during `next build`,
+  invoking the route's own Prisma-backed service call in the process. This is unrelated to the
+  `@prisma/adapter-neon` vs. `@prisma/adapter-pg` split (ADR-004) — `createPrismaAdapter`
+  (`packages/database/src/adapter.ts`) already auto-detects the right adapter from the connection
+  string and was already correctly using `PrismaPg`/`pg.Pool` for the non-Neon URL; `pg.Pool`
+  doesn't open a connection at construction, only on first query, so the adapter code was never
+  the problem — only the *timing* of when that first query ran (build vs. request) was.
+- **Decision.**
+  - Audited all 81 `GET` route handlers under `apps/web/app/api`. Only 9 fixed-path routes were
+    both DB-backed and had no dynamic signal: `categories`, `bikes`, `bikes/featured`,
+    `partner-membership/plans`, `membership/plans`, `trips`, `destinations`,
+    `destinations/popular`, `testimonials`. Every other DB-backed route already calls
+    `requireSession`/`requireRole`/`requireMembership` (→ `headers()`) or reads
+    `request.headers`/`request.url`/`req.nextUrl` directly (rate-limit-by-IP routes, query-param
+    routes), which already forces per-request dynamic rendering — those were never at risk and
+    were left untouched. The 4 dynamic-segment siblings (`bikes/[slug]`, `bikes/[slug]/reviews`,
+    `trips/[slug]`, `destinations/[slug]`) define no `generateStaticParams`, so `dynamicParams`
+    (default `true`) already defers their first render to request time regardless of `revalidate`
+    — also left untouched, since forcing them dynamic too would be exactly the "blindly add
+    `force-dynamic` everywhere" anti-pattern this fix was explicit about avoiding.
+  - The 9 affected routes were switched from `export const revalidate = N` to
+    `export const dynamic = "force-dynamic"`. This is a real, acknowledged trade-off, not a free
+    fix: these routes lose their in-process ISR caching (previously up to 5 minutes stale) and now
+    query Postgres on every request. Chosen over the alternative (`unstable_cache`-wrapping each
+    service call to keep data-level caching while still avoiding build-time execution) because it
+    is a one-line, low-risk, easily-audited change with an identical response contract, versus a
+    multi-file change touching cache-tag invalidation on every admin mutation path for those same
+    entities (category/bike/destination/testimonial/plan CRUD) — out of scope for a
+    production-unblocking fix. Re-introducing `unstable_cache`-based data caching for these routes
+    is a legitimate follow-up if DB load in production warrants it.
+  - Removed `DATABASE_URL`/`DIRECT_URL` from the Dockerfile builder stage's `ARG`/`ENV` and from
+    `docker-compose.yml`'s `build.args` — no route handler touches the DB during build anymore, so
+    baking a DB credential into the build stage serves no purpose (and needlessly invalidated
+    Docker/Turbo build caching on every credential rotation). `prisma.config.ts` already has a
+    harmless localhost fallback for exactly this case (`prisma generate` never needs a reachable
+    DB, only `migrate`/`db push` do), confirming this was already the intended design. Also
+    dropped both vars from `turbo.json`'s `build` task `env` list for the same reason. Left
+    `BETTER_AUTH_SECRET`/`BETTER_AUTH_URL`/`NEXT_PUBLIC_APP_URL`/`MESSAGE_ENCRYPTION_KEY` as
+    build-time `ARG`/`ENV` unchanged — no evidence they're needed only for DB-dependent
+    prerendering, and removing them wasn't required to fix this bug.
+  - `docker/entrypoint.sh` already runs `npx prisma migrate deploy` at container **startup**,
+    before `pnpm --filter web start` — i.e., safe, non-destructive migrations already happen after
+    `docker compose up`, once Postgres is actually reachable. No change needed; confirmed as
+    already the correct pattern rather than something this fix had to add.
+- **Consequences.** `pnpm build --filter=web` now completes with `DATABASE_URL` pointing at an
+  unreachable host (verified: 162/162 pages generated, all 9 fixed routes correctly marked `ƒ`
+  dynamic in the build output), matching the real `docker compose build` environment. No schema,
+  API response shape, auth behavior, or business logic changed. `apps/web` `tsc --noEmit` clean.
+  Not addressed here: restoring ISR-level ("< 5 min stale, no DB hit") caching for the 9 affected
+  routes via `unstable_cache` — deferred as a performance follow-up, not a build-correctness
+  requirement.

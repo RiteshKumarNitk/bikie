@@ -1,5 +1,16 @@
 # BIKIE — Roadmap
 
+## Fixed: Docker Production Build Unblocked — DB Reachability at Image-Build Time (2026-08-15, ADR-054)
+Moving production Postgres from Neon to a `postgres` Docker Compose service broke
+`docker compose build`: 9 public catalog/listing API routes (categories, bikes, destinations,
+testimonials, membership plans, etc.) had `revalidate` set, which Next 16 treats as an ISR opt-in
+requiring a build-time static snapshot — so `next build` tried to query Postgres while building the
+image, before the `postgres` container exists. Fixed by switching those 9 routes to
+`dynamic = "force-dynamic"` so the DB is only ever queried at request time, after
+`docker compose up`; removed the now-unnecessary `DATABASE_URL`/`DIRECT_URL` build args from the
+Dockerfile/docker-compose.yml/turbo.json. Verified `pnpm build --filter=web` completes with no DB
+reachable at all. See ADR-054.
+
 ## Fixed: Vercel Deploy Unblocked — Business Contact Fields Build Breakage (2026-08-11)
 The two most recent pushes weren't appearing on Vercel because `next build` failed outright: the
 `businessMobile`/`businessEmail` fields added to the partner forms were never threaded through

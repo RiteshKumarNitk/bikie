@@ -1,5 +1,23 @@
 # Changelog
 
+## Fix — Docker production build no longer requires Postgres reachable at image-build time (ADR-054)
+- **Root cause**: 9 fixed-path, DB-backed `GET` routes (`categories`, `bikes`, `bikes/featured`,
+  `partner-membership/plans`, `membership/plans`, `trips`, `destinations`,
+  `destinations/popular`, `testimonials`) set `export const revalidate = N` with no other dynamic
+  signal, which Next 16 treats as an ISR opt-in requiring a build-time static snapshot — invoking
+  their Prisma queries during `next build`, before the `postgres` Compose service exists. Switched
+  all 9 to `export const dynamic = "force-dynamic"` (DB now queried per-request; loses the prior
+  ISR cache window as an explicit trade-off — see ADR-054). Dynamic-segment siblings
+  (`bikes/[slug]`, `trips/[slug]`, etc.) were already safe (no `generateStaticParams`) and left
+  unchanged.
+- **Dockerfile/docker-compose.yml/turbo.json**: removed the now-unnecessary `DATABASE_URL`/
+  `DIRECT_URL` build-time `ARG`/`ENV`/build-args/cache-key entries — the build no longer touches
+  Postgres, so baking a DB credential into the image build stage served no purpose.
+- Verified: `pnpm db:generate`, `apps/web tsc --noEmit`, and `pnpm build --filter=web` all pass
+  with `DATABASE_URL` pointing at an unreachable host (162/162 pages generated). No schema, API
+  response shape, auth behavior, or business logic changed. `docker/entrypoint.sh` already runs
+  `prisma migrate deploy` at container startup — confirmed correct, no change needed there.
+
 ## Feature/Fix — Service Provider gets its own membership (ADR-051); mobile UX fixes; admin category control
 - **New: separate Partner Membership**, replacing the Rider membership requirement Service
   Providers were incorrectly gated on. New `PartnerMembershipPlan`/`PartnerMembership` schema
