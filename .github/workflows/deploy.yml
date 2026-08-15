@@ -1,0 +1,85 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: production-deployment
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh/
+          echo "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          cat >>~/.ssh/config <<END
+          Host vps
+            HostName $VPS_HOST
+            User $VPS_USER
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+          END
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Execute Deployment
+        run: |
+          ssh vps 'bash -s' << 'EOF'
+          set -e
+          
+          echo "Navigating to /opt/bikie..."
+          cd /opt/bikie
+
+          echo "Checking Git status..."
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "ERROR: Local changes detected in production repository. Deployment aborted to prevent data loss."
+            git status
+            exit 1
+          fi
+          
+          echo "Pulling latest changes from origin/master..."
+          git pull origin master
+
+          echo "Building Next.js web container..."
+          docker compose build web
+
+          echo "Starting/Updating Next.js web container..."
+          docker compose up -d web
+          
+          echo "Waiting for web container to initialize and run migrations..."
+          sleep 10
+          
+          echo "Checking web container status..."
+          if ! docker compose ps web | grep -q "Up"; then
+            echo "ERROR: Web container failed to stay up!"
+            docker compose logs --tail=100 web
+            exit 1
+          fi
+
+          echo "Performing HTTP health check (waiting up to 60s)..."
+          i=0
+          while [ $i -lt 30 ]; do
+            # We use a simple curl check. A 307/302 redirect or 200 OK means the Next.js server is up.
+            # We just need to know it's responding to HTTP.
+            HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}\n" http://127.0.0.1:3001/ || echo "Failed")
+            if [ "$HTTP_STATUS" != "Failed" ] && [ "$HTTP_STATUS" -ne 000 ] && [ "$HTTP_STATUS" -ne 502 ]; then
+              echo "Health check passed with HTTP status $HTTP_STATUS!"
+              exit 0
+            fi
+            echo "Waiting for web server to become healthy... (Status: $HTTP_STATUS)"
+            sleep 2
+            i=$((i+1))
+          done
+          
+          echo "ERROR: Health check failed! Web container is not responding."
+          docker compose logs --tail=100 web
+          exit 1
+          EOF
