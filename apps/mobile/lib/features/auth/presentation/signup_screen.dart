@@ -150,7 +150,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
                 const Center(child: AppLogo(size: 56, glow: true)),
                 const SizedBox(height: 18),
                 Text(
-                  selectedRole == 'SERVICE_PROVIDER' ? 'Create your partner account' : 'Create your rider account',
+                  selectedRole == 'SERVICE_PROVIDER' ? 'Create your partner account ...' : 'Create your rider account',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
