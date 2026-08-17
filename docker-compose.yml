@@ -19,7 +19,7 @@ services:
     # the published one: server components self-fetch /api/* using the request's Host
     # header, so "localhost:3001" has to resolve inside the container too.
     ports:
-      - "3001:3001"
+      - "3001:3000"
     env_file:
       - ./apps/.env
     environment:
