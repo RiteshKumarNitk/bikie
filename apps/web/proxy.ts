@@ -1,24 +1,31 @@
 import { NextResponse, type NextRequest } from "next/server";
+import { auth } from "@bikie/auth";
 import { SELECTED_ROLE_COOKIE, isSelectedRole } from "@/lib/role";
 
-// Deliberately NOT imported from @bikie/services here (unlike other gates) — that package's
-// barrel export pulls in Node-only modules (message-crypto's `crypto`, razorpay) incompatible
-// with the Edge Middleware runtime. This one-line check is inlined instead, same reasoning as
-// the local `getSession` helper below avoiding the better-auth server import.
+// Deliberately NOT imported from @bikie/services here (unlike other gates) — the barrel export
+// pulls in Node-only modules (message-crypto's `crypto`, razorpay) and the one-line check below
+// needs nothing from it. Same discipline as the `auth` import here being the only heavy module
+// this file pulls in.
 function isServiceProviderAccountType(user: { accountType?: string | null } | null | undefined): boolean {
   return user?.accountType === "SERVICE_PROVIDER";
 }
 
-// Helper to fetch session without importing better-auth server (prevents 1MB Edge Function bloat)
+// Resolve the session in-process, exactly like every API gate does (lib/get-session.ts). The
+// previous implementation fetched the app's own /api/auth/get-session over the public origin —
+// behind the production Docker/Nginx topology that self-fetch never completed reliably (hairpin
+// routing + Secure-cookie dropping over plaintext http), and the catch-all silently turned every
+// transport failure into "no session", redirecting valid users to /login.
+//
+// This file uses the Next.js 16 `proxy` convention (formerly `middleware.ts`), which runs on the
+// Node.js runtime — the same runtime as the server components and route handlers that already
+// load `@bikie/auth` + Prisma. (The legacy `middleware.ts` name still bundled for the Edge
+// runtime, where these Node-only modules fail to load at module evaluation.)
 async function getSession(request: NextRequest) {
   try {
-    const response = await fetch(new URL("/api/auth/get-session", request.url).toString(), {
-      headers: request.headers,
-    });
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data?.session ? data : null;
+    const session = await auth.api.getSession({ headers: request.headers });
+    return session?.session ? session : null;
   } catch (err) {
+    console.error("[proxy][getSession]", err);
     return null;
   }
 }
@@ -36,7 +43,7 @@ function isPathOrSubpath(pathname: string, base: string) {
   return pathname === base || pathname.startsWith(`${base}/`);
 }
 
-export default async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const url = new URL(request.url);
   const { pathname } = url;
 
