@@ -50,7 +50,16 @@ export async function getAdminOverviewStats() {
 export async function findAllUsers() {
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, email: true, role: true, createdAt: true, image: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      accountType: true,
+      partnerStatus: true,
+      createdAt: true,
+      image: true,
+    },
   });
   return users.map((u) => ({ ...u, createdAt: u.createdAt.toISOString() }));
 }
@@ -78,24 +87,62 @@ export async function updateUserRole(userId: string, role: string) {
     const user = await tx.user.update({
       where: { id: userId },
       data: { role: role as any },
-      select: { id: true, name: true, email: true, role: true, createdAt: true, image: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        accountType: true,
+        partnerStatus: true,
+        createdAt: true,
+        image: true,
+      },
     });
     return { ...user, createdAt: user.createdAt.toISOString() };
   });
 }
 
-export async function deleteUser(userId: string): Promise<{ ok: true } | { ok: false; reason: "HAS_DEPENDENCIES" }> {
+/** ADR-053 — admin-only write to a user's `accountType` (the same field the signup flow sets
+ * for brand-new accounts, and the Account Type Change Request flow sets on approval). The admin
+ * panel is the direct, immediate path; the request flow exists for self-service. */
+export async function updateUserAccountType(userId: string, accountType: "RIDER" | "SERVICE_PROVIDER") {
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { accountType },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      accountType: true,
+      partnerStatus: true,
+      createdAt: true,
+      image: true,
+    },
+  });
+  return { ...user, createdAt: user.createdAt.toISOString() };
+}
+
+export async function deleteUser(
+  userId: string,
+): Promise<{ ok: true } | { ok: false; reason: "HAS_DEPENDENCIES" | "ADMIN_PROTECTED" | "NOT_FOUND" }> {
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  // Admin accounts are deletable from the admin API: at minimum they own audit logs seeded
+  // against the platform itself, and a routine-account cleanup must never remove the platform's
+  // own operators (or the audit trail they generated).
+  if (!target) return { ok: false, reason: "NOT_FOUND" };
+  if (target.role === "ADMIN") return { ok: false, reason: "ADMIN_PROTECTED" };
   try {
     await prisma.user.delete({ where: { id: userId } });
     return { ok: true };
   } catch (err) {
     // Bookings/reviews/organized trips/moderation actions etc. all restrict deletion of
-    // their owning user (see schema.prisma) — surface that as a clean 409 instead of a
+    // their owning user (see schema.prisma) �?" surface that as a clean 409 instead of a
     // raw 500 so the admin UI can explain why the delete didn't go through.
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
       return { ok: false, reason: "HAS_DEPENDENCIES" };
     }
-    throw err;
+throw err;
   }
 }
 

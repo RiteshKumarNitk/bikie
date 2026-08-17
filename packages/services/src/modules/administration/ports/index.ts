@@ -10,6 +10,7 @@ export interface AdminRepositoryPort {
   getAdminOverviewStats(): Promise<AdminOverviewStatsDTO>;
   findAllUsers(): Promise<any[]>;
   updateUserRole(userId: string, role: string): Promise<any>;
+  updateUserAccountType(userId: string, accountType: "RIDER" | "SERVICE_PROVIDER"): Promise<any>;
   deleteUser(userId: string): Promise<any>;
   findAllPartners(): Promise<any[]>;
   /** §37 — summary counts for the admin Service Provider dashboard. */

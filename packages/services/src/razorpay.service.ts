@@ -66,6 +66,9 @@ export const RazorpayService = {
     const expectedBuf = Buffer.from(expected, "hex");
     const actualBuf = Buffer.from(params.signature, "hex");
     if (expectedBuf.length !== actualBuf.length) return false;
-    return timingSafeEqual(expectedBuf, actualBuf);
+    return timingSafeEqual(
+      expectedBuf as unknown as Uint8Array,
+      actualBuf as unknown as Uint8Array,
+    );
   },
 };

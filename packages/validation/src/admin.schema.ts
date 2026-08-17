@@ -49,6 +49,20 @@ export const updateUserRoleSchema = z.object({
 
 export type UpdateUserRoleInput = z.infer<typeof updateUserRoleSchema>;
 
+// Admin panel: role and/or accountType in one PATCH. `role` is the account-tier field
+// (RENTER/PARTNER/ADMIN — ADR-046b, PARTNER no longer grants capability); `accountType`
+// is the Rider-vs-Service-Provider selector (ADR-053). At least one must be provided.
+export const updateUserAdminSchema = z
+  .object({
+    role: z.enum(["RENTER", "PARTNER", "ADMIN"]).optional(),
+    accountType: z.enum(["RIDER", "SERVICE_PROVIDER"]).optional(),
+  })
+  .refine((d) => d.role !== undefined || d.accountType !== undefined, {
+    message: "Provide role and/or accountType",
+  });
+
+export type UpdateUserAdminInput = z.infer<typeof updateUserAdminSchema>;
+
 // --- Testimonials ---
 
 export const createTestimonialSchema = z.object({

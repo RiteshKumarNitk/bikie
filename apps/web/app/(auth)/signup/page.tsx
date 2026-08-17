@@ -145,11 +145,21 @@ export default function SignUpPage() {
         // form right after this. Registration is the ONLY moment accountType is chosen freely —
         // once set, changing it later requires an admin-approved Account Type Change Request
         // (ADR-053), never a self-service switch.
-        await fetch("/api/user/complete-phone-signup", {
+        //
+        // The response is checked, not fire-and-forget: if the accountType write fails
+        // (e.g. the session cookie raced the just-created account), continuing to the
+        // onboarding page would strand the user with a RIDER account and no way to fix it.
+        const signupRes = await fetch("/api/user/complete-phone-signup", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ accountType: selectedRole }),
         });
+        if (!signupRes.ok) {
+          const data = (await signupRes.json().catch(() => ({}))) as { error?: string };
+          setServerError(data.error ?? "Could not finish creating your account. Please try again.");
+          setVerifying(false);
+          return;
+        }
 
         // Referral code is collected on the onboarding form itself now, not here —
         // forward it along as a query param so that step can prefill it.

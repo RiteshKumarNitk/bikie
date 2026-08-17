@@ -16,9 +16,12 @@ export const completePhoneSignupSchema = z.object({
   // that follows this call, not during OTP verification itself.
   name: z.string().min(2, "Name is too short").max(100).optional(),
   // ADR-053 — registration is the ONE free choice point for accountType; every later change
-  // needs an admin-approved Account Type Change Request. `role` kept accepted-and-ignored for
-  // older/in-flight clients that may still send it (pre-ADR-053).
-  accountType: z.enum(["RIDER", "SERVICE_PROVIDER"]).default("RIDER"),
+  // needs an admin-approved Account Type Change Request. Optional (not defaulted): the service
+  // needs to know whether the caller explicitly asked for a type so it can surface a clear
+  // error when the write can't apply (established account) instead of silently staying RIDER.
+  // `role` kept accepted-and-ignored for older/in-flight clients that may still send it
+  // (pre-ADR-053).
+  accountType: z.enum(["RIDER", "SERVICE_PROVIDER"]).optional(),
   role: z.enum(["RENTER", "PARTNER"]).optional(),
 });
 

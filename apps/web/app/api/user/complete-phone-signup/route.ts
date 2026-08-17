@@ -28,5 +28,18 @@ export async function PATCH(request: Request) {
   if (!result.ok) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
+  // AccountType requested but not applied = this is an established account (real name, outside
+  // the signup window). Not a hard error for a plain name update, but the client must know its
+  // chosen accountType did NOT stick — silently proceeding would strand a would-be partner as a
+  // Rider with no explanation.
+  if (parsed.data.accountType && !result.accountTypeApplied) {
+    return NextResponse.json(
+      {
+        error:
+          "This account is already set up and its account type can't be changed here anymore. Contact support or request an account type change from the app.",
+      },
+      { status: 409 },
+    );
+  }
   return NextResponse.json({ success: true });
 }

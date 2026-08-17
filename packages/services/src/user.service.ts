@@ -39,25 +39,35 @@ export const UserService = {
    *
    * ADR-053: registration is the ONE free choice point for `accountType` — after this, changing
    * it needs an admin-approved Account Type Change Request, never a bare API call. Guarded by
-   * account age (`SIGNUP_WINDOW_MS`) rather than a one-shot flag: this endpoint is only ever
-   * meant to fire once, in the same request flow as account creation, so a call against an
-   * account older than the window is treated as a (possibly malicious) replay against an
-   * *existing* account and its accountType is left untouched.
+   * account age (`SIGNUP_WINDOW_MS`) OR the still-placeholder name: an account whose name is
+   * still its raw phone number has never completed onboarding, so it's still in the
+   * "registration" phase no matter how long it's been since the OTP verify created it (a slow
+   * form, a retry after a failed page load, or a user who verified and came back later must not
+   * silently end up as the wrong type). A call against an *established* account (real name set)
+   * outside the window is treated as a (possibly malicious) replay and its accountType is left
+   * untouched.
    */
   async completePhoneSignup(
     userId: string,
     input: { name?: string; accountType?: "RIDER" | "SERVICE_PROVIDER" },
-  ): Promise<{ ok: true } | { ok: false; reason: "NOT_FOUND" }> {
+  ): Promise<{ ok: true; accountTypeApplied: boolean } | { ok: false; reason: "NOT_FOUND" }> {
     const user = await userRepository.findById(userId);
     if (!user) return { ok: false, reason: "NOT_FOUND" };
 
     if (input.name) {
       await userRepository.updateName(userId, input.name);
     }
-    const isBrandNewAccount = Date.now() - user.createdAt.getTime() < SIGNUP_WINDOW_MS;
+    // `user.name === user.phoneNumber` is the still-unclaimed signal: Better Auth's temp name
+    // is the raw phone number, and it's only replaced by a real name on the onboarding form.
+    const isPlaceholderName =
+      user.name === user.phoneNumber || user.name === user.phoneNumber?.replace("+", "");
+    const isBrandNewAccount =
+      Date.now() - user.createdAt.getTime() < SIGNUP_WINDOW_MS || isPlaceholderName;
+
     if (input.accountType && isBrandNewAccount) {
       await userRepository.setAccountType(userId, input.accountType);
+      return { ok: true, accountTypeApplied: true };
     }
-    return { ok: true };
+    return { ok: true, accountTypeApplied: false };
   },
 };

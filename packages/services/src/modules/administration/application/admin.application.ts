@@ -44,6 +44,8 @@ export function createAdminApplication(ports: AdministrationPorts) {
     getOverviewStats: () => ports.admin.getAdminOverviewStats(),
     getAllUsers: () => ports.admin.findAllUsers(),
     updateUserRole: (userId: string, role: string) => ports.admin.updateUserRole(userId, role),
+    updateUserAccountType: (userId: string, accountType: "RIDER" | "SERVICE_PROVIDER") =>
+      ports.admin.updateUserAccountType(userId, accountType),
     deleteUser: (userId: string) => ports.admin.deleteUser(userId),
     getAllPartners: () => ports.admin.findAllPartners(),
     getPartnerStats: () => ports.admin.getAdminPartnerStats(),

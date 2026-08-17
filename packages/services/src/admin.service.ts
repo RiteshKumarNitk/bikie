@@ -12,6 +12,9 @@ export const AdminService = {
   updateUserRole(userId: string, role: string) {
     return getAdministrationModule().admin.updateUserRole(userId, role);
   },
+  updateUserAccountType(userId: string, accountType: "RIDER" | "SERVICE_PROVIDER") {
+    return getAdministrationModule().admin.updateUserAccountType(userId, accountType);
+  },
   deleteUser(userId: string) {
     return getAdministrationModule().admin.deleteUser(userId);
   },
