@@ -13,9 +13,7 @@ function isServiceProviderAccountType(user: { accountType?: string | null } | nu
 async function getSession(request: NextRequest) {
   try {
     const response = await fetch(new URL("/api/auth/get-session", request.url).toString(), {
-      headers: {
-        cookie: request.headers.get("cookie") || "",
-      },
+      headers: request.headers,
     });
     if (!response.ok) return null;
     const data = await response.json();
