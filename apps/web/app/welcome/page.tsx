@@ -63,7 +63,7 @@ export default async function WelcomePage({
             BIKIE
           </h1>
           <p className="mt-1 text-[0.55rem] font-medium uppercase tracking-[0.15em] text-white/60 sm:text-[0.6rem] sm:tracking-[0.2em] md:text-[0.65rem]">
-            Anytime anywhere — your only companion
+            Anytime anywhere --- your only companion
           </p>
           <p className="mt-1.5 text-xs text-white/70 sm:mt-3 sm:text-sm">
             Welcome! How would you like to join BIKIE?
