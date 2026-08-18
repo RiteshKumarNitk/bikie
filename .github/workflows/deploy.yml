@@ -11,75 +11,104 @@ concurrency:
 
 jobs:
   deploy:
+    name: Deploy Web Application
     runs-on: ubuntu-latest
     steps:
       - name: Configure SSH
         run: |
-          mkdir -p ~/.ssh/
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
           echo "$VPS_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          cat >>~/.ssh/config <<END
+          cat >> ~/.ssh/config <<EOF
           Host vps
             HostName $VPS_HOST
             User $VPS_USER
+            Port ${VPS_PORT:-22}
             IdentityFile ~/.ssh/deploy_key
             StrictHostKeyChecking no
-          END
+            UserKnownHostsFile /dev/null
+            LogLevel ERROR
+          EOF
+          chmod 600 ~/.ssh/config
         env:
           VPS_HOST: ${{ secrets.VPS_HOST }}
           VPS_USER: ${{ secrets.VPS_USER }}
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
 
-      - name: Execute Deployment
+      - name: Execute Deployment on VPS
         run: |
           ssh vps 'bash -s' << 'EOF'
-          set -e
-          
-          echo "Navigating to /opt/bikie..."
-          cd /opt/bikie
+          set -euo pipefail
 
-          echo "Checking Git status..."
-          if [ -n "$(git status --porcelain)" ]; then
-            echo "ERROR: Local changes detected in production repository. Deployment aborted to prevent data loss."
-            git status
+          echo "==> 1. Checking deployment directory /opt/bikie..."
+          if [ ! -d "/opt/bikie" ]; then
+            echo "ERROR: Directory /opt/bikie does not exist on the VPS."
             exit 1
           fi
-          
-          echo "Pulling latest changes from origin/master..."
-          git pull origin master
+          cd /opt/bikie
 
-          echo "Building Next.js web container..."
+          echo "==> 2. Verifying Git repository status..."
+          if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "ERROR: /opt/bikie is not a valid Git repository."
+            exit 1
+          fi
+
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "ERROR: Uncommitted local changes detected in /opt/bikie."
+            echo "Deployment stopped safely to prevent overwriting local files."
+            git status --short
+            exit 1
+          fi
+
+          echo "==> 3. Fetching and pulling latest changes from master..."
+          git fetch origin master
+          git pull --ff-only origin master
+
+          echo "==> 4. Building Next.js web image..."
           docker compose build web
 
-          echo "Starting/Updating Next.js web container..."
-          docker compose up -d web
-          
-          echo "Waiting for web container to initialize and run migrations..."
-          sleep 10
-          
-          echo "Checking web container status..."
-          if ! docker compose ps web | grep -q "Up"; then
-            echo "ERROR: Web container failed to stay up!"
+          echo "==> 5. Starting/updating web service container..."
+          docker compose up -d --no-deps web
+
+          echo "==> 6. Performing HTTP health check on http://127.0.0.1:3001/..."
+          MAX_ATTEMPTS=30
+          ATTEMPT=1
+          HEALTHY=false
+
+          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
+            # Check if web container crashed
+            if [ "$(docker compose ps --status running -q web 2>/dev/null | wc -l)" -eq 0 ]; then
+              echo "ERROR: Web container is not running (crashed or failed to start)."
+              docker compose logs --tail=100 web
+              exit 1
+            fi
+
+            # Check HTTP response status code
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 3 http://127.0.0.1:3001/ || echo "000")
+
+            case "$HTTP_STATUS" in
+              200|301|302|307|308)
+                echo "Health check passed! (HTTP $HTTP_STATUS on attempt $ATTEMPT/$MAX_ATTEMPTS)"
+                HEALTHY=true
+                break
+                ;;
+              *)
+                echo "Waiting for web service... Attempt $ATTEMPT/$MAX_ATTEMPTS (HTTP status: $HTTP_STATUS)"
+                sleep 2
+                ;;
+            esac
+
+            ATTEMPT=$((ATTEMPT + 1))
+          done
+
+          if [ "$HEALTHY" != "true" ]; then
+            echo "ERROR: Health check failed after $MAX_ATTEMPTS attempts."
+            echo "Displaying recent web container logs:"
             docker compose logs --tail=100 web
             exit 1
           fi
 
-          echo "Performing HTTP health check (waiting up to 60s)..."
-          i=0
-          while [ $i -lt 30 ]; do
-            # We use a simple curl check. A 307/302 redirect or 200 OK means the Next.js server is up.
-            # We just need to know it's responding to HTTP.
-            HTTP_STATUS=$(curl -o /dev/null -s -w "%{http_code}\n" http://127.0.0.1:3001/ || echo "Failed")
-            if [ "$HTTP_STATUS" != "Failed" ] && [ "$HTTP_STATUS" -ne 000 ] && [ "$HTTP_STATUS" -ne 502 ]; then
-              echo "Health check passed with HTTP status $HTTP_STATUS!"
-              exit 0
-            fi
-            echo "Waiting for web server to become healthy... (Status: $HTTP_STATUS)"
-            sleep 2
-            i=$((i+1))
-          done
-          
-          echo "ERROR: Health check failed! Web container is not responding."
-          docker compose logs --tail=100 web
-          exit 1
+          echo "==> Deployment successfully completed!"
           EOF
