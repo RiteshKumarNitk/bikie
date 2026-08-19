@@ -14,20 +14,61 @@ jobs:
     name: Deploy Web Application
     runs-on: ubuntu-latest
     steps:
+      - name: Validate Deployment Secrets
+        run: |
+          MISSING_SECRETS=0
+
+          if [ -z "$VPS_HOST" ]; then
+            echo "::error::GitHub Actions secret VPS_HOST is not configured."
+            MISSING_SECRETS=1
+          fi
+
+          if [ -z "$VPS_USER" ]; then
+            echo "::error::GitHub Actions secret VPS_USER is not configured."
+            MISSING_SECRETS=1
+          fi
+
+          if [ -z "$VPS_SSH_KEY" ]; then
+            echo "::error::GitHub Actions secret VPS_SSH_KEY is not configured."
+            MISSING_SECRETS=1
+          fi
+
+          if [ "$MISSING_SECRETS" -ne 0 ]; then
+            echo "ERROR: Required deployment secrets are missing in GitHub repository settings."
+            echo "Please configure VPS_HOST, VPS_USER, and VPS_SSH_KEY under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+
+          echo "All required deployment secrets are configured."
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          echo "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+
+          # Write SSH private key with trailing newline
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          cat >> ~/.ssh/config <<EOF
+
+          # Default SSH port to 22 if not configured
+          SSH_PORT="${VPS_PORT:-22}"
+
+          # Scan and register host key in known_hosts to prevent MITM attacks
+          ssh-keyscan -p "$SSH_PORT" -H "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null || true
+          chmod 644 ~/.ssh/known_hosts 2>/dev/null || true
+
+          # Configure SSH client
+          cat > ~/.ssh/config <<EOF
           Host vps
             HostName $VPS_HOST
             User $VPS_USER
-            Port ${VPS_PORT:-22}
+            Port $SSH_PORT
             IdentityFile ~/.ssh/deploy_key
-            StrictHostKeyChecking no
-            UserKnownHostsFile /dev/null
+            StrictHostKeyChecking accept-new
             LogLevel ERROR
           EOF
           chmod 600 ~/.ssh/config
