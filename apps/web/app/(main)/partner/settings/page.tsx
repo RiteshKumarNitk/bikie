@@ -1,19 +1,19 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { PartnerProfileDTO } from "@bikie/types";
-import { getJson } from "@/lib/api";
+import { getJsonOrFallback } from "@/lib/api";
 import { PartnerSettingsForm } from "@/components/dashboard/PartnerSettingsForm";
 
 export const metadata: Metadata = { title: "Partner Settings" };
 
 export default async function PartnerSettingsPage() {
-  let profile: PartnerProfileDTO | null = null;
-  try {
-    const res = await getJson<{ profile: PartnerProfileDTO | null }>("/api/partner/profile", { auth: true });
-    profile = res.profile;
-  } catch {
-    // Fall back to null profile if fetch fails
-  }
+  // `null` = "no business profile yet", which is exactly what this form renders as an empty
+  // create-form — the same state a Service Provider who hasn't finished onboarding is really in.
+  const { profile } = await getJsonOrFallback<{ profile: PartnerProfileDTO | null }>(
+    "/api/partner/profile",
+    { profile: null },
+    { auth: true },
+  );
 
   return (
     <div>

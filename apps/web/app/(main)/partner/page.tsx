@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { PartnerDashboardStatsDTO } from "@bikie/types";
-import { getJson } from "@/lib/api";
+import { getJsonOrFallback } from "@/lib/api";
+import { ZERO_PARTNER_STATS } from "@/lib/partner-dashboard";
 import { getServerSession } from "@/lib/get-session";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { PartnerVerificationBanner } from "@/components/partner/PartnerVerificationBanner";
@@ -8,24 +9,13 @@ import { formatCurrency } from "@bikie/utils";
 
 export const metadata: Metadata = { title: "Partner Dashboard" };
 
-const defaultStats: PartnerDashboardStatsDTO = {
-  totalBikes: 0,
-  activeBookings: 0,
-  completedBookings: 0,
-  totalEarnings: 0,
-  ratingAvg: 0,
-  ratingCount: 0,
-};
-
 export default async function PartnerOverviewPage() {
   const session = await getServerSession();
-  let stats: PartnerDashboardStatsDTO = defaultStats;
-  try {
-    const res = await getJson<{ stats: PartnerDashboardStatsDTO }>("/api/partner/dashboard", { auth: true });
-    stats = res.stats;
-  } catch {
-    // Fall back to default initial stats if membership/data is not yet populated
-  }
+  const { stats } = await getJsonOrFallback<{ stats: PartnerDashboardStatsDTO }>(
+    "/api/partner/dashboard",
+    { stats: ZERO_PARTNER_STATS },
+    { auth: true },
+  );
 
   return (
     <div>

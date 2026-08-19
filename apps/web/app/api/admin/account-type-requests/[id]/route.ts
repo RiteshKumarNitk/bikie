@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { refreshCachedUserSessions } from "@bikie/auth";
 import { AccountTypeRequestService } from "@bikie/services";
 import { reviewAccountTypeRequestSchema } from "@bikie/validation";
 import { requireRole } from "@/lib/require-role";
@@ -38,6 +39,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       { status: 409 },
     );
   }
+
+  // ADR-055 — an APPROVED decision rewrote the applicant's `accountType`/`role` via Prisma, so
+  // their live session still routes them to the old experience until it is republished.
+  if (result.decision === "APPROVED") await refreshCachedUserSessions(result.userId);
 
   await logAdminAction({
     userId: session.user.id,

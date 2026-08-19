@@ -84,10 +84,23 @@ needed, it can be extracted later by pointing new route handlers at the same
 ## Auth & roles
 
 Better Auth, backed by Neon via the Prisma adapter. `User.role` is one of
-`RENTER | PARTNER | ADMIN` — as of ADR-046b it means account **tier**, not capability:
-every non-admin account is `RENTER` (the `PARTNER` value is legacy, no longer assigned).
-Dashboard routes are gated in `middleware.ts` plus a server-side session check in each
-dashboard's layout.
+`RENTER | PARTNER | ADMIN`. It means account **tier**, not capability (ADR-046b) — nothing
+authorizes Service Provider work off `role`. As of **ADR-055** it is no longer frozen at
+`RENTER` either: `role` is a derived mirror of `accountType`, written in the same statement
+(`SERVICE_PROVIDER → PARTNER`, `RIDER → RENTER`, `ADMIN` preserved) by the single write path
+`userRepository.setAccountType`. `PARTNER` is therefore an *assigned* value again, and the pair
+can never disagree in the DB.
+
+Dashboard routes are gated in `proxy.ts` (Next 16's renamed `middleware.ts`, running on the
+Node runtime) plus a server-side session check in each dashboard's layout.
+
+**Session values are a cached snapshot.** When `UPSTASH_REDIS_REST_URL`/`_TOKEN` are set,
+Better Auth's `secondaryStorage` holds the whole `{ session, user }` document and
+`getSession` never re-reads Postgres. Since BIKIE writes `role`/`accountType`/`partnerStatus`/
+`accountStatus` through Prisma repositories rather than Better Auth's own `updateUser`, any such
+write must be followed by `refreshCachedUserSessions(userId)` from `@bikie/auth` at the API route
+layer, or the session keeps routing by stale values until it expires (ADR-055). It is a no-op
+when Upstash is unset, which is why this is invisible in local dev.
 
 The web app authenticates via Better Auth's HTTP-only session cookie. The Flutter app
 (`apps/mobile`) instead uses **bearer tokens**, enabled by the `bearer()` plugin in
@@ -103,7 +116,9 @@ One account can hold Rider capability (universal, always on) and Service Provide
 account's Rider standing or requires a second login. Four previously-conflated concerns
 are now separate:
 
-- **Account tier** — `User.role` (`RENTER`/`ADMIN`), unaffected by Partner capability.
+- **Account tier** — `User.role` (`RENTER`/`PARTNER`/`ADMIN`). Never consulted for Partner
+  capability; ADR-055 makes it track `accountType` so it stays an honest label (and so a Service
+  Provider actually holds the `fleet:manage` permission), not a second authorization signal.
 - **Partner CAPABILITY** (ADR-049, membership source corrected by ADR-051) — whether the
   account can operate as a Service Provider at all: an active `Partner` profile (a row exists)
   + active **Partner** membership + not admin-`SUSPENDED`. Does **not** depend on verification —

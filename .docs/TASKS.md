@@ -2,6 +2,28 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Service Provider role/accountType mismatch + the 500 behind it (2026-08-19, ADR-055)
+
+A SERVICE_PROVIDER signup produced `Account Type: SERVICE_PROVIDER` / `Role: RENTER` in
+`/admin/users`, and logging into that account hit a 500. Investigation separated three distinct
+defects — see ADR-055 for why "fix the middleware" would have addressed none of them.
+
+| Task | Status |
+|---|---|
+| Traced the full signup path (`/signup` → MSG91 widget → `phoneNumber.verify` → `signUpOnVerification` → `PATCH /api/user/complete-phone-signup` → `UserService.completePhoneSignup` → `userRepository.setAccountType`) and confirmed `role: RENTER` originates in Better Auth's `additionalFields` default, not in a stray write | Completed |
+| Confirmed `PARTNER` is the project's own intended value for a Service Provider `role` (`UserRole` enum, `/admin/users` role picker, `permissionsForRole`) — no new enum value invented | Completed |
+| Made `role` a derived mirror of `accountType` in the same statement at all three write paths: `userRepository.setAccountType`, `adminRepository.updateUserAccountType`, `accountTypeRequestRepository.reviewRequest` (APPROVED); `adminRepository.updateUserRole` closes the loop from the role side | Completed |
+| Verified the role change is authorization-safe: every `requireRole()` call in the repo asks for `"ADMIN"`, and `PARTNER_PERMISSIONS` is a strict superset of `RENTER_PERMISSIONS` — no account loses any capability | Completed |
+| Found the real 500: `/api/partner/**` requires an active Service Provider membership while `/partner/**` page routing does not, and six server components turned that expected 403 into an unhandled throw | Completed |
+| Added `ApiError` + `getJsonOrFallback` to `apps/web/lib/api.ts` (falls back on 401/403 only, so a genuine 5xx still surfaces) and applied it to `/partner`, `/partner/analytics`, `/partner/payouts`, `/partner/bookings`, `/partner/reviews`, `/partner/settings` | Completed |
+| Moved `GET /api/partner/profile` from `requirePartnerCapability` to `requireSession` + `accountType` check, matching `PUT` — reading your own profile can't require a membership you haven't bought | Completed |
+| Found that Better Auth's `secondaryStorage` caches the whole `{session, user}` document, so Prisma-side writes to `role`/`accountType` left production sessions stale (and bounced new Service Providers off `/partner-onboarding`) | Completed |
+| Added `refreshCachedUserSessions(userId)` to `@bikie/auth`; called from `PATCH /api/user/complete-phone-signup`, `PATCH /api/admin/users/[id]`, and the APPROVED branch of `PATCH /api/admin/account-type-requests/[id]` | Completed |
+| Fixed `prisma/seed.ts` — the three Service Provider personas set `partnerStatus` but never `accountType`/`role`, so a freshly seeded DB routed them as Riders | Completed |
+| Audited live data read-only: 6 `SERVICE_PROVIDER` users with `role: RENTER`, 0 `RIDER` mismatches, `ADMIN` untouched | Completed |
+| Apply the one-shot corrective `UPDATE` to the 6 existing rows (idempotent; needs explicit go-ahead — not run) | Blocked |
+| Wire `refreshCachedUserSessions` into the `partnerStatus` (`syncPartnerStatus`) and `accountStatus` (moderation ban/suspend) write paths — same staleness, pre-dates ADR-055, deliberately out of scope here | Backlog |
+
 ## Docker production build: DB-backed API routes no longer prerendered at build time (2026-08-15, ADR-054)
 
 Production Postgres moved from Neon to a `postgres` Docker Compose service (not running during

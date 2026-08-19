@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import type { PartnerDashboardStatsDTO } from "@bikie/types";
-import { getJson } from "@/lib/api";
+import { getJsonOrFallback } from "@/lib/api";
+import { ZERO_PARTNER_STATS } from "@/lib/partner-dashboard";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { formatCurrency } from "@bikie/utils";
 
 export const metadata: Metadata = { title: "Payouts" };
 
 export default async function PartnerPayoutsPage() {
-  const { stats } = await getJson<{ stats: PartnerDashboardStatsDTO }>("/api/partner/dashboard", { auth: true });
+  const { stats } = await getJsonOrFallback<{ stats: PartnerDashboardStatsDTO }>(
+    "/api/partner/dashboard",
+    { stats: ZERO_PARTNER_STATS },
+    { auth: true },
+  );
 
   return (
     <div>

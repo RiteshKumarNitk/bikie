@@ -11,14 +11,22 @@ export async function findUserByPhoneNumber(phoneNumber: string) {
 }
 
 /** ADR-046b — keeps the denormalized `User.partnerStatus` (exposed on the Better Auth session)
- * in sync with `Partner.verificationStatus` whenever the latter changes. Never mutates `role` —
- * Partner capability is fully decoupled from the RENTER/ADMIN account-tier field now. */
+ * in sync with `Partner.verificationStatus` whenever the latter changes. Never mutates `role`:
+ * verification status is not a capability, and `role` follows `accountType` (see
+ * `setAccountType`), not the review state of a business profile. */
 export async function syncPartnerStatus(userId: string, status: string | null) {
   await prisma.user.update({ where: { id: userId }, data: { partnerStatus: status as any } });
 }
 
-/** ADR-053 — the one write path for `User.accountType`. Synchronizes `role` to match
- * (SERVICE_PROVIDER -> PARTNER, RIDER -> RENTER) while preserving ADMIN role. */
+/** ADR-053/055 — the one write path for `User.accountType`, and the reason `role` can never
+ * drift from it: the two are written together in a single statement
+ * (SERVICE_PROVIDER -> PARTNER, RIDER -> RENTER). ADMIN is preserved, since it outranks both and
+ * an admin keeps the Rider experience outside `/admin` by design (see `dashboardHomeFor`).
+ *
+ * `role` is NOT what authorizes provider work — `evaluatePartnerCapability` still gates on
+ * `accountType` + profile + membership (ADR-049/051/053). It's a display/permission tier, and
+ * leaving a Service Provider on RENTER made `/admin/users` report a self-contradicting account
+ * and denied them `fleet:manage`. */
 export async function setAccountType(userId: string, accountType: "RIDER" | "SERVICE_PROVIDER") {
   const existing = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
   const role = existing?.role === "ADMIN" ? "ADMIN" : accountType === "SERVICE_PROVIDER" ? "PARTNER" : "RENTER";

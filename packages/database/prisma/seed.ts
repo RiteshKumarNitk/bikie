@@ -83,9 +83,11 @@ async function main() {
   const demoUser = await signUpViaAuthApi(SEED_ACCOUNTS.user);
 
   await prisma.user.update({ where: { id: adminUser.id }, data: { role: "ADMIN" } });
-  // demoUser and partnerUser both stay RENTER (default) — as of ADR-046b, `role` is account
-  // tier only, `PARTNER` is a legacy value no longer assigned. Service Provider capability
-  // lives entirely on `Partner.verificationStatus` / `User.partnerStatus`, set below.
+  // demoUser stays RIDER/RENTER (the schema defaults). The three Service Provider personas below
+  // each get `accountType: SERVICE_PROVIDER` + `role: PARTNER` explicitly (ADR-055) — before
+  // that they were only given a `Partner` row and a `partnerStatus`, which meant a freshly
+  // seeded database produced provider personas that `proxy.ts` and `partner/layout.tsx` both
+  // routed as Riders, since neither reads `partnerStatus` for routing any more (ADR-053).
 
   await prisma.user.update({
     where: { id: partnerUser.id },
@@ -125,7 +127,11 @@ async function main() {
   });
   await prisma.user.update({
     where: { id: partnerUser.id },
-    data: { partnerStatus: verifiedPartner.verificationStatus },
+    data: {
+      partnerStatus: verifiedPartner.verificationStatus,
+      accountType: "SERVICE_PROVIDER",
+      role: "PARTNER",
+    },
   });
 
   // 2) Draft Service Provider — profile created, capability active, nothing submitted yet.
@@ -147,7 +153,11 @@ async function main() {
   });
   await prisma.user.update({
     where: { id: providerDraftUser.id },
-    data: { partnerStatus: draftPartner.verificationStatus },
+    data: {
+      partnerStatus: draftPartner.verificationStatus,
+      accountType: "SERVICE_PROVIDER",
+      role: "PARTNER",
+    },
   });
 
   // 3) Pending-verification Service Provider — application submitted, awaiting admin review.
@@ -170,7 +180,11 @@ async function main() {
   });
   await prisma.user.update({
     where: { id: providerPendingUser.id },
-    data: { partnerStatus: pendingPartner.verificationStatus },
+    data: {
+      partnerStatus: pendingPartner.verificationStatus,
+      accountType: "SERVICE_PROVIDER",
+      role: "PARTNER",
+    },
   });
 
   // No dummy Bike/Category/Destination/Testimonial/Trip content is seeded — all of it is

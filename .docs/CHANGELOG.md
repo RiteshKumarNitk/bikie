@@ -1,5 +1,52 @@
 # BIKIE Changelog
 
+## 2026-08-19 — Service Provider role/accountType mismatch, and the 500 behind it (ADR-055)
+
+A Service Provider signup produced an account that `/admin/users` showed as
+`Account Type: SERVICE_PROVIDER` / `Role: RENTER`, and logging into it hit a 500. Two unrelated
+defects, plus a third found while verifying the fix.
+
+**`role` now mirrors `accountType`.** `SERVICE_PROVIDER → PARTNER`, `RIDER → RENTER`, `ADMIN`
+preserved — written in the same statement as `accountType` at all three write paths (signup,
+admin panel, approved change request), so the two can't drift. `PARTNER` was never actually
+retired: the enum still has it, the admin UI edits it, and `permissionsForRole` grants
+`fleet:manage` to `PARTNER` only — so the old "everyone stays RENTER" rule was denying Service
+Providers the one permission that names their job. `role` stays authorization-inert;
+`evaluatePartnerCapability` still gates on `accountType` + profile + membership.
+
+**The 500 was not the role.** `/partner/**` pages gate on `accountType` + `partnerStatus`, but
+every `/api/partner/**` route also requires an active Service Provider membership — deliberately,
+so a new provider can reach `/partner/membership` and buy one. Six server components fetched
+their own data with a bare `getJson`, turning that expected 403 into an unhandled throw and a
+500 page on a brand-new provider's first dashboard visit. New `getJsonOrFallback` falls back on
+401/403 only, so a real 5xx still surfaces instead of hiding behind an empty state.
+`GET /api/partner/profile` also moved off the membership gate, matching `PUT`.
+
+**Stale sessions.** With Upstash configured, Better Auth's `secondaryStorage` caches the whole
+`{session, user}` document and `getSession` never re-reads Postgres. BIKIE writes
+`role`/`accountType` through Prisma, which bypasses the `refreshUserSessions` hook Better Auth
+runs inside its own `updateUser` — so in production the signup wrote the right row and left the
+session saying `accountType: "RIDER"`, and `/partner-onboarding` bounced the new Service Provider
+to `/account-type-request`. New `refreshCachedUserSessions` from `@bikie/auth` is now called
+after each of those writes. No-op without Upstash, which is why local dev never showed it.
+
+**Seed fixed** — the three Service Provider personas set `partnerStatus` but never `accountType`,
+so a freshly seeded DB routed them as Riders; the live DB only looked right because ADR-053's
+backfill migration had patched it afterwards.
+
+**Data**: 6 `SERVICE_PROVIDER` users had `role: RENTER` (0 `RIDER` mismatches, `ADMIN` untouched).
+Corrected by a one-shot idempotent statement rather than a migration — the schema didn't change,
+these are just rows written before the code was fixed. Affected users must re-login for the new
+`role` to reach their cached session.
+
+```sql
+UPDATE "user" SET role = 'PARTNER'
+ WHERE "accountType" = 'SERVICE_PROVIDER' AND role = 'RENTER';
+```
+
+Verified: `tsc --noEmit` clean across all 8 packages, 199/199 tests pass, `next build` succeeds,
+all changed files lint clean. Full details in DECISIONS.md ADR-055.
+
 ## 2026-08-11 — Rider/Service Provider account type: mutually exclusive, admin-approved changes (ADR-053)
 
 Replaced the "dual capability" model (one account could be Rider + Service Provider at the same

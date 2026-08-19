@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { refreshCachedUserSessions } from "@bikie/auth";
 import { UserService } from "@bikie/services";
 import { completePhoneSignupSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
@@ -28,6 +29,11 @@ export async function PATCH(request: Request) {
   if (!result.ok) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
+  // ADR-055 — the write above went through Prisma, so the just-created session still holds the
+  // signup-time `accountType: "RIDER"` / `role: "RENTER"` snapshot. Republish it before the
+  // client redirects, or a Service Provider signup lands on `/partner-onboarding` and gets
+  // bounced to `/account-type-request` by that page's own accountType guard.
+  await refreshCachedUserSessions(session.user.id);
   // AccountType requested but not applied = this is an established account (real name, outside
   // the signup window). Not a hard error for a plain name update, but the client must know its
   // chosen accountType did NOT stick — silently proceeding would strand a would-be partner as a

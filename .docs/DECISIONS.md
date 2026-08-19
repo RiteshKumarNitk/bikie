@@ -2471,3 +2471,85 @@ changes:
   Not addressed here: restoring ISR-level ("< 5 min stale, no DB hit") caching for the 9 affected
   routes via `unstable_cache` — deferred as a performance follow-up, not a build-correctness
   requirement.
+
+## ADR-055: `User.role` mirrors `accountType`; session values must be republished after any Prisma write
+
+- **Context.** A phone signup that selected **Service Provider** produced an account that
+  `/admin/users` rendered as `Account Type: SERVICE_PROVIDER` / `Role: RENTER`, and logging into
+  it eventually hit a 500. Two independent defects were tangled together here, and separating
+  them mattered because the obvious "fix the middleware" reflex would have addressed neither.
+  - **(1) The role.** ADR-046b decoupled `role` from Service Provider capability and ADR-053
+    restated it as "every account is RENTER and stays that way", so `role: RENTER` on a
+    SERVICE_PROVIDER account was, strictly, working as specified. But the specification had aged
+    badly. `UserRole` still carries `PARTNER`; `/admin/users` displays and edits `role` as a
+    first-class column; `adminRepository.updateUserRole("PARTNER")` still creates a `Partner`
+    row, so the value was never actually retired; and `permissionsForRole` grants `fleet:manage`
+    to `PARTNER` only — so the frozen-`RENTER` rule quietly denied Service Providers the one
+    permission that names their job. A field the admin UI presents as the account's identity
+    cannot be permanently wrong about it.
+  - **(2) The 500.** Not caused by `role` at all. `/partner/**` *page* routing gates on
+    `accountType` + `partnerStatus` (`proxy.ts`, `partner/layout.tsx`), while every
+    `/api/partner/**` *route* additionally requires an active Service Provider membership
+    (`requirePartnerCapability`, ADR-051). That gap is intentional — a provider has to get inside
+    the dashboard to reach `/partner/membership` and buy one. But six server components fetched
+    their own data with a bare `getJson`, so the resulting 403 became an unhandled throw:
+    `apps/web/lib/api.ts` → `throw new Error("Request to /api/partner/dashboard failed with
+    status 403")` inside `PartnerOverviewPage`, rendered by Next as a 500 error page. Every
+    brand-new Service Provider hit this on their first visit to their own dashboard.
+  - **(3) Found while verifying the fix.** `secondaryStorage` (ADR-032's Upstash store) is not
+    only a rate-limit counter: `internalAdapter.findSession` returns the entire cached
+    `{ session, user }` document and never touches Postgres. Better Auth keeps that coherent for
+    its own writes by calling `refreshUserSessions` inside `updateUser` — but ADR-053 deliberately
+    made `accountType` a server-only field written through Prisma repositories, which bypasses
+    that hook. So in production the signup wrote the correct row and left the session reporting
+    `accountType: "RIDER"`; `/partner-onboarding`'s client-side guard then bounced the new
+    Service Provider to `/account-type-request`. Invisible in local dev, where Upstash is unset
+    and `findSession` falls through to the DB join.
+- **Decision.**
+  - **`role` is a derived mirror of `accountType`**, not an independent field. `SERVICE_PROVIDER
+    → PARTNER`, `RIDER → RENTER`, `ADMIN` always preserved (it outranks both, and admins keep the
+    Rider experience outside `/admin` by design). Written in the *same statement* as
+    `accountType` at all three write sites, so the two cannot drift: `setAccountType`
+    (registration), `adminRepository.updateUserAccountType` (admin panel), and
+    `accountTypeRequestRepository.reviewRequest`'s APPROVED branch. `updateUserRole` closes the
+    loop from the other direction (PARTNER ⇒ SERVICE_PROVIDER, RENTER ⇒ RIDER).
+    **`role` remains authorization-inert**: `evaluatePartnerCapability` still gates on
+    `accountType` + profile + membership, exactly as ADR-049/051/053 specified. Verified safe:
+    every `requireRole()` call in the repo asks for `"ADMIN"`, and `PARTNER_PERMISSIONS` is a
+    strict superset of `RENTER_PERMISSIONS`, so no account loses anything.
+  - **`getJsonOrFallback`** (`apps/web/lib/api.ts`) replaces the bare `getJson` in the six
+    capability-gated partner server components. It falls back **only** on 401/403 — a 500 from a
+    genuinely broken upstream still propagates, so an outage can't hide behind an empty state.
+    `getJson` now throws a typed `ApiError` carrying the status to make that distinction
+    possible. Deliberately *not* fixed by adding a membership check to `proxy.ts` /
+    `partner/layout.tsx`: that would lock a new provider out of the very dashboard containing the
+    "buy a membership" page.
+  - **`GET /api/partner/profile`** moves from `requirePartnerCapability` to
+    `requireSession` + an `accountType === "SERVICE_PROVIDER"` check (ADMIN also allowed, for
+    support). Reading your own business profile can't require a membership you haven't bought
+    yet — `PUT` had always been ungated on membership for exactly that reason, and this `GET` was
+    the inconsistent one.
+  - **`refreshCachedUserSessions(userId)`** exported from `@bikie/auth`, called at the API route
+    layer after every write that changes a session-exposed `User` column:
+    `PATCH /api/user/complete-phone-signup`, `PATCH /api/admin/users/[id]`, and the APPROVED
+    branch of `PATCH /api/admin/account-type-requests/[id]`. It re-reads the row and republishes
+    it into each cached session blob, and is a no-op when `secondaryStorage` is unconfigured.
+    Lives in `packages/auth` because that package already depends on `@bikie/database`; the
+    reverse import would be a cycle. Called from the route layer rather than the repository for
+    the same reason — repositories must not know about auth.
+  - **Seed corrected.** The three Service Provider personas were only ever given a `Partner` row
+    and a `partnerStatus`; they never set `accountType`. The live database only looked right
+    because ADR-053's backfill migration had patched it after the fact — a freshly seeded DB
+    produced provider personas that `proxy.ts` routed as Riders. They now set `accountType` and
+    `role` explicitly.
+- **Data.** 6 existing `SERVICE_PROVIDER` accounts carried `role: RENTER`; 0 `RIDER` accounts
+  were mismatched and the 1 `ADMIN` is untouched by design. Corrected by a one-shot idempotent
+  `UPDATE` (see CHANGELOG), not a migration: this is a one-time data repair of rows created
+  before the write paths were fixed, and the schema itself is unchanged. Every affected user must
+  sign out and back in (or be refreshed) for the corrected `role` to reach their cached session.
+- **Consequences.** `partnerStatus` and `accountStatus` are written by other repositories
+  (`syncPartnerStatus`, the moderation ban/suspend paths) that are **not** yet wired to
+  `refreshCachedUserSessions` — the same staleness applies to them, pre-dates this ADR, and is
+  left as follow-up rather than widened into this change. Verified: `tsc --noEmit` clean across
+  all 8 packages, 199/199 tests pass, `next build` succeeds, and all changed files lint clean
+  (the repo's 48 pre-existing `react-hooks` lint errors are untouched).

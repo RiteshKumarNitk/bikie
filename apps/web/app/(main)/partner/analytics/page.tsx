@@ -1,13 +1,18 @@
 import type { Metadata } from "next";
 import type { PartnerDashboardStatsDTO } from "@bikie/types";
-import { getJson } from "@/lib/api";
+import { getJsonOrFallback } from "@/lib/api";
+import { ZERO_PARTNER_STATS } from "@/lib/partner-dashboard";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { formatCurrency } from "@bikie/utils";
 
 export const metadata: Metadata = { title: "Analytics" };
 
 export default async function PartnerAnalyticsPage() {
-  const { stats } = await getJson<{ stats: PartnerDashboardStatsDTO }>("/api/partner/dashboard", { auth: true });
+  const { stats } = await getJsonOrFallback<{ stats: PartnerDashboardStatsDTO }>(
+    "/api/partner/dashboard",
+    { stats: ZERO_PARTNER_STATS },
+    { auth: true },
+  );
   const completionRate =
     stats.activeBookings + stats.completedBookings > 0
       ? Math.round((stats.completedBookings / (stats.activeBookings + stats.completedBookings)) * 100)

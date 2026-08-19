@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReviewDTO } from "@bikie/types";
-import { getJson } from "@/lib/api";
+import { getJsonOrFallback } from "@/lib/api";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export const metadata: Metadata = { title: "Reviews" };
@@ -15,8 +15,9 @@ interface ProviderReviewRow {
 }
 
 export default async function PartnerReviewsPage() {
-  const data = await getJson<{ reviews: ReviewDTO[]; providerReviews?: ProviderReviewRow[] }>(
+  const data = await getJsonOrFallback<{ reviews: ReviewDTO[]; providerReviews?: ProviderReviewRow[] }>(
     "/api/partner/reviews",
+    { reviews: [], providerReviews: [] },
     { auth: true },
   );
   const reviews = data.reviews ?? [];

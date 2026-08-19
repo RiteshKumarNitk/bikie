@@ -34,8 +34,10 @@ export const UserService = {
    * accepted for backward compatibility with any other caller that still wants to set it in the
    * same step).
    *
-   * ADR-046b: no longer touches `role`. Every account is RENTER by default and stays that way —
-   * the `role` field some older/in-flight clients still send here is accepted and ignored.
+   * ADR-055: the `role` field some older/in-flight clients still send here is accepted and
+   * ignored — but `role` is no longer *frozen* at RENTER either. `setAccountType` below writes
+   * it alongside `accountType` (SERVICE_PROVIDER -> PARTNER), so the account type chosen at
+   * registration and the role shown in `/admin/users` can never disagree.
    *
    * ADR-053: registration is the ONE free choice point for `accountType` — after this, changing
    * it needs an admin-approved Account Type Change Request, never a bare API call. Guarded by

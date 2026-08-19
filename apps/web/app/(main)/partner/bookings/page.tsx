@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import type { BookingDTO } from "@bikie/types";
-import { getJson } from "@/lib/api";
+import { getJsonOrFallback } from "@/lib/api";
 import { formatCurrency } from "@bikie/utils";
 import { EmptyState } from "@/components/shared/EmptyState";
 
 export const metadata: Metadata = { title: "Bookings" };
 
 export default async function PartnerBookingsPage() {
-  const { bookings } = await getJson<{ bookings: BookingDTO[] }>("/api/partner/bookings", { auth: true });
+  const { bookings } = await getJsonOrFallback<{ bookings: BookingDTO[] }>(
+    "/api/partner/bookings",
+    { bookings: [] },
+    { auth: true },
+  );
 
   return (
     <div>

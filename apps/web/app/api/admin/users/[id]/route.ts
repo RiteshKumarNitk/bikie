@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { refreshCachedUserSessions } from "@bikie/auth";
 import { AdminService } from "@bikie/services";
 import { updateUserAdminSchema } from "@bikie/validation";
 import { requireRole } from "@/lib/require-role";
@@ -36,6 +37,11 @@ export async function PATCH(_request: Request, { params }: { params: Promise<{ i
       metadata: { newAccountType: accountType },
     });
   }
+  // ADR-055 — `role` and `accountType` are both mirrored onto the Better Auth session, and both
+  // writes above go through Prisma. Without this the target user keeps routing by their old
+  // role/accountType until their session expires, which makes an admin correction look like it
+  // silently did nothing.
+  if (user) await refreshCachedUserSessions(id);
   return NextResponse.json({ user });
 }
 

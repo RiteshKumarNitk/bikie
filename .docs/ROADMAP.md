@@ -1,5 +1,20 @@
 # BIKIE — Roadmap
 
+## Fixed: Service Provider Accounts Were Created With The Wrong Role — And 500'd On Their Own Dashboard (2026-08-19, ADR-055)
+Signing up as a Service Provider produced an account the admin panel showed as
+`SERVICE_PROVIDER` with `Role: RENTER`, and that 500'd on first login. Three separate causes.
+`role` was frozen at `RENTER` by an older decision that had aged out — the `PARTNER` value was
+never actually retired (the admin UI still edits it, and it carries the `fleet:manage`
+permission), so Service Providers were denied the one permission that names their job; `role`
+now mirrors `accountType` and is written in the same statement, so the two can never disagree.
+The 500 was unrelated: partner *pages* let a provider in on `accountType`, but partner *APIs*
+also require an active Service Provider membership — correctly, so a new provider can reach the
+page that sells one — and six server components turned that expected 403 into an unhandled
+throw. They now degrade on 401/403 only, so a real outage still surfaces. Third, Better Auth's
+Redis session cache holds a full copy of the user, so Prisma-side writes left production sessions
+reporting the old account type and bounced new Service Providers out of onboarding; those writes
+now republish the session. See ADR-055.
+
 ## Fixed: Docker Production Build Unblocked — DB Reachability at Image-Build Time (2026-08-15, ADR-054)
 Moving production Postgres from Neon to a `postgres` Docker Compose service broke
 `docker compose build`: 9 public catalog/listing API routes (categories, bikes, destinations,

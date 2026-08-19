@@ -77,9 +77,12 @@ export const auth = betterAuth({
     additionalFields: {
       role: {
         type: "string",
-        // Never accept role from client signup/update — RENTER default only; Admin via
-        // AdminService only. (ADR-046b: PARTNER capability no longer flips this field — see
-        // partnerStatus below.)
+        // Never accept role from client signup/update. RENTER is the creation-time default for
+        // every account, including a Service Provider signup — Better Auth creates the row
+        // before the app knows which account type was picked. ADR-055: the very next call,
+        // `PATCH /api/user/complete-phone-signup`, promotes it to PARTNER through
+        // `userRepository.setAccountType`, which is the one place `role` and `accountType` are
+        // kept in step. ADMIN is only ever set by AdminService.
         input: false,
         defaultValue: "RENTER",
       },
@@ -209,3 +212,59 @@ export const auth = betterAuth({
     },
   },
 });
+
+/**
+ * ADR-055 — re-publishes a user's live DB row into every cached session blob.
+ *
+ * `secondaryStorage` above doesn't only hold rate-limit counters: Better Auth's
+ * `internalAdapter.findSession` reads the WHOLE `{ session, user }` document out of it and
+ * returns that cached `user` verbatim, never touching Postgres (confirmed in
+ * better-auth/dist/db/internal-adapter.mjs). So `session.user.role` / `.accountType` /
+ * `.partnerStatus` / `.accountStatus` are a *snapshot taken when the session was created*.
+ * Better Auth keeps its own writes coherent by calling `refreshUserSessions` inside
+ * `updateUser`, but BIKIE writes those columns through Prisma repositories (ADR-053 made
+ * `accountType` a server-only field precisely so it could never be a client `updateUser` call),
+ * which bypasses that hook entirely.
+ *
+ * Result before this helper: a phone signup that picked Service Provider got the right row in
+ * Postgres and a session still saying `accountType: "RIDER"` — so `proxy.ts` and
+ * `/partner-onboarding`'s client-side guard both routed the account as a Rider until the session
+ * happened to be recreated. Invisible in local dev, where Upstash is unset and `findSession`
+ * falls through to the DB join.
+ *
+ * Call this from the API route layer after any write that changes a session-exposed `User`
+ * column. It is a no-op when `secondaryStorage` isn't configured, so local dev is unaffected.
+ * Lives here rather than in `@bikie/database` because `@bikie/auth` already depends on that
+ * package — the reverse import would be a cycle.
+ */
+export async function refreshCachedUserSessions(userId: string): Promise<void> {
+  if (!secondaryStorage) return;
+
+  // Selected explicitly rather than passed the whole Prisma row: this object is JSON-serialized
+  // straight into the cache, and the full `User` model carries `Decimal` columns
+  // (`helperRatingAvg`) plus relations that don't round-trip. These are exactly the Better Auth
+  // core fields + the `additionalFields` declared above + the phone-number plugin's fields.
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      emailVerified: true,
+      image: true,
+      phoneNumber: true,
+      phoneNumberVerified: true,
+      role: true,
+      partnerStatus: true,
+      accountType: true,
+      accountStatus: true,
+      accountStatusExpiresAt: true,
+      createdAt: true,
+      updatedAt: true,
+    },
+  });
+  if (!user) return;
+
+  const ctx = await auth.$context;
+  await ctx.internalAdapter.refreshUserSessions(user as never);
+}

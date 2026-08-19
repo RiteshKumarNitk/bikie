@@ -1,10 +1,16 @@
 import { NextResponse } from "next/server";
 import { PartnerService } from "@bikie/services";
 import { partnerProfileSchema } from "@bikie/validation";
-import { requirePartnerCapability, requireSession } from "@/lib/require-role";
+import { requireSession } from "@/lib/require-role";
 
 /** Service Provider business-profile read (`/partner/settings`). Open to any authenticated
- * `accountType: SERVICE_PROVIDER` account (matching PUT below). */
+ * `accountType: SERVICE_PROVIDER` account (matching PUT below).
+ *
+ * ADR-055 — deliberately NOT `requirePartnerCapability`: that gate also demands an active
+ * Service Provider membership (ADR-051), which a provider who is still *creating* their business
+ * profile cannot have bought yet. Reading your own profile and paying for a membership are
+ * separate concerns, and PUT below has always been ungated on membership for the same reason —
+ * this GET was the odd one out. ADMIN is allowed through for support/debugging. */
 export async function GET() {
   const { session, error } = await requireSession();
   if (error) return error;
