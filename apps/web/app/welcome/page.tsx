@@ -10,7 +10,7 @@ const bebasNeue = Bebas_Neue({ weight: "400", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Bikie - Welcome",
-  description: "Are you here to ride, or to grow your motorcycle business?",
+  description: "Are you here to ride, or to grow your motorcycle business...?",
 };
 
 export default async function WelcomePage({
