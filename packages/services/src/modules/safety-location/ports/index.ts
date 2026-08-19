@@ -293,6 +293,14 @@ export interface PartnerDispatchPort {
     isGeneralResponder: boolean;
     type: string;
   } | null>;
+  /** ADR-056 — mirrors `identity-access`'s `PartnerMembershipPort.hasActivePartnerMembership`
+   * exactly (same underlying `PartnerMembership` table), duplicated rather than imported so
+   * `safety-location` doesn't take a cross-module dependency on `identity-access` just for one
+   * boolean check. Used both to keep non-member partners out of SOS dispatch fan-out
+   * (`findEligibleForAlert`) and as the belt-and-suspenders re-check in `offerHelp` — a
+   * capability+membership account could still reach the accept endpoint directly with a stale
+   * or since-expired membership. */
+  hasActivePartnerMembership(userId: string): Promise<boolean>;
 }
 
 /** §25 — Rider → Service Provider service reviews. Written once per SOS session, when the rider

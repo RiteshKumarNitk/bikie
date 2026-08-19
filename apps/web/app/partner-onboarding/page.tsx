@@ -108,12 +108,13 @@ export default function PartnerOnboardingPage() {
         throw new Error(typeof data.error === "string" ? data.error : "Failed to save partner profile");
       }
 
-      // FINAL PRODUCT MODEL — creating the profile IS the onboarding: capability activates the
-      // moment the profile exists (ADR-049), with no admin approval in between. Verification is
-      // a separate, optional trust step requested later from the provider dashboard, so a
-      // brand-new signup lands directly on the Service Provider dashboard, not a "pending
-      // review" status page.
-      router.push("/partner");
+      // ADR-056 — the profile itself needs no admin approval (FINAL PRODUCT MODEL, ADR-049) and
+      // no membership either: creating/saving it is always allowed. Actually *operating* as a
+      // Service Provider (fleet, bookings, SOS) needs the ₹99/month membership, so the very next
+      // stop is that screen — never the dashboard directly. `/partner/membership` itself has a
+      // "Skip for Now" out, so this never blocks onboarding; it just makes the next required
+      // step visible instead of leaving a brand-new provider to discover it by hitting a 403.
+      router.push("/partner/membership?onboarding=1");
     } catch (err: any) {
       setError(err.message || "Something went wrong saving your details. Please try again.");
     } finally {

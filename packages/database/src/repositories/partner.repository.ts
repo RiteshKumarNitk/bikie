@@ -426,9 +426,20 @@ export async function findProviderReviews(providerId: string, take = 50) {
  * a specific alert happens one layer up (`partnerMatchesAlertType`) — this stays a plain
  * geo+status query, same separation `findPartnersNearPoint` already has from its callers.
  */
+/** ADR-056 — a partner without an active `PartnerMembership` (`endDate >= now`, `status: ACTIVE`)
+ * must never be dispatched an SOS alert at all, not just blocked from accepting one: getting
+ * paged/SMS'd about an emergency they're not entitled to respond to is itself the wrong
+ * experience, and it's also what `offerHelp`'s membership re-check (session.application.ts)
+ * exists to catch if this filter is ever somehow bypassed. */
 export async function findEligiblePartnersNearPoint(latitude: number, longitude: number, radiusMeters: number) {
   const partners = await prisma.partner.findMany({
-    where: { latitude: { not: null }, longitude: { not: null }, verificationStatus: { not: "SUSPENDED" }, isAvailable: true },
+    where: {
+      latitude: { not: null },
+      longitude: { not: null },
+      verificationStatus: { not: "SUSPENDED" },
+      isAvailable: true,
+      user: { partnerMembership: { some: { status: "ACTIVE", endDate: { gte: new Date() } } } },
+    },
     include: { user: { select: { id: true, name: true, email: true, phone: true } } },
   });
 

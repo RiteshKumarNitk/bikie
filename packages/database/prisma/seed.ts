@@ -217,6 +217,44 @@ async function main() {
     console.log("Seeded membership plan.");
   }
 
+  // --- Seed Partner (Service Provider) Membership Plan ---
+  // ADR-056 — the live business offering is ₹99/month (durationDays: 30), entirely separate
+  // from the Rider ₹99/year plan above. Idempotent on `name` rather than "table empty" (like the
+  // Rider plan above) because `20260811100000_partner_membership_model`'s migration already
+  // inserted one row here — the grandfathered `legacy-free-partner-plan` — so `count() === 0`
+  // would never be true again.
+  const partnerPlanExists = await prisma.partnerMembershipPlan.findFirst({
+    where: { name: "Service Provider Membership" },
+  });
+  if (!partnerPlanExists) {
+    await prisma.partnerMembershipPlan.create({
+      data: {
+        name: "Service Provider Membership",
+        description: "Everything you need to operate as a BIKIE Service Provider",
+        price: 99,
+        durationDays: 30,
+        benefits: [
+          "Receive & accept SOS assistance requests",
+          "Go available to riders nearby",
+          "List and manage your fleet",
+          "Accept bookings from riders",
+          "Priority placement in rider search",
+        ],
+        sortOrder: 0,
+      },
+    });
+    console.log("Seeded partner membership plan (₹99/month).");
+  }
+  // The migration's grandfathered free plan must stay purchasable by nobody NEW — it exists only
+  // so the Service Providers who already had capability the day ADR-051 shipped didn't lose it.
+  // Deactivating it (not deleting: `PartnerMembership.planId` FK'd rows from that backfill still
+  // need it to exist) removes it from `findAllActivePlans()`, so a brand-new signup is offered
+  // only the real ₹99/month plan — never a free-forever loophole.
+  await prisma.partnerMembershipPlan.updateMany({
+    where: { id: "legacy-free-partner-plan" },
+    data: { isActive: false },
+  });
+
   // --- SOS E2E fixtures (membership + emergency contacts + nearby riders with GPS) ---
   console.log("Seeding SOS E2E fixtures around", SOS_SEED_GPS, "...");
 

@@ -291,6 +291,7 @@ describe("SOS end-to-end (ADR-045)", () => {
         findByCity: vi.fn(async () => []),
         findEligibleForAlert: vi.fn(async () => [generalPartner, mechanicOnlyPartner]),
         getEligibilityFields: vi.fn(async () => null),
+        hasActivePartnerMembership: vi.fn(async () => true),
       },
     });
 
@@ -313,6 +314,7 @@ describe("SOS end-to-end (ADR-045)", () => {
             ? { providerId: null, verificationStatus: "APPROVED", isAvailable: false, isGeneralResponder: false, type: "MECHANIC" }
             : { providerId: null, verificationStatus: "APPROVED", isAvailable: true, isGeneralResponder: false, type: "FUEL_DELIVERY" },
         ),
+        hasActivePartnerMembership: vi.fn(async () => true),
       },
     });
 
@@ -325,6 +327,47 @@ describe("SOS end-to-end (ADR-045)", () => {
       requireAvailableAndCapacity: true,
     });
     expect(mismatched).toEqual({ ok: false, reason: "CATEGORY_MISMATCH" });
+  });
+
+  it("ADR-056: a capable, available, type-matched partner with NO active membership is still blocked from offering", async () => {
+    const fake = createFakePorts({ userId: "rider-1", type: "FUEL_EMPTY" });
+    const hasActivePartnerMembership = vi.fn(async () => false);
+    const module = buildModule({
+      ...fake.ports,
+      partnerDispatch: {
+        findByCity: vi.fn(async () => []),
+        findEligibleForAlert: vi.fn(async () => []),
+        getEligibilityFields: vi.fn(async () => ({
+          providerId: null,
+          verificationStatus: "APPROVED",
+          isAvailable: true,
+          isGeneralResponder: false,
+          type: "FUEL_DELIVERY",
+        })),
+        hasActivePartnerMembership,
+      },
+    });
+
+    const result = await module.session.offerHelp("alert-1", "partner-no-membership", undefined, undefined, {
+      requireAvailableAndCapacity: true,
+    });
+    expect(result).toEqual({ ok: false, reason: "MEMBERSHIP_REQUIRED" });
+    expect(hasActivePartnerMembership).toHaveBeenCalledWith("partner-no-membership");
+  });
+
+  it("ADR-056: a plain Rider (no requireAvailableAndCapacity) is never asked about partner membership", async () => {
+    // Guards against a regression that would accidentally start gating every Rider "I'm Coming"
+    // offer on Partner membership — the two are unrelated systems.
+    const fake = createFakePorts({ userId: "rider-1" });
+    const hasActivePartnerMembership = vi.fn(async () => false);
+    const module = buildModule({
+      ...fake.ports,
+      partnerDispatch: { ...emptyRepos().partnerDispatch, hasActivePartnerMembership } as any,
+    });
+
+    const result = await module.session.offerHelp("alert-1", "rider-helper");
+    expect(result.ok).toBe(true);
+    expect(hasActivePartnerMembership).not.toHaveBeenCalled();
   });
 
   it("Multiple responders + assignment locking: accepting one offer expires the others, notifies them, and blocks a second accept", async () => {
@@ -378,6 +421,7 @@ describe("SOS end-to-end (ADR-045)", () => {
           isGeneralResponder: false,
           type: "FUEL_DELIVERY",
         })),
+        hasActivePartnerMembership: vi.fn(async () => true),
       },
     });
 
@@ -461,7 +505,12 @@ describe("SOS end-to-end (ADR-045)", () => {
         findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()),
       },
       riderLocation: { ...(emptyRepos().riderLocation as SafetyLocationPorts["riderLocation"]), findNearbyAroundPoint: vi.fn(async () => []) },
-      partnerDispatch: { findByCity: vi.fn(async () => []), findEligibleForAlert, getEligibilityFields: vi.fn(async () => null) },
+      partnerDispatch: {
+        findByCity: vi.fn(async () => []),
+        findEligibleForAlert,
+        getEligibilityFields: vi.fn(async () => null),
+        hasActivePartnerMembership: vi.fn(async () => true),
+      },
       escalation: { findAdminContacts },
     });
 
@@ -530,6 +579,7 @@ describe("SOS end-to-end (ADR-045)", () => {
         findByCity: vi.fn(async () => []),
         findEligibleForAlert: vi.fn(async () => []),
         getEligibilityFields: vi.fn(async () => null),
+        hasActivePartnerMembership: vi.fn(async () => true),
       },
     });
 

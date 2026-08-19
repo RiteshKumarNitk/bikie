@@ -1,5 +1,22 @@
 # BIKIE — Roadmap
 
+## Service Provider Membership Made Real: Rs 99/month, Optional At Signup, Enforced At SOS Accept (2026-08-19, ADR-056)
+The Partner Membership system (plans/checkout/purchase) already existed from ADR-051 but didn't
+match the actual product rule: creating a Service Provider profile should never require payment,
+operating as one should, and a non-subscriber should see what membership unlocks rather than a
+blank dashboard. Fixed all three, plus two real bugs found while doing it. Pricing: the only live
+plan was a Rs 0/100-year grandfather plan from ADR-051's launch backfill, offered to every new
+signup as a free-forever loophole — added a real Rs 99/month plan and deactivated the old one
+(not yet applied to production, exact script in CHANGELOG). Onboarding now stops at the
+membership screen (with "Skip for Now") before the dashboard, instead of skipping it entirely.
+The dashboard now shows an activation card explaining locked features instead of silently zeroed
+stats — and along the way, a real crash was found and fixed on `/partner/fleet` for non-members,
+plus misleading "no requests" messaging on `/partner/sos`. The actual authorization gap: SOS
+dispatch and the accept endpoint never checked Partner membership at all, only profile status —
+fixed server-side on both the dispatch fan-out and the accept call. Mobile audited for parity,
+including a real navigation bug where the onboarding screen bounced a brand-new provider back to
+a blank form instead of forward. See ADR-056.
+
 ## Fixed: Service Provider Accounts Were Created With The Wrong Role — And 500'd On Their Own Dashboard (2026-08-19, ADR-055)
 Signing up as a Service Provider produced an account the admin panel showed as
 `SERVICE_PROVIDER` with `Role: RENTER`, and that 500'd on first login. Three separate causes.

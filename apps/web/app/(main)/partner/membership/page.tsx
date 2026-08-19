@@ -20,10 +20,25 @@ interface ActiveMembership {
   endDate: string;
 }
 
-/** ADR-051 — a Service Provider's own membership, entirely separate from the Rider
+/** Renders "/month" or "/year" for the common billing periods, falling back to the raw day
+ * count for anything else (e.g. the grandfathered 100-year legacy plan, if it's ever shown). */
+function billingPeriodLabel(durationDays: number): string {
+  if (durationDays === 30) return "/month";
+  if (durationDays === 365) return "/year";
+  return ` / ${durationDays} days`;
+}
+
+/** ADR-051/056 — a Service Provider's own membership, entirely separate from the Rider
  * `/membership` page it mirrors. A free plan (price 0) activates immediately with no payment
  * step; a paid plan opens the same `PaymentModal` pointed at the `/api/partner-membership/*`
- * routes instead of the Rider ones. */
+ * routes instead of the Rider ones.
+ *
+ * ADR-056 — this is now also the mandatory next stop after `/partner-onboarding` (never a gate:
+ * "Skip for Now" always reaches `/partner`). `?onboarding=1` only changes the copy — every other
+ * behavior on this page, including Skip, is identical whether it's reached from onboarding or
+ * from the sidebar later. Read via `window.location.search` rather than `useSearchParams()` to
+ * match this app's existing pattern for optional query params on client pages (see
+ * `(auth)/signup/page.tsx`) and avoid a Suspense-boundary requirement for one boolean flag. */
 export default function PartnerMembershipPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +47,11 @@ export default function PartnerMembershipPage() {
   const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
   const [activatingPlanId, setActivatingPlanId] = useState<string | null>(null);
   const [justPurchased, setJustPurchased] = useState(false);
+  const [isOnboarding, setIsOnboarding] = useState(false);
+
+  useEffect(() => {
+    setIsOnboarding(new URLSearchParams(window.location.search).get("onboarding") === "1");
+  }, []);
 
   useEffect(() => {
     fetch("/api/partner-membership/plans")
@@ -93,15 +113,29 @@ export default function PartnerMembershipPage() {
 
   return (
     <div>
+      {isOnboarding && !activeMembership && (
+        <div className="mb-6 max-w-2xl rounded-2xl border border-accent/20 bg-accent/5 px-6 py-4">
+          <p className="text-sm font-semibold">Your Service Provider profile is ready.</p>
+          <p className="mt-1 text-sm text-foreground/70">
+            Activate your ₹99/month membership to start receiving and responding to assistance
+            requests — or skip for now and explore your dashboard first.
+          </p>
+        </div>
+      )}
+
       <h1 className="text-2xl font-semibold">Service Provider Membership</h1>
       <p className="mt-1 text-sm text-foreground/50">
-        A Service Provider capability requires an active membership — separate from Rider
-        membership. Your admin may offer a free plan.
+        Operating as a Service Provider — accepting SOS requests, listing your fleet, taking
+        bookings — requires an active membership, separate from Rider membership. Your profile
+        and business details are already saved either way.
       </p>
 
       {justPurchased && (
         <div className="mt-6 max-w-md rounded-2xl bg-success/10 px-6 py-4 text-sm text-success">
-          🎉 Membership activated!
+          <p>🎉 Membership activated!</p>
+          <Link href="/partner" className="mt-2 inline-block font-semibold underline">
+            Continue to Dashboard →
+          </Link>
         </div>
       )}
 
@@ -133,7 +167,7 @@ export default function PartnerMembershipPage() {
                 <p className="mt-1 text-sm text-foreground/50">{plan.description}</p>
                 <p className="mt-4">
                   <span className="text-3xl font-bold">{isFree ? "Free" : `₹${plan.price}`}</span>
-                  <span className="text-sm text-foreground/50"> / {plan.durationDays} days</span>
+                  <span className="text-sm text-foreground/50">{billingPeriodLabel(plan.durationDays)}</span>
                 </p>
                 <ul className="mt-6 space-y-3">
                   {plan.benefits.map((benefit, i) => (
@@ -163,9 +197,18 @@ export default function PartnerMembershipPage() {
         </div>
       )}
 
-      <p className="mt-8 text-sm text-foreground/50">
-        <Link href="/partner" className="text-accent-text hover:underline">← Back to Partner Dashboard</Link>
-      </p>
+      {!activeMembership && !justPurchased && (
+        <p className="mt-8 text-sm">
+          <Link href="/partner" className="font-medium text-foreground/70 hover:text-foreground hover:underline">
+            Skip for Now — explore the dashboard first →
+          </Link>
+        </p>
+      )}
+      {(activeMembership || justPurchased) && (
+        <p className="mt-8 text-sm text-foreground/50">
+          <Link href="/partner" className="text-accent-text hover:underline">← Back to Partner Dashboard</Link>
+        </p>
+      )}
 
       {checkoutPlan && (
         <PaymentModal

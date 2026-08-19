@@ -2,6 +2,34 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Service Provider membership: Rs 99/month, non-mandatory at onboarding, enforced at SOS accept (2026-08-19, ADR-056)
+
+Made the existing Partner Membership system (ADR-051) match three product requirements: profile
+creation never requires payment, operating as a provider does, and a non-member exploring the
+dashboard sees what they're missing rather than a blank screen. Also found and closed a real
+authorization gap in the SOS accept/dispatch path, and a real navigation bug in the mobile
+onboarding flow. See ADR-056.
+
+| Task | Status |
+|---|---|
+| Audited the existing Partner Membership system (plans/checkout/purchase, ADR-051) against the four product requirements — found it structurally complete but functionally missing an actual paid plan, an onboarding step, non-subscriber messaging, and SOS-path enforcement | Completed |
+| Found the only live plan was the Rs 0/100-year ADR-051 launch backfill, left `isActive: true` and offered to every new signup as a permanent free tier | Completed |
+| Added a real Rs 99/`durationDays: 30` plan to `prisma/seed.ts` (idempotent, matched on name) and deactivated the legacy plan for new purchases (existing grandfathered memberships unaffected) | Completed |
+| Apply the seed's plan-creation/deactivation to production (exact idempotent SQL in CHANGELOG.md; blocked here — direct production data write outside this session's tooling) | Blocked |
+| Changed `/partner-onboarding` to route to `/partner/membership?onboarding=1` instead of straight to `/partner`; added "Skip for Now" to the membership page | Completed |
+| Added `PartnerActivationCard` (main `/partner` dashboard) and `MembershipRequiredNotice` (fleet/bookings/reviews/analytics/payouts/SOS) — non-blocking, explains locked features + Subscribe CTA | Completed |
+| Found and fixed a real crash: `/partner/fleet` called `setBikes(bikesData.bikes)` on an unchecked response — a 403 body has no `bikes` key, so `setBikes(undefined)` crashed the next render | Completed |
+| Found and fixed a real bug: `/partner/sos`'s nearby/active fetches used `data.requests ?? []`, silently rendering "No open requests" for a locked-out account instead of explaining why | Completed |
+| Made `PartnerAvailabilityToggle` (web) pre-emptively show a locked state instead of only failing after a click | Completed |
+| Found the real authorization gap: neither SOS dispatch (`findEligiblePartnersNearPoint`) nor the accept endpoint (`offerHelp`'s `requireAvailableAndCapacity`) ever checked Partner membership | Completed |
+| Added `PartnerDispatchPort.hasActivePartnerMembership`; dispatch now excludes non-members from fan-out entirely, `offerHelp` returns `MEMBERSHIP_REQUIRED` (403) as a second, direct-call-covering check | Completed |
+| Added regression tests: a capable/available/type-matched partner with no membership is still blocked; a plain Rider offer never triggers a partner-membership check | Completed |
+| Audited `apps/mobile` for parity: `PartnerMembershipScreen` (added Skip for Now), `PartnerHomeScreen`/`PartnerAvailabilityBanner` (added activation-card/locked-state treatment) | Completed |
+| Found and fixed a real mobile bug: onboarding's post-save `context.go('/become-provider')` redirected a brand-new provider back to a blank onboarding form (`BecomeProviderScreen`'s logic predates ADR-053) — now goes to `/partner-membership` directly | Completed |
+| Confirmed mobile's `POST /api/sos/alerts/[id]/offer` error handling already surfaces `MEMBERSHIP_REQUIRED` via existing `ApiException.isMembershipRequired`; added a "Subscribe" snackbar action to the accept handler | Completed |
+| Confirmed `kApiBaseUrl` defaults to production (`https://bikie.app`) and no hardcoded membership state exists anywhere in `apps/mobile` | Completed |
+| Run `flutter analyze` / `flutter test` (no Flutter SDK available in this environment — verified by manual review only) | Blocked |
+
 ## Service Provider role/accountType mismatch + the 500 behind it (2026-08-19, ADR-055)
 
 A SERVICE_PROVIDER signup produced `Account Type: SERVICE_PROVIDER` / `Role: RENTER` in

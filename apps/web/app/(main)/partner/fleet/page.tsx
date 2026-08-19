@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { formatCurrency } from "@bikie/utils";
 import { Skeleton } from "@bikie/ui";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { MembershipRequiredNotice } from "@/components/partner/PartnerMembershipStatus";
 
 interface Bike {
   id: string;
@@ -38,13 +39,23 @@ export default function PartnerFleetPage() {
   const [uploadingCover, setUploadingCover] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // ADR-056 — `/api/partner/bikes` is capability-gated (`requirePartnerCapability`), which also
+  // requires an active membership. A non-member reaching this page (accountType lets them in,
+  // membership doesn't) previously got a 403 body with no `bikes` field, and `setBikes(undefined)`
+  // crashed the page on the very next render (`bikes.length`). Tracked separately from `loading`
+  // so the empty-fleet state and the locked state render distinct messaging.
+  const [membershipRequired, setMembershipRequired] = useState(false);
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/partner/bikes").then((r) => r.json()),
+      fetch("/api/partner/bikes").then(async (r) => ({ ok: r.ok, status: r.status, data: await r.json() })),
       fetch("/api/categories").then((r) => r.json()),
-    ]).then(([bikesData, catsData]) => {
-      setBikes(bikesData.bikes);
+    ]).then(([bikesRes, catsData]) => {
+      if (bikesRes.ok) {
+        setBikes(bikesRes.data.bikes ?? []);
+      } else {
+        setMembershipRequired(bikesRes.status === 403);
+      }
       setCategories(catsData.categories ?? []);
       setLoading(false);
     });
@@ -114,13 +125,16 @@ export default function PartnerFleetPage() {
         <button
           type="button"
           onClick={() => setShowAdd(true)}
-          className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover"
+          disabled={membershipRequired}
+          className="rounded-xl bg-accent px-5 py-2 text-sm font-medium text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
         >
           + Add Bike
         </button>
       </div>
 
-      {bikes.length === 0 ? (
+      <MembershipRequiredNotice feature="Fleet management" />
+
+      {membershipRequired ? null : bikes.length === 0 ? (
         <div className="mt-8">
           <EmptyState
             icon="🏍️"

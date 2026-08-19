@@ -3,12 +3,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../auth/domain/auth_controller.dart';
+import '../../partner_membership/domain/partner_membership_providers.dart';
 import '../../sos/data/sos_model.dart';
 import '../data/partner_dashboard_model.dart';
 import '../domain/partner_dashboard_providers.dart';
 
 /// Partner's dedicated Home — replaces the renter `HomeScreen` for `role == 'PARTNER'` (ADR-044).
 /// A live stats + activity dashboard, not a marketplace browse screen: partners don't rent bikes.
+///
+/// ADR-056 — every stats/nearby/active provider here reads a `requirePartnerCapability`-gated
+/// route, which also requires an active membership; a non-member previously just saw everything
+/// silently blank (`error: (_, __) => const SizedBox.shrink()`) with no explanation why. The
+/// `_ActivationCard` below (self-contained, reads `activePartnerMembershipProvider`) makes the
+/// real reason visible without gating anything — mirrors web's `PartnerActivationCard`.
 class PartnerHomeScreen extends ConsumerWidget {
   const PartnerHomeScreen({super.key});
 
@@ -26,12 +33,14 @@ class PartnerHomeScreen extends ConsumerWidget {
           ref.invalidate(partnerSosDashboardProvider);
           ref.invalidate(partnerNearbyRequestsProvider);
           ref.invalidate(partnerActiveSessionsProvider);
+          ref.invalidate(activePartnerMembershipProvider);
         },
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
             Text(me != null ? 'Hello, ${me.name}' : 'Hello', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 16),
+            const _ActivationCard(),
             statsAsync.when(
               data: (stats) => _StatsGrid(stats: stats),
               loading: () => const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator())),
@@ -68,6 +77,63 @@ class PartnerHomeScreen extends ConsumerWidget {
               error: (_, __) => const SizedBox.shrink(),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Renders nothing while loading or once a membership is active — never a gate, matches web's
+/// `PartnerActivationCard`. Stats/nearby/active stay visible underneath (all honestly zero/empty
+/// for a brand-new account) so a non-member can still explore the dashboard shape.
+class _ActivationCard extends ConsumerWidget {
+  const _ActivationCard();
+
+  static const _lockedFeatures = [
+    'Receive & accept SOS assistance requests',
+    'Go available to riders nearby',
+  ];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref.watch(activePartnerMembershipProvider);
+    final hasActiveMembership = active.valueOrNull != null;
+    if (active.isLoading || hasActiveMembership) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Card(
+        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Your Service Provider profile is ready.', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 6),
+              const Text(
+                'Activate your ₹99/month membership to start receiving and responding to '
+                'assistance requests.',
+              ),
+              const SizedBox(height: 10),
+              ..._lockedFeatures.map(
+                (f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 2),
+                  child: Row(
+                    children: [
+                      const Text('🔒 ', style: TextStyle(fontSize: 12)),
+                      Expanded(child: Text(f, style: Theme.of(context).textTheme.bodySmall)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => context.push('/partner-membership'),
+                child: const Text('Subscribe — ₹99/month'),
+              ),
+            ],
+          ),
         ),
       ),
     );

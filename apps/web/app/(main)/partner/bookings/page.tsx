@@ -4,6 +4,7 @@ import type { BookingDTO } from "@bikie/types";
 import { getJsonOrFallback } from "@/lib/api";
 import { formatCurrency } from "@bikie/utils";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { MembershipRequiredNotice } from "@/components/partner/PartnerMembershipStatus";
 
 export const metadata: Metadata = { title: "Bookings" };
 
@@ -17,6 +18,7 @@ export default async function PartnerBookingsPage() {
   return (
     <div>
       <h1 className="text-2xl font-semibold">Bookings</h1>
+      <MembershipRequiredNotice feature="Bookings" />
       {bookings.length === 0 ? (
         <div className="mt-8">
           <EmptyState title="No bookings yet" description="Bookings for your fleet will show up here." />

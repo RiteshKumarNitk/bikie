@@ -612,6 +612,7 @@ describe("fan-out dispatch", () => {
         partnerDispatch: {
           findEligibleForAlert: vi.fn(async () => []),
           getEligibilityFields: vi.fn(async () => null),
+          hasActivePartnerMembership: vi.fn(async () => true),
           findByCity: vi.fn(async () => [
             {
               userId: "partner-1",

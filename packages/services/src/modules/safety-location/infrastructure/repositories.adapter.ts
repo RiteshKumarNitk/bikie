@@ -1,5 +1,6 @@
 import {
   communityRepository,
+  partnerMembershipRepository,
   partnerRepository,
   riderLocationRepository,
   riderProfileRepository,
@@ -193,6 +194,10 @@ export function createPartnerDispatchAdapter(): PartnerDispatchPort {
       const row = await partnerRepository.findPartnerEligibilityFields(userId);
       if (!row) return null;
       return { providerId: row.id, verificationStatus: row.verificationStatus, isAvailable: row.isAvailable, isGeneralResponder: row.isGeneralResponder, type: row.type };
+    },
+    hasActivePartnerMembership: async (userId) => {
+      const membership = await partnerMembershipRepository.getActiveMembership(userId);
+      return membership !== null;
     },
   };
 }

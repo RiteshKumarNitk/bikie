@@ -124,7 +124,19 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
       if (mounted) setState(() => _myOffer = offer);
       await _refresh();
     } on ApiException catch (e) {
-      _showError(e.message);
+      // ADR-056 — server-side membership gate on `POST /api/sos/alerts/[id]/offer`; a plain
+      // snackbar would leave a non-member with no way forward from here, so this one case gets
+      // a direct action instead of `_showError`'s generic message-only snackbar.
+      if (e.isMembershipRequired && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.message),
+            action: SnackBarAction(label: 'Subscribe', onPressed: () => context.push('/partner-membership')),
+          ),
+        );
+      } else {
+        _showError(e.message);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

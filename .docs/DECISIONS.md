@@ -2553,3 +2553,125 @@ changes:
   left as follow-up rather than widened into this change. Verified: `tsc --noEmit` clean across
   all 8 packages, 199/199 tests pass, `next build` succeeds, and all changed files lint clean
   (the repo's 48 pre-existing `react-hooks` lint errors are untouched).
+
+## ADR-056: Service Provider membership is Rs 99/month, non-mandatory at onboarding, and actually enforced at SOS accept/dispatch
+
+- **Context.** Product direction: creating a Service Provider account/profile must never require
+  immediate payment, but *operating* as one (SOS, availability, fleet, bookings) must require an
+  active Rs 99/month membership, with a non-blocking "explore first" path in between. Auditing the
+  existing ADR-051 Partner Membership system (plans/checkout/purchase/active — all already built)
+  against that requirement found it was structurally correct but functionally incomplete in four
+  independent ways:
+  1. **No Rs 99/month plan existed.** The only PartnerMembershipPlan row in production was
+     legacy-free-partner-plan (price 0, durationDays 36500) — the one-time grandfather clause from
+     20260811100000_partner_membership_model's migration, for accounts that already had
+     capability the day ADR-051 shipped. It was left isActive: true, so findAllActivePlans() (and
+     therefore GET /api/partner-membership/plans) offered it to everyone, including a brand-new
+     signup — a free-forever loophole, not a Rs 99/month business.
+  2. **Onboarding skipped the membership step entirely.** PUT /api/partner/profile succeeding
+     sent the user straight to /partner (router.push("/partner") in partner-onboarding/page.tsx);
+     the membership screen existed only as a sidebar nav item a provider had to go find. No
+     "Subscribe / Skip for Now" moment ever happened.
+  3. **Non-subscriber dashboard was silent, not explanatory.** ADR-055 (same day, prior fix in
+     this session) had already made the six capability-gated /partner/** pages degrade gracefully
+     on a MEMBERSHIP_REQUIRED 403 instead of 500ing — but "gracefully" meant zeroed stats and
+     generic empty states, indistinguishable from a genuinely idle active provider. The product
+     ask ("show what they're missing, not a blank screen") was still unmet.
+  4. **The membership check existed at the profile-capability layer (evaluatePartnerCapability,
+     ADR-051) but nowhere in the SOS accept/dispatch path itself** — a genuine authorization gap,
+     not a display one. findEligiblePartnersNearPoint (dispatch fan-out — who gets notified of a
+     new SOS alert) filtered only on verificationStatus != SUSPENDED and isAvailable, never
+     membership. offerHelp's requireAvailableAndCapacity branch (the actual "ACCEPT" gate,
+     POST /api/sos/alerts/[id]/offer) checked profile-not-suspended + available + type-matched +
+     not-at-capacity — also never membership. A non-member Service Provider could not reach
+     /partner/sos (page-level requirePartnerCapability already blocked that), but a direct POST to
+     the offer endpoint with a known alert ID — a forwarded link, or a membership that expired
+     after dispatch already happened — would have succeeded. This is the one finding in this ADR
+     that's a real security/business-rule gap, not a UX one.
+- **Decision.**
+  - **Pricing**: one active plan, "Service Provider Membership", Rs 99 / durationDays: 30. Seeded
+    idempotently in prisma/seed.ts (matches the existing Rider-plan seeding pattern) — matched on
+    name, not "table empty", since the migration's backfill already inserted a row.
+    legacy-free-partner-plan is flipped to isActive: false in the same seed step: its FK'd
+    PartnerMembership rows (the accounts grandfathered at ADR-051 launch) stay valid — nothing
+    about an existing membership changes — it simply stops being offered to anyone new. **Not yet
+    applied to the live database** — creating a plan row and deactivating another is a direct
+    production data write outside what this session's tooling permits unattended; the exact
+    idempotent script is provided in the CHANGELOG entry for manual execution, matching the
+    posture ADR-053 and prior ADRs in this file already established for this class of change.
+  - **Onboarding order.** partner-onboarding/page.tsx now routes to
+    /partner/membership?onboarding=1 instead of /partner directly. ?onboarding=1 only swaps in
+    "Your Service Provider profile is ready…" framing copy — every other behavior, including
+    "Skip for Now" (new — routes to /partner), is identical whether the page is reached from
+    onboarding or the sidebar later. The profile write itself remains completely ungated on
+    membership (requireSession + accountType check only, per ADR-055) — this is ordering of
+    screens, never a new gate.
+  - **Non-subscriber dashboard**: new PartnerActivationCard (/partner, the main dashboard) —
+    self-fetches GET /api/partner-membership/active (session-only, always callable), renders
+    nothing once a membership is active, otherwise shows the profile-ready message, which
+    features are locked, which parts of the account already work, and a Subscribe CTA — never a
+    gate, the zeroed stats and every nav item stay reachable underneath it. Lighter
+    MembershipRequiredNotice (same self-fetch, one line + Subscribe link) added to the six
+    capability-gated sub-pages (fleet, bookings, reviews, analytics, payouts, SOS). Two real bugs
+    fixed along the way, not just messaging gaps: partner/fleet/page.tsx did
+    setBikes(bikesData.bikes) on the raw JSON body with no res.ok check — a 403's
+    {error, message} body has no bikes key, so setBikes(undefined) crashed the very next render
+    (bikes.length) client-side; and partner/sos/page.tsx's nearby/active fetches used
+    data.requests ?? [] / data.sessions ?? [], which silently turned a 403 into "No open requests
+    near you right now" / "You're not assisting anyone right now" — indistinguishable from a
+    genuinely idle active provider. Both now check res.ok and branch on it.
+    PartnerAvailabilityToggle.tsx (web) now pre-emptively renders a locked/disabled state via the
+    same self-fetch instead of only failing after a click with a generic "Something went wrong" —
+    PATCH /api/partner/availability was already server-side gated (requirePartnerCapability);
+    this is UX, the gate is unchanged.
+  - **SOS enforcement, server-side, both layers.** New
+    PartnerDispatchPort.hasActivePartnerMembership (safety-location module; deliberately
+    duplicates identity-access's PartnerMembershipPort method rather than importing it, to avoid
+    a cross-module dependency for one boolean read — same underlying PartnerMembership table
+    either way). Used in two places: (1) findEligiblePartnersNearPoint (packages/database) now
+    filters candidates on user.partnerMembership.some({status: ACTIVE, endDate: {gte: now}}) — a
+    non-member is never dispatched an SOS alert at all, not just blocked from accepting one,
+    since being paged about an emergency you're not entitled to respond to is itself the wrong
+    experience; (2) offerHelp's requireAvailableAndCapacity branch (session.application.ts)
+    re-checks membership directly and returns a new MEMBERSHIP_REQUIRED reason (mapped to 403 at
+    POST /api/sos/alerts/[id]/offer, same status class as NOT_VERIFIED) — belt-and-suspenders
+    against the direct-call case dispatch filtering alone can't cover. A plain Rider "I'm Coming"
+    offer (opts omitted entirely) never reaches either check — confirmed by a new regression test
+    (safety-location.e2e.test.ts) — this is Partner-membership-specific, not a new condition on
+    every SOS offer.
+  - **Mobile parity + one real bug found and fixed.** Audited apps/mobile against every point
+    above. PartnerMembershipScreen had no "Skip for Now" at all — added, context.go('/').
+    PartnerHomeScreen and PartnerAvailabilityBanner got the same self-fetch
+    (activePartnerMembershipProvider, already existed) activation-card/locked-state treatment as
+    their web counterparts. Found a genuine navigation bug while tracing the onboarding path:
+    PartnerOnboardingScreen._save()'s non-edit-mode branch called
+    context.go('/become-provider') — a screen whose entire remaining job, per its own doc
+    comment, is redirecting a SERVICE_PROVIDER-accountType account straight back to
+    /partner-onboarding (written for the ADR-046b application-review model BecomeProviderScreen
+    predates and ADR-053 superseded). A brand-new provider who just filled out and submitted the
+    onboarding form was landing back on a blank copy of the same form instead of progressing —
+    not a cosmetic gap, a broken flow. Fixed by pointing that call at /partner-membership
+    directly, mirroring web's /partner/membership redirect. POST /api/sos/alerts/[id]/offer's new
+    MEMBERSHIP_REQUIRED reason surfaces through the existing ApiException.isMembershipRequired
+    (already present, reading the shared {error, message} envelope — no mobile-side parsing
+    changes needed); partner_sos_request_screen.dart's accept handler gained a "Subscribe"
+    snackbar action for that specific case. Confirmed kApiBaseUrl defaults to production
+    (https://bikie.app, override only via explicit --dart-define) — mobile is not pointed at a
+    stale/local API. Confirmed no hardcoded membership booleans anywhere in apps/mobile
+    (activePartnerMembershipProvider is the only source, always server-fetched). **Not run**:
+    flutter analyze / flutter test — no Flutter SDK available in this execution environment;
+    changes were verified by full manual read-through of every edited file plus cross-reference
+    against the existing provider/routing patterns, not by the toolchain. Flagged to the user as
+    an environment limitation, not silently skipped.
+- **Data.** No existing PartnerMembership rows are affected — the grandfathered legacy
+  memberships (6 accounts, see ADR-055's audit) keep working exactly as before; only new
+  purchases are affected by the plan-activation change. The plan-seeding step itself has not been
+  run against production (see above) — .docs/CHANGELOG.md carries the exact idempotent script.
+- **Consequences.** evaluatePartnerCapability (identity-access) and the new SOS-path membership
+  check (safety-location) now independently read the same PartnerMembership table through two
+  separate, intentionally-duplicated port methods — accepted rather than unified behind a shared
+  module dependency, consistent with this codebase's existing module-boundary discipline (see
+  ADR-051's own note on PartnerMembershipPort vs. the Rider MembershipPort). Verified:
+  tsc --noEmit clean across all 8 packages, 201/201 tests pass (2 new: a member-vs-non-member
+  offerHelp case and a plain-Rider-never-checked-membership regression guard), next build
+  succeeds, and every changed web file lints clean.

@@ -197,9 +197,17 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       if (_isEditMode) {
         context.pop();
       } else {
-        // ADR-046b: saving no longer grants capability — land on the application-status screen
-        // (which shows the draft/submit step next) instead of the Home route.
-        context.go('/become-provider');
+        // ADR-056 — was `context.go('/become-provider')`, which for a brand-new
+        // SERVICE_PROVIDER-accountType account immediately redirected right back to
+        // `/partner-onboarding` (`BecomeProviderScreen`'s own redirect logic, written for the
+        // superseded ADR-046b application-review model) — a real bug: the provider who just
+        // saved their profile landed back on a blank copy of the same form instead of
+        // progressing. The profile itself needs no approval (FINAL PRODUCT MODEL, ADR-049) and
+        // no membership either — creating/saving it is always allowed. Actually *operating* as a
+        // provider (SOS, availability) needs the ₹99/month membership, so that's the next stop;
+        // `/partner-membership` has its own "Skip for Now" out to `/`, so this never blocks
+        // onboarding — mirrors web's `/partner-onboarding` → `/partner/membership` redirect.
+        context.go('/partner-membership');
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);

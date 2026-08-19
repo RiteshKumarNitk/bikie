@@ -5,6 +5,7 @@ import { ZERO_PARTNER_STATS } from "@/lib/partner-dashboard";
 import { getServerSession } from "@/lib/get-session";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { PartnerVerificationBanner } from "@/components/partner/PartnerVerificationBanner";
+import { PartnerActivationCard } from "@/components/partner/PartnerMembershipStatus";
 import { formatCurrency } from "@bikie/utils";
 
 export const metadata: Metadata = { title: "Partner Dashboard" };
@@ -25,6 +26,9 @@ export default async function PartnerOverviewPage() {
       {/* FINAL PRODUCT MODEL — verification status is a separate, optional trust layer shown
       here, never a gate: the profile is already live and operational. */}
       <PartnerVerificationBanner />
+      {/* ADR-056 — membership (₹99/month) is what actually gates operating as a provider; this
+      renders nothing once a membership is active, so a subscribed provider sees no change here. */}
+      <PartnerActivationCard />
 
       <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Total Bikes" value={stats.totalBikes} />

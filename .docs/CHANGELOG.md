@@ -1,5 +1,64 @@
 # BIKIE Changelog
 
+## 2026-08-19 — Service Provider membership: Rs 99/month, optional at onboarding, enforced at SOS accept (ADR-056)
+
+Made the existing Partner Membership system (plans/checkout/purchase — built under ADR-051) match
+three product requirements it didn't yet meet: creating a Service Provider profile must never
+require payment; operating as one (SOS, availability, fleet, bookings) must require an active
+Rs 99/month membership; and a non-member exploring the dashboard must see what they're missing,
+not a blank screen.
+
+**Pricing** — the only plan live in production was a Rs 0, 100-year "grandfather" plan from
+ADR-051's launch backfill, left active and therefore offered to every new signup as a permanent
+free tier. Added a real Rs 99/`30 days` plan (`prisma/seed.ts`, idempotent) and deactivated the
+legacy plan for new purchases (existing grandfathered memberships are untouched). **Not yet run
+against production** — apply with:
+
+```sql
+-- Only if a plan by this name doesn't already exist:
+INSERT INTO "partner_membership_plan" (id, name, description, price, "durationDays", benefits, "isActive", "sortOrder", "createdAt")
+SELECT gen_random_uuid()::text, 'Service Provider Membership',
+       'Everything you need to operate as a BIKIE Service Provider', 99, 30,
+       ARRAY['Receive & accept SOS assistance requests','Go available to riders nearby',
+             'List and manage your fleet','Accept bookings from riders',
+             'Priority placement in rider search'],
+       true, 0, CURRENT_TIMESTAMP
+WHERE NOT EXISTS (SELECT 1 FROM "partner_membership_plan" WHERE name = 'Service Provider Membership');
+
+UPDATE "partner_membership_plan" SET "isActive" = false WHERE id = 'legacy-free-partner-plan';
+```
+
+**Onboarding** now routes `/partner-onboarding` → `/partner/membership?onboarding=1` (was
+straight to `/partner`) with a new "Skip for Now" — always reaches the dashboard, never a gate.
+
+**Non-subscriber dashboard** — new `PartnerActivationCard` (main `/partner` page) and
+`MembershipRequiredNotice` (fleet/bookings/reviews/analytics/payouts/SOS) explain what's locked
+and link to Subscribe, replacing silent zeroed stats. Found and fixed two real bugs along the
+way: `/partner/fleet` crashed client-side for a non-member (`setBikes(undefined)` on a 403 body
+with no `bikes` key); `/partner/sos` silently rendered "No open requests" / "not assisting
+anyone" for a locked-out account instead of explaining why.
+
+**SOS enforcement** — the actual authorization gap this ADR closes: neither SOS dispatch
+(`findEligiblePartnersNearPoint`) nor the accept endpoint
+(`POST /api/sos/alerts/[id]/offer`'s `offerHelp`) ever checked Partner membership, only
+profile-not-suspended + available + type-matched. A non-member couldn't reach the nearby-requests
+*page*, but a direct API call with a known alert ID would have gone through. Both now check
+membership server-side; dispatch excludes non-members from fan-out entirely, offer returns a new
+`403 MEMBERSHIP_REQUIRED`.
+
+**Mobile** — audited `apps/mobile` for parity. Added the same "Skip for Now" and
+activation-card/locked-availability treatment. Found and fixed a real bug: the onboarding
+screen's post-save navigation (`context.go('/become-provider')`) redirected a brand-new provider
+straight back to a blank onboarding form instead of forward — `BecomeProviderScreen`'s own logic,
+written for a superseded pre-ADR-053 model, sends any SERVICE_PROVIDER-accountType account back
+to `/partner-onboarding`. Now navigates to `/partner-membership` directly. Confirmed mobile
+defaults to the production API (`https://bikie.app`) and has no hardcoded membership state.
+`flutter analyze`/`flutter test` were **not run** — no Flutter SDK in this environment; changes
+were verified by manual review only.
+
+Verified: `tsc --noEmit` clean (8 packages), 201/201 tests pass (2 new), `next build` succeeds,
+changed files lint clean. Full details in `.docs/DECISIONS.md` ADR-056.
+
 ## 2026-08-19 — Service Provider role/accountType mismatch, and the 500 behind it (ADR-055)
 
 A Service Provider signup produced an account that `/admin/users` showed as

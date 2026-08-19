@@ -37,10 +37,18 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     const status =
       result.reason === "NOT_FOUND"
         ? 404
-        : result.reason === "FORBIDDEN" || result.reason === "NOT_VERIFIED"
+        : result.reason === "FORBIDDEN" || result.reason === "NOT_VERIFIED" || result.reason === "MEMBERSHIP_REQUIRED"
           ? 403
           : 409;
-    return NextResponse.json({ error: result.reason }, { status });
+    return NextResponse.json(
+      result.reason === "MEMBERSHIP_REQUIRED"
+        ? {
+            error: result.reason,
+            message: "This requires an active Service Provider membership (₹99/month). Activate it to accept requests.",
+          }
+        : { error: result.reason },
+      { status },
+    );
   }
   return NextResponse.json({ offer: result.offer });
 }

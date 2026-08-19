@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReviewDTO } from "@bikie/types";
 import { getJsonOrFallback } from "@/lib/api";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { MembershipRequiredNotice } from "@/components/partner/PartnerMembershipStatus";
 
 export const metadata: Metadata = { title: "Reviews" };
 
@@ -26,6 +27,7 @@ export default async function PartnerReviewsPage() {
   return (
     <div>
       <h1 className="text-2xl font-semibold">Reviews</h1>
+      <MembershipRequiredNotice feature="Reviews" />
 
       {providerReviews.length > 0 && (
         <div className="mt-8">

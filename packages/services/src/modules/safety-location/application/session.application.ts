@@ -39,6 +39,15 @@ export function createSessionApplication(ports: SafetyLocationPorts, deps: Sessi
         if (!partner || partner.verificationStatus === "SUSPENDED") {
           return { ok: false as const, reason: "NOT_VERIFIED" as const };
         }
+        // ADR-056 — the ₹99/month Service Provider membership is what turns capability into
+        // permission to actually operate (mirrors `evaluatePartnerCapability`'s membership check,
+        // ADR-051). Checked here too, not only at dispatch fan-out
+        // (`findEligiblePartnersNearPoint`), because this endpoint is reachable directly with any
+        // alert ID a non-member happened to learn (a forwarded link, an expired membership after
+        // the alert was already dispatched) — dispatch filtering alone doesn't cover that.
+        if (!(await ports.partnerDispatch.hasActivePartnerMembership(responderId))) {
+          return { ok: false as const, reason: "MEMBERSHIP_REQUIRED" as const };
+        }
         if (!partner.isAvailable) return { ok: false as const, reason: "PARTNER_OFFLINE" as const };
         if (!partnerMatchesAlertType(partner, alert.type)) {
           return { ok: false as const, reason: "CATEGORY_MISMATCH" as const };

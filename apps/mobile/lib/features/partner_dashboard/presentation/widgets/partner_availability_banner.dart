@@ -1,13 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/network/api_exception.dart';
+import '../../../partner_membership/domain/partner_membership_providers.dart';
 import '../../data/partner_dashboard_repository.dart';
 import '../../domain/partner_dashboard_providers.dart';
 
 /// The "🟢 AVAILABLE / ⚫ OFFLINE" toggle (ADR-044) — deliberately persistent across every
 /// partner screen (rendered once, in `AppShell`), not confined to Home, since offline is exactly
 /// the state where a partner most needs a constant reminder they won't be paged for anything.
+///
+/// ADR-056 — `PATCH /api/partner/availability` was already server-side membership-gated
+/// (`requirePartnerCapability`); a non-member tapping the switch previously just got a snackbar
+/// error after the fact. Pre-emptively disabling it via `activePartnerMembershipProvider` (mirrors
+/// web's `PartnerAvailabilityToggle.tsx`) makes the restriction visible instead of discoverable
+/// only by trying — the server-side gate remains the actual enforcement either way.
 class PartnerAvailabilityBanner extends ConsumerStatefulWidget {
   const PartnerAvailabilityBanner({super.key});
 
@@ -32,6 +40,45 @@ class _PartnerAvailabilityBannerState extends ConsumerState<PartnerAvailabilityB
 
   @override
   Widget build(BuildContext context) {
+    final membershipAsync = ref.watch(activePartnerMembershipProvider);
+    // Fail open while loading/on error rather than flashing a locked state that then flips —
+    // the PATCH itself still enforces membership server-side regardless of what this shows.
+    final membershipActive = membershipAsync.maybeWhen(data: (m) => m != null, orElse: () => true);
+
+    if (!membershipActive) {
+      return Material(
+        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.05),
+        child: InkWell(
+          onTap: () => context.push('/partner-membership'),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            child: Row(
+              children: [
+                const Text('🔒', style: TextStyle(fontSize: 14)),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'UNAVAILABLE',
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      Text(
+                        'Activate ₹99/month membership to go available',
+                        style: Theme.of(context).textTheme.labelSmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right, size: 18),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     final availableAsync = ref.watch(partnerAvailabilityProvider);
     final available = availableAsync.valueOrNull ?? false;
     final color = available ? const Color(0xFF22C55E) : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5);

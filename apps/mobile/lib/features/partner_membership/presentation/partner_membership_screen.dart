@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -9,8 +10,12 @@ import '../data/partner_membership_model.dart';
 import '../data/partner_membership_repository.dart';
 import '../domain/partner_membership_providers.dart';
 
-/// ADR-051 — mirrors `MembershipScreen`, entirely separate data: a Service Provider's own
+/// ADR-051/056 — mirrors `MembershipScreen`, entirely separate data: a Service Provider's own
 /// membership, not the Rider one.
+///
+/// ADR-056 — this is the mandatory next stop after `/partner-onboarding` (never a gate: "Skip
+/// for Now" always reaches `/`, the Partner Home). Reached from both onboarding and later,
+/// self-service, via the same route — mirrors web's `/partner/membership`.
 class PartnerMembershipScreen extends ConsumerWidget {
   const PartnerMembershipScreen({super.key});
 
@@ -18,6 +23,7 @@ class PartnerMembershipScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(activePartnerMembershipProvider);
     final plans = ref.watch(partnerMembershipPlansProvider);
+    final hasActiveMembership = active.valueOrNull != null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Service Provider Membership')),
@@ -31,7 +37,23 @@ class PartnerMembershipScreen extends ConsumerWidget {
           children: [
             active.when(
               data: (membership) => membership == null
-                  ? const SizedBox.shrink()
+                  ? Card(
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Your Service Provider profile is ready.', style: Theme.of(context).textTheme.titleSmall),
+                            const SizedBox(height: 6),
+                            const Text(
+                              'Activate your ₹99/month membership to start receiving and responding to '
+                              'assistance requests — or skip for now and explore your dashboard first.',
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
                   : Card(
                       color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
                       child: Padding(
@@ -59,11 +81,27 @@ class PartnerMembershipScreen extends ConsumerWidget {
                 children: list.where((p) => p.isActive).map((plan) => _PlanCard(plan: plan)).toList(),
               ),
             ),
+            if (!hasActiveMembership) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton(
+                  onPressed: () => context.go('/'),
+                  child: const Text('Skip for Now — explore the dashboard first'),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
+}
+
+/// Mirrors web's `billingPeriodLabel` in `apps/web/app/(main)/partner/membership/page.tsx`.
+String _billingPeriodLabel(int durationDays) {
+  if (durationDays == 30) return '/month';
+  if (durationDays == 365) return '/year';
+  return '/ $durationDays days';
 }
 
 class _PlanCard extends ConsumerStatefulWidget {
@@ -136,7 +174,9 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
             Row(
               children: [
                 Text(
-                  isFree ? 'Free / ${widget.plan.durationDays} days' : '₹${widget.plan.price.toStringAsFixed(0)} / ${widget.plan.durationDays} days',
+                  isFree
+                      ? 'Free ${_billingPeriodLabel(widget.plan.durationDays)}'
+                      : '₹${widget.plan.price.toStringAsFixed(0)}${_billingPeriodLabel(widget.plan.durationDays)}',
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 const Spacer(),

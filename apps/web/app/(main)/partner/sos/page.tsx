@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { PartnerAvailabilityToggle } from "@/components/partner/PartnerAvailabilityToggle";
+import { MembershipRequiredNotice } from "@/components/partner/PartnerMembershipStatus";
 
 interface PartnerSosStats {
   activeRequests: number;
@@ -56,6 +57,11 @@ export default function PartnerSosDashboardPage() {
   const [active, setActive] = useState<PartnerActiveSession[] | null>(null);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
+  // ADR-056 — every `/api/partner/sos/*` route here is capability-gated (membership required).
+  // Without this, a non-member saw "No open requests near you right now" / "You're not assisting
+  // anyone right now" — indistinguishable from a genuinely idle, fully-active provider, when the
+  // real reason was a 403 the page silently swallowed via `data.requests ?? []`.
+  const [membershipRequired, setMembershipRequired] = useState(false);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -67,19 +73,20 @@ export default function PartnerSosDashboardPage() {
 
   useEffect(() => {
     const query = location ? `?lat=${location.latitude}&lng=${location.longitude}` : "";
-    fetch(`/api/partner/sos/dashboard${query}`)
-      .then((r) => r.json())
-      .then((data) => setStats(data.stats));
-    fetch("/api/partner/sos/active")
-      .then((r) => r.json())
-      .then((data) => setActive(data.sessions ?? []));
+    fetch(`/api/partner/sos/dashboard${query}`).then(async (r) => {
+      if (r.ok) setStats((await r.json()).stats);
+      else if (r.status === 403) setMembershipRequired(true);
+    });
+    fetch("/api/partner/sos/active").then(async (r) => {
+      setActive(r.ok ? ((await r.json()).sessions ?? []) : []);
+    });
   }, [location]);
 
   useEffect(() => {
     if (!location) return;
-    fetch(`/api/partner/sos/nearby?lat=${location.latitude}&lng=${location.longitude}`)
-      .then((r) => r.json())
-      .then((data) => setNearby(data.requests ?? []));
+    fetch(`/api/partner/sos/nearby?lat=${location.latitude}&lng=${location.longitude}`).then(async (r) => {
+      setNearby(r.ok ? ((await r.json()).requests ?? []) : []);
+    });
   }, [location]);
 
   return (
@@ -90,6 +97,8 @@ export default function PartnerSosDashboardPage() {
       <div className="mt-6">
         <PartnerAvailabilityToggle />
       </div>
+
+      <MembershipRequiredNotice feature="SOS assistance" />
 
       {locationError && (
         <p className="mt-3 text-sm text-foreground/50">{locationError}</p>
@@ -109,7 +118,9 @@ export default function PartnerSosDashboardPage() {
         <h2 className="text-lg font-semibold">Nearby Requests</h2>
       </div>
       <div className="mt-3 space-y-3">
-        {nearby === null ? (
+        {membershipRequired ? (
+          <p className="text-sm text-foreground/40">Activate your membership above to see nearby requests.</p>
+        ) : nearby === null ? (
           <p className="text-sm text-foreground/40">
             {location ? "Loading…" : "Share your location to see nearby requests."}
           </p>
@@ -148,7 +159,9 @@ export default function PartnerSosDashboardPage() {
         <h2 className="text-lg font-semibold">Active Assistance</h2>
       </div>
       <div className="mt-3 space-y-3">
-        {active === null ? (
+        {membershipRequired ? (
+          <p className="text-sm text-foreground/40">Activate your membership above to accept assistance requests.</p>
+        ) : active === null ? (
           <p className="text-sm text-foreground/40">Loading…</p>
         ) : active.length === 0 ? (
           <p className="text-sm text-foreground/40">You&apos;re not assisting anyone right now.</p>
