@@ -4,10 +4,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../data/auth_repository.dart';
+import '../data/msg91_otp_repository.dart';
 import '../domain/auth_controller.dart';
 import '../domain/role_provider.dart';
 import '../../../core/widgets/app_logo.dart';
 import 'widgets/dev_otp_banner.dart';
+import 'widgets/otp_channel_toggle.dart';
 import 'widgets/phone_number_field.dart';
 import 'widgets/resend_countdown.dart';
 
@@ -33,6 +35,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
   String _phoneNumber = '';
   bool? _exists;
   final _otpController = TextEditingController();
+  // ADR-057 — see login_screen.dart's identical fields.
+  OtpChannel _otpChannel = OtpChannel.sms;
+  String? _reqId;
 
   String? _error;
   String? _devOtp;
@@ -69,10 +74,11 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
         setState(() => _error = _accountExistsError);
         return;
       }
-      await repo.sendOtp(normalized);
+      final sendResult = await repo.sendOtp(normalized, channel: _otpChannel);
       setState(() {
         _phoneNumber = normalized;
         _exists = false;
+        _reqId = sendResult.reqId;
         _step = 'otp';
       });
       startResendCountdown();
@@ -88,7 +94,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
     if (!canResend) return;
     setState(() => _sendingOtp = true);
     try {
-      await ref.read(authRepositoryProvider).sendOtp(_phoneNumber);
+      await ref.read(authRepositoryProvider).resendOtp(_phoneNumber, reqId: _reqId, channel: _otpChannel);
       startResendCountdown();
       _fetchDevOtp(_phoneNumber);
     } finally {
@@ -102,7 +108,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       _verifying = true;
     });
     try {
-      await ref.read(authControllerProvider.notifier).verifyOtp(phoneNumber: _phoneNumber, code: _otpController.text.trim());
+      await ref
+          .read(authControllerProvider.notifier)
+          .verifyOtp(phoneNumber: _phoneNumber, code: _otpController.text.trim(), reqId: _reqId);
       if (_exists == false) {
         final accountType = ref.read(selectedRoleProvider);
         await ref.read(authRepositoryProvider).completePhoneSignup(accountType: accountType);
@@ -178,6 +186,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
                         ),
                         const SizedBox(height: 6),
                         Text("We'll text you a 6-digit code.", style: Theme.of(context).textTheme.bodySmall),
+                        const SizedBox(height: 10),
+                        OtpChannelToggle(
+                          value: _otpChannel,
+                          onChanged: (c) => setState(() => _otpChannel = c),
+                          enabled: !_sendingOtp,
+                        ),
                         if (_error == _accountExistsError)
                           Padding(
                             padding: const EdgeInsets.only(top: 12),
@@ -217,13 +231,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
                                   _otpController.clear();
                                   _error = null;
                                   _devOtp = null;
+                                  _reqId = null;
                                 }),
                                 child: const Text('Change'),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+                        OtpChannelToggle(
+                          value: _otpChannel,
+                          onChanged: (c) => setState(() => _otpChannel = c),
+                          enabled: !_sendingOtp,
+                        ),
+                        const SizedBox(height: 4),
                         TextField(
                           controller: _otpController,
                           keyboardType: TextInputType.number,

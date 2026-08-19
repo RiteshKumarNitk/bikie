@@ -295,14 +295,14 @@ class _$NotificationModelImpl implements _NotificationModel {
 
 abstract class _NotificationModel implements NotificationModel {
   const factory _NotificationModel({
-    required final String id,
-    required final String type,
-    required final String title,
-    required final String body,
-    final String? entity,
-    final String? entityId,
-    final String? readAt,
-    required final String createdAt,
+    required String id,
+    required String type,
+    required String title,
+    required String body,
+    String? entity,
+    String? entityId,
+    String? readAt,
+    required String createdAt,
   }) = _$NotificationModelImpl;
 
   factory _NotificationModel.fromJson(Map<String, dynamic> json) =

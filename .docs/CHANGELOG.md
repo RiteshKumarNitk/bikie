@@ -1,5 +1,53 @@
 # BIKIE Changelog
 
+## 2026-08-19 — SMS/WhatsApp OTP channel toggle; mobile release builds move to MSG91's Widget SDK (ADR-057)
+
+Requested: an SMS/WhatsApp toggle on OTP screens, plus mobile adopting `sendotp_flutter_sdk`.
+Inspected the existing ADR-034 MSG91 integration first — it already matched nearly the entire
+spec (widget SDK on web with the real credentials already live, server-side re-verification,
+one-account-per-number, mismatch screens, rate limiting, dev bypass). Two things needed
+confirming against MSG91's actual docs rather than guessing, and both were then put to the user
+before implementing, since this is a live production auth system:
+
+**MSG91 has no channel parameter on the first OTP send** — only `retryOtp`/`retryOTP` takes one
+(confirmed for both the JS widget and the Flutter SDK). So the toggle works as: fire the default
+send, then immediately retry on WhatsApp if that's what was picked — the phone may get both an
+SMS and a WhatsApp message once, and MSG91 bills for both. **MSG91's native server-to-server OTP
+API** (what mobile used exclusively before) is the older product; WhatsApp delivery is documented
+as a Widget-product feature, not confirmed for the native API. User chose: toggle applies from
+the first send (accepting the double-delivery tradeoff), and mobile release builds adopt
+`sendotp_flutter_sdk`.
+
+**Implementation**: new `OtpChannel` (SMS/WhatsApp) mirrored on both platforms.
+`apps/web/lib/use-msg91-widget.ts` gained channel-aware `sendOtp`/`retryOtp`, and its `retryOtp`
+channel code was corrected from an unverified `"text"` placeholder to the confirmed `"SMS-11"`/
+`"WHATSAPP-12"` codes. New `OtpChannelToggle` on both `/login` and `/signup`.
+
+Mobile release builds get a new `Msg91OtpRepository` wrapping `sendotp_flutter_sdk` —
+send/retry/verify client-side against MSG91 directly, mirroring the web widget's trust model
+exactly (backend never sees the send leg, only re-verifies the final access token). **Zero
+backend changes were needed for verify**: the existing shape-based discriminator in
+`otp-verify.application.ts` (native numeric code vs. opaque widget token) already handled
+whichever platform's token showed up. Mobile **debug builds** keep the old backend-proxied
+native-API flow, gated on `kDebugMode` — required, not optional: MSG91's real widget would reject
+the fixed `TEST_OTP`/`SHOW_OTP_TOAST` dev-bypass codes before our backend ever saw them, so that
+tooling can only keep working through the path our own backend controls. WhatsApp is disabled in
+the toggle UI on that path.
+
+**Flagged, not silently worked around**: `sendotp_flutter_sdk` has only two published versions
+and its docs show the call shape but not the response shape — `Msg91OtpRepository`'s response
+parsing is defensive but still needs a live-device MSG91 round-trip test before shipping. The
+corrected web retry channel codes need the same — nothing here is unit-testable, both legs talk
+to MSG91 directly from the browser/app.
+
+Verified: web `tsc --noEmit` clean, `next build` succeeds, all 201 backend tests still pass
+(nothing server-side changed), all changed web files lint clean. On mobile, `flutter analyze`
+found one pre-existing, unrelated issue (zero in anything this change touched) and `flutter test`
+passed all 112 tests. `flutter build apk --debug` hit a pre-existing Java/Gradle toolchain
+mismatch in this environment (Java 25 vs. this project's pinned Gradle 8.12) before compiling any
+source file — unrelated to this change, not fixed here. Full details in `.docs/DECISIONS.md`
+ADR-057.
+
 ## 2026-08-19 — Service Provider membership: Rs 99/month, optional at onboarding, enforced at SOS accept (ADR-056)
 
 Made the existing Partner Membership system (plans/checkout/purchase — built under ADR-051) match

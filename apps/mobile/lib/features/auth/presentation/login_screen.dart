@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../data/auth_repository.dart';
+import '../data/msg91_otp_repository.dart';
 import '../domain/auth_controller.dart';
 import '../domain/role_provider.dart';
 import 'widgets/dev_otp_banner.dart';
+import 'widgets/otp_channel_toggle.dart';
 import 'widgets/phone_number_field.dart';
 import 'widgets/resend_countdown.dart';
 
@@ -31,6 +33,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
   String _localNumber = '';
   String _phoneNumber = '';
   final _otpController = TextEditingController();
+  // ADR-057 — which channel the OTP goes out on; see `Msg91OtpRepository`'s doc comment for why
+  // WhatsApp only works in release builds. `_reqId` is the MSG91 widget session id (release
+  // builds only — null in debug mode, where the backend-proxied path needs no session tracking).
+  OtpChannel _otpChannel = OtpChannel.sms;
+  String? _reqId;
 
   final _emailFormKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -92,9 +99,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
         });
         return;
       }
-      await repo.sendOtp(normalized);
+      final sendResult = await repo.sendOtp(normalized, channel: _otpChannel);
       setState(() {
         _phoneNumber = normalized;
+        _reqId = sendResult.reqId;
         _step = 'otp';
       });
       startResendCountdown();
@@ -110,7 +118,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
     if (!canResend) return;
     setState(() => _sendingOtp = true);
     try {
-      await ref.read(authRepositoryProvider).sendOtp(_phoneNumber);
+      await ref.read(authRepositoryProvider).resendOtp(_phoneNumber, reqId: _reqId, channel: _otpChannel);
       startResendCountdown();
       _fetchDevOtp(_phoneNumber);
     } finally {
@@ -124,7 +132,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       _verifying = true;
     });
     try {
-      await ref.read(authControllerProvider.notifier).verifyOtp(phoneNumber: _phoneNumber, code: _otpController.text.trim());
+      await ref
+          .read(authControllerProvider.notifier)
+          .verifyOtp(phoneNumber: _phoneNumber, code: _otpController.text.trim(), reqId: _reqId);
       final user = ref.read(authControllerProvider).user;
       final selectedRole = ref.read(selectedRoleProvider);
 
@@ -279,6 +289,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                         PhoneNumberField(
                           onLocalNumberChanged: (v) => _localNumber = v,
                         ),
+                        const SizedBox(height: 10),
+                        OtpChannelToggle(
+                          value: _otpChannel,
+                          onChanged: (c) => setState(() => _otpChannel = c),
+                          enabled: !_sendingOtp,
+                        ),
                         const SizedBox(height: 16),
                         if (_error == _noAccountError)
                           Padding(
@@ -362,13 +378,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                                   _otpController.clear();
                                   _error = null;
                                   _devOtp = null;
+                                  _reqId = null;
                                 }),
                                 child: const Text('Change'),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+                        OtpChannelToggle(
+                          value: _otpChannel,
+                          onChanged: (c) => setState(() => _otpChannel = c),
+                          enabled: !_sendingOtp,
+                        ),
+                        const SizedBox(height: 4),
                         TextField(
                           controller: _otpController,
                           keyboardType: TextInputType.number,

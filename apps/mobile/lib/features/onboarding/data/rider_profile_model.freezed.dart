@@ -213,10 +213,10 @@ class _$EmergencyContactInputImpl implements _EmergencyContactInput {
 
 abstract class _EmergencyContactInput implements EmergencyContactInput {
   const factory _EmergencyContactInput({
-    required final String name,
-    required final String phone,
-    final String? email,
-    final String? relation,
+    required String name,
+    required String phone,
+    String? email,
+    String? relation,
   }) = _$EmergencyContactInputImpl;
 
   factory _EmergencyContactInput.fromJson(Map<String, dynamic> json) =
@@ -656,7 +656,7 @@ class _$RiderProfileInputImpl implements _RiderProfileInput {
     this.riderFrequency,
     this.ridingClubType,
     this.clubName,
-    final List<EmergencyContactInput> emergencyContacts = const [],
+    List<EmergencyContactInput> emergencyContacts = const [],
   }) : _emergencyContacts = emergencyContacts;
 
   factory _$RiderProfileInputImpl.fromJson(Map<String, dynamic> json) =>
@@ -825,29 +825,29 @@ class _$RiderProfileInputImpl implements _RiderProfileInput {
 
 abstract class _RiderProfileInput implements RiderProfileInput {
   const factory _RiderProfileInput({
-    final String? drivingLicenceNumber,
-    final String? drivingLicenceExpiry,
-    final String? addressLine,
-    final String? area,
-    final String? district,
-    final String? pincode,
-    final String? country,
-    final String? fatherName,
-    final String? motherName,
-    final String? dateOfBirth,
-    final String? gender,
-    final String? bloodGroup,
-    final String? medicalHistory,
-    final String? allergies,
-    final String? vehicleType,
-    final String? vehicleBrand,
-    final String? vehicleModel,
-    final String? governmentIdType,
-    final String? governmentIdNumber,
-    final String? riderFrequency,
-    final String? ridingClubType,
-    final String? clubName,
-    final List<EmergencyContactInput> emergencyContacts,
+    String? drivingLicenceNumber,
+    String? drivingLicenceExpiry,
+    String? addressLine,
+    String? area,
+    String? district,
+    String? pincode,
+    String? country,
+    String? fatherName,
+    String? motherName,
+    String? dateOfBirth,
+    String? gender,
+    String? bloodGroup,
+    String? medicalHistory,
+    String? allergies,
+    String? vehicleType,
+    String? vehicleBrand,
+    String? vehicleModel,
+    String? governmentIdType,
+    String? governmentIdNumber,
+    String? riderFrequency,
+    String? ridingClubType,
+    String? clubName,
+    List<EmergencyContactInput> emergencyContacts,
   }) = _$RiderProfileInputImpl;
 
   factory _RiderProfileInput.fromJson(Map<String, dynamic> json) =

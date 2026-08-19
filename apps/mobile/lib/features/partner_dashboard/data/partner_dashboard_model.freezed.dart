@@ -244,11 +244,11 @@ class _$PartnerSosStatsImpl implements _PartnerSosStats {
 
 abstract class _PartnerSosStats implements PartnerSosStats {
   const factory _PartnerSosStats({
-    required final int activeRequests,
-    required final int todayAssistanceCount,
-    required final int completedCount,
-    required final num ratingAvg,
-    required final int ratingCount,
+    required int activeRequests,
+    required int todayAssistanceCount,
+    required int completedCount,
+    required num ratingAvg,
+    required int ratingCount,
   }) = _$PartnerSosStatsImpl;
 
   factory _PartnerSosStats.fromJson(Map<String, dynamic> json) =
@@ -522,12 +522,12 @@ class _$PartnerNearbyRequestImpl implements _PartnerNearbyRequest {
 
 abstract class _PartnerNearbyRequest implements PartnerNearbyRequest {
   const factory _PartnerNearbyRequest({
-    required final String id,
-    required final String type,
-    required final String severity,
-    required final String city,
-    required final num distanceMeters,
-    required final String createdAt,
+    required String id,
+    required String type,
+    required String severity,
+    required String city,
+    required num distanceMeters,
+    required String createdAt,
   }) = _$PartnerNearbyRequestImpl;
 
   factory _PartnerNearbyRequest.fromJson(Map<String, dynamic> json) =
@@ -822,13 +822,13 @@ class _$PartnerActiveSessionImpl implements _PartnerActiveSession {
 
 abstract class _PartnerActiveSession implements PartnerActiveSession {
   const factory _PartnerActiveSession({
-    required final String id,
-    required final String alertId,
-    required final String status,
-    required final String riderName,
-    required final String alertType,
-    final num? distanceMeters,
-    final int? etaMinutes,
+    required String id,
+    required String alertId,
+    required String status,
+    required String riderName,
+    required String alertType,
+    num? distanceMeters,
+    int? etaMinutes,
   }) = _$PartnerActiveSessionImpl;
 
   factory _PartnerActiveSession.fromJson(Map<String, dynamic> json) =
@@ -1146,14 +1146,14 @@ class _$PartnerHistorySessionImpl implements _PartnerHistorySession {
 
 abstract class _PartnerHistorySession implements PartnerHistorySession {
   const factory _PartnerHistorySession({
-    required final String id,
-    required final String alertId,
-    required final String status,
-    required final String riderName,
-    required final String alertType,
-    final String? completedAt,
-    final String? cancelledAt,
-    final int? rating,
+    required String id,
+    required String alertId,
+    required String status,
+    required String riderName,
+    required String alertType,
+    String? completedAt,
+    String? cancelledAt,
+    int? rating,
   }) = _$PartnerHistorySessionImpl;
 
   factory _PartnerHistorySession.fromJson(Map<String, dynamic> json) =

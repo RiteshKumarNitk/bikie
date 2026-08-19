@@ -23,3 +23,25 @@ String get kApiBaseUrl {
   if (_apiBaseUrlDefine.isNotEmpty) return _apiBaseUrlDefine;
   return _productionFallback;
 }
+
+/// MSG91 OTP Widget credentials (ADR-057) — the same `widgetId`/`tokenAuth` pair web ships as
+/// `NEXT_PUBLIC_MSG91_WIDGET_ID`/`NEXT_PUBLIC_MSG91_WIDGET_TOKEN_AUTH`. Safe to embed in the app
+/// binary by the same reasoning as those `NEXT_PUBLIC_` vars: MSG91 scopes/restricts a widget by
+/// domain/app in its own dashboard, not by keeping this pair secret — the real trust boundary is
+/// server-side `verifyAccessToken` (see `Msg91OtpRepository`), which never trusts a client's mere
+/// claim of a verified token. The `MSG91_AUTH_KEY` used for that server-side call is a *different*,
+/// genuinely secret credential that must never appear here or anywhere else in this app.
+///
+/// Override for a non-production MSG91 widget (a staging/test widget configured in MSG91's
+/// dashboard for this app's package name) via:
+///   flutter run --dart-define=MSG91_WIDGET_ID=... --dart-define=MSG91_WIDGET_TOKEN_AUTH=...
+const String _msg91WidgetIdDefine = String.fromEnvironment('MSG91_WIDGET_ID');
+const String _msg91WidgetTokenAuthDefine = String.fromEnvironment('MSG91_WIDGET_TOKEN_AUTH');
+
+const String _productionMsg91WidgetId = '366865617643373439363036';
+const String _productionMsg91WidgetTokenAuth = '553102TZsB14dlJ806a72924fP1';
+
+String get kMsg91WidgetId => _msg91WidgetIdDefine.isNotEmpty ? _msg91WidgetIdDefine : _productionMsg91WidgetId;
+
+String get kMsg91WidgetTokenAuth =>
+    _msg91WidgetTokenAuthDefine.isNotEmpty ? _msg91WidgetTokenAuthDefine : _productionMsg91WidgetTokenAuth;

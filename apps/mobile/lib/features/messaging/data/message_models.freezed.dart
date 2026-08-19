@@ -191,9 +191,9 @@ class _$ConversationParticipantImpl implements _ConversationParticipant {
 
 abstract class _ConversationParticipant implements ConversationParticipant {
   const factory _ConversationParticipant({
-    required final String id,
-    required final String name,
-    required final String role,
+    required String id,
+    required String name,
+    required String role,
   }) = _$ConversationParticipantImpl;
 
   factory _ConversationParticipant.fromJson(Map<String, dynamic> json) =
@@ -391,9 +391,9 @@ class _$LastMessagePreviewImpl implements _LastMessagePreview {
 
 abstract class _LastMessagePreview implements LastMessagePreview {
   const factory _LastMessagePreview({
-    final String? content,
-    required final String createdAt,
-    final String? senderId,
+    String? content,
+    required String createdAt,
+    String? senderId,
   }) = _$LastMessagePreviewImpl;
 
   factory _LastMessagePreview.fromJson(Map<String, dynamic> json) =
@@ -632,7 +632,7 @@ class _$ConversationModelImpl implements _ConversationModel {
     required this.id,
     this.subject,
     this.isLocked = false,
-    required final List<ConversationParticipant> participants,
+    required List<ConversationParticipant> participants,
     this.lastMessage,
     required this.unreadCount,
     required this.createdAt,
@@ -727,14 +727,14 @@ class _$ConversationModelImpl implements _ConversationModel {
 
 abstract class _ConversationModel implements ConversationModel {
   const factory _ConversationModel({
-    required final String id,
-    final String? subject,
-    final bool isLocked,
-    required final List<ConversationParticipant> participants,
-    final LastMessagePreview? lastMessage,
-    required final int unreadCount,
-    required final String createdAt,
-    required final String updatedAt,
+    required String id,
+    String? subject,
+    bool isLocked,
+    required List<ConversationParticipant> participants,
+    LastMessagePreview? lastMessage,
+    required int unreadCount,
+    required String createdAt,
+    required String updatedAt,
   }) = _$ConversationModelImpl;
 
   factory _ConversationModel.fromJson(Map<String, dynamic> json) =
@@ -1028,13 +1028,13 @@ class _$MessageAttachmentImpl implements _MessageAttachment {
 
 abstract class _MessageAttachment implements MessageAttachment {
   const factory _MessageAttachment({
-    required final String id,
-    required final String type,
-    required final String fileName,
-    required final String mimeType,
-    required final int sizeBytes,
-    final int? width,
-    final int? height,
+    required String id,
+    required String type,
+    required String fileName,
+    required String mimeType,
+    required int sizeBytes,
+    int? width,
+    int? height,
   }) = _$MessageAttachmentImpl;
 
   factory _MessageAttachment.fromJson(Map<String, dynamic> json) =
@@ -1239,9 +1239,9 @@ class _$MessageReceiptImpl implements _MessageReceipt {
 
 abstract class _MessageReceipt implements MessageReceipt {
   const factory _MessageReceipt({
-    required final String userId,
-    final String? deliveredAt,
-    final String? readAt,
+    required String userId,
+    String? deliveredAt,
+    String? readAt,
   }) = _$MessageReceiptImpl;
 
   factory _MessageReceipt.fromJson(Map<String, dynamic> json) =
@@ -1438,9 +1438,9 @@ class _$MessageReactionImpl implements _MessageReaction {
 
 abstract class _MessageReaction implements MessageReaction {
   const factory _MessageReaction({
-    required final String emoji,
-    required final String userId,
-    required final String createdAt,
+    required String emoji,
+    required String userId,
+    required String createdAt,
   }) = _$MessageReactionImpl;
 
   factory _MessageReaction.fromJson(Map<String, dynamic> json) =
@@ -1744,9 +1744,9 @@ class _$MessageModelImpl implements _MessageModel {
     this.replyToId,
     this.editedAt,
     this.deletedAt,
-    final List<MessageAttachment> attachments = const [],
-    final List<MessageReceipt> receipts = const [],
-    final List<MessageReaction> reactions = const [],
+    List<MessageAttachment> attachments = const [],
+    List<MessageReceipt> receipts = const [],
+    List<MessageReaction> reactions = const [],
     required this.createdAt,
   }) : _attachments = attachments,
        _receipts = receipts,
@@ -1882,20 +1882,20 @@ class _$MessageModelImpl implements _MessageModel {
 
 abstract class _MessageModel implements MessageModel {
   const factory _MessageModel({
-    required final String id,
-    required final String conversationId,
-    final String? senderId,
-    final String? senderName,
-    final String? senderImage,
-    final String type,
-    final String? content,
-    final String? replyToId,
-    final String? editedAt,
-    final String? deletedAt,
-    final List<MessageAttachment> attachments,
-    final List<MessageReceipt> receipts,
-    final List<MessageReaction> reactions,
-    required final String createdAt,
+    required String id,
+    required String conversationId,
+    String? senderId,
+    String? senderName,
+    String? senderImage,
+    String type,
+    String? content,
+    String? replyToId,
+    String? editedAt,
+    String? deletedAt,
+    List<MessageAttachment> attachments,
+    List<MessageReceipt> receipts,
+    List<MessageReaction> reactions,
+    required String createdAt,
   }) = _$MessageModelImpl;
 
   factory _MessageModel.fromJson(Map<String, dynamic> json) =

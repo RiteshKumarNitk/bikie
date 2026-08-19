@@ -248,12 +248,12 @@ class _$CategoryModelImpl implements _CategoryModel {
 
 abstract class _CategoryModel implements CategoryModel {
   const factory _CategoryModel({
-    required final String id,
-    required final String slug,
-    required final String name,
-    required final String type,
-    final String? iconUrl,
-    required final String imageUrl,
+    required String id,
+    required String slug,
+    required String name,
+    required String type,
+    String? iconUrl,
+    required String imageUrl,
   }) = _$CategoryModelImpl;
 
   factory _CategoryModel.fromJson(Map<String, dynamic> json) =

@@ -188,9 +188,9 @@ class _$NearbyRiderImpl implements _NearbyRider {
 
 abstract class _NearbyRider implements NearbyRider {
   const factory _NearbyRider({
-    required final String id,
-    required final String name,
-    required final num distanceMeters,
+    required String id,
+    required String name,
+    required num distanceMeters,
   }) = _$NearbyRiderImpl;
 
   factory _NearbyRider.fromJson(Map<String, dynamic> json) =

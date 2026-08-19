@@ -252,12 +252,12 @@ class _$DestinationSummaryImpl implements _DestinationSummary {
 
 abstract class _DestinationSummary implements DestinationSummary {
   const factory _DestinationSummary({
-    required final String id,
-    required final String slug,
-    required final String name,
-    required final String state,
-    required final String imageUrl,
-    required final int bikeCount,
+    required String id,
+    required String slug,
+    required String name,
+    required String state,
+    required String imageUrl,
+    required int bikeCount,
   }) = _$DestinationSummaryImpl;
 
   factory _DestinationSummary.fromJson(Map<String, dynamic> json) =
@@ -486,7 +486,7 @@ class _$DestinationDetailImpl implements _DestinationDetail {
     required this.imageUrl,
     required this.bikeCount,
     this.description,
-    required final List<BikeSummary> bikes,
+    required List<BikeSummary> bikes,
   }) : _bikes = bikes;
 
   factory _$DestinationDetailImpl.fromJson(Map<String, dynamic> json) =>
@@ -570,14 +570,14 @@ class _$DestinationDetailImpl implements _DestinationDetail {
 
 abstract class _DestinationDetail implements DestinationDetail {
   const factory _DestinationDetail({
-    required final String id,
-    required final String slug,
-    required final String name,
-    required final String state,
-    required final String imageUrl,
-    required final int bikeCount,
-    final String? description,
-    required final List<BikeSummary> bikes,
+    required String id,
+    required String slug,
+    required String name,
+    required String state,
+    required String imageUrl,
+    required int bikeCount,
+    String? description,
+    required List<BikeSummary> bikes,
   }) = _$DestinationDetailImpl;
 
   factory _DestinationDetail.fromJson(Map<String, dynamic> json) =

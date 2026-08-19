@@ -5,8 +5,9 @@ import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
 import { SELECTED_ROLE_COOKIE, type SelectedRole } from "@/lib/role";
 import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
+import { OtpChannelToggle } from "@/components/auth/OtpChannelToggle";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
-import { useMsg91Widget } from "@/lib/use-msg91-widget";
+import { useMsg91Widget, type OtpChannel } from "@/lib/use-msg91-widget";
 import { LogoMark } from "@/components/layout/LogoMark";
 import Link from "next/link";
 
@@ -40,6 +41,9 @@ export default function SignUpPage() {
   const [otpCode, setOtpCode] = useState("");
   const [exists, setExists] = useState<boolean | null>(null);
   const [referralCode, setReferralCode] = useState("");
+  // ADR-057 — see login/page.tsx's identical field for why this is read at send/resend time
+  // rather than fixed once: MSG91's widget has no channel choice on the first send at all.
+  const [otpChannel, setOtpChannel] = useState<OtpChannel>("sms");
 
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
@@ -64,7 +68,7 @@ export default function SignUpPage() {
   async function sendOtpTo(normalized: string, knownExists: boolean) {
     setSendingOtp(true);
     try {
-      await widget.sendOtp(normalized);
+      await widget.sendOtp(normalized, otpChannel);
       setPhoneNumber(normalized);
       setExists(knownExists);
       setStep("otp");
@@ -115,7 +119,7 @@ export default function SignUpPage() {
     setServerError(null);
     setSendingOtp(true);
     try {
-      await widget.retryOtp();
+      await widget.retryOtp(otpChannel);
       resendTimer.start();
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Could not resend the verification code. Please try again.");
@@ -263,6 +267,8 @@ export default function SignUpPage() {
                 </p>
               </div>
 
+              <OtpChannelToggle value={otpChannel} onChange={setOtpChannel} disabled={sendingOtp} />
+
               {serverError && (
                 <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
                   {serverError}
@@ -311,14 +317,17 @@ export default function SignUpPage() {
                   placeholder="6-digit code"
                   className={inputClassName}
                 />
-                <button
-                  type="button"
-                  onClick={handleResend}
-                  disabled={sendingOtp || !resendTimer.canResend}
-                  className="mt-1.5 text-xs font-medium text-accent-text hover:text-accent-hover disabled:opacity-50"
-                >
-                  {resendTimer.canResend ? "Resend code" : `Resend code in ${resendTimer.remaining}s`}
-                </button>
+                <div className="mt-2 flex items-center justify-between gap-2">
+                  <OtpChannelToggle value={otpChannel} onChange={setOtpChannel} disabled={sendingOtp} />
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={sendingOtp || !resendTimer.canResend}
+                    className="shrink-0 text-xs font-medium text-accent-text hover:text-accent-hover disabled:opacity-50"
+                  >
+                    {resendTimer.canResend ? "Resend code" : `Resend in ${resendTimer.remaining}s`}
+                  </button>
+                </div>
               </div>
 
               {serverError && (

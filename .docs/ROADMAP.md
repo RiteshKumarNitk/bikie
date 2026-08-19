@@ -1,5 +1,23 @@
 # BIKIE — Roadmap
 
+## SMS/WhatsApp OTP Channel Toggle; Mobile Release Builds Move To MSG91's Widget SDK (2026-08-19, ADR-057)
+Added an SMS/WhatsApp toggle to OTP screens on both platforms, and moved mobile release builds
+onto MSG91's Widget SDK (`sendotp_flutter_sdk`) for OTP send/verify, mirroring how web already
+worked. Before writing code, the existing MSG91 integration was inspected end-to-end and found to
+already match nearly the entire request. Two real MSG91 API constraints were confirmed against
+public docs rather than assumed — channel selection only exists on MSG91's *resend* call, never
+the first send; and WhatsApp delivery is a Widget-product feature, not confirmed on the older
+native API mobile used before — and both were put to the user for a decision before implementing,
+since this touches live production authentication. Mobile debug builds deliberately keep the old
+backend-proxied flow so the dev-bypass and fixed-test-number tooling keep working (MSG91's real
+widget would reject those on contact). No backend changes were needed for the new mobile flow's
+verification step — the server already discriminated a widget token from a native code by shape.
+Flagged for follow-up: the new response-parsing code and the corrected retry-channel codes still
+need a live MSG91 round-trip test (`flutter analyze` and `flutter test` confirm the Dart is
+correct — 1 pre-existing unrelated issue, 112/112 tests passed — not that MSG91's real response
+shape matches what's assumed). A `flutter build apk --debug` attempt also surfaced a pre-existing,
+unrelated Java/Gradle toolchain mismatch in this environment. See ADR-057.
+
 ## Service Provider Membership Made Real: Rs 99/month, Optional At Signup, Enforced At SOS Accept (2026-08-19, ADR-056)
 The Partner Membership system (plans/checkout/purchase) already existed from ADR-051 but didn't
 match the actual product rule: creating a Service Provider profile should never require payment,

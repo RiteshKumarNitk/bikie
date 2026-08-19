@@ -165,10 +165,8 @@ class _$BikeCategoryRefImpl implements _BikeCategoryRef {
 }
 
 abstract class _BikeCategoryRef implements BikeCategoryRef {
-  const factory _BikeCategoryRef({
-    required final String name,
-    required final String slug,
-  }) = _$BikeCategoryRefImpl;
+  const factory _BikeCategoryRef({required String name, required String slug}) =
+      _$BikeCategoryRefImpl;
 
   factory _BikeCategoryRef.fromJson(Map<String, dynamic> json) =
       _$BikeCategoryRefImpl.fromJson;
@@ -337,8 +335,8 @@ class _$BikeDestinationRefImpl implements _BikeDestinationRef {
 
 abstract class _BikeDestinationRef implements BikeDestinationRef {
   const factory _BikeDestinationRef({
-    required final String name,
-    required final String slug,
+    required String name,
+    required String slug,
   }) = _$BikeDestinationRefImpl;
 
   factory _BikeDestinationRef.fromJson(Map<String, dynamic> json) =
@@ -707,17 +705,17 @@ class _$BikeSummaryImpl implements _BikeSummary {
 
 abstract class _BikeSummary implements BikeSummary {
   const factory _BikeSummary({
-    required final String id,
-    required final String slug,
-    required final String name,
-    required final String brand,
-    required final BikeCategoryRef category,
-    required final num pricePerDay,
-    required final String city,
-    required final String imageUrl,
-    required final num ratingAvg,
-    required final int ratingCount,
-    required final bool instantBooking,
+    required String id,
+    required String slug,
+    required String name,
+    required String brand,
+    required BikeCategoryRef category,
+    required num pricePerDay,
+    required String city,
+    required String imageUrl,
+    required num ratingAvg,
+    required int ratingCount,
+    required bool instantBooking,
   }) = _$BikeSummaryImpl;
 
   factory _BikeSummary.fromJson(Map<String, dynamic> json) =
@@ -1187,7 +1185,7 @@ class _$BikeDetailImpl implements _BikeDetail {
     required this.ratingAvg,
     required this.ratingCount,
     required this.instantBooking,
-    required final List<String> gallery,
+    required List<String> gallery,
     this.description,
     required this.securityDeposit,
     this.engineCc,
@@ -1353,29 +1351,29 @@ class _$BikeDetailImpl implements _BikeDetail {
 
 abstract class _BikeDetail implements BikeDetail {
   const factory _BikeDetail({
-    required final String id,
-    required final String slug,
-    required final String name,
-    required final String brand,
-    required final BikeCategoryRef category,
-    required final num pricePerDay,
-    required final String city,
-    required final String imageUrl,
-    required final num ratingAvg,
-    required final int ratingCount,
-    required final bool instantBooking,
-    required final List<String> gallery,
-    final String? description,
-    required final num securityDeposit,
-    final int? engineCc,
-    final num? mileageKmpl,
-    final num? fuelTankLitres,
-    required final bool hasAbs,
-    final int? seatHeightMm,
-    final int? luggageCapacityL,
-    required final bool helmetIncluded,
-    required final bool deliveryAvailable,
-    final BikeDestinationRef? destination,
+    required String id,
+    required String slug,
+    required String name,
+    required String brand,
+    required BikeCategoryRef category,
+    required num pricePerDay,
+    required String city,
+    required String imageUrl,
+    required num ratingAvg,
+    required int ratingCount,
+    required bool instantBooking,
+    required List<String> gallery,
+    String? description,
+    required num securityDeposit,
+    int? engineCc,
+    num? mileageKmpl,
+    num? fuelTankLitres,
+    required bool hasAbs,
+    int? seatHeightMm,
+    int? luggageCapacityL,
+    required bool helmetIncluded,
+    required bool deliveryAvailable,
+    BikeDestinationRef? destination,
   }) = _$BikeDetailImpl;
 
   factory _BikeDetail.fromJson(Map<String, dynamic> json) =
@@ -1569,7 +1567,7 @@ class __$$BikeSearchResultImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$BikeSearchResultImpl implements _BikeSearchResult {
   const _$BikeSearchResultImpl({
-    required final List<BikeSummary> bikes,
+    required List<BikeSummary> bikes,
     required this.total,
     required this.page,
     required this.pageSize,
@@ -1639,10 +1637,10 @@ class _$BikeSearchResultImpl implements _BikeSearchResult {
 
 abstract class _BikeSearchResult implements BikeSearchResult {
   const factory _BikeSearchResult({
-    required final List<BikeSummary> bikes,
-    required final int total,
-    required final int page,
-    required final int pageSize,
+    required List<BikeSummary> bikes,
+    required int total,
+    required int page,
+    required int pageSize,
   }) = _$BikeSearchResultImpl;
 
   factory _BikeSearchResult.fromJson(Map<String, dynamic> json) =

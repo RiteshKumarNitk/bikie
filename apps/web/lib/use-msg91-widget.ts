@@ -13,6 +13,21 @@ import { useCallback, useEffect } from "react";
 
 type WidgetResult = { message: string; type: "success" | "error" };
 
+/** ADR-057 — the two delivery channels exposed to the user (Voice/Email exist on MSG91's side
+ * too, but aren't offered in this app's UI). */
+export type OtpChannel = "sms" | "whatsapp";
+
+/** MSG91 JS widget's `retryOtp` channel codes — confirmed against MSG91's public docs during
+ * ADR-057 (docs.msg91.com/otp-widget's resend reference: 'SMS-11' / 'VOICE-4' / 'EMAIL-3' /
+ * 'WHATSAPP-12'). The previous value here was the untested string `"text"`, carried over from
+ * this file's original implementation before the exact codes could be confirmed — replaced now
+ * that they have been, but still worth a real end-to-end test against a live widget before
+ * relying on it (this file talks to MSG91 directly from the browser; nothing here is unit-testable). */
+const RETRY_CHANNEL_CODE: Record<OtpChannel, string> = {
+  sms: "SMS-11",
+  whatsapp: "WHATSAPP-12",
+};
+
 declare global {
   interface Window {
     initSendOTP?: (config: Record<string, unknown>) => void;
@@ -97,17 +112,33 @@ export function useMsg91Widget() {
     loadWidget().catch((err) => console.error("[MSG91 widget]", err));
   }, []);
 
-  const sendOtp = useCallback(async (phoneNumber: string) => {
+  /**
+   * ADR-057 — `channel` defaults to `"sms"`. MSG91's widget has no channel parameter on the
+   * *initial* send at all (`initSendOTP`'s `sendOtp(identifier, success, failure)` — confirmed
+   * against MSG91's public docs, no third argument exists for this call); the account's
+   * configured default channel is whatever fires. So `channel: "whatsapp"` here means: let the
+   * default send go out, then immediately fire a `retryOtp("WHATSAPP-12", ...)` right behind it
+   * so the OTP the user actually reads arrives on WhatsApp. This is a real, documented MSG91
+   * limitation, not a workaround invented here — flagged in ADR-057. Concretely: if the account's
+   * default channel is SMS, picking WhatsApp on the first send means the phone receives BOTH an
+   * SMS and a WhatsApp message with the same code (and MSG91 bills for both) — there is no way to
+   * suppress the first one from this widget API. The `success`/`failure` callbacks/return value
+   * always reflect the *last* channel attempted (the one the user actually asked for).
+   */
+  const sendOtp = useCallback(async (phoneNumber: string, channel: OtpChannel = "sms") => {
     await loadWidget();
     if (typeof window.sendOtp !== "function") throw new Error("MSG91 widget not ready");
-    return callWidgetMethod((success, failure) => window.sendOtp!(phoneNumber, success, failure));
+    const sendResult = await callWidgetMethod((success, failure) => window.sendOtp!(phoneNumber, success, failure));
+    if (channel === "sms") return sendResult;
+
+    if (typeof window.retryOtp !== "function") throw new Error("MSG91 widget not ready");
+    return callWidgetMethod((success, failure) => window.retryOtp!(RETRY_CHANNEL_CODE[channel], success, failure));
   }, []);
 
-  const retryOtp = useCallback(async () => {
+  const retryOtp = useCallback(async (channel: OtpChannel = "sms") => {
     await loadWidget();
     if (typeof window.retryOtp !== "function") throw new Error("MSG91 widget not ready");
-    // Explicit 'text' channel — MSG91's own default for this call is a voice call, not SMS.
-    return callWidgetMethod((success, failure) => window.retryOtp!("text", success, failure));
+    return callWidgetMethod((success, failure) => window.retryOtp!(RETRY_CHANNEL_CODE[channel], success, failure));
   }, []);
 
   const verifyOtp = useCallback(async (code: string) => {

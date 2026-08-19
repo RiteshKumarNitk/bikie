@@ -5,8 +5,9 @@ import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
 import { SELECTED_ROLE_COOKIE, type SelectedRole } from "@/lib/role";
 import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNumberInput";
+import { OtpChannelToggle } from "@/components/auth/OtpChannelToggle";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
-import { useMsg91Widget } from "@/lib/use-msg91-widget";
+import { useMsg91Widget, type OtpChannel } from "@/lib/use-msg91-widget";
 import { LogoMark } from "@/components/layout/LogoMark";
 import Link from "next/link";
 
@@ -43,6 +44,10 @@ export default function LoginPage() {
   const [localNumber, setLocalNumber] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [otpCode, setOtpCode] = useState("");
+  // ADR-057 — which channel the OTP goes out on. Read at send/resend time, not stored per
+  // request: MSG91's widget has no channel choice on the very first send (see use-msg91-widget.ts),
+  // so this also decides what `sendOtp`'s follow-up retry does when set to "whatsapp".
+  const [otpChannel, setOtpChannel] = useState<OtpChannel>("sms");
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -60,7 +65,7 @@ export default function LoginPage() {
   async function sendOtpTo(normalized: string) {
     setSendingOtp(true);
     try {
-      await widget.sendOtp(normalized);
+      await widget.sendOtp(normalized, otpChannel);
       setPhoneNumber(normalized);
       setStep("otp");
       resendTimer.start();
@@ -117,7 +122,7 @@ export default function LoginPage() {
     setServerError(null);
     setSendingOtp(true);
     try {
-      await widget.retryOtp();
+      await widget.retryOtp(otpChannel);
       resendTimer.start();
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Could not resend the verification code. Please try again.");
@@ -353,6 +358,8 @@ export default function LoginPage() {
                 </div>
               </div>
 
+              <OtpChannelToggle value={otpChannel} onChange={setOtpChannel} disabled={sendingOtp} />
+
               {serverError === NO_ACCOUNT ? (
                 <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
                   No account found for this number.{" "}
@@ -411,6 +418,9 @@ export default function LoginPage() {
                   >
                     {resendTimer.canResend ? "Resend" : `Resend in ${resendTimer.remaining}s`}
                   </button>
+                </div>
+                <div className="mt-2">
+                  <OtpChannelToggle value={otpChannel} onChange={setOtpChannel} disabled={sendingOtp} />
                 </div>
                 <input
                   id="otpCode"

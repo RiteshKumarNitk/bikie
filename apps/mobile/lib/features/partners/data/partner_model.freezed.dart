@@ -352,17 +352,17 @@ class _$NearbyPartnerImpl implements _NearbyPartner {
 
 abstract class _NearbyPartner implements NearbyPartner {
   const factory _NearbyPartner({
-    required final String id,
-    required final String businessName,
-    required final String type,
-    required final String city,
-    required final double latitude,
-    required final double longitude,
-    required final String verificationStatus,
-    required final bool isAvailable,
-    required final double ratingAvg,
-    required final int ratingCount,
-    required final double distanceMeters,
+    required String id,
+    required String businessName,
+    required String type,
+    required String city,
+    required double latitude,
+    required double longitude,
+    required String verificationStatus,
+    required bool isAvailable,
+    required double ratingAvg,
+    required int ratingCount,
+    required double distanceMeters,
   }) = _$NearbyPartnerImpl;
 
   factory _NearbyPartner.fromJson(Map<String, dynamic> json) =

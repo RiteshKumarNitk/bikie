@@ -1,15 +1,24 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_guard.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/providers.dart';
 import '../../../core/storage/secure_storage.dart';
+import 'msg91_otp_repository.dart';
 import 'user_model.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
   return AuthRepository(ref.watch(dioProvider), ref.watch(secureStorageProvider));
 });
+
+/// Result of [AuthRepository.sendOtp] — `reqId` is set only on the MSG91-Widget (release) path;
+/// null on the debug-only backend-proxied path, where [AuthRepository.verifyOtp] doesn't need one.
+class OtpSendResult {
+  const OtpSendResult({this.reqId});
+  final String? reqId;
+}
 
 /// `{ exists, hasRealName, accountType }` from `GET /api/auth-helpers/phone-exists`.
 /// ADR-053 — `accountType` ('RIDER' | 'SERVICE_PROVIDER') is null when `exists` is false; lets
@@ -21,6 +30,7 @@ class AuthRepository {
 
   final Dio _dio;
   final SecureStorage _storage;
+  final Msg91OtpRepository _msg91 = Msg91OtpRepository();
 
   Future<UserModel> signIn({required String email, required String password}) {
     return apiGuard(() async {
@@ -42,28 +52,61 @@ class AuthRepository {
     });
   }
 
-  /// MSG91's native OTP API, called via our backend (ADR-034) — mobile has no
-  /// equivalent to MSG91's browser-only Widget SDK, which web uses instead.
-  /// Better Auth never generates a code; this is deliberately not a Better
-  /// Auth endpoint.
-  Future<void> sendOtp(String phoneNumber) {
+  /// ADR-057 — release builds use MSG91's OTP Widget SDK directly (`Msg91OtpRepository`),
+  /// mirroring web exactly: the app talks to MSG91 itself, our backend never sees the send leg,
+  /// only the final access token at verify time. Debug builds keep the older backend-proxied
+  /// native-API path (ADR-034) unchanged, specifically to preserve the dev-bypass and
+  /// `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE` fixed-code mechanisms — MSG91's real widget
+  /// would reject a fake test code before our backend ever saw it, so those two flows can't share
+  /// one code path (see `Msg91OtpRepository`'s doc comment for the full reasoning).
+  Future<OtpSendResult> sendOtp(String phoneNumber, {OtpChannel channel = OtpChannel.sms}) {
+    if (kDebugMode) {
+      return apiGuard(() async {
+        await _dio.post('/api/otp/mobile/send', data: {'phoneNumber': phoneNumber});
+        return const OtpSendResult();
+      });
+    }
     return apiGuard(() async {
-      await _dio.post('/api/otp/mobile/send', data: {'phoneNumber': phoneNumber});
+      final result = await _msg91.sendOtp(phoneNumber, channel: channel);
+      return OtpSendResult(reqId: result.reqId);
     });
   }
 
-  /// Mirrors `authClient.phoneNumber.verify` — unchanged by ADR-034, still
-  /// the one shared verify path for both platforms (Better Auth's
-  /// `verifyOTP` hook asks MSG91 instead of comparing its own code, but the
-  /// endpoint and response shape are identical). The session token comes
-  /// back in the JSON body's `token` field (Better Auth's own documented
-  /// response shape for this endpoint), not the `set-auth-token` header —
-  /// read from there instead.
-  Future<UserModel> verifyOtp({required String phoneNumber, required String code}) {
+  /// Resends the OTP on the given [channel]. In debug mode this is just a fresh
+  /// `sendOtp` call (MSG91's native API treats a repeat send as a resend for the same number);
+  /// in release mode it's a real MSG91 `retryOTP` against the session `reqId` from the original
+  /// send — [reqId] must be non-null on that path (the caller's responsibility to track it,
+  /// same as web's `use-msg91-widget.ts` tracks widget session state internally).
+  Future<void> resendOtp(String phoneNumber, {String? reqId, OtpChannel channel = OtpChannel.sms}) {
+    if (kDebugMode) {
+      return apiGuard(() async {
+        await _dio.post('/api/otp/mobile/send', data: {'phoneNumber': phoneNumber});
+      });
+    }
+    if (reqId == null) {
+      throw ArgumentError('reqId is required to resend an OTP outside debug mode.');
+    }
+    return apiGuard(() => _msg91.retryOtp(reqId, channel: channel));
+  }
+
+  /// Mirrors `authClient.phoneNumber.verify` — unchanged by ADR-034/057, still the one shared
+  /// verify path for both platforms and both send flows (Better Auth's `verifyOTP` hook asks
+  /// MSG91 instead of comparing its own code, and discriminates a plain numeric native-API code
+  /// from an MSG91-widget access token purely by shape — see
+  /// `packages/services/.../otp-verify.application.ts`'s `NATIVE_OTP_SHAPE`). The session token
+  /// comes back in the JSON body's `token` field (Better Auth's own documented response shape for
+  /// this endpoint), not the `set-auth-token` header — read from there instead.
+  ///
+  /// [reqId] non-null means the release/widget send path was used: [code] is first verified
+  /// against MSG91 directly (`Msg91OtpRepository.verifyOtp`), and its resulting access token —
+  /// not the user-typed digits — is what actually gets sent to our backend below. `reqId: null`
+  /// (debug mode) sends the user-typed code straight through unchanged, exactly as before ADR-057.
+  Future<UserModel> verifyOtp({required String phoneNumber, required String code, String? reqId}) {
     return apiGuard(() async {
+      final verifiedCode = reqId != null ? await _msg91.verifyOtp(reqId, code) : code;
       final res = await _dio.post(
         '/api/auth/phone-number/verify',
-        data: {'phoneNumber': phoneNumber, 'code': code},
+        data: {'phoneNumber': phoneNumber, 'code': verifiedCode},
       );
       final token = res.data['token'] as String?;
       if (token != null) await _storage.writeToken(token);

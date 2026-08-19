@@ -345,16 +345,16 @@ class _$AccountTypeChangeRequestImpl implements _AccountTypeChangeRequest {
 
 abstract class _AccountTypeChangeRequest implements AccountTypeChangeRequest {
   const factory _AccountTypeChangeRequest({
-    required final String id,
-    required final String currentType,
-    required final String requestedType,
-    required final String reason,
-    final String? supportingInfo,
-    required final String status,
-    final String? adminRemarks,
-    final String? reviewedByName,
-    final String? reviewedAt,
-    required final String createdAt,
+    required String id,
+    required String currentType,
+    required String requestedType,
+    required String reason,
+    String? supportingInfo,
+    required String status,
+    String? adminRemarks,
+    String? reviewedByName,
+    String? reviewedAt,
+    required String createdAt,
   }) = _$AccountTypeChangeRequestImpl;
 
   factory _AccountTypeChangeRequest.fromJson(Map<String, dynamic> json) =

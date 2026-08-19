@@ -303,14 +303,14 @@ class _$UserModelImpl implements _UserModel {
 
 abstract class _UserModel implements UserModel {
   const factory _UserModel({
-    required final String id,
-    required final String name,
-    required final String email,
-    required final String role,
-    final String? phone,
-    final String? image,
-    final String? partnerStatus,
-    final String accountType,
+    required String id,
+    required String name,
+    required String email,
+    required String role,
+    String? phone,
+    String? image,
+    String? partnerStatus,
+    String accountType,
   }) = _$UserModelImpl;
 
   factory _UserModel.fromJson(Map<String, dynamic> json) =

@@ -614,30 +614,30 @@ class _$SOSAlertImpl implements _SOSAlert {
 
 abstract class _SOSAlert implements SOSAlert {
   const factory _SOSAlert({
-    required final String id,
-    required final String userId,
-    required final String userName,
-    final String? userPhone,
-    final String? userEmail,
-    required final String type,
-    final String? description,
-    final num? latitude,
-    final num? longitude,
-    required final String city,
-    required final String status,
-    required final String severity,
-    required final String escalationTier,
-    required final int currentRadiusMeters,
-    final String? assignedHelperId,
-    final String? resolvedAt,
-    required final String createdAt,
-    final String? placeName,
-    final String? area,
-    final String? formattedAddress,
-    final String? riderVehicleType,
-    final String? riderVehicleBrand,
-    final String? riderVehicleModel,
-    final num? distanceMeters,
+    required String id,
+    required String userId,
+    required String userName,
+    String? userPhone,
+    String? userEmail,
+    required String type,
+    String? description,
+    num? latitude,
+    num? longitude,
+    required String city,
+    required String status,
+    required String severity,
+    required String escalationTier,
+    required int currentRadiusMeters,
+    String? assignedHelperId,
+    String? resolvedAt,
+    required String createdAt,
+    String? placeName,
+    String? area,
+    String? formattedAddress,
+    String? riderVehicleType,
+    String? riderVehicleBrand,
+    String? riderVehicleModel,
+    num? distanceMeters,
   }) = _$SOSAlertImpl;
 
   factory _SOSAlert.fromJson(Map<String, dynamic> json) =
@@ -950,7 +950,7 @@ class _$SOSHistoryEntryImpl implements _SOSHistoryEntry {
     this.assignedHelperId,
     this.resolvedAt,
     required this.createdAt,
-    final List<SOSHistoryResponse> responses = const [],
+    List<SOSHistoryResponse> responses = const [],
   }) : _responses = responses;
 
   factory _$SOSHistoryEntryImpl.fromJson(Map<String, dynamic> json) =>
@@ -1053,17 +1053,17 @@ class _$SOSHistoryEntryImpl implements _SOSHistoryEntry {
 
 abstract class _SOSHistoryEntry implements SOSHistoryEntry {
   const factory _SOSHistoryEntry({
-    required final String id,
-    required final String type,
-    final String? description,
-    required final String city,
-    required final String status,
-    required final String severity,
-    required final String escalationTier,
-    final String? assignedHelperId,
-    final String? resolvedAt,
-    required final String createdAt,
-    final List<SOSHistoryResponse> responses,
+    required String id,
+    required String type,
+    String? description,
+    required String city,
+    required String status,
+    required String severity,
+    required String escalationTier,
+    String? assignedHelperId,
+    String? resolvedAt,
+    required String createdAt,
+    List<SOSHistoryResponse> responses,
   }) = _$SOSHistoryEntryImpl;
 
   factory _SOSHistoryEntry.fromJson(Map<String, dynamic> json) =
@@ -1303,10 +1303,10 @@ class _$SOSHistoryResponseImpl implements _SOSHistoryResponse {
 
 abstract class _SOSHistoryResponse implements SOSHistoryResponse {
   const factory _SOSHistoryResponse({
-    required final String id,
-    required final String responderName,
-    final String? message,
-    required final String createdAt,
+    required String id,
+    required String responderName,
+    String? message,
+    required String createdAt,
   }) = _$SOSHistoryResponseImpl;
 
   factory _SOSHistoryResponse.fromJson(Map<String, dynamic> json) =
@@ -1644,16 +1644,16 @@ class _$SOSOfferImpl implements _SOSOffer {
 
 abstract class _SOSOffer implements SOSOffer {
   const factory _SOSOffer({
-    required final String id,
-    required final String alertId,
-    required final String responderId,
-    required final String responderName,
-    final String? responderPhone,
-    required final String status,
-    final num? distanceMeters,
-    final int? etaMinutes,
-    final String? message,
-    required final String createdAt,
+    required String id,
+    required String alertId,
+    required String responderId,
+    required String responderName,
+    String? responderPhone,
+    required String status,
+    num? distanceMeters,
+    int? etaMinutes,
+    String? message,
+    required String createdAt,
   }) = _$SOSOfferImpl;
 
   factory _SOSOffer.fromJson(Map<String, dynamic> json) =
@@ -1878,10 +1878,10 @@ class _$SOSParticipantImpl implements _SOSParticipant {
 
 abstract class _SOSParticipant implements SOSParticipant {
   const factory _SOSParticipant({
-    required final String id,
-    required final String name,
-    final String? phone,
-    required final String email,
+    required String id,
+    required String name,
+    String? phone,
+    required String email,
   }) = _$SOSParticipantImpl;
 
   factory _SOSParticipant.fromJson(Map<String, dynamic> json) =
@@ -2175,12 +2175,12 @@ class _$SOSSessionDetailImpl implements _SOSSessionDetail {
 
 abstract class _SOSSessionDetail implements SOSSessionDetail {
   const factory _SOSSessionDetail({
-    required final String id,
-    required final String status,
-    final String? conversationId,
-    final int? rating,
-    required final SOSParticipant helper,
-    required final SOSParticipant rider,
+    required String id,
+    required String status,
+    String? conversationId,
+    int? rating,
+    required SOSParticipant helper,
+    required SOSParticipant rider,
   }) = _$SOSSessionDetailImpl;
 
   factory _SOSSessionDetail.fromJson(Map<String, dynamic> json) =
@@ -2399,10 +2399,10 @@ class _$SOSTimelineEventImpl implements _SOSTimelineEvent {
 
 abstract class _SOSTimelineEvent implements SOSTimelineEvent {
   const factory _SOSTimelineEvent({
-    required final String id,
-    required final String type,
-    final String? actorName,
-    required final String createdAt,
+    required String id,
+    required String type,
+    String? actorName,
+    required String createdAt,
   }) = _$SOSTimelineEventImpl;
 
   factory _SOSTimelineEvent.fromJson(Map<String, dynamic> json) =
@@ -2588,7 +2588,7 @@ class __$$SOSAlertDetailImplCopyWithImpl<$Res>
 class _$SOSAlertDetailImpl implements _SOSAlertDetail {
   const _$SOSAlertDetailImpl({
     required this.alert,
-    final List<SOSTimelineEvent> timeline = const [],
+    List<SOSTimelineEvent> timeline = const [],
     this.session,
   }) : _timeline = timeline;
 
@@ -2652,9 +2652,9 @@ class _$SOSAlertDetailImpl implements _SOSAlertDetail {
 
 abstract class _SOSAlertDetail implements SOSAlertDetail {
   const factory _SOSAlertDetail({
-    required final SOSAlert alert,
-    final List<SOSTimelineEvent> timeline,
-    final SOSSessionDetail? session,
+    required SOSAlert alert,
+    List<SOSTimelineEvent> timeline,
+    SOSSessionDetail? session,
   }) = _$SOSAlertDetailImpl;
 
   factory _SOSAlertDetail.fromJson(Map<String, dynamic> json) =
@@ -2853,11 +2853,8 @@ class _$SOSDispatchChannelsImpl implements _SOSDispatchChannels {
 }
 
 abstract class _SOSDispatchChannels implements SOSDispatchChannels {
-  const factory _SOSDispatchChannels({
-    final bool sms,
-    final bool whatsapp,
-    final bool email,
-  }) = _$SOSDispatchChannelsImpl;
+  const factory _SOSDispatchChannels({bool sms, bool whatsapp, bool email}) =
+      _$SOSDispatchChannelsImpl;
 
   factory _SOSDispatchChannels.fromJson(Map<String, dynamic> json) =
       _$SOSDispatchChannelsImpl.fromJson;
@@ -3268,18 +3265,18 @@ class _$SOSDispatchSummaryImpl implements _SOSDispatchSummary {
 
 abstract class _SOSDispatchSummary implements SOSDispatchSummary {
   const factory _SOSDispatchSummary({
-    final int nearbyRiders,
-    final int serviceProviders,
-    final int emergencyContacts,
-    final int emergencyServices,
-    final int smsAttempted,
-    final int smsSent,
-    final int whatsappAttempted,
-    final int whatsappSent,
-    final int emailAttempted,
-    final int emailSent,
-    final int escalatedToAdmins,
-    final SOSDispatchChannels? channels,
+    int nearbyRiders,
+    int serviceProviders,
+    int emergencyContacts,
+    int emergencyServices,
+    int smsAttempted,
+    int smsSent,
+    int whatsappAttempted,
+    int whatsappSent,
+    int emailAttempted,
+    int emailSent,
+    int escalatedToAdmins,
+    SOSDispatchChannels? channels,
   }) = _$SOSDispatchSummaryImpl;
 
   factory _SOSDispatchSummary.fromJson(Map<String, dynamic> json) =
@@ -3535,9 +3532,9 @@ class _$SOSCreateResultImpl implements _SOSCreateResult {
 
 abstract class _SOSCreateResult implements SOSCreateResult {
   const factory _SOSCreateResult({
-    required final SOSAlert alert,
-    final SOSDispatchSummary? dispatch,
-    final String? profileWarning,
+    required SOSAlert alert,
+    SOSDispatchSummary? dispatch,
+    String? profileWarning,
   }) = _$SOSCreateResultImpl;
 
   factory _SOSCreateResult.fromJson(Map<String, dynamic> json) =

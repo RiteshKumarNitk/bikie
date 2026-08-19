@@ -166,8 +166,8 @@ class _$TripDestinationRefImpl implements _TripDestinationRef {
 
 abstract class _TripDestinationRef implements TripDestinationRef {
   const factory _TripDestinationRef({
-    required final String name,
-    required final String slug,
+    required String name,
+    required String slug,
   }) = _$TripDestinationRefImpl;
 
   factory _TripDestinationRef.fromJson(Map<String, dynamic> json) =
@@ -346,9 +346,9 @@ class _$TripOrganizerImpl implements _TripOrganizer {
 
 abstract class _TripOrganizer implements TripOrganizer {
   const factory _TripOrganizer({
-    required final String id,
-    required final String name,
-    final String? image,
+    required String id,
+    required String name,
+    String? image,
   }) = _$TripOrganizerImpl;
 
   factory _TripOrganizer.fromJson(Map<String, dynamic> json) =
@@ -529,9 +529,9 @@ class _$TripMemberImpl implements _TripMember {
 
 abstract class _TripMember implements TripMember {
   const factory _TripMember({
-    required final String id,
-    required final String name,
-    final String? image,
+    required String id,
+    required String name,
+    String? image,
   }) = _$TripMemberImpl;
 
   factory _TripMember.fromJson(Map<String, dynamic> json) =
@@ -1018,23 +1018,23 @@ class _$TripSummaryImpl implements _TripSummary {
 
 abstract class _TripSummary implements TripSummary {
   const factory _TripSummary({
-    required final String id,
-    required final String slug,
-    required final String title,
-    required final String imageUrl,
-    required final String type,
-    required final String difficulty,
-    required final num price,
-    required final int seatsTotal,
-    required final int seatsLeft,
-    required final String startDate,
-    required final String endDate,
-    required final String status,
-    final TripDestinationRef? destination,
-    final String? destinationName,
-    final int? unreadMessages,
-    final int? pendingRequests,
-    final int? membersCount,
+    required String id,
+    required String slug,
+    required String title,
+    required String imageUrl,
+    required String type,
+    required String difficulty,
+    required num price,
+    required int seatsTotal,
+    required int seatsLeft,
+    required String startDate,
+    required String endDate,
+    required String status,
+    TripDestinationRef? destination,
+    String? destinationName,
+    int? unreadMessages,
+    int? pendingRequests,
+    int? membersCount,
   }) = _$TripSummaryImpl;
 
   factory _TripSummary.fromJson(Map<String, dynamic> json) =
@@ -1494,12 +1494,12 @@ class _$TripDetailImpl implements _TripDetail {
     this.destination,
     this.destinationName,
     required this.description,
-    required final List<String> gallery,
+    required List<String> gallery,
     this.meetingPoint,
     this.meetingLat,
     this.meetingLng,
     required this.organizer,
-    final List<TripMember>? members,
+    List<TripMember>? members,
   }) : _gallery = gallery,
        _members = members;
 
@@ -1650,27 +1650,27 @@ class _$TripDetailImpl implements _TripDetail {
 
 abstract class _TripDetail implements TripDetail {
   const factory _TripDetail({
-    required final String id,
-    required final String slug,
-    required final String title,
-    required final String imageUrl,
-    required final String type,
-    required final String difficulty,
-    required final num price,
-    required final int seatsTotal,
-    required final int seatsLeft,
-    required final String startDate,
-    required final String endDate,
-    required final String status,
-    final TripDestinationRef? destination,
-    final String? destinationName,
-    required final String description,
-    required final List<String> gallery,
-    final String? meetingPoint,
-    final double? meetingLat,
-    final double? meetingLng,
-    required final TripOrganizer organizer,
-    final List<TripMember>? members,
+    required String id,
+    required String slug,
+    required String title,
+    required String imageUrl,
+    required String type,
+    required String difficulty,
+    required num price,
+    required int seatsTotal,
+    required int seatsLeft,
+    required String startDate,
+    required String endDate,
+    required String status,
+    TripDestinationRef? destination,
+    String? destinationName,
+    required String description,
+    required List<String> gallery,
+    String? meetingPoint,
+    double? meetingLat,
+    double? meetingLng,
+    required TripOrganizer organizer,
+    List<TripMember>? members,
   }) = _$TripDetailImpl;
 
   factory _TripDetail.fromJson(Map<String, dynamic> json) =
@@ -1963,12 +1963,12 @@ class _$RideRequestRiderImpl implements _RideRequestRider {
 
 abstract class _RideRequestRider implements RideRequestRider {
   const factory _RideRequestRider({
-    required final String id,
-    required final String name,
-    final String? image,
-    final int? completedRides,
-    final num? rating,
-    final String? bike,
+    required String id,
+    required String name,
+    String? image,
+    int? completedRides,
+    num? rating,
+    String? bike,
   }) = _$RideRequestRiderImpl;
 
   factory _RideRequestRider.fromJson(Map<String, dynamic> json) =
@@ -2273,13 +2273,13 @@ class _$RideJoinRequestImpl implements _RideJoinRequest {
 
 abstract class _RideJoinRequest implements RideJoinRequest {
   const factory _RideJoinRequest({
-    required final String id,
-    required final String tripId,
-    required final String tripSlug,
-    required final String tripTitle,
-    final String? message,
-    required final String createdAt,
-    required final RideRequestRider rider,
+    required String id,
+    required String tripId,
+    required String tripSlug,
+    required String tripTitle,
+    String? message,
+    required String createdAt,
+    required RideRequestRider rider,
   }) = _$RideJoinRequestImpl;
 
   factory _RideJoinRequest.fromJson(Map<String, dynamic> json) =
@@ -2459,8 +2459,8 @@ class _$MyRideRequestStatusImpl implements _MyRideRequestStatus {
 
 abstract class _MyRideRequestStatus implements MyRideRequestStatus {
   const factory _MyRideRequestStatus({
-    required final String status,
-    final String? message,
+    required String status,
+    String? message,
   }) = _$MyRideRequestStatusImpl;
 
   factory _MyRideRequestStatus.fromJson(Map<String, dynamic> json) =
@@ -2703,11 +2703,11 @@ class _$RideStatsImpl implements _RideStats {
 
 abstract class _RideStats implements RideStats {
   const factory _RideStats({
-    required final int ridesOrganized,
-    required final int requestsSent,
-    required final int requestsApproved,
-    required final int ridesCancelled,
-    final int? approvalRate,
+    required int ridesOrganized,
+    required int requestsSent,
+    required int requestsApproved,
+    required int ridesCancelled,
+    int? approvalRate,
   }) = _$RideStatsImpl;
 
   factory _RideStats.fromJson(Map<String, dynamic> json) =
@@ -2886,9 +2886,9 @@ class __$$MyRidesImplCopyWithImpl<$Res>
 @JsonSerializable()
 class _$MyRidesImpl implements _MyRides {
   const _$MyRidesImpl({
-    required final List<TripSummary> organized,
-    required final List<TripSummary> joined,
-    required final List<TripSummary> requested,
+    required List<TripSummary> organized,
+    required List<TripSummary> joined,
+    required List<TripSummary> requested,
     required this.stats,
   }) : _organized = organized,
        _joined = joined,
@@ -2972,10 +2972,10 @@ class _$MyRidesImpl implements _MyRides {
 
 abstract class _MyRides implements MyRides {
   const factory _MyRides({
-    required final List<TripSummary> organized,
-    required final List<TripSummary> joined,
-    required final List<TripSummary> requested,
-    required final RideStats stats,
+    required List<TripSummary> organized,
+    required List<TripSummary> joined,
+    required List<TripSummary> requested,
+    required RideStats stats,
   }) = _$MyRidesImpl;
 
   factory _MyRides.fromJson(Map<String, dynamic> json) = _$MyRidesImpl.fromJson;

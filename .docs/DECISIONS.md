@@ -2675,3 +2675,105 @@ changes:
   tsc --noEmit clean across all 8 packages, 201/201 tests pass (2 new: a member-vs-non-member
   offerHelp case and a plain-Rider-never-checked-membership regression guard), next build
   succeeds, and every changed web file lints clean.
+
+## ADR-057: SMS/WhatsApp OTP channel toggle; mobile release builds move to MSG91's Widget SDK
+
+- **Context.** Requested: an explicit SMS/WhatsApp toggle on OTP screens (MSG91 also offers
+  WhatsApp delivery), and — per the request's literal spec — mobile adopting `sendotp_flutter_sdk`
+  with `OTPWidget.initializeWidget/sendOTP/retryOTP/verifyOTP`. Before touching code, the existing
+  ADR-034 MSG91 integration was inspected in full (send/verify application layer, both adapters,
+  rate limiting, dev-bypass, both platforms' login/signup screens) — it already matched nearly
+  every requirement in the request (widget SDK on web with the exact widget ID/token already live
+  in `apps/web/.env`, server-side `verifyAccessToken` re-verification, one-account-per-number,
+  account-type mismatch screens, rate limiting, a `NODE_ENV`-gated dev bypass). Two things were
+  not resolvable from the code alone and were confirmed against MSG91's public docs
+  (docs.msg91.com, pub.dev) before implementing, rather than guessed:
+  1. **MSG91's channel selection lives only on `retryOtp`/`retryOTP`, never on the first send.**
+     Confirmed for both the JS widget (`window.sendOtp(identifier, success, failure)` — no third
+     argument) and the Flutter SDK (`OTPWidget.sendOTP({'identifier': ...})` — no channel key).
+     Only the retry/resend call takes a channel: JS widget string codes `'SMS-11'` /
+     `'VOICE-4'` / `'EMAIL-3'` / `'WHATSAPP-12'`; Flutter SDK numeric codes `11`/`4`/`3`/`12` for
+     the same four. (The JS widget hook already in this codebase had `retryOtp("text", ...)` —
+     an unverified placeholder per its own comment at the time it was written; corrected to the
+     confirmed `'SMS-11'`/`'WHATSAPP-12'` codes here.) Consequence: there is no way to make the
+     *first* OTP go out on WhatsApp without the default-channel send firing too — asked the user
+     directly rather than picking silently, given the cost/UX tradeoff (see Decision below).
+  2. **MSG91's native server-to-server OTP API** (`control.msg91.com/api/v5/otp`, what
+     `msg91-native-otp.adapter.ts` calls, and what mobile used exclusively before this change) is
+     the older, simpler product — WhatsApp delivery is consistently described in MSG91's docs as
+     available "for mobile number as a contact point" via the Widget product, never confirmed for
+     this native API. Also asked the user directly, since committing mobile to the Widget SDK is
+     an architecture change (client gets a token, backend re-verifies it) with real security-model
+     implications, not just a dependency bump.
+  Both questions were put to the user rather than resolved unilaterally, given this is a live
+  production auth system. Answers: **(1)** the toggle applies from the very first send —
+  send-then-auto-retry-on-the-chosen-channel, accepting that the phone may receive both an SMS
+  and a WhatsApp message once (same code, MSG91 bills for both deliveries) when WhatsApp is
+  picked. **(2)** mobile release builds adopt `sendotp_flutter_sdk`, replacing the native-API send
+  path for real devices.
+- **Decision.**
+  - **`OtpChannel` (`"sms" | "whatsapp"`)** — new on both platforms, mirrored 1:1: web's
+    `apps/web/lib/use-msg91-widget.ts` / `OtpChannelToggle.tsx`; mobile's new
+    `msg91_otp_repository.dart` (`enum OtpChannel`) / `otp_channel_toggle.dart`. `sendOtp(...,
+    channel)` on both platforms: fire the default-channel send, and if `channel === "whatsapp"`,
+    immediately follow with a `retryOtp`/`retryOTP` call on the WhatsApp channel code — the
+    send-then-auto-retry pattern from the question above, implemented identically on both
+    platforms since both hit the same MSG91 Widget product now.
+  - **Mobile release builds**: new `Msg91OtpRepository` (`apps/mobile/lib/features/auth/data/`)
+    wraps `sendotp_flutter_sdk` — `sendOtp`/`retryOtp`/`verifyOtp`, mirroring
+    `use-msg91-widget.ts`'s shape exactly. `verifyOtp` returns MSG91's access token, which
+    `AuthRepository.verifyOtp` forwards unchanged as the `code` sent to the existing, *unchanged*
+    `POST /api/auth/phone-number/verify` — the same endpoint mobile always used, the same
+    shape-based discriminator (`NATIVE_OTP_SHAPE`) that already existed in
+    `otp-verify.application.ts` to tell a native numeric code from an opaque widget token,
+    written for exactly this eventuality even though mobile hadn't used it before. **Zero backend
+    changes were needed for verify** as a result — the server-side trust boundary
+    (`msg91-widget-verify.adapter.ts`'s `verifyAccessToken`) already applied uniformly to
+    whichever platform's token showed up.
+  - **Mobile debug builds keep the pre-ADR-057 backend-proxied native-API flow**, gated on
+    Flutter's `kDebugMode` (`AuthRepository.sendOtp`/`resendOtp`). This is not a hedge or
+    unfinished migration — it's required: MSG91's real widget rejects a fake code before our
+    backend ever sees it, so `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`/`TEST_OTP`
+    (`test-otp-bypass.ts`) and the `SHOW_OTP_TOAST` dev-bypass — both explicitly required to keep
+    working, per the request — can only function through a path our own backend controls. The two
+    flows structurally cannot share one code path once mobile's real send goes client-side; kept
+    as two, selected automatically by build mode, never a runtime toggle. The WhatsApp option is
+    disabled in the app's toggle UI while on this path (SMS/native-API only), with a tooltip
+    explaining why.
+  - **Widget credentials on mobile**: `kMsg91WidgetId`/`kMsg91WidgetTokenAuth`
+    (`app_config.dart`), same values as web's `NEXT_PUBLIC_MSG91_WIDGET_ID`/
+    `NEXT_PUBLIC_MSG91_WIDGET_TOKEN_AUTH`, safe to embed in the binary by the identical reasoning
+    (MSG91 scopes a widget by domain/app in its own dashboard, not by keeping this pair secret).
+    `MSG91_AUTH_KEY` — the genuinely secret credential used for server-side `verifyAccessToken` —
+    remains exactly where it already was: server-only, never referenced by either client.
+    Override via `--dart-define=MSG91_WIDGET_ID=...`/`MSG91_WIDGET_TOKEN_AUTH=...` for a
+    non-production widget, mirroring `kApiBaseUrl`'s existing override pattern.
+- **Consequences / open risk, reported rather than silently worked around, per the request's own
+  instruction to do so:**
+  - `sendotp_flutter_sdk` has published exactly two versions (0.0.1, 0.0.2) and its public docs
+    show the *call* shape, not the *response* shape. `Msg91OtpRepository`'s `_extractReqId`/
+    `_extractToken` parse defensively across several plausible key names rather than assuming
+    one, and every failure path converts to a generic `ApiException` message rather than
+    surfacing the SDK's raw text. **This needs a live-device test pass before shipping** — flagged
+    explicitly in code comments on both extraction methods and here, not discovered later.
+  - The `'text'` → `'SMS-11'` channel-code correction on web's `retryOtp` is a behavior change to
+    an already-live code path (previously used for plain SMS resend, no WhatsApp option existed).
+    Also needs a live end-to-end test — nothing here is unit-testable, since both send/verify legs
+    talk to MSG91 directly from the browser/app.
+  - `flutter analyze` / `flutter test` were assumed unavailable (no `flutter` on the shell tool's
+    PATH — same as when ADR-056 was written) until a `pubspec.yaml` edit here triggered the IDE's
+    own Dart/Flutter extension to run `pub get` in the background, which surfaced the SDK's real
+    location (`C:\Users\ADMIN\Documents\flutter sdk\flutter`, not on PATH but present on disk).
+    Both were then run for real, directly against that path: `flutter analyze` found exactly one
+    issue, pre-existing and unrelated (`partner_onboarding_screen.dart`'s `http` import, present
+    before this change) — zero issues in any file this ADR touched. `flutter test` passed all 112
+    tests, including the existing `AuthRepository.sendOtp`/`verifyOtp` cases exercising the
+    `kDebugMode` branch exactly as predicted. `flutter build apk --debug` was also attempted, for
+    a full native compile check beyond static analysis — it failed, but at Gradle/Java toolchain
+    initialization (`Java 25.0.2` incompatible with this project's pinned `Gradle 8.12`, before
+    compiling a single source file), a pre-existing environment configuration gap unrelated to
+    `sendotp_flutter_sdk` or any file this ADR touched — not attempted to fix here, out of scope.
+  - Web-side changes verified normally: `tsc --noEmit` clean, changed files lint clean, existing
+    vitest suite unaffected (this change touches no backend logic — `otp-verify.application.ts`'s
+    discriminator, the actual thing making mobile's new flow work, was already covered by
+    `identity-access.test.ts` before this change and needed no modification).

@@ -202,7 +202,7 @@ class _$MembershipPlanImpl implements _MembershipPlan {
     required this.description,
     required this.price,
     required this.durationDays,
-    required final List<String> benefits,
+    required List<String> benefits,
     required this.isActive,
   }) : _benefits = benefits;
 
@@ -284,13 +284,13 @@ class _$MembershipPlanImpl implements _MembershipPlan {
 
 abstract class _MembershipPlan implements MembershipPlan {
   const factory _MembershipPlan({
-    required final String id,
-    required final String name,
-    required final String description,
-    required final num price,
-    required final int durationDays,
-    required final List<String> benefits,
-    required final bool isActive,
+    required String id,
+    required String name,
+    required String description,
+    required num price,
+    required int durationDays,
+    required List<String> benefits,
+    required bool isActive,
   }) = _$MembershipPlanImpl;
 
   factory _MembershipPlan.fromJson(Map<String, dynamic> json) =
@@ -614,14 +614,14 @@ class _$UserMembershipImpl implements _UserMembership {
 
 abstract class _UserMembership implements UserMembership {
   const factory _UserMembership({
-    required final String id,
-    required final String userId,
-    required final String planId,
-    required final MembershipPlan plan,
-    required final String startDate,
-    required final String endDate,
-    required final String status,
-    required final int daysLeft,
+    required String id,
+    required String userId,
+    required String planId,
+    required MembershipPlan plan,
+    required String startDate,
+    required String endDate,
+    required String status,
+    required int daysLeft,
   }) = _$UserMembershipImpl;
 
   factory _UserMembership.fromJson(Map<String, dynamic> json) =

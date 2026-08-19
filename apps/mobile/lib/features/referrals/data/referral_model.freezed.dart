@@ -203,10 +203,10 @@ class _$ReferredUserImpl implements _ReferredUser {
 
 abstract class _ReferredUser implements ReferredUser {
   const factory _ReferredUser({
-    required final String id,
-    required final String name,
-    required final String email,
-    required final String createdAt,
+    required String id,
+    required String name,
+    required String email,
+    required String createdAt,
   }) = _$ReferredUserImpl;
 
   factory _ReferredUser.fromJson(Map<String, dynamic> json) =
@@ -335,7 +335,7 @@ class __$$ReferralInfoImplCopyWithImpl<$Res>
 class _$ReferralInfoImpl implements _ReferralInfo {
   const _$ReferralInfoImpl({
     required this.code,
-    required final List<ReferredUser> referrals,
+    required List<ReferredUser> referrals,
   }) : _referrals = referrals;
 
   factory _$ReferralInfoImpl.fromJson(Map<String, dynamic> json) =>
@@ -392,8 +392,8 @@ class _$ReferralInfoImpl implements _ReferralInfo {
 
 abstract class _ReferralInfo implements ReferralInfo {
   const factory _ReferralInfo({
-    required final String code,
-    required final List<ReferredUser> referrals,
+    required String code,
+    required List<ReferredUser> referrals,
   }) = _$ReferralInfoImpl;
 
   factory _ReferralInfo.fromJson(Map<String, dynamic> json) =

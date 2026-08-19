@@ -260,12 +260,12 @@ class _$TestimonialModelImpl implements _TestimonialModel {
 
 abstract class _TestimonialModel implements TestimonialModel {
   const factory _TestimonialModel({
-    required final String id,
-    required final String authorName,
-    final String? authorAvatarUrl,
-    final String? authorLocation,
-    required final num rating,
-    required final String quote,
+    required String id,
+    required String authorName,
+    String? authorAvatarUrl,
+    String? authorLocation,
+    required num rating,
+    required String quote,
   }) = _$TestimonialModelImpl;
 
   factory _TestimonialModel.fromJson(Map<String, dynamic> json) =

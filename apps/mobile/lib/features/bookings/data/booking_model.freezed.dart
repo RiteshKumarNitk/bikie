@@ -206,10 +206,10 @@ class _$BookingBikeRefImpl implements _BookingBikeRef {
 
 abstract class _BookingBikeRef implements BookingBikeRef {
   const factory _BookingBikeRef({
-    required final String slug,
-    required final String name,
-    required final String imageUrl,
-    required final String brand,
+    required String slug,
+    required String name,
+    required String imageUrl,
+    required String brand,
   }) = _$BookingBikeRefImpl;
 
   factory _BookingBikeRef.fromJson(Map<String, dynamic> json) =
@@ -545,15 +545,15 @@ class _$BookingModelImpl implements _BookingModel {
 
 abstract class _BookingModel implements BookingModel {
   const factory _BookingModel({
-    required final String id,
-    required final String status,
-    required final String startDate,
-    required final String endDate,
-    required final num totalPrice,
-    required final String pickupCity,
-    required final String createdAt,
-    required final BookingBikeRef bike,
-    required final bool hasReview,
+    required String id,
+    required String status,
+    required String startDate,
+    required String endDate,
+    required num totalPrice,
+    required String pickupCity,
+    required String createdAt,
+    required BookingBikeRef bike,
+    required bool hasReview,
   }) = _$BookingModelImpl;
 
   factory _BookingModel.fromJson(Map<String, dynamic> json) =

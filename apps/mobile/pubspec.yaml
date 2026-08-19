@@ -44,6 +44,13 @@ dependencies:
   # Networking
   dio: ^5.7.0
 
+  # MSG91 OTP Widget SDK (ADR-057) — release-build OTP send/verify, replacing the debug-only
+  # backend-proxied native API path for real devices. Only two versions ever published
+  # (0.0.1/0.0.2, msg91's own verified publisher) — pinned exactly rather than with a caret,
+  # since a 0.0.x package's own semver gives no guarantee a "compatible" bump wouldn't break
+  # the API shape this integration depends on.
+  sendotp_flutter_sdk: 0.0.2
+
   # Immutable models / JSON
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0

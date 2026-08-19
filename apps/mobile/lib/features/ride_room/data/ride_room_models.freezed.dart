@@ -191,9 +191,9 @@ class _$EmergencyContactImpl implements _EmergencyContact {
 
 abstract class _EmergencyContact implements EmergencyContact {
   const factory _EmergencyContact({
-    required final String name,
-    required final String phone,
-    required final String relation,
+    required String name,
+    required String phone,
+    required String relation,
   }) = _$EmergencyContactImpl;
 
   factory _EmergencyContact.fromJson(Map<String, dynamic> json) =
@@ -415,7 +415,7 @@ class _$RideRoomImpl extends _RideRoom {
     this.meetingPoint,
     this.meetingLat,
     this.meetingLng,
-    final List<EmergencyContact> emergencyContacts = const [],
+    List<EmergencyContact> emergencyContacts = const [],
   }) : _emergencyContacts = emergencyContacts,
        super._();
 
@@ -504,14 +504,14 @@ class _$RideRoomImpl extends _RideRoom {
 
 abstract class _RideRoom extends RideRoom {
   const factory _RideRoom({
-    required final String tripId,
-    required final String conversationId,
-    required final String role,
-    required final bool isLocked,
-    final String? meetingPoint,
-    final double? meetingLat,
-    final double? meetingLng,
-    final List<EmergencyContact> emergencyContacts,
+    required String tripId,
+    required String conversationId,
+    required String role,
+    required bool isLocked,
+    String? meetingPoint,
+    double? meetingLat,
+    double? meetingLng,
+    List<EmergencyContact> emergencyContacts,
   }) = _$RideRoomImpl;
   const _RideRoom._() : super._();
 
@@ -804,13 +804,13 @@ class _$AnnouncementImpl implements _Announcement {
 
 abstract class _Announcement implements Announcement {
   const factory _Announcement({
-    required final String id,
-    required final String tripId,
-    required final String authorId,
-    required final String authorName,
-    required final String content,
-    final String? pinnedAt,
-    required final String createdAt,
+    required String id,
+    required String tripId,
+    required String authorId,
+    required String authorName,
+    required String content,
+    String? pinnedAt,
+    required String createdAt,
   }) = _$AnnouncementImpl;
 
   factory _Announcement.fromJson(Map<String, dynamic> json) =
@@ -1116,14 +1116,14 @@ class _$MediaItemImpl implements _MediaItem {
 
 abstract class _MediaItem implements MediaItem {
   const factory _MediaItem({
-    required final String id,
-    required final String type,
-    required final String fileName,
-    required final String mimeType,
-    required final int sizeBytes,
-    final int? width,
-    final int? height,
-    required final String createdAt,
+    required String id,
+    required String type,
+    required String fileName,
+    required String mimeType,
+    required int sizeBytes,
+    int? width,
+    int? height,
+    required String createdAt,
   }) = _$MediaItemImpl;
 
   factory _MediaItem.fromJson(Map<String, dynamic> json) =

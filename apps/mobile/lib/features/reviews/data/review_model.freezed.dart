@@ -162,10 +162,8 @@ class _$ReviewAuthorImpl implements _ReviewAuthor {
 }
 
 abstract class _ReviewAuthor implements ReviewAuthor {
-  const factory _ReviewAuthor({
-    required final String name,
-    final String? image,
-  }) = _$ReviewAuthorImpl;
+  const factory _ReviewAuthor({required String name, String? image}) =
+      _$ReviewAuthorImpl;
 
   factory _ReviewAuthor.fromJson(Map<String, dynamic> json) =
       _$ReviewAuthorImpl.fromJson;
@@ -330,10 +328,8 @@ class _$ReviewBikeRefImpl implements _ReviewBikeRef {
 }
 
 abstract class _ReviewBikeRef implements ReviewBikeRef {
-  const factory _ReviewBikeRef({
-    required final String slug,
-    required final String name,
-  }) = _$ReviewBikeRefImpl;
+  const factory _ReviewBikeRef({required String slug, required String name}) =
+      _$ReviewBikeRefImpl;
 
   factory _ReviewBikeRef.fromJson(Map<String, dynamic> json) =
       _$ReviewBikeRefImpl.fromJson;
@@ -616,12 +612,12 @@ class _$ReviewModelImpl implements _ReviewModel {
 
 abstract class _ReviewModel implements ReviewModel {
   const factory _ReviewModel({
-    required final String id,
-    required final num rating,
-    required final String comment,
-    required final String createdAt,
-    required final ReviewAuthor author,
-    final ReviewBikeRef? bike,
+    required String id,
+    required num rating,
+    required String comment,
+    required String createdAt,
+    required ReviewAuthor author,
+    ReviewBikeRef? bike,
   }) = _$ReviewModelImpl;
 
   factory _ReviewModel.fromJson(Map<String, dynamic> json) =

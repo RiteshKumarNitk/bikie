@@ -2,6 +2,32 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SMS/WhatsApp OTP channel toggle; mobile release builds move to MSG91's Widget SDK (2026-08-19, ADR-057)
+
+Requested: an SMS/WhatsApp toggle on OTP screens, plus mobile adopting `sendotp_flutter_sdk`.
+Inspected the existing ADR-034 MSG91 integration first (it already matched nearly the whole
+spec), confirmed two genuine MSG91 API constraints against public docs rather than guessing, put
+both to the user before implementing (live production auth), then built accordingly. See ADR-057.
+
+| Task | Status |
+|---|---|
+| Inspected the existing MSG91 integration end-to-end (send/verify application layer, both adapters, rate limiting, dev-bypass, `test-otp-bypass.ts`, both platforms' login/signup screens) before writing any code | Completed |
+| Confirmed via MSG91's public docs (docs.msg91.com, pub.dev) that channel selection exists only on `retryOtp`/`retryOTP`, never on the first send, for both the JS widget and the Flutter SDK — corrected the JS widget's unverified `"text"` retry-channel placeholder to the confirmed `"SMS-11"`/`"WHATSAPP-12"` codes | Completed |
+| Confirmed MSG91's native server-to-server OTP API (mobile's pre-existing send path) is the older product, with WhatsApp delivery documented only for the Widget product | Completed |
+| Asked the user how to resolve both findings rather than deciding silently: toggle-applies-from-first-send (accepting a double-delivery tradeoff) vs. resend-only; keep mobile on the native API (SMS/Voice only) vs. adopt `sendotp_flutter_sdk` | Completed |
+| Added `OtpChannel` (SMS/WhatsApp), channel-aware `sendOtp`/`retryOtp`, and `OtpChannelToggle` to web's `/login` and `/signup` | Completed |
+| Added `sendotp_flutter_sdk` dependency + `Msg91OtpRepository` (mobile) — client-side MSG91 send/retry/verify for release builds, mirroring web's widget trust model exactly | Completed |
+| Verified zero backend changes were needed for the mobile release-build verify path — the existing shape-based discriminator in `otp-verify.application.ts` already routes a widget access token correctly regardless of which platform produced it | Completed |
+| Kept mobile debug builds on the old backend-proxied native-API flow, gated on `kDebugMode` — required to preserve `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`/`TEST_OTP` and `SHOW_OTP_TOAST`, which MSG91's real widget would otherwise break (it rejects a fake code before our backend ever sees it) | Completed |
+| Added the same `OtpChannelToggle` to mobile's login/signup screens, WhatsApp disabled with a tooltip while on the debug-mode native-API path | Completed |
+| Fixed a real bug introduced mid-implementation: `Msg91OtpRepository` initially threw plain `Exception`s, which `apiGuard`'s `DioException`-only catch and the UI's `ApiException`-only catch would both miss — converted to always throw `ApiException` | Completed |
+| Ran web `tsc --noEmit`, `next build`, full backend `vitest` suite (201/201, nothing server-side changed), and lint on every changed web file | Completed |
+| Located the Flutter SDK on disk (not on the shell tool's PATH, but present — a `pubspec.yaml` edit triggered the IDE's own Dart extension to `pub get` in the background, revealing its path) and ran `flutter analyze` for real: 1 pre-existing, unrelated issue found, 0 in anything this change touched | Completed |
+| Ran `flutter test` for real: all 112 tests passed, including the existing `AuthRepository.sendOtp`/`verifyOtp` cases exercising the new `kDebugMode` branch exactly as designed | Completed |
+| Attempted `flutter build apk --debug` for a full native compile check — failed at Gradle/Java toolchain initialization (Java 25 vs. this project's pinned Gradle 8.12), a pre-existing environment gap unrelated to this change, before compiling any source file | Blocked (environment) |
+| Live-device test of `Msg91OtpRepository`'s response parsing and the corrected web/mobile retry-channel codes against a real MSG91 send/verify round-trip — `flutter analyze`/`flutter test` confirm the code is correct Dart, not that MSG91's actual response shape matches what's assumed | Blocked |
+| Fix the Java/Gradle toolchain mismatch blocking `flutter build apk` in this environment, and/or set up a real production release-signing config (currently debug-signed even for `--release` builds, per the earlier APK-build conversation) | Backlog |
+
 ## Service Provider membership: Rs 99/month, non-mandatory at onboarding, enforced at SOS accept (2026-08-19, ADR-056)
 
 Made the existing Partner Membership system (ADR-051) match three product requirements: profile

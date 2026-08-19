@@ -22,16 +22,30 @@ for mobile). The verify endpoint is shared by both platforms unchanged.
 
 - **Web** sends/resends OTPs via the MSG91 Widget SDK directly from the browser (our backend
   never sees that leg) — see `apps/web/lib/use-msg91-widget.ts`. The widget's `verifyOtp` returns
-  an opaque access token, sent as `code` below.
-- **Mobile** sends via `POST /api/otp/mobile/send` — `{ phoneNumber }` (E.164, Indian numbers
-  only). Rate-limited (60s per-phone cooldown, 3/10min per-phone, 10/10min per-IP). Returns
-  `{ success: true }` or a 4xx/5xx/429 with `{ error }`.
-- **Both** verify via `POST /api/auth/phone-number/verify` — `{ phoneNumber, code }`, where `code`
-  is either MSG91's native OTP (mobile) or the widget's access token (web); Better Auth's
-  `verifyOTP` hook discriminates by shape. Same response shape as before ADR-034 — a `token` field
-  in the JSON body for mobile, a `set-auth-token`-equivalent session cookie for web.
+  an opaque access token, sent as `code` below. **ADR-057**: the app also offers an SMS/WhatsApp
+  channel toggle — see that ADR for the exact mechanics (MSG91's widget has no channel choice on
+  the *first* send, only on `retryOtp`).
+- **Mobile, release builds (ADR-057)**: sends/resends OTPs via `sendotp_flutter_sdk` (the same
+  MSG91 Widget product web uses), directly from the app — our backend never sees that leg either.
+  Same SMS/WhatsApp channel toggle as web, same "no channel on first send" mechanic. See
+  `apps/mobile/lib/features/auth/data/msg91_otp_repository.dart`.
+- **Mobile, debug builds only**: sends via `POST /api/otp/mobile/send` — `{ phoneNumber }` (E.164,
+  Indian numbers only). Rate-limited (60s per-phone cooldown, 3/10min per-phone, 10/10min
+  per-IP). Returns `{ success: true }` or a 4xx/5xx/429 with `{ error }`. **ADR-057**: kept
+  specifically so `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`/`TEST_OTP` and the
+  `SHOW_OTP_TOAST` dev-bypass keep working — MSG91's real widget would reject a fake test code
+  before this endpoint ever ran, so those mechanisms only work through this path, gated on
+  `kDebugMode` client-side. SMS-only; the WhatsApp toggle is disabled in the app's UI when this
+  path is active.
+- **Both, always** verify via `POST /api/auth/phone-number/verify` — `{ phoneNumber, code }`,
+  where `code` is either MSG91's native OTP (mobile debug builds), a raw test code
+  (`TEST_OTP`/`SHOW_OTP_TOAST`, dev only), or an MSG91 widget access token (web always; mobile
+  release builds) — Better Auth's `verifyOTP` hook discriminates the first two from the third
+  purely by shape (`NATIVE_OTP_SHAPE`, `otp-verify.application.ts`). Same response shape as
+  before ADR-034 — a `token` field in the JSON body for mobile, a `set-auth-token`-equivalent
+  session cookie for web.
 - `POST /api/auth/phone-number/send-otp` — Better Auth's own built-in send endpoint — returns
-  **410**, deliberately disabled (superseded by the two send paths above).
+  **410**, deliberately disabled (superseded by the send paths above).
 
 ### Mobile / Bearer Auth
 

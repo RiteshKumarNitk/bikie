@@ -73,8 +73,10 @@ class AuthController extends StateNotifier<AuthState> {
   /// Establishes a session from a verified OTP. Left un-caught on failure
   /// (state stays unauthenticated) — the caller (the OTP entry screen) shows
   /// its own inline error, same as the web's local `serverError` state.
-  Future<void> verifyOtp({required String phoneNumber, required String code}) async {
-    final user = await _repository.verifyOtp(phoneNumber: phoneNumber, code: code);
+  /// ADR-057 — `reqId` non-null routes through MSG91's widget verify first (release builds);
+  /// see `AuthRepository.verifyOtp`.
+  Future<void> verifyOtp({required String phoneNumber, required String code, String? reqId}) async {
+    final user = await _repository.verifyOtp(phoneNumber: phoneNumber, code: code, reqId: reqId);
     state = AuthState.authenticated(user);
     unawaited(_push.registerForCurrentUser());
   }

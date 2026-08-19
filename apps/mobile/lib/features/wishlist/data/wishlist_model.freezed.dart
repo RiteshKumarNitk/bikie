@@ -203,9 +203,9 @@ class _$WishlistItemImpl implements _WishlistItem {
 
 abstract class _WishlistItem implements WishlistItem {
   const factory _WishlistItem({
-    required final String id,
-    required final String createdAt,
-    required final BikeSummary bike,
+    required String id,
+    required String createdAt,
+    required BikeSummary bike,
   }) = _$WishlistItemImpl;
 
   factory _WishlistItem.fromJson(Map<String, dynamic> json) =
