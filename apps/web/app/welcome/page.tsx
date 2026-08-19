@@ -9,7 +9,7 @@ import styles from "./welcome.module.css";
 const bebasNeue = Bebas_Neue({ weight: "400", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Welcome",
+  title: "Bikie - Welcome",
   description: "Are you here to ride, or to grow your motorcycle business?",
 };
 
