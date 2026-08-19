@@ -17,9 +17,18 @@ export async function syncPartnerStatus(userId: string, status: string | null) {
   await prisma.user.update({ where: { id: userId }, data: { partnerStatus: status as any } });
 }
 
-/** ADR-053 — the one write path for `User.accountType`. */
+/** ADR-053 — the one write path for `User.accountType`. Synchronizes `role` to match
+ * (SERVICE_PROVIDER -> PARTNER, RIDER -> RENTER) while preserving ADMIN role. */
 export async function setAccountType(userId: string, accountType: "RIDER" | "SERVICE_PROVIDER") {
-  await prisma.user.update({ where: { id: userId }, data: { accountType } });
+  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  const role = existing?.role === "ADMIN" ? "ADMIN" : accountType === "SERVICE_PROVIDER" ? "PARTNER" : "RENTER";
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      accountType,
+      role,
+    },
+  });
 }
 
 export async function findById(userId: string) {

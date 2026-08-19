@@ -3,11 +3,17 @@ import { PartnerService } from "@bikie/services";
 import { partnerProfileSchema } from "@bikie/validation";
 import { requirePartnerCapability, requireSession } from "@/lib/require-role";
 
-/** Already-approved partners' business-profile read (`/partner/settings`). Brand-new/pending
- * applicants read their in-progress application via `GET /api/partner/application` instead. */
+/** Service Provider business-profile read (`/partner/settings`). Open to any authenticated
+ * `accountType: SERVICE_PROVIDER` account (matching PUT below). */
 export async function GET() {
-  const { session, error } = await requirePartnerCapability();
+  const { session, error } = await requireSession();
   if (error) return error;
+  if (session.user.accountType !== "SERVICE_PROVIDER" && session.user.role !== "ADMIN") {
+    return NextResponse.json(
+      { error: "WRONG_ACCOUNT_TYPE", message: "This requires a Service Provider account." },
+      { status: 403 },
+    );
+  }
 
   const profile = await PartnerService.getProfile(session.user.id);
   return NextResponse.json({ profile });

@@ -84,9 +84,19 @@ export async function updateUserRole(userId: string, role: string) {
       }
     }
 
+    const accountTypeUpdate =
+      role === "PARTNER"
+        ? { accountType: "SERVICE_PROVIDER" as const }
+        : role === "RENTER"
+          ? { accountType: "RIDER" as const }
+          : {};
+
     const user = await tx.user.update({
       where: { id: userId },
-      data: { role: role as any },
+      data: {
+        role: role as any,
+        ...accountTypeUpdate,
+      },
       select: {
         id: true,
         name: true,
@@ -106,9 +116,14 @@ export async function updateUserRole(userId: string, role: string) {
  * for brand-new accounts, and the Account Type Change Request flow sets on approval). The admin
  * panel is the direct, immediate path; the request flow exists for self-service. */
 export async function updateUserAccountType(userId: string, accountType: "RIDER" | "SERVICE_PROVIDER") {
+  const existing = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+  const nextRole = existing?.role === "ADMIN" ? "ADMIN" : accountType === "SERVICE_PROVIDER" ? "PARTNER" : "RENTER";
   const user = await prisma.user.update({
     where: { id: userId },
-    data: { accountType },
+    data: {
+      accountType,
+      role: nextRole,
+    },
     select: {
       id: true,
       name: true,

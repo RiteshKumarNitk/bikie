@@ -7,7 +7,13 @@ import { PartnerSettingsForm } from "@/components/dashboard/PartnerSettingsForm"
 export const metadata: Metadata = { title: "Partner Settings" };
 
 export default async function PartnerSettingsPage() {
-  const { profile } = await getJson<{ profile: PartnerProfileDTO | null }>("/api/partner/profile", { auth: true });
+  let profile: PartnerProfileDTO | null = null;
+  try {
+    const res = await getJson<{ profile: PartnerProfileDTO | null }>("/api/partner/profile", { auth: true });
+    profile = res.profile;
+  } catch {
+    // Fall back to null profile if fetch fails
+  }
 
   return (
     <div>

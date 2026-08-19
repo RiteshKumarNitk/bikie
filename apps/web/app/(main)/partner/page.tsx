@@ -8,9 +8,24 @@ import { formatCurrency } from "@bikie/utils";
 
 export const metadata: Metadata = { title: "Partner Dashboard" };
 
+const defaultStats: PartnerDashboardStatsDTO = {
+  totalBikes: 0,
+  activeBookings: 0,
+  completedBookings: 0,
+  totalEarnings: 0,
+  ratingAvg: 0,
+  ratingCount: 0,
+};
+
 export default async function PartnerOverviewPage() {
   const session = await getServerSession();
-  const { stats } = await getJson<{ stats: PartnerDashboardStatsDTO }>("/api/partner/dashboard", { auth: true });
+  let stats: PartnerDashboardStatsDTO = defaultStats;
+  try {
+    const res = await getJson<{ stats: PartnerDashboardStatsDTO }>("/api/partner/dashboard", { auth: true });
+    stats = res.stats;
+  } catch {
+    // Fall back to default initial stats if membership/data is not yet populated
+  }
 
   return (
     <div>

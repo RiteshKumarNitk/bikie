@@ -130,9 +130,20 @@ export async function reviewRequest(
     });
 
     if (decision === "APPROVED") {
+      const existingUser = await tx.user.findUnique({ where: { id: request.userId }, select: { role: true } });
+      const nextRole =
+        existingUser?.role === "ADMIN"
+          ? "ADMIN"
+          : request.requestedType === "SERVICE_PROVIDER"
+            ? "PARTNER"
+            : "RENTER";
+
       await tx.user.update({
         where: { id: request.userId },
-        data: { accountType: request.requestedType },
+        data: {
+          accountType: request.requestedType,
+          role: nextRole,
+        },
       });
     }
 
