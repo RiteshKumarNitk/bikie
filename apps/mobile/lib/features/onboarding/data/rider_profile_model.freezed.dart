@@ -263,6 +263,7 @@ mixin _$RiderProfileInput {
   String? get vehicleType => throw _privateConstructorUsedError;
   String? get vehicleBrand => throw _privateConstructorUsedError;
   String? get vehicleModel => throw _privateConstructorUsedError;
+  String? get vehicleRegistrationNumber => throw _privateConstructorUsedError;
   String? get governmentIdType =>
       throw _privateConstructorUsedError; // "AADHAAR" | "PASSPORT"
   String? get governmentIdNumber => throw _privateConstructorUsedError;
@@ -309,6 +310,7 @@ abstract class $RiderProfileInputCopyWith<$Res> {
     String? vehicleType,
     String? vehicleBrand,
     String? vehicleModel,
+    String? vehicleRegistrationNumber,
     String? governmentIdType,
     String? governmentIdNumber,
     String? riderFrequency,
@@ -350,6 +352,7 @@ class _$RiderProfileInputCopyWithImpl<$Res, $Val extends RiderProfileInput>
     Object? vehicleType = freezed,
     Object? vehicleBrand = freezed,
     Object? vehicleModel = freezed,
+    Object? vehicleRegistrationNumber = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
     Object? riderFrequency = freezed,
@@ -427,6 +430,10 @@ class _$RiderProfileInputCopyWithImpl<$Res, $Val extends RiderProfileInput>
                 ? _value.vehicleModel
                 : vehicleModel // ignore: cast_nullable_to_non_nullable
                       as String?,
+            vehicleRegistrationNumber: freezed == vehicleRegistrationNumber
+                ? _value.vehicleRegistrationNumber
+                : vehicleRegistrationNumber // ignore: cast_nullable_to_non_nullable
+                      as String?,
             governmentIdType: freezed == governmentIdType
                 ? _value.governmentIdType
                 : governmentIdType // ignore: cast_nullable_to_non_nullable
@@ -484,6 +491,7 @@ abstract class _$$RiderProfileInputImplCopyWith<$Res>
     String? vehicleType,
     String? vehicleBrand,
     String? vehicleModel,
+    String? vehicleRegistrationNumber,
     String? governmentIdType,
     String? governmentIdNumber,
     String? riderFrequency,
@@ -524,6 +532,7 @@ class __$$RiderProfileInputImplCopyWithImpl<$Res>
     Object? vehicleType = freezed,
     Object? vehicleBrand = freezed,
     Object? vehicleModel = freezed,
+    Object? vehicleRegistrationNumber = freezed,
     Object? governmentIdType = freezed,
     Object? governmentIdNumber = freezed,
     Object? riderFrequency = freezed,
@@ -601,6 +610,10 @@ class __$$RiderProfileInputImplCopyWithImpl<$Res>
             ? _value.vehicleModel
             : vehicleModel // ignore: cast_nullable_to_non_nullable
                   as String?,
+        vehicleRegistrationNumber: freezed == vehicleRegistrationNumber
+            ? _value.vehicleRegistrationNumber
+            : vehicleRegistrationNumber // ignore: cast_nullable_to_non_nullable
+                  as String?,
         governmentIdType: freezed == governmentIdType
             ? _value.governmentIdType
             : governmentIdType // ignore: cast_nullable_to_non_nullable
@@ -651,6 +664,7 @@ class _$RiderProfileInputImpl implements _RiderProfileInput {
     this.vehicleType,
     this.vehicleBrand,
     this.vehicleModel,
+    this.vehicleRegistrationNumber,
     this.governmentIdType,
     this.governmentIdNumber,
     this.riderFrequency,
@@ -699,6 +713,8 @@ class _$RiderProfileInputImpl implements _RiderProfileInput {
   @override
   final String? vehicleModel;
   @override
+  final String? vehicleRegistrationNumber;
+  @override
   final String? governmentIdType;
   // "AADHAAR" | "PASSPORT"
   @override
@@ -723,7 +739,7 @@ class _$RiderProfileInputImpl implements _RiderProfileInput {
 
   @override
   String toString() {
-    return 'RiderProfileInput(drivingLicenceNumber: $drivingLicenceNumber, drivingLicenceExpiry: $drivingLicenceExpiry, addressLine: $addressLine, area: $area, district: $district, pincode: $pincode, country: $country, fatherName: $fatherName, motherName: $motherName, dateOfBirth: $dateOfBirth, gender: $gender, bloodGroup: $bloodGroup, medicalHistory: $medicalHistory, allergies: $allergies, vehicleType: $vehicleType, vehicleBrand: $vehicleBrand, vehicleModel: $vehicleModel, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, riderFrequency: $riderFrequency, ridingClubType: $ridingClubType, clubName: $clubName, emergencyContacts: $emergencyContacts)';
+    return 'RiderProfileInput(drivingLicenceNumber: $drivingLicenceNumber, drivingLicenceExpiry: $drivingLicenceExpiry, addressLine: $addressLine, area: $area, district: $district, pincode: $pincode, country: $country, fatherName: $fatherName, motherName: $motherName, dateOfBirth: $dateOfBirth, gender: $gender, bloodGroup: $bloodGroup, medicalHistory: $medicalHistory, allergies: $allergies, vehicleType: $vehicleType, vehicleBrand: $vehicleBrand, vehicleModel: $vehicleModel, vehicleRegistrationNumber: $vehicleRegistrationNumber, governmentIdType: $governmentIdType, governmentIdNumber: $governmentIdNumber, riderFrequency: $riderFrequency, ridingClubType: $ridingClubType, clubName: $clubName, emergencyContacts: $emergencyContacts)';
   }
 
   @override
@@ -761,6 +777,12 @@ class _$RiderProfileInputImpl implements _RiderProfileInput {
                 other.vehicleBrand == vehicleBrand) &&
             (identical(other.vehicleModel, vehicleModel) ||
                 other.vehicleModel == vehicleModel) &&
+            (identical(
+                  other.vehicleRegistrationNumber,
+                  vehicleRegistrationNumber,
+                ) ||
+                other.vehicleRegistrationNumber ==
+                    vehicleRegistrationNumber) &&
             (identical(other.governmentIdType, governmentIdType) ||
                 other.governmentIdType == governmentIdType) &&
             (identical(other.governmentIdNumber, governmentIdNumber) ||
@@ -798,6 +820,7 @@ class _$RiderProfileInputImpl implements _RiderProfileInput {
     vehicleType,
     vehicleBrand,
     vehicleModel,
+    vehicleRegistrationNumber,
     governmentIdType,
     governmentIdNumber,
     riderFrequency,
@@ -842,6 +865,7 @@ abstract class _RiderProfileInput implements RiderProfileInput {
     String? vehicleType,
     String? vehicleBrand,
     String? vehicleModel,
+    String? vehicleRegistrationNumber,
     String? governmentIdType,
     String? governmentIdNumber,
     String? riderFrequency,
@@ -887,6 +911,8 @@ abstract class _RiderProfileInput implements RiderProfileInput {
   String? get vehicleBrand;
   @override
   String? get vehicleModel;
+  @override
+  String? get vehicleRegistrationNumber;
   @override
   String? get governmentIdType; // "AADHAAR" | "PASSPORT"
   @override

@@ -152,6 +152,27 @@ platform admins immediately, logs `[SOS][DISPATCH][NO-RECIPIENTS]`, and reports
 `escalatedToAdmins` in the summary. The reporter always receives an in-app notice regardless of
 provider configuration.
 
+**SMS content is DLT-template-bound, and differs by recipient role (ADR-059).** India's TRAI DLT
+content firewall requires SMS text to exactly match a registered template — the free-text,
+multi-line `buildTextBody` (with maps links etc.) used for every other channel does **not**
+qualify, and was likely being silently rejected by MSG91 for every SMS send before ADR-059 (caught
+into `summary.errors`, never surfaced elsewhere). `NEARBY_RIDER`/`SERVICE_PROVIDER` recipients now
+get the DLT-approved **"BIKIE_SR"** template instead (`buildSmsTemplateBody`,
+`MSG91_SOS_HELP_TEMPLATE_ID`): rider name, vehicle registration number (`"N/A"` if the rider never
+filled it in — `RiderProfile.vehicleRegistrationNumber`), and approximate location
+(`describeLocation`, respecting the same pre-assignment redaction as every other channel).
+Emergency contacts/admins/emergency services still get the older free-text body on the original
+`MSG91_TEMPLATE_ID` default — a still-open DLT-compliance gap for those roles, not yet resolved
+(no approved template exists for that copy).
+
+**SMS is capped to the nearest 10 per dispatch batch (ADR-059).** `markSmsEligibility`
+(`fan-out.application.ts`) sorts the combined nearby-rider + service-provider candidate pool by
+`distanceMeters` and marks only the closest `SOS_SMS_RECIPIENT_LIMIT` (10) recipients
+`smsEligible`; the rest still get in-app push, WhatsApp, and email — only the SMS leg is skipped
+for them. Applied independently at each dispatch call (`seedEscalation`'s tier-1 batch, and both
+of `tickEscalation`'s radius-widening/community-timeout batches) — a per-batch cap, not a
+lifetime-per-alert one.
+
 ### 4b. Cron idempotency (ADR-052)
 
 Both `GET /api/cron/sos-escalate` and `GET /api/cron/sos-resolve` claim an alert **before**

@@ -26,6 +26,7 @@ export interface RiderProfileExtraValue {
   vehicleType: string;
   vehicleBrand: string;
   vehicleModel: string;
+  vehicleRegistrationNumber: string;
   governmentIdType: string; // "" | "AADHAAR" | "PASSPORT"
   governmentIdNumber: string;
   riderFrequency: string; // "" | "OCCASIONAL" | "WEEKLY" | "DAILY"
@@ -44,6 +45,7 @@ export const emptyRiderProfileExtraValue: RiderProfileExtraValue = {
   vehicleType: "",
   vehicleBrand: "",
   vehicleModel: "",
+  vehicleRegistrationNumber: "",
   governmentIdType: "",
   governmentIdNumber: "",
   riderFrequency: "",
@@ -135,6 +137,21 @@ export function VehicleDetailsFields({
             placeholder="e.g. Classic 350"
             className={inputClassName}
           />
+        </div>
+        <div>
+          <label className={labelClassName} htmlFor={id("vehicleRegistrationNumber")}>
+            Registration number <span className="font-normal text-foreground/40">(optional)</span>
+          </label>
+          <input
+            id={id("vehicleRegistrationNumber")}
+            value={value.vehicleRegistrationNumber}
+            onChange={(e) => set("vehicleRegistrationNumber", e.target.value)}
+            placeholder="e.g. MH12AB1234"
+            className={inputClassName}
+          />
+          <p className="mt-1 text-xs text-foreground/40">
+            Shared with nearby riders/providers only if you raise an SOS alert.
+          </p>
         </div>
       </div>
     </div>

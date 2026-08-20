@@ -33,8 +33,8 @@ vi.mock("../../../push.service", () => ({
 }));
 
 import { alertKind } from "./domain/alert-kind";
-import { buildEmailHtml, buildTextBody, describeLocation } from "./domain/dispatch-message";
-import { dispatchToRecipient, emptySummary } from "./application/fan-out.application";
+import { buildEmailHtml, buildSmsTemplateBody, buildTextBody, describeLocation } from "./domain/dispatch-message";
+import { dispatchToRecipient, emptySummary, markSmsEligibility } from "./application/fan-out.application";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "./domain/maps";
 import {
   channelsForRecipient,
@@ -110,6 +110,71 @@ describe("safety-location domain", () => {
     expect(buildEmailHtml(alert, { role: "NEARBY_RIDER", name: "Helper" })).toContain(
       "City Park, Malviya Nagar, Jaipur, Rajasthan, India",
     );
+  });
+
+  describe("buildSmsTemplateBody (ADR-059, DLT 'BIKIE_SR')", () => {
+    it("matches the registered template text exactly, with rider name/vehicle reg/location filled in", () => {
+      const alert = sampleAlert({
+        userName: "Priya Verma",
+        city: "Jaipur",
+        riderVehicleRegistrationNumber: "RJ14AB1234",
+      });
+      expect(buildSmsTemplateBody(alert)).toBe(
+        "Hello Riders/Service Providers, Rider Priya Verma, with Vehicle registration number is " +
+          "RJ14AB1234 having some emergency situation at Jaipur ;Please reach out to Rider to " +
+          "Provide Moral support and Adequate help, as noted by Kiesh India",
+      );
+    });
+
+    it("falls back to N/A when the rider never filled in a vehicle registration number", () => {
+      const alert = sampleAlert({ riderVehicleRegistrationNumber: null });
+      expect(buildSmsTemplateBody(alert)).toContain("Vehicle registration number is N/A having");
+    });
+
+    it("uses the same redacted-aware location as describeLocation (approximate pre-assignment)", () => {
+      const alert = sampleAlert({ formattedAddress: "Exact Street, Jaipur", city: "Jaipur" });
+      expect(buildSmsTemplateBody(alert)).toContain("emergency situation at Exact Street, Jaipur ;");
+    });
+  });
+
+  describe("markSmsEligibility (ADR-059 — SOS_SMS_RECIPIENT_LIMIT)", () => {
+    it("marks only the nearest `limit` recipients smsEligible, by distanceMeters ascending", () => {
+      const recipients = [
+        { role: "NEARBY_RIDER" as const, name: "Far", distanceMeters: 5000 },
+        { role: "SERVICE_PROVIDER" as const, name: "Near", distanceMeters: 100 },
+        { role: "NEARBY_RIDER" as const, name: "Mid", distanceMeters: 1000 },
+      ];
+      const result = markSmsEligibility(recipients, 2);
+      expect(result.find((r) => r.name === "Near")?.smsEligible).toBe(true);
+      expect(result.find((r) => r.name === "Mid")?.smsEligible).toBe(true);
+      expect(result.find((r) => r.name === "Far")?.smsEligible).toBe(false);
+    });
+
+    it("does not mutate the input array's objects", () => {
+      const recipients = [{ role: "NEARBY_RIDER" as const, name: "A", distanceMeters: 100 }];
+      markSmsEligibility(recipients, 1);
+      expect(recipients[0]).not.toHaveProperty("smsEligible");
+    });
+
+    it("treats a recipient with no distanceMeters as farthest (sorts last)", () => {
+      const recipients = [
+        { role: "NEARBY_RIDER" as const, name: "Unknown distance" },
+        { role: "NEARBY_RIDER" as const, name: "Known", distanceMeters: 9000 },
+      ];
+      const result = markSmsEligibility(recipients, 1);
+      expect(result.find((r) => r.name === "Known")?.smsEligible).toBe(true);
+      expect(result.find((r) => r.name === "Unknown distance")?.smsEligible).toBe(false);
+    });
+
+    it("defaults to SOS_SMS_RECIPIENT_LIMIT (10) when no explicit limit is given", () => {
+      const recipients = Array.from({ length: 15 }, (_, i) => ({
+        role: "NEARBY_RIDER" as const,
+        name: `r${i}`,
+        distanceMeters: i * 100,
+      }));
+      const result = markSmsEligibility(recipients);
+      expect(result.filter((r) => r.smsEligible).length).toBe(10);
+    });
   });
 });
 

@@ -35,6 +35,8 @@ export interface SOSAlertDTO {
   riderVehicleType: string | null;
   riderVehicleBrand: string | null;
   riderVehicleModel: string | null;
+  /** ADR-059 — feeds the DLT "BIKIE_SR" dispatch SMS template's Vehicle Registration Number slot. */
+  riderVehicleRegistrationNumber: string | null;
   /** ADR-045 — server-computed straight-line distance from the viewer's own supplied lat/lng,
    * only present on `GET /api/sos/alerts?lat=&lng=` results (undefined everywhere else, e.g. the
    * single-alert detail route, which has no viewer location to compute against). Compensates for

@@ -8,6 +8,7 @@ import '../data/msg91_otp_repository.dart';
 import '../domain/auth_controller.dart';
 import '../domain/role_provider.dart';
 import '../../../core/widgets/app_logo.dart';
+import '../../../core/widgets/app_toast.dart';
 import 'widgets/dev_otp_banner.dart';
 import 'widgets/otp_channel_toggle.dart';
 import 'widgets/phone_number_field.dart';
@@ -85,6 +86,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       _fetchDevOtp(normalized);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
       if (mounted) setState(() => _sendingOtp = false);
     }
@@ -97,6 +99,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       await ref.read(authRepositoryProvider).resendOtp(_phoneNumber, reqId: _reqId, channel: _otpChannel);
       startResendCountdown();
       _fetchDevOtp(_phoneNumber);
+      if (mounted) showAppToast(context, 'Verification code resent', variant: AppToastVariant.success);
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
       if (mounted) setState(() => _sendingOtp = false);
     }
@@ -124,12 +129,19 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
         // Brand-new account: collect the same profile details the website gathers post-signup
         // (mirrors web's role-based redirect in apps/web/app/(auth)/signup/page.tsx) — rider
         // profile is skippable, partner profile is not. Existing users never reach this branch.
-        if (mounted) context.go(accountType == 'SERVICE_PROVIDER' ? '/partner-onboarding' : '/onboarding');
+        if (mounted) {
+          showAppToast(context, 'Account created successfully', variant: AppToastVariant.success);
+          context.go(accountType == 'SERVICE_PROVIDER' ? '/partner-onboarding' : '/onboarding');
+        }
         return;
       }
-      if (mounted) context.go('/');
+      if (mounted) {
+        showAppToast(context, 'Signed in successfully', variant: AppToastVariant.success);
+        context.go('/');
+      }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
       if (mounted) setState(() => _verifying = false);
     }

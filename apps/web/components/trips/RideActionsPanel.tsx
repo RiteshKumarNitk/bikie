@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { ReportModal } from "@/components/shared/ReportModal";
+import { useToast } from "@/components/ui/Toast";
 
 interface MyRequestStatus {
   status: string;
@@ -66,6 +67,7 @@ function RiderPanel({ tripSlug, tripId, seatsLeft }: { tripSlug: string; tripId:
   const [message, setMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   function reload() {
     fetchJson(`/api/trips/${tripSlug}/requests/mine`).then((data) => setRequest(data?.request ?? null));
@@ -84,9 +86,12 @@ function RiderPanel({ tripSlug, tripId, seatsLeft }: { tripSlug: string; tripId:
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(typeof data.error === "string" ? data.error : "Couldn't send your request.");
+        const messageText = typeof data.error === "string" ? data.error : "Couldn't send your request.";
+        setError(messageText);
+        toast.error(messageText);
         return;
       }
+      toast.success("Request submitted successfully");
       reload();
     } finally {
       setIsSubmitting(false);
@@ -177,6 +182,7 @@ function RiderPanel({ tripSlug, tripId, seatsLeft }: { tripSlug: string; tripId:
 function OrganizerPanel({ tripSlug }: { tripSlug: string }) {
   const [requests, setRequests] = useState<RideRequest[] | undefined>(undefined);
   const [decidingId, setDecidingId] = useState<string | null>(null);
+  const toast = useToast();
 
   function reload() {
     fetchJson(`/api/trips/${tripSlug}/requests`).then((data) => setRequests(data?.requests ?? []));
@@ -187,7 +193,12 @@ function OrganizerPanel({ tripSlug }: { tripSlug: string }) {
   async function decide(requestId: string, decision: "approve" | "reject") {
     setDecidingId(requestId);
     try {
-      await fetch(`/api/trips/${tripSlug}/requests/${requestId}/${decision}`, { method: "POST" });
+      const res = await fetch(`/api/trips/${tripSlug}/requests/${requestId}/${decision}`, { method: "POST" });
+      if (!res.ok) {
+        toast.error("Unable to complete the request. Please try again.");
+        return;
+      }
+      toast.success(decision === "approve" ? "Request approved" : "Request rejected");
       reload();
     } finally {
       setDecidingId(null);

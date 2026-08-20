@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../data/partner_membership_model.dart';
 import '../data/partner_membership_repository.dart';
 import '../domain/partner_membership_providers.dart';
@@ -131,13 +132,11 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
       await ref.read(partnerMembershipRepositoryProvider).purchase(planId: widget.plan.id, paymentId: paymentId);
       ref.invalidate(activePartnerMembershipProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${widget.plan.name} activated!')),
-        );
+        showAppToast(context, 'Subscription purchased successfully', variant: AppToastVariant.success);
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        showAppToast(context, e.message, variant: AppToastVariant.error);
       }
     } finally {
       if (mounted) setState(() => _isPurchasing = false);

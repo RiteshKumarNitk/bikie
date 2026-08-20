@@ -89,6 +89,7 @@ export const riderProfileSchema = z
     vehicleType: optionalString(50),
     vehicleBrand: optionalString(50),
     vehicleModel: optionalString(50),
+    vehicleRegistrationNumber: optionalString(20),
     governmentIdType: z.enum(["AADHAAR", "PASSPORT"]).optional(),
     governmentIdNumber: optionalString(30),
     riderFrequency: z.enum(["OCCASIONAL", "WEEKLY", "DAILY"]).optional(),

@@ -1,5 +1,70 @@
 # BIKIE Changelog
 
+## 2026-08-20 — SOS dispatch moves to the DLT "BIKIE_SR" SMS template; found a real DLT-compliance bug; SMS capped to nearest 10 (ADR-059)
+
+Requested: a third DLT template ("BIKIE_SR") for SOS SMS to nearby riders/Service Providers, capped
+to 10 recipients. Tracing the actual SOS dispatch code (`fan-out.application.ts`) turned up a real,
+pre-existing bug: **every SOS SMS — to nearby riders, providers, emergency contacts, and admins —
+has likely been silently rejected by MSG91 since the feature shipped.** The SMS text has always
+been `buildTextBody`'s free-text, multi-line body (maps links, GPS, distance), tagged with a fixed
+DLT template ID — but India's TRAI content firewall requires an *exact* match to registered text,
+which that dynamic body structurally can't provide. The failure was only ever caught into an
+internal `errors` array, never surfaced anywhere.
+
+The new "BIKIE_SR" template fixes this for the two roles it addresses (`NEARBY_RIDER`/
+`SERVICE_PROVIDER` — "Hello Riders/Service Providers…"). Emergency contacts/admins stay on the
+broken free-text path for now — no approved template exists for that copy, and reusing "BIKIE_SR"
+for a role it doesn't name would be worse than the current silent failure.
+
+**Real data gap found**: the template needs a Vehicle Registration Number, and nothing in BIKIE
+captured one — not on `RiderProfile`, `SOSAlert`, or `Bike`. Added `vehicleRegistrationNumber` to
+`RiderProfile` (optional, mirrors the existing `vehicleType`/`vehicleBrand`/`vehicleModel` fields
+exactly — same onboarding/Settings forms, same "most riders leave it blank" posture), threaded
+through to `SOSAlertDTO` and both platforms' SOS detail screens, not just the SMS. Falls back to
+`"N/A"` in the SMS specifically (never blank, which risks the DLT filter rejecting the message
+outright).
+
+**SMS capped to the nearest 10** per dispatch batch (`markSmsEligibility`, sorts the combined
+nearby-rider + provider pool by distance) — in-app push/WhatsApp/email are unaffected, since
+under-notifying there has real safety cost and neither is billed per-message the way SMS is.
+
+Verified: `tsc --noEmit` clean (database/types/validation/services/web), 213/213 backend tests
+pass (7 new), `next build` succeeds. Mobile: `flutter analyze` (1 pre-existing, unrelated issue),
+`flutter test` (112/112 pass). `build_runner` codegen for the new Dart model fields hit a real
+toolchain bug on this machine (this Flutter SDK's Dart version is newer than the `analyzer`
+package `build_runner` resolves, which crashes regenerating any `@freezed` file) — worked around
+by hand-patching the two affected generated files at every site freezed/json_serializable would
+have generated, verified clean by both `flutter analyze` and the IDE's live Dart diagnostics.
+Full details in ADR-059.
+
+## 2026-08-19 — Rider membership purchase sends the DLT-approved "BIKIE_Sub" SMS confirmation (ADR-058)
+
+MSG91 has a second, already-approved DLT template beyond the SOS-alert one this codebase already
+used: "BIKIE_Sub" (Sender ID `KSHIDL`), fixed text `Hello Rider ##alphanumeric##; Welcome to
+BIKIE Community, You are successfully subscribed for BIKIE annual Membership, your membership
+will be renewed on ##alphanumeric## as Noted by KSHIDL`. Wired it to fire once a **Rider**
+membership purchase succeeds.
+
+**Rider-only, deliberately**: the template's own copy says "annual Membership," which is only
+true of the Rider plan (₹99/365 days) — the Service Provider plan is ₹99/*month* (ADR-056), so
+this exact template would be factually wrong there, and India's DLT content-firewall rules mean
+the fixed text can't be swapped per-purpose at send time anyway. Never wired into
+`PartnerMembershipService`.
+
+`SmsPort.send` gained an optional `templateId` parameter (every existing caller — SOS alerts — is
+unaffected, since omitting it preserves the prior default-template behavior exactly). New
+`SMSService.sendMembershipSubscribed` builds the exact template text and new
+`MSG91_MEMBERSHIP_SUB_TEMPLATE_ID` env var supplies the DLT template ID.
+`MembershipService.purchaseMembership` fires it fire-and-forget after the membership row is
+created — mirrors this codebase's existing pattern (`AccountTypeRequestService.review`) for
+"notification must never fail the underlying success," and is skipped entirely when the user has
+no phone number on file.
+
+Verified: `tsc --noEmit` clean (services/database/web), 206/206 tests pass (5 new — an explicit
+`templateId` overriding the SMS adapter's default, the default still applying when omitted, and
+three `MembershipService.purchaseMembership` cases), `next build` succeeds. Full details in
+`.docs/DECISIONS.md` ADR-058.
+
 ## 2026-08-19 — SMS/WhatsApp OTP channel toggle; mobile release builds move to MSG91's Widget SDK (ADR-057)
 
 Requested: an SMS/WhatsApp toggle on OTP screens, plus mobile adopting `sendotp_flutter_sdk`.

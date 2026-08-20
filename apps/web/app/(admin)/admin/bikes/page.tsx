@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 interface AdminBike {
   id: string;
@@ -20,6 +21,7 @@ export default function AdminBikesPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     fetch("/api/bikes?pageSize=48")
@@ -34,10 +36,15 @@ export default function AdminBikesPage() {
   }, []);
 
   async function handleDelete(id: string) {
-    await fetch(`/api/admin/bikes/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/bikes/${id}`, { method: "DELETE" });
     setDeletingId(null);
+    if (!res.ok) {
+      toast.error("Unable to delete this bike. Please try again.");
+      return;
+    }
     setBikes((prev) => prev.filter((b) => b.id !== id));
     setTotal((prev) => prev - 1);
+    toast.success("Bike deleted successfully");
   }
 
   const filtered = bikes.filter(

@@ -26,6 +26,12 @@ export interface SOSRecipient {
   /** In-app notification target (platform users only). */
   userId?: string;
   distanceMeters?: number;
+  /** ADR-059 — undefined/true means eligible; explicit `false` means the SMS channel is skipped
+   * for this recipient (in-app/WhatsApp/email are unaffected). Set by `markSmsEligibility` on the
+   * combined nearby-rider + service-provider candidate pool before dispatch, capping the DLT
+   * "BIKIE_SR" SMS to the nearest `SOS_SMS_RECIPIENT_LIMIT` — never set for the small, fixed
+   * emergency-contact/admin/emergency-services recipient lists, which the cap doesn't apply to. */
+  smsEligible?: boolean;
 }
 
 /** Human-readable location for notification text (ADR-038) — prefers the reverse-geocoded
@@ -83,6 +89,28 @@ export function buildTextBody(alert: DispatchableAlert, recipient: SOSRecipient)
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+/**
+ * ADR-059 — the DLT-approved "BIKIE_SR" template's exact fixed text (Sender ID `KSHIDL`,
+ * `MSG91_SOS_HELP_TEMPLATE_ID`), for the **SMS channel only**, sent only to `NEARBY_RIDER`/
+ * `SERVICE_PROVIDER` candidate-responder recipients — matches this template's own "Hello
+ * Riders/Service Providers" framing exactly. WhatsApp/email/in-app keep the richer
+ * `buildTextBody`/`buildEmailHtml` (no DLT constraint applies to those channels). India's TRAI
+ * DLT content firewall requires an exact match to the registered text; only the three
+ * `##alphanumeric##` values (rider name, vehicle reg, location) actually vary. Vehicle
+ * registration is optional on `RiderProfile` and usually unset — "N/A" is a deliberate, honest
+ * fallback (never an empty string, which the DLT filter may reject as not matching
+ * `##alphanumeric##` at all), same posture ADR-044 already established for the sibling
+ * vehicleType/Brand/Model fields being empty for most riders.
+ */
+export function buildSmsTemplateBody(alert: DispatchableAlert): string {
+  const vehicleReg = alert.riderVehicleRegistrationNumber?.trim() || "N/A";
+  return (
+    `Hello Riders/Service Providers, Rider ${alert.userName}, with Vehicle registration number is ` +
+    `${vehicleReg} having some emergency situation at ${describeLocation(alert)} ;Please reach out ` +
+    `to Rider to Provide Moral support and Adequate help, as noted by Kiesh India`
+  );
 }
 
 export function buildEmailHtml(alert: DispatchableAlert, recipient: SOSRecipient): string {

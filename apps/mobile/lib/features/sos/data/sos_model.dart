@@ -37,6 +37,9 @@ class SOSAlert with _$SOSAlert {
     String? riderVehicleType,
     String? riderVehicleBrand,
     String? riderVehicleModel,
+    // ADR-059 — feeds the DLT "BIKIE_SR" SOS dispatch SMS template's Vehicle Registration
+    // Number slot; also shown directly in this screen next to type/brand/model.
+    String? riderVehicleRegistrationNumber,
     // ADR-045 — server-computed distance from the viewer's own supplied lat/lng; only populated
     // on the active-alerts list (`GET /api/sos/alerts?lat=&lng=`), null elsewhere. Compensates
     // for latitude/longitude being redacted pre-assignment.

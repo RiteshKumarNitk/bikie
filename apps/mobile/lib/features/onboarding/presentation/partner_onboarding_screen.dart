@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../data/partner_profile_model.dart';
@@ -194,6 +195,11 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       // just after an incidental name update. `role` itself is never touched here anymore.
       await ref.read(authControllerProvider.notifier).refreshSession();
       if (!mounted) return;
+      showAppToast(
+        context,
+        _isEditMode ? 'Profile updated successfully' : 'Profile created successfully',
+        variant: AppToastVariant.success,
+      );
       if (_isEditMode) {
         context.pop();
       } else {
@@ -211,6 +217,7 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
       if (mounted) setState(() => _saving = false);
     }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../bikes/data/bike_models.dart';
 import '../domain/booking_calculator.dart';
 import '../domain/booking_providers.dart';
@@ -63,11 +64,11 @@ class _CreateBookingSheetState extends ConsumerState<CreateBookingSheet> {
 
   Future<void> _submit() async {
     if (_range == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pick your travel dates')));
+      showAppToast(context, 'Pick your travel dates', variant: AppToastVariant.warning);
       return;
     }
     if (_cityController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Pickup city is required')));
+      showAppToast(context, 'Pickup city is required', variant: AppToastVariant.warning);
       return;
     }
     setState(() => _isSubmitting = true);
@@ -81,13 +82,15 @@ class _CreateBookingSheetState extends ConsumerState<CreateBookingSheet> {
       if (mounted) {
         Navigator.of(context).pop();
         context.push('/bookings');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Booking ${booking.status.toLowerCase()} — see My Bookings')),
+        showAppToast(
+          context,
+          'Request submitted successfully — booking ${booking.status.toLowerCase()}',
+          variant: AppToastVariant.success,
         );
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        showAppToast(context, e.message, variant: AppToastVariant.error);
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);

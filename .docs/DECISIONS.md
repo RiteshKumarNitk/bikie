@@ -2754,8 +2754,31 @@ changes:
     show the *call* shape, not the *response* shape. `Msg91OtpRepository`'s `_extractReqId`/
     `_extractToken` parse defensively across several plausible key names rather than assuming
     one, and every failure path converts to a generic `ApiException` message rather than
-    surfacing the SDK's raw text. **This needs a live-device test pass before shipping** — flagged
-    explicitly in code comments on both extraction methods and here, not discovered later.
+    surfacing the SDK's raw text. **Live-device confirmed 2026-08-20** (real mobile OTP send
+    failing in the field, `"IPBlocked"` shown to the user): MSG91's widget API returns **HTTP 200**
+    with `{"type": "error", "message": "<reason>"}` on rejection — a normal, non-throwing
+    response, not a 4xx/5xx (same "always-200, read the body" quirk `sms.adapter.ts` already
+    documents for the plain sendsms API). `_extractReqId` had no `type === "error"` guard (unlike
+    `_extractToken`, which already had one) and `retryOtp` didn't inspect its response at all, so
+    an `"IPBlocked"`/any-other-rejection response was silently read as a *successful* `reqId` (or
+    silently swallowed on the WhatsApp-channel retry) — the SDK's raw error text ended up on
+    screen not because it was deliberately surfaced, but because the send was wrongly treated as
+    having succeeded and a *later* call failed differently. Fixed: both methods now check
+    `type === "error"` (a new shared `_isErrorResponse` helper) before reading `message` as a
+    success value, restoring the documented intent that failures always surface the same generic
+    `ApiException` message, never MSG91's raw text.
+  - **Separately, a real MSG91-side configuration gap, not a code bug:** the shared `BIKIEOTP`
+    widget (id `366865617643373439363036`, used by both platforms) has **`"mobileIntegration": 0`**
+    in its live MSG91 config (`GET .../getWidgetProcess`, read-only, no OTP sent) — `sendotp_flutter_sdk`'s
+    own README states this must be enabled for the SDK to function. Web is unaffected because the
+    browser `<script>` widget is a separate MSG91 product path (domain-restricted, not
+    integration-flag-gated). A probe against `sendOtpMobile` with this widget's real credentials
+    (invalid identifier, no real OTP triggered) returned an anomalous 302 redirect to a different
+    host (`otpwidget.msg91.com`) carrying an internal auth-bypass JWT, ultimately erroring —
+    consistent with MSG91 routing non-integration-enabled mobile calls through a gated path. User
+    is enabling "Mobile Integration" on the existing widget via MSG91's dashboard directly (an
+    additive setting per MSG91's docs — doesn't alter anything the browser widget relies on); no
+    code or widget-ID change needed on either platform once that's done.
   - The `'text'` → `'SMS-11'` channel-code correction on web's `retryOtp` is a behavior change to
     an already-live code path (previously used for plain SMS resend, no WhatsApp option existed).
     Also needs a live end-to-end test — nothing here is unit-testable, since both send/verify legs
@@ -2777,3 +2800,155 @@ changes:
     vitest suite unaffected (this change touches no backend logic — `otp-verify.application.ts`'s
     discriminator, the actual thing making mobile's new flow work, was already covered by
     `identity-access.test.ts` before this change and needed no modification).
+
+## ADR-058: Rider membership purchase sends the DLT-approved "BIKIE_Sub" SMS confirmation
+
+- **Context.** MSG91 has a second, already-DLT-approved transactional SMS template beyond the
+  SOS-alert one this codebase already used (`MSG91_TEMPLATE_ID`, `sms.adapter.ts`): "BIKIE_Sub"
+  (Sender ID `KSHIDL`, template ID `1077368990007493633`), fixed text `Hello Rider
+  ##alphanumeric##; Welcome to BIKIE Community, You are successfully subscribed for BIKIE annual
+  Membership, your membership will be renewed on ##alphanumeric## as Noted by KSHIDL`. Requested:
+  send it whenever a user subscribes. The template's own copy — "annual Membership" — only
+  describes the **Rider** membership plan (₹99/365 days); the Service Provider plan is ₹99/*month*
+  as of ADR-056, so this template is factually wrong for it and was never wired to that purchase
+  path. A separate template would be needed if Service-Provider-specific SMS confirmation is ever
+  wanted, never this one (India's TRAI DLT content firewall requires an exact match to a
+  registered template's fixed text, so "annual" can't be dynamically swapped for "monthly" at
+  send time either).
+- **Decision.**
+  - **`SmsPort.send`** gained an optional third `templateId` parameter, overriding the adapter's
+    configured default (`MSG91_TEMPLATE_ID`) for this one call — every previously-existing caller
+    (SOS alerts) is unaffected, since omitting it preserves the exact prior behavior. Needed
+    because the adapter previously assumed one single DLT template for the whole app; a second
+    template requires a second ID reachable per-call, not a second hardcoded default.
+  - **New `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID`** env var (`.env.example`, `apps/web/.env` — the
+    real value from the DLT dashboard screenshot). Same `MSG91_SENDER_ID`/`MSG91_AUTH_KEY` as
+    every other MSG91 send — only the template ID differs, matching how `MSG91_OTP_TEMPLATE_ID`
+    already coexists with `MSG91_TEMPLATE_ID` for the same reason.
+  - **`SMSService.sendMembershipSubscribed(phoneNumber, name, renewalDate)`** builds the exact
+    template text with `name` and a formatted `renewalDate` filling the two `##alphanumeric##`
+    slots, and passes the new template ID through to `sms.send`.
+  - **`MembershipService.purchaseMembership`** calls it once the membership row is created,
+    reading `phoneNumber`/`name` via `userRepository.findById`. Fire-and-forget with its own
+    `.catch` — mirrors `AccountTypeRequestService.review`'s established pattern in this codebase:
+    a notification failure must never fail an otherwise-successful purchase. Skipped entirely
+    when the user has no `phoneNumber` on file (should not happen for a phone-signup account, but
+    the email/password admin path exists — see ADR-055's own note on this). **Never wired into
+    `PartnerMembershipService.purchaseMembership`** — see Context above.
+- **Consequences.** New tests: `communications.test.ts` confirms an explicit `templateId`
+  overrides the adapter's default and that omitting it still falls back to `MSG91_TEMPLATE_ID`
+  (SOS alerts unaffected); new `membership.service.test.ts` confirms the SMS fires with the right
+  arguments, is skipped without a phone number, and never propagates a failure into the purchase
+  response. `tsc --noEmit` clean across services/database/web, 206/206 tests pass (5 new),
+  `next build` succeeds.
+
+## ADR-059: SOS dispatch SMS moves to the DLT "BIKIE_SR" template; a real DLT-compliance gap found; new vehicle-registration field; SMS capped to nearest 10
+
+- **Context.** Requested: a third DLT SMS template — "BIKIE_SR" (Sender ID `KSHIDL`, fixed text
+  `Hello Riders/Service Providers, Rider ##alphanumeric##, with Vehicle registration number is
+  ##alphanumeric## having some emergency situation at ##alphanumeric## ;Please reach out to Rider
+  to Provide Moral support and Adequate help, as noted by Kiesh India`) — sent to nearby riders and
+  Service Providers when someone raises an SOS, capped to 10 recipients when more are nearby.
+  Investigating where SOS dispatch actually sends SMS today (`fan-out.application.ts`'s
+  `dispatchToRecipient`, called from both `fanOut` and `escalation.application.ts`) surfaced a
+  real, pre-existing production bug: every SOS SMS — to nearby riders, Service Providers,
+  emergency contacts, and admins alike — has been going out as `buildTextBody`'s free-text,
+  multi-line body (role hint, distance, maps links, GPS coordinates) with only
+  `MSG91_TEMPLATE_ID` as its DLT tag. That text does not, and structurally cannot, match any
+  single fixed DLT template — India's TRAI content firewall requires an exact match, not "close
+  enough." This SMS has very likely been silently rejected by MSG91 on every send since the SOS
+  feature shipped; the failure was caught into `summary.errors` (visible only in the create-alert
+  API response's `dispatch.errors` array and server logs), never surfaced anywhere a human would
+  actually see it. The user's own "BIKIE_SR" template is the fix for the two roles it's addressed
+  to; emergency contacts/admins remain on the broken free-text path, since no approved template
+  exists for that copy — flagged as a known, separate, still-open gap rather than silently
+  patched over by reusing "BIKIE_SR" for a role it doesn't address.
+  - **Data gap found and resolved via explicit user decision, not assumed:** the template needs a
+    Vehicle Registration Number, and nothing in BIKIE captured one anywhere — not on
+    `RiderProfile` (which has `vehicleType`/`vehicleBrand`/`vehicleModel`, ADR-014, but no
+    registration number), not on `SOSAlert`, not on `Bike`. Asked the user rather than inventing a
+    source or shipping a permanent `"N/A"` placeholder to real SMS recipients; asked separately
+    whether the "cap to 10" applies to SMS only or the whole dispatch (push/WhatsApp/email too),
+    since those questions have materially different risk (a data-model change touching two
+    platforms' onboarding forms, vs. a behavior change to the escalation system other ADRs have
+    carefully tuned). The user's clarifying-question response was not captured by the tool UI and
+    they said to continue; both were resolved by explicit reasoning here rather than silently
+    guessed, so the tradeoffs are on record: **(1)** add `vehicleRegistrationNumber` to
+    `RiderProfile`, mirroring the existing three vehicle fields' pattern exactly (optional,
+    settable from onboarding/Settings, most riders will leave it empty — same posture ADR-044
+    already established for its siblings) rather than adding a field to the time-pressured
+    SOS-creation flow itself. **(2)** cap SMS only — in-app push/WhatsApp/email are unaffected by
+    the cap, since under-notifying on those channels has real safety cost and neither is
+    per-message billed; SMS is both.
+- **Decision.**
+  - **New `RiderProfile.vehicleRegistrationNumber`** (migration `20260820090000_rider_vehicle_registration_number`,
+    additive/nullable, no backfill), threaded through the exact same points as the sibling
+    `vehicleType`/`vehicleBrand`/`vehicleModel` fields: `rider-profile.repository.ts`
+    (`RiderProfileRow`/`toDTO`/`RiderProfileInputData`/`sharedFields`),
+    `RiderProfileDTO`/validation schema, the web onboarding form + `RiderDetailsSettings`
+    (`RiderProfileExtraFields.tsx`'s `VehicleDetailsFields`), and mobile's
+    `RiderProfileInput`/`rider_onboarding_screen.dart`. Also joined into `sos.repository.ts`'s
+    alert query alongside the other three vehicle fields (`ALERT_USER_INCLUDE`), exposed on
+    `SOSAlertDTO` as `riderVehicleRegistrationNumber`, and — since it's already fetched — also
+    surfaced directly in both platforms' SOS detail UI next to the existing vehicle
+    type/brand/model line, not only inside the SMS text.
+  - **`buildSmsTemplateBody(alert)`** (`dispatch-message.ts`) — the "BIKIE_SR" template's exact
+    fixed text, `"N/A"` fallback for an unset vehicle registration (never an empty string, which
+    risks the DLT filter rejecting the whole message for not matching `##alphanumeric##` at all).
+    `dispatchToRecipient` uses it, with `MSG91_SOS_HELP_TEMPLATE_ID`, only for
+    `NEARBY_RIDER`/`SERVICE_PROVIDER` recipients on the SMS channel specifically; every other
+    channel (WhatsApp/email/in-app) and every other role keep their existing, richer bodies
+    unchanged.
+  - **`SmsPort.send`'s `templateId` parameter** (already added in ADR-058) is what makes per-call
+    DLT template selection possible here too — no further port changes needed.
+  - **`markSmsEligibility(recipients, limit = SOS_SMS_RECIPIENT_LIMIT)`** (`fan-out.application.ts`,
+    limit defaults to 10) sorts the combined nearby-rider + Service-Provider candidate array by
+    `distanceMeters` ascending and marks only the nearest `limit` `smsEligible: true` (rest
+    `false`) — a new immutable-copy function, not a mutation. New `SOSRecipient.smsEligible?:
+    boolean` field (`undefined`/`true` = eligible) read by `dispatchToRecipient`'s SMS branch;
+    every other channel ignores it entirely. Applied at all three places `escalation.application.ts`
+    builds a combined candidate batch before dispatch (`seedEscalation`'s `toNotify`, and both of
+    `tickEscalation`'s `fresh` arrays) — per-dispatch-batch, not a lifetime-per-alert counter, so a
+    later radius-widening tick gets its own fresh 10 among newly-eligible candidates. Emergency
+    contacts/admins/emergency-services recipient lists are never passed through this function —
+    the cap doesn't apply to them (small, fixed-size, not the "nearby pool" concern this addresses).
+- **Consequences.** New tests in `safety-location.test.ts`: `buildSmsTemplateBody` matches the
+  registered text exactly (including the `"N/A"` fallback and redacted-aware location), and
+  `markSmsEligibility` picks the nearest N, doesn't mutate its input, treats a missing
+  `distanceMeters` as farthest, and defaults to a limit of 10. Existing PII-redaction test
+  (`dispatch PII redaction`) still passes unmodified — its assertions (`riderText` excludes exact
+  GPS/phone, includes the rider's name) hold identically true of the new template text. `tsc
+  --noEmit` clean across database/types/validation/services/web; 213/213 backend tests pass (7
+  new); `next build` succeeds. Mobile: `flutter analyze` — 1 issue, pre-existing and unrelated
+  (`http` not declared as a direct dependency in `partner_onboarding_screen.dart`); `flutter
+  test` — 112/112 pass, no regressions.
+  - **Toolchain bug hit and worked around, not silently absorbed:** this machine's Flutter SDK
+    (3.47.0 / Dart 3.13.0) is newer than the `analyzer` package `build_runner` resolves
+    (`pubspec.lock` pinned `analyzer: 7.6.0`), and `analyzer`'s AST-to-summary linker has no case
+    for a newer Dart syntax node (`DotShorthandPropertyAccess`) — `dart run build_runner build`
+    crashes (`Exception: Missing implementation of visitDotShorthandPropertyAccess`) partway
+    through regenerating `.freezed.dart`/`.g.dart`, after its first step has already deleted all
+    44 of them, leaving the mobile app uncompilable until it finishes or is reverted. `flutter pub
+    upgrade` only moved the lock to `analyzer: 7.7.1` (still too old — build_runner's own
+    constraint blocks a jump to the fixed `14.x` line, which would need major-version bumps of
+    `build_runner`/`freezed`/`json_serializable` themselves) and, separately, pulled in a new
+    native-assets transitive dependency (`objective_c`) whose build hook broke outright on this
+    machine's path; both were reverted rather than pursued further, since a multi-major dependency
+    upgrade to fix codegen tooling is out of scope for a one-field change. **Actual fix applied:**
+    hand-patched the two affected generated files
+    (`rider_profile_model.freezed.dart`/`.g.dart`, `sos_model.freezed.dart`/`.g.dart`) to add the
+    new field at every site `freezed`/`json_serializable` would generate it (getter, `copyWith`
+    call signature and both implementations, constructor param, field, `toString`, `==`,
+    `hashCode`, JSON to/from) — mechanical, since freezed's output is fully deterministic per
+    field, and verified via `flutter analyze` (no new errors) plus the IDE's own Dart analysis
+    server surfacing real-time type errors while each site was being patched. This is a stopgap:
+    the next time someone runs `build_runner` on a machine with a compatible `analyzer`, it will
+    regenerate these files from source and silently supersede the hand patch — nothing to clean up
+    later. The other 42 previously-tracked generated files were untouched (confirmed via
+    `git status`/`git diff` showing zero diff on them after two separate accidental
+    `--delete-conflicting-outputs` deletions this session, both restored via `git checkout HEAD --
+    <path>` before being hand-patched).
+  **Not fixed here, flagged as follow-up:** emergency-contact/admin SOS SMS remains on the
+  free-text body that likely fails MSG91's DLT filter — needs its own approved template before
+  it's actually fixable, and applying "BIKIE_SR" to a role it doesn't address would be worse than
+  the current silent failure, not better.

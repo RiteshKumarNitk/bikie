@@ -27,6 +27,7 @@ interface Alert {
   riderVehicleType: string | null;
   riderVehicleBrand: string | null;
   riderVehicleModel: string | null;
+  riderVehicleRegistrationNumber: string | null;
 }
 
 interface Offer {
@@ -249,6 +250,9 @@ export default function PartnerSosRequestPage() {
                   .filter(Boolean)
                   .join(" · ")}
               </p>
+            )}
+            {alert.riderVehicleRegistrationNumber && (
+              <p className="text-sm text-foreground/50">Reg. no: {alert.riderVehicleRegistrationNumber}</p>
             )}
             {alert.description && <p className="mt-2 text-sm text-foreground/70">{alert.description}</p>}
             {alert.latitude != null && alert.longitude != null && (

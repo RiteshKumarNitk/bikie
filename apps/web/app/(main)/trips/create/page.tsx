@@ -6,6 +6,7 @@ import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { LocationPicker, type LocationPickerValue } from "@/components/shared/LocationPicker";
+import { useToast } from "@/components/ui/Toast";
 
 const RIDE_TYPES = [
   { value: "WEEKEND", label: "Weekend Ride" },
@@ -43,6 +44,7 @@ export default function CreateRidePage() {
 
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const toast = useToast();
 
   useEffect(() => {
     if (!isPending && !session) {
@@ -92,15 +94,17 @@ export default function CreateRidePage() {
       }
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        setError(
+        const message =
           typeof data.error === "string"
             ? data.error
-            : "Couldn't create the ride — check the form and try again.",
-        );
+            : "Couldn't create the ride — check the form and try again.";
+        setError(message);
+        toast.error(message);
         return;
       }
 
       const data = await res.json();
+      toast.success("Ride created successfully");
       router.push(`/trips/${data.trip.slug}`);
     } finally {
       setIsSubmitting(false);

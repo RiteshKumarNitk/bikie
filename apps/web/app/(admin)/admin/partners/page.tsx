@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import type { AdminPartnerRowDTO, AdminPartnerStatsDTO } from "@bikie/types";
+import { useToast } from "@/components/ui/Toast";
 
 const STAT_CARDS: { key: keyof AdminPartnerStatsDTO; label: string; tone?: string }[] = [
   { key: "total", label: "Total Providers" },
@@ -40,6 +41,7 @@ export default function AdminPartnersPage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     fetch("/api/admin/partners")
@@ -48,9 +50,14 @@ export default function AdminPartnersPage() {
   }, []);
 
   async function handleDelete(id: string) {
-    await fetch(`/api/admin/partners/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/partners/${id}`, { method: "DELETE" });
     setDeletingId(null);
+    if (!res.ok) {
+      toast.error("Unable to delete this provider. Please try again.");
+      return;
+    }
     setPartners((prev) => prev.filter((p) => p.id !== id));
+    toast.success("Provider deleted successfully");
   }
 
   const filtered = partners.filter(

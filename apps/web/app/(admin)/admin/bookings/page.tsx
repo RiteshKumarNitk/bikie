@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 interface AdminBooking {
   id: string;
@@ -21,6 +22,7 @@ export default function AdminBookingsPage() {
   const [editingBooking, setEditingBooking] = useState<AdminBooking | null>(null);
   const [newStatus, setNewStatus] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     fetch("/api/admin/bookings")
@@ -30,19 +32,29 @@ export default function AdminBookingsPage() {
 
   async function handleUpdateStatus() {
     if (!editingBooking) return;
-    await fetch(`/api/admin/bookings/${editingBooking.id}`, {
+    const res = await fetch(`/api/admin/bookings/${editingBooking.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: newStatus }),
     });
+    if (!res.ok) {
+      toast.error("Unable to update this booking. Please try again.");
+      return;
+    }
     setBookings((prev) => prev.map((b) => (b.id === editingBooking.id ? { ...b, status: newStatus } : b)));
     setEditingBooking(null);
+    toast.success("Booking updated successfully");
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/admin/bookings/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/bookings/${id}`, { method: "DELETE" });
     setDeletingId(null);
+    if (!res.ok) {
+      toast.error("Unable to delete this booking. Please try again.");
+      return;
+    }
     setBookings((prev) => prev.filter((b) => b.id !== id));
+    toast.success("Booking deleted successfully");
   }
 
   const filtered = bookings.filter((b) => !statusFilter || b.status === statusFilter);

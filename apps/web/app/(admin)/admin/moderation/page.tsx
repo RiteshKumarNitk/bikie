@@ -2,6 +2,7 @@
 
 import { Fragment, useEffect, useState } from "react";
 import type { ReportDTO, ReportStatus, ReportTargetType, ModerationConversationSummaryDTO } from "@bikie/types";
+import { useToast } from "@/components/ui/Toast";
 
 const REPORT_STATUSES: ReportStatus[] = ["PENDING", "REVIEWING", "RESOLVED", "DISMISSED"];
 const TARGET_TYPES: ReportTargetType[] = ["MESSAGE", "USER", "TRIP", "CONVERSATION", "GROUP"];
@@ -73,6 +74,7 @@ function ReportsQueue() {
   const [durationHours, setDurationHours] = useState(24);
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const toast = useToast();
 
   // Fetched once on mount; status/target-type filters are applied client-side (same
   // pattern as the Bookings/Users admin pages) so changing a filter never needs to
@@ -96,9 +98,14 @@ function ReportsQueue() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status, resolutionNote }),
     });
+    if (!res.ok) {
+      toast.error("Unable to complete the request. Please try again.");
+      return;
+    }
     const data = await res.json();
     if (data.report) {
       setReports((prev) => prev.map((r) => (r.id === id ? data.report : r)));
+      toast.success("Report updated successfully");
     }
   }
 
@@ -130,7 +137,9 @@ function ReportsQueue() {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
-      setActionError(data?.error ? JSON.stringify(data.error) : "Action failed");
+      const message = data?.error ? JSON.stringify(data.error) : "Action failed";
+      setActionError(message);
+      toast.error(message);
       setSubmitting(false);
       return;
     }
@@ -143,22 +152,30 @@ function ReportsQueue() {
   async function deleteReportedMessage(report: ReportDTO) {
     const noteReason = window.prompt("Reason for deleting this message?", "Violates community guidelines");
     if (!noteReason) return;
-    await fetch(`/api/admin/moderation/messages/${report.targetId}`, {
+    const res = await fetch(`/api/admin/moderation/messages/${report.targetId}`, {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reason: noteReason, reportId: report.id }),
     });
+    if (!res.ok) {
+      toast.error("Unable to delete this message. Please try again.");
+      return;
+    }
     await updateReportStatus(report.id, "RESOLVED", "Message deleted");
   }
 
   async function lockReportedConversation(report: ReportDTO, locked: boolean) {
     const noteReason = window.prompt(locked ? "Reason for locking this conversation?" : "Reason for unlocking?", "Reported content");
     if (!noteReason) return;
-    await fetch(`/api/admin/moderation/conversations/${report.targetId}/lock`, {
+    const res = await fetch(`/api/admin/moderation/conversations/${report.targetId}/lock`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ locked, reason: noteReason }),
     });
+    if (!res.ok) {
+      toast.error("Unable to complete the request. Please try again.");
+      return;
+    }
     await updateReportStatus(report.id, "RESOLVED", locked ? "Conversation locked" : "Conversation unlocked");
   }
 
@@ -383,6 +400,7 @@ function ConversationsQueue() {
   const [viewReasonPending, setViewReasonPending] = useState<string | null>(null);
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const toast = useToast();
 
   // Fetch chain lives directly in the effect (no synchronous setState before the
   // .then) so page changes re-fetch without a pre-emptive setLoading(true) call.
@@ -433,20 +451,32 @@ function ConversationsQueue() {
     const { conversation, action } = actionModal;
     setSubmitting(true);
     if (action === "DELETE") {
-      await fetch(`/api/admin/moderation/conversations/${conversation.id}`, {
+      const res = await fetch(`/api/admin/moderation/conversations/${conversation.id}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: reason.trim() || "No reason given" }),
       });
+      if (!res.ok) {
+        toast.error("Unable to delete this conversation. Please try again.");
+        setSubmitting(false);
+        return;
+      }
       setConversations((prev) => prev.filter((c) => c.id !== conversation.id));
+      toast.success("Conversation deleted successfully");
     } else {
       const locked = action === "LOCK";
-      await fetch(`/api/admin/moderation/conversations/${conversation.id}/lock`, {
+      const res = await fetch(`/api/admin/moderation/conversations/${conversation.id}/lock`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ locked, reason: reason.trim() || "No reason given" }),
       });
+      if (!res.ok) {
+        toast.error("Unable to complete the request. Please try again.");
+        setSubmitting(false);
+        return;
+      }
       setConversations((prev) => prev.map((c) => (c.id === conversation.id ? { ...c, isLocked: locked } : c)));
+      toast.success(locked ? "Conversation locked successfully" : "Conversation unlocked successfully");
     }
     setSubmitting(false);
     setActionModal(null);

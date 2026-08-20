@@ -9,6 +9,7 @@ import { OtpChannelToggle } from "@/components/auth/OtpChannelToggle";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { useMsg91Widget, type OtpChannel } from "@/lib/use-msg91-widget";
 import { LogoMark } from "@/components/layout/LogoMark";
+import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
 
 const inputClassName =
@@ -57,6 +58,7 @@ export default function LoginPage() {
   const [signingIn, setSigningIn] = useState(false);
   const resendTimer = useResendCountdown(60);
   const widget = useMsg91Widget();
+  const toast = useToast();
 
   /** The actual "text me a code" step, factored out so both the normal phone-entry submit and
    * the pre-auth mismatch screen's "Continue as X" button (which needs to resume login, not
@@ -70,7 +72,9 @@ export default function LoginPage() {
       setStep("otp");
       resendTimer.start();
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : "Could not send the verification code. Please try again.");
+      const message = err instanceof Error ? err.message : "Could not send the verification code. Please try again.";
+      setServerError(message);
+      toast.error(message);
     } finally {
       setSendingOtp(false);
     }
@@ -124,8 +128,11 @@ export default function LoginPage() {
     try {
       await widget.retryOtp(otpChannel);
       resendTimer.start();
+      toast.success("Verification code resent");
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : "Could not resend the verification code. Please try again.");
+      const message = err instanceof Error ? err.message : "Could not resend the verification code. Please try again.";
+      setServerError(message);
+      toast.error(message);
     } finally {
       setSendingOtp(false);
     }
@@ -142,7 +149,9 @@ export default function LoginPage() {
       const widgetResult = await widget.verifyOtp(otpCode);
       const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: widgetResult.message });
       if (error) {
-        setServerError(error.message ?? "Invalid or expired code. Please try again.");
+        const message = error.message ?? "Invalid or expired code. Please try again.";
+        setServerError(message);
+        toast.error(message);
         return;
       }
 
@@ -177,7 +186,9 @@ export default function LoginPage() {
       const nextUrl = urlParams.get("next");
       window.location.href = nextUrl || (currentType === "SERVICE_PROVIDER" ? "/partner" : "/dashboard");
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : "Invalid or expired code. Please try again.");
+      const message = err instanceof Error ? err.message : "Invalid or expired code. Please try again.";
+      setServerError(message);
+      toast.error(message);
     } finally {
       setVerifying(false);
     }
@@ -190,7 +201,9 @@ export default function LoginPage() {
     try {
       const { error } = await authClient.signIn.email({ email, password });
       if (error) {
-        setServerError(error.message ?? "Invalid email or password.");
+        const message = error.message ?? "Invalid email or password.";
+        setServerError(message);
+        toast.error(message);
         return;
       }
 
@@ -221,6 +234,7 @@ export default function LoginPage() {
       window.location.href = nextUrl || (currentType === "SERVICE_PROVIDER" ? "/partner" : "/dashboard");
     } catch {
       setServerError("Something went wrong. Please try again.");
+      toast.error("Something went wrong. Please try again.");
     } finally {
       setSigningIn(false);
     }

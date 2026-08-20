@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 interface Plan {
   id: string;
@@ -96,6 +97,7 @@ export function PaymentModal({
   const [cvv, setCvv] = useState("");
   const [status, setStatus] = useState<"form" | "processing" | "error">("form");
   const [formError, setFormError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     let cancelled = false;
@@ -130,11 +132,15 @@ export function PaymentModal({
     try {
       await loadRazorpayCheckout();
     } catch {
-      setRazorpayError("Couldn't load the payment form. Please check your connection and try again.");
+      const message = "Couldn't load the payment form. Please check your connection and try again.";
+      setRazorpayError(message);
+      toast.error(message);
       return;
     }
     if (!window.Razorpay) {
-      setRazorpayError("Couldn't load the payment form. Please try again.");
+      const message = "Couldn't load the payment form. Please try again.";
+      setRazorpayError(message);
+      toast.error(message);
       return;
     }
 
@@ -157,9 +163,12 @@ export function PaymentModal({
           }),
         });
         if (res.ok) {
+          toast.success("Subscription purchased successfully");
           onSuccess();
         } else {
-          setRazorpayError("Payment succeeded but couldn't be verified. Contact support with your payment ID.");
+          const message = "Payment succeeded but couldn't be verified. Contact support with your payment ID.";
+          setRazorpayError(message);
+          toast.error(message);
         }
       },
       modal: {
@@ -198,10 +207,12 @@ export function PaymentModal({
     });
 
     if (res.ok) {
+      toast.success("Subscription purchased successfully");
       onSuccess();
     } else {
       setStatus("form");
       setFormError("Payment could not be processed. Please try again.");
+      toast.error("Payment could not be processed. Please try again.");
     }
   }
 

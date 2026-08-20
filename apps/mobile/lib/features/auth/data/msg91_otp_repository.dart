@@ -58,9 +58,9 @@ class Msg91OtpRepository {
     _ensureWidgetInitialized();
     final identifier = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber;
     final response = await _guarded(() => OTPWidget.sendOTP({'identifier': identifier}));
-    final reqId = _extractReqId(response);
+    final reqId = _isErrorResponse(response) ? null : _extractReqId(response);
     if (reqId == null) {
-      throw ApiException(statusCode: 0, message: 'Could not send the verification code. Please try again.');
+      throw ApiException(statusCode: 0, message: _withReason('Could not send the verification code.', response));
     }
 
     // ADR-057 — MSG91's widget has no channel parameter on the *initial* send (confirmed against
@@ -77,7 +77,10 @@ class Msg91OtpRepository {
 
   Future<void> retryOtp(String reqId, {OtpChannel channel = OtpChannel.sms}) async {
     _ensureWidgetInitialized();
-    await _guarded(() => OTPWidget.retryOTP({'reqId': reqId, 'retryChannel': _retryChannelCode(channel)}));
+    final response = await _guarded(() => OTPWidget.retryOTP({'reqId': reqId, 'retryChannel': _retryChannelCode(channel)}));
+    if (_isErrorResponse(response)) {
+      throw ApiException(statusCode: 0, message: _withReason('Could not send the verification code.', response));
+    }
   }
 
   /// Returns MSG91's access token (an opaque, JWT-like string) on success — pass this straight
@@ -87,9 +90,13 @@ class Msg91OtpRepository {
   Future<String> verifyOtp(String reqId, String otp) async {
     _ensureWidgetInitialized();
     final response = await _guarded(() => OTPWidget.verifyOTP({'reqId': reqId, 'otp': otp}));
-    final token = _extractToken(response);
+    final token = _isErrorResponse(response) ? null : _extractToken(response);
     if (token == null) {
-      throw ApiException(statusCode: 400, message: 'Invalid or expired code. Please try again.', errorCode: 'INVALID_OTP');
+      throw ApiException(
+        statusCode: 400,
+        message: _withReason('Invalid or expired code.', response),
+        errorCode: 'INVALID_OTP',
+      );
     }
     return token;
   }
@@ -104,15 +111,43 @@ class Msg91OtpRepository {
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException(statusCode: 0, message: 'Could not reach the verification service. Please try again.');
+      throw ApiException(
+        statusCode: 0,
+        message: 'Could not reach the verification service. Please try again. (${_shortReason(e)})',
+      );
     }
   }
 
+  /// The underlying reason, kept visible on screen rather than silently discarded — this app is
+  /// still in active testing and a generic "please try again" gives no way to tell "MSG91
+  /// rejected the request" apart from "no internet" apart from "widget misconfigured" apart from
+  /// a dozen other causes. `sendotp_flutter_sdk`'s own exceptions stringify as
+  /// `Exception: Error exception OTP: Exception: Error sending OTP: Exception: Failed to post
+  /// data: \<code\>, \<body\>` — strip the `Exception: ` noise so what's left reads as one sentence.
+  String _shortReason(Object e) => e.toString().replaceAll('Exception: ', '').trim();
+
+  /// Appends MSG91's own rejection reason (e.g. `"IPBlocked"`) to a safe, user-facing prefix — see
+  /// [_shortReason]'s doc comment for why this stays visible instead of being swallowed.
+  String _withReason(String prefix, dynamic response) {
+    if (response is Map && response['message'] is String && (response['message'] as String).isNotEmpty) {
+      return '$prefix (${response['message']})';
+    }
+    return '$prefix Please try again.';
+  }
+
+  /// Live-device confirmed (2026-08-20): MSG91's widget API returns HTTP 200 with
+  /// `{"type": "error", "message": "<reason>"}` on rejection (e.g. `"IPBlocked"`) — a normal,
+  /// non-throwing response, since MSG91 uses HTTP status only for transport-level failures, not
+  /// business-logic ones (same quirk as `sms.adapter.ts`'s plain sendsms API). Every call site
+  /// must check this *before* reading `message` as a success value — `message` is reused as both
+  /// the success payload and the error text depending on `type`. Was a real bug here previously:
+  /// `_extractReqId` had no such check, so an `"IPBlocked"`-style rejection was silently read as
+  /// a valid `reqId` and treated as a successful send.
+  bool _isErrorResponse(dynamic response) => response is Map && response['type'] == 'error';
+
   /// `sendotp_flutter_sdk`'s exact response shape for a successful send is not confirmed from
   /// public docs alone (its README shows the call, not the response body) — this reads every
-  /// plausible key defensively rather than assuming one. **Needs live-device confirmation**
-  /// before this is trusted without a manual test pass — flagged explicitly in ADR-057 and the
-  /// implementation report rather than silently assumed correct.
+  /// plausible key defensively rather than assuming one.
   String? _extractReqId(dynamic response) {
     if (response is Map) {
       final candidate = response['message'] ?? response['reqId'] ?? response['req_id'] ?? response['reqID'];
@@ -122,11 +157,9 @@ class Msg91OtpRepository {
     return null;
   }
 
-  /// Same caveat as [_extractReqId] — the failure shape in particular (does a rejected OTP throw,
-  /// or resolve with `type: 'error'`?) needs a live-device test.
+  /// Same caveat as [_extractReqId].
   String? _extractToken(dynamic response) {
     if (response is Map) {
-      if (response['type'] == 'error') return null;
       final candidate =
           response['message'] ?? response['token'] ?? response['access-token'] ?? response['accessToken'];
       if (candidate is String && candidate.isNotEmpty) return candidate;

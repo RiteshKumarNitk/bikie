@@ -8,6 +8,7 @@ import {
   PartnerBusinessFields,
   type PartnerBusinessDetails,
 } from "@/components/auth/PartnerBusinessFields";
+import { useToast } from "@/components/ui/Toast";
 
 /** Mirrors RiderDetailsSettings.tsx's pattern — a client form owning its own state/save call,
  * rendered from the server component that fetched the initial profile. Replaces what used to be
@@ -40,6 +41,7 @@ export function PartnerSettingsForm({ profile }: { profile: PartnerProfileDTO | 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const toast = useToast();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -87,8 +89,11 @@ export function PartnerSettingsForm({ profile }: { profile: PartnerProfileDTO | 
         throw new Error(data.error ?? "Failed to save partner profile");
       }
       setSaved(true);
+      toast.success("Profile updated successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong saving your details. Please try again.");
+      const message = err instanceof Error ? err.message : "Something went wrong saving your details. Please try again.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }

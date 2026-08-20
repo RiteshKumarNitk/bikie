@@ -3,7 +3,7 @@ import type { CommunicationsPorts } from "../../communications/public";
 import { partnerMatchesAlertType } from "../domain/partner-mapping";
 import type { SOSRecipient } from "../domain/dispatch-message";
 import type { RawSOSAlertDTO, SafetyLocationPorts } from "../ports";
-import { dispatchToRecipient, emptySummary, type SOSDispatchSummary } from "./fan-out.application";
+import { dispatchToRecipient, emptySummary, markSmsEligibility, type SOSDispatchSummary } from "./fan-out.application";
 
 const INITIAL_RADIUS_METERS = 5000;
 const radiusStepMeters = () => Number(process.env.SOS_RADIUS_STEP_KM ?? "5") * 1000;
@@ -163,7 +163,9 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
       communityIds.size > 0 ? "NEARBY_RIDERS_COMMUNITY" : "NEARBY_RIDERS_GENERAL";
     const ridersToNotify = tier === "NEARBY_RIDERS_COMMUNITY" ? nearby.filter((r) => r.userId && communityIds.has(r.userId)) : nearby;
     const timeoutMs = tier === "NEARBY_RIDERS_COMMUNITY" ? communityTierTimeoutMs() : tierTimeoutMs();
-    const toNotify = [...ridersToNotify, ...providers];
+    // ADR-059 — caps the DLT "BIKIE_SR" SMS to the nearest 10 combined riders+providers in this
+    // batch; in-app/WhatsApp/email still reach everyone in ridersToNotify/providers unchanged.
+    const toNotify = markSmsEligibility([...ridersToNotify, ...providers]);
 
     const summary = await notifyRecipients(alert, toNotify, ports, communications, availability);
     summary.nearbyRiders = ridersToNotify.length;
@@ -213,7 +215,7 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
         resolveServiceProviders(alert, ports, INITIAL_RADIUS_METERS, alreadyNotified),
       ]);
       const freshRiders = nearby.filter((r) => !r.userId || !alreadyNotified.has(r.userId));
-      const fresh = [...freshRiders, ...providers];
+      const fresh = markSmsEligibility([...freshRiders, ...providers]); // ADR-059
       const summary = await notifyRecipients(alert, fresh, ports, communications, availability);
       await ports.sosTimeline.record({
         alertId: alert.id,
@@ -244,7 +246,7 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
         resolveServiceProviders(alert, ports, widened, alreadyNotified),
       ]);
       const freshRiders = nearby.filter((r) => r.userId && !alreadyNotified.has(r.userId));
-      const fresh = [...freshRiders, ...providers];
+      const fresh = markSmsEligibility([...freshRiders, ...providers]); // ADR-059
 
       const summary = await notifyRecipients(alert, fresh, ports, communications, availability);
       await ports.sosTimeline.record({

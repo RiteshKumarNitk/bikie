@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 interface AdminTrip {
   id: string;
@@ -34,6 +35,7 @@ export default function AdminTripsPage() {
   const [saving, setSaving] = useState(false);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     fetch("/api/admin/trips")
@@ -64,9 +66,15 @@ export default function AdminTripsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
+    if (!res.ok) {
+      toast.error("Unable to save this ride. Please try again.");
+      setSaving(false);
+      return;
+    }
     const data = await res.json();
     if (data.trip) {
       setTrips((prev) => prev.map((t) => (t.id === editingTrip.id ? data.trip : t)));
+      toast.success("Ride updated successfully");
     }
     setSaving(false);
     setEditingTrip(null);
@@ -78,17 +86,27 @@ export default function AdminTripsPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ status: "CANCELLED" }),
     });
+    setCancelingId(null);
+    if (!res.ok) {
+      toast.error("Unable to cancel this ride. Please try again.");
+      return;
+    }
     const data = await res.json();
     if (data.trip) {
       setTrips((prev) => prev.map((t) => (t.id === id ? data.trip : t)));
+      toast.success("Ride cancelled successfully");
     }
-    setCancelingId(null);
   }
 
   async function handleDelete(id: string) {
-    await fetch(`/api/admin/trips/${id}`, { method: "DELETE" });
-    setTrips((prev) => prev.filter((t) => t.id !== id));
+    const res = await fetch(`/api/admin/trips/${id}`, { method: "DELETE" });
     setDeletingId(null);
+    if (!res.ok) {
+      toast.error("Unable to delete this ride. Please try again.");
+      return;
+    }
+    setTrips((prev) => prev.filter((t) => t.id !== id));
+    toast.success("Ride deleted successfully");
   }
 
   const filtered = trips.filter((t) => !statusFilter || t.status === statusFilter);

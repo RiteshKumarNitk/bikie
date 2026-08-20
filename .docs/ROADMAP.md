@@ -1,5 +1,26 @@
 # BIKIE — Roadmap
 
+## SOS Dispatch Moves To The DLT "BIKIE_SR" SMS Template — And A Real Delivery Bug Found (2026-08-20, ADR-059)
+Wired MSG91's DLT-approved "BIKIE_SR" template to SOS dispatch SMS for nearby riders and Service
+Providers, capped to the nearest 10 recipients per dispatch batch (in-app/WhatsApp/email still
+reach everyone nearby — only SMS, which is billed per message, is capped). While wiring it up,
+found that SOS SMS to every recipient role has likely been silently failing MSG91's DLT content
+filter since the feature launched — the text sent has always been free-form and dynamic (maps
+links, GPS, distance), which India's DLT rules don't allow for SMS. Also found BIKIE had no
+"vehicle registration number" field anywhere the new template needed — added one to Rider Profile,
+mirroring the existing vehicle type/brand/model fields, and surfaced it in both platforms' SOS
+detail screens as well as the SMS. Emergency-contact and admin SOS SMS remain on the old,
+likely-failing free text for now — no approved template exists for that copy yet. See ADR-059.
+
+## Rider Membership Purchase Sends The "BIKIE_Sub" SMS Confirmation (2026-08-19, ADR-058)
+Wired MSG91's already-DLT-approved "BIKIE_Sub" template to fire an SMS confirmation once a Rider
+membership purchase succeeds — Sender ID KSHIDL, exact registered text with the rider's name and
+renewal date filled in. Deliberately Rider-only: the template's own copy says "annual
+Membership," which only describes the Rider plan (₹99/year) — the Service Provider plan is
+₹99/month (ADR-056), so this template can't correctly describe that purchase and was never wired
+there. The SMS adapter now supports per-call DLT template overrides (previously assumed a single
+app-wide template), with every existing SOS-alert caller unaffected. See ADR-058.
+
 ## SMS/WhatsApp OTP Channel Toggle; Mobile Release Builds Move To MSG91's Widget SDK (2026-08-19, ADR-057)
 Added an SMS/WhatsApp toggle to OTP screens on both platforms, and moved mobile release builds
 onto MSG91's Widget SDK (`sendotp_flutter_sdk`) for OTP send/verify, mirroring how web already

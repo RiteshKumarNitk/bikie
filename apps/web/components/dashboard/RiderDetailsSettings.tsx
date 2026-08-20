@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { RiderProfileDTO } from "@bikie/types";
 import { riderProfileSchema } from "@bikie/validation";
 import { formatZodError } from "@/lib/format-zod-error";
+import { useToast } from "@/components/ui/Toast";
 import {
   EmergencyContactsEditor,
   type EmergencyContactValue,
@@ -54,6 +55,7 @@ export function RiderDetailsSettings({ profile }: { profile: RiderProfileDTO | n
     vehicleType: profile?.vehicleType ?? "",
     vehicleBrand: profile?.vehicleBrand ?? "",
     vehicleModel: profile?.vehicleModel ?? "",
+    vehicleRegistrationNumber: profile?.vehicleRegistrationNumber ?? "",
     governmentIdType: profile?.governmentIdType ?? "",
     governmentIdNumber: profile?.governmentIdNumber ?? "",
     riderFrequency: profile?.riderFrequency ?? "",
@@ -64,6 +66,7 @@ export function RiderDetailsSettings({ profile }: { profile: RiderProfileDTO | n
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
@@ -91,6 +94,7 @@ export function RiderDetailsSettings({ profile }: { profile: RiderProfileDTO | n
       vehicleType: extra.vehicleType || undefined,
       vehicleBrand: extra.vehicleBrand.trim() || undefined,
       vehicleModel: extra.vehicleModel.trim() || undefined,
+      vehicleRegistrationNumber: extra.vehicleRegistrationNumber.trim() || undefined,
       governmentIdType: (extra.governmentIdType || undefined) as "AADHAAR" | "PASSPORT" | undefined,
       governmentIdNumber: extra.governmentIdNumber.trim() || undefined,
       riderFrequency: (extra.riderFrequency || undefined) as
@@ -126,8 +130,10 @@ export function RiderDetailsSettings({ profile }: { profile: RiderProfileDTO | n
       if (!res.ok) throw new Error("Failed to save rider profile");
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      toast.success("Profile updated successfully");
     } catch {
       setError("Something went wrong saving your details. Please try again.");
+      toast.error("Unable to save your details. Please try again.");
     } finally {
       setSaving(false);
     }

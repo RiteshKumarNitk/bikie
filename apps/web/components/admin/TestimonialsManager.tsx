@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 type Testimonial = {
   id: string;
@@ -16,19 +17,30 @@ type Testimonial = {
 export function TestimonialsManager({ initial }: { initial: Testimonial[] }) {
   const [list, setList] = useState<Testimonial[]>(initial);
   const [showForm, setShowForm] = useState(false);
+  const toast = useToast();
 
   async function toggleFeatured(t: Testimonial) {
-    await fetch(`/api/admin/testimonials/${t.id}`, {
+    const res = await fetch(`/api/admin/testimonials/${t.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isFeatured: !t.isFeatured }),
     });
+    if (!res.ok) {
+      toast.error("Unable to complete the request. Please try again.");
+      return;
+    }
     setList((prev) => prev.map((x) => (x.id === t.id ? { ...x, isFeatured: !x.isFeatured } : x)));
+    toast.success("Testimonial updated successfully");
   }
 
   async function deleteTestimonial(id: string) {
-    await fetch(`/api/admin/testimonials/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/admin/testimonials/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      toast.error("Unable to delete this testimonial. Please try again.");
+      return;
+    }
     setList((prev) => prev.filter((x) => x.id !== id));
+    toast.success("Testimonial deleted successfully");
   }
 
   return (
@@ -78,6 +90,7 @@ function TestimonialForm({ onCreated }: { onCreated: (t: Testimonial) => void })
   const [quote, setQuote] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const toast = useToast();
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -90,6 +103,8 @@ function TestimonialForm({ onCreated }: { onCreated: (t: Testimonial) => void })
       if (res.ok) {
         const { url } = await res.json();
         setAuthorAvatarUrl(url);
+      } else {
+        toast.error("Failed to upload image. Please try again.");
       }
     } finally {
       setUploadingAvatar(false);
@@ -100,14 +115,22 @@ function TestimonialForm({ onCreated }: { onCreated: (t: Testimonial) => void })
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const res = await fetch("/api/admin/testimonials", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ authorName, authorLocation, authorAvatarUrl: authorAvatarUrl ?? undefined, rating, quote }),
-    });
-    const data = await res.json();
-    onCreated(data.testimonial);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/admin/testimonials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ authorName, authorLocation, authorAvatarUrl: authorAvatarUrl ?? undefined, rating, quote }),
+      });
+      if (!res.ok) {
+        toast.error("Unable to create this testimonial. Please try again.");
+        return;
+      }
+      const data = await res.json();
+      onCreated(data.testimonial);
+      toast.success("Testimonial created successfully");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

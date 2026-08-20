@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { MessageDTO } from "@bikie/types";
 import { MessageItem } from "./MessageItem";
+import { useToast } from "@/components/ui/Toast";
 
 const TYPING_STOP_DELAY_MS = 3000;
 
@@ -22,6 +23,7 @@ export function ChatArea({
   const [replyTo, setReplyTo] = useState<MessageDTO | null>(null);
   const [typingUserIds, setTypingUserIds] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const toast = useToast();
 
   const isTypingRef = useRef(false);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,7 +79,7 @@ export function ChatArea({
     });
     const data = await res.json();
     if (!res.ok || !data.message) {
-      alert(data.error === "MUTED" ? "You've been muted and can't send messages right now." : "Couldn't send that message.");
+      toast.error(data.error === "MUTED" ? "You've been muted and can't send messages right now." : "Couldn't send that message.");
       return;
     }
     setMessages((prev) => [...prev, data.message]);
@@ -214,7 +216,7 @@ export function ChatArea({
     });
     const data = await res.json();
     if (!res.ok) {
-      alert(data.error === "FORBIDDEN" ? "You can only edit your own messages." : "Couldn't edit this message.");
+      toast.error(data.error === "FORBIDDEN" ? "You can only edit your own messages." : "Couldn't edit this message.");
       return false;
     }
     setMessages((prev) => prev.map((m) => (m.id === messageId ? data.message : m)));

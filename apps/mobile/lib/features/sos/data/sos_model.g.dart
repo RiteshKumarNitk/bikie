@@ -31,6 +31,8 @@ _$SOSAlertImpl _$$SOSAlertImplFromJson(Map<String, dynamic> json) =>
       riderVehicleType: json['riderVehicleType'] as String?,
       riderVehicleBrand: json['riderVehicleBrand'] as String?,
       riderVehicleModel: json['riderVehicleModel'] as String?,
+      riderVehicleRegistrationNumber:
+          json['riderVehicleRegistrationNumber'] as String?,
       distanceMeters: json['distanceMeters'] as num?,
     );
 
@@ -59,6 +61,7 @@ Map<String, dynamic> _$$SOSAlertImplToJson(_$SOSAlertImpl instance) =>
       'riderVehicleType': instance.riderVehicleType,
       'riderVehicleBrand': instance.riderVehicleBrand,
       'riderVehicleModel': instance.riderVehicleModel,
+      'riderVehicleRegistrationNumber': instance.riderVehicleRegistrationNumber,
       'distanceMeters': instance.distanceMeters,
     };
 

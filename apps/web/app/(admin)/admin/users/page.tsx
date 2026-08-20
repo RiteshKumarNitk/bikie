@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 interface AdminUser {
   id: string;
@@ -33,6 +34,7 @@ export default function AdminUsersPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     fetch("/api/admin/users")
@@ -55,26 +57,32 @@ export default function AdminUsersPage() {
     });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
-      setSaveError(data?.error ?? "Failed to update this user.");
+      const message = data?.error ?? "Failed to update this user.";
+      setSaveError(message);
+      toast.error(message);
       return;
     }
     setEditingUser(null);
     setUsers((prev) =>
       prev.map((u) => (u.id === editingUser.id ? { ...u, ...body } : u)),
     );
+    toast.success("User updated successfully");
   }
 
   async function handleDelete(id: string) {
     const res = await fetch(`/api/admin/users/${id}`, { method: "DELETE" });
     if (!res.ok) {
       const data = await res.json().catch(() => null);
-      setDeleteError(data?.error ?? "Failed to delete this user.");
+      const message = data?.error ?? "Failed to delete this user.";
+      setDeleteError(message);
       setDeletingId(null);
+      toast.error(message);
       return;
     }
     setDeleteError(null);
     setDeletingId(null);
     setUsers((prev) => prev.filter((u) => u.id !== id));
+    toast.success("User deleted successfully");
   }
 
   const filtered = users.filter((u) => {

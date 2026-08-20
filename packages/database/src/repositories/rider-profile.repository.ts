@@ -18,6 +18,7 @@ interface RiderProfileRow {
   vehicleType: string | null;
   vehicleBrand: string | null;
   vehicleModel: string | null;
+  vehicleRegistrationNumber: string | null;
   governmentIdType: string | null;
   governmentIdNumber: string | null;
   riderFrequency: string | null;
@@ -51,6 +52,7 @@ function toDTO(profile: RiderProfileRow) {
     vehicleType: profile.vehicleType,
     vehicleBrand: profile.vehicleBrand,
     vehicleModel: profile.vehicleModel,
+    vehicleRegistrationNumber: profile.vehicleRegistrationNumber,
     governmentIdType: profile.governmentIdType as "AADHAAR" | "PASSPORT" | null,
     governmentIdNumber: profile.governmentIdNumber,
     riderFrequency: profile.riderFrequency as "OCCASIONAL" | "WEEKLY" | "DAILY" | null,
@@ -129,6 +131,7 @@ interface RiderProfileInputData {
   vehicleType?: string;
   vehicleBrand?: string;
   vehicleModel?: string;
+  vehicleRegistrationNumber?: string;
   governmentIdType?: "AADHAAR" | "PASSPORT";
   governmentIdNumber?: string;
   riderFrequency?: "OCCASIONAL" | "WEEKLY" | "DAILY";
@@ -156,6 +159,7 @@ function sharedFields(data: RiderProfileInputData) {
     vehicleType: data.vehicleType,
     vehicleBrand: data.vehicleBrand,
     vehicleModel: data.vehicleModel,
+    vehicleRegistrationNumber: data.vehicleRegistrationNumber,
     governmentIdType: data.governmentIdType,
     governmentIdNumber: data.governmentIdNumber,
     riderFrequency: data.riderFrequency,

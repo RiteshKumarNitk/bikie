@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { AdminPartnerDetailDTO } from "@bikie/types";
 import { partnerTypes } from "@/components/auth/PartnerBusinessFields";
+import { useToast } from "@/components/ui/Toast";
 
 type Action = "APPROVE" | "REJECT" | "REQUEST_INFO" | "SUSPEND" | "RESTORE";
 
@@ -33,6 +34,7 @@ export default function AdminPartnerDetailPage() {
   const [category, setCategory] = useState("");
   const [categoryBusy, setCategoryBusy] = useState(false);
   const [categoryError, setCategoryError] = useState<string | null>(null);
+  const toast = useToast();
 
   async function load() {
     setLoading(true);
@@ -59,8 +61,11 @@ export default function AdminPartnerDetailPage() {
         throw new Error(typeof data.error === "string" ? data.error : "Could not update the category.");
       }
       await load();
+      toast.success("Category updated successfully");
     } catch (err) {
-      setCategoryError(err instanceof Error ? err.message : "Something went wrong.");
+      const message = err instanceof Error ? err.message : "Something went wrong.";
+      setCategoryError(message);
+      toast.error(message);
     } finally {
       setCategoryBusy(false);
     }
@@ -87,8 +92,11 @@ export default function AdminPartnerDetailPage() {
       setPendingAction(null);
       setReason("");
       await load();
+      toast.success("Provider updated successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const message = err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }

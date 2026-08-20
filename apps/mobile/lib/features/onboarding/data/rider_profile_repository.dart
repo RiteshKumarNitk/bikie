@@ -98,6 +98,7 @@ class RiderProfileRepository {
       if (_notBlank(input.vehicleType)) 'vehicleType': input.vehicleType,
       if (_notBlank(input.vehicleBrand)) 'vehicleBrand': input.vehicleBrand,
       if (_notBlank(input.vehicleModel)) 'vehicleModel': input.vehicleModel,
+      if (_notBlank(input.vehicleRegistrationNumber)) 'vehicleRegistrationNumber': input.vehicleRegistrationNumber,
       if (_notBlank(input.governmentIdType)) 'governmentIdType': input.governmentIdType,
       if (_notBlank(input.governmentIdNumber)) 'governmentIdNumber': input.governmentIdNumber,
       if (_notBlank(input.riderFrequency)) 'riderFrequency': input.riderFrequency,

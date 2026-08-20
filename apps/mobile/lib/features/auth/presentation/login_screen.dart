@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/app_logo.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../data/auth_repository.dart';
 import '../data/msg91_otp_repository.dart';
 import '../domain/auth_controller.dart';
@@ -109,6 +110,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       _fetchDevOtp(normalized);
     } on ApiException catch (e) {
       setState(() => _error = e.message);
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
       if (mounted) setState(() => _sendingOtp = false);
     }
@@ -121,6 +123,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       await ref.read(authRepositoryProvider).resendOtp(_phoneNumber, reqId: _reqId, channel: _otpChannel);
       startResendCountdown();
       _fetchDevOtp(_phoneNumber);
+      if (mounted) showAppToast(context, 'Verification code resent', variant: AppToastVariant.success);
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
       if (mounted) setState(() => _sendingOtp = false);
     }
@@ -150,9 +155,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
         return;
       }
 
-      if (mounted) context.go('/');
+      if (mounted) {
+        showAppToast(context, 'Signed in successfully', variant: AppToastVariant.success);
+        context.go('/');
+      }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
       if (mounted) setState(() => _verifying = false);
     }
@@ -182,9 +191,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
         return;
       }
 
-      if (mounted) context.go('/');
+      if (mounted) {
+        showAppToast(context, 'Signed in successfully', variant: AppToastVariant.success);
+        context.go('/');
+      }
     } on ApiException catch (e) {
       setState(() => _error = e.message);
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
       if (mounted) setState(() => _signingIn = false);
     }

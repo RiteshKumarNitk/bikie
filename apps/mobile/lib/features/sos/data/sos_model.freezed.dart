@@ -50,11 +50,13 @@ mixin _$SOSAlert {
       throw _privateConstructorUsedError; // From the reporting rider's own RiderProfile (ADR-044) — most riders never fill this in.
   String? get riderVehicleType => throw _privateConstructorUsedError;
   String? get riderVehicleBrand => throw _privateConstructorUsedError;
-  String? get riderVehicleModel =>
+  String? get riderVehicleModel => throw _privateConstructorUsedError;
+  String? get riderVehicleRegistrationNumber =>
+      throw _privateConstructorUsedError;
+  num? get distanceMeters =>
       throw _privateConstructorUsedError; // ADR-045 — server-computed distance from the viewer's own supplied lat/lng; only populated
   // on the active-alerts list (`GET /api/sos/alerts?lat=&lng=`), null elsewhere. Compensates
   // for latitude/longitude being redacted pre-assignment.
-  num? get distanceMeters => throw _privateConstructorUsedError;
 
   /// Serializes this SOSAlert to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -95,6 +97,7 @@ abstract class $SOSAlertCopyWith<$Res> {
     String? riderVehicleType,
     String? riderVehicleBrand,
     String? riderVehicleModel,
+    String? riderVehicleRegistrationNumber,
     num? distanceMeters,
   });
 }
@@ -137,6 +140,7 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
     Object? riderVehicleType = freezed,
     Object? riderVehicleBrand = freezed,
     Object? riderVehicleModel = freezed,
+    Object? riderVehicleRegistrationNumber = freezed,
     Object? distanceMeters = freezed,
   }) {
     return _then(
@@ -233,6 +237,11 @@ class _$SOSAlertCopyWithImpl<$Res, $Val extends SOSAlert>
                 ? _value.riderVehicleModel
                 : riderVehicleModel // ignore: cast_nullable_to_non_nullable
                       as String?,
+            riderVehicleRegistrationNumber:
+                freezed == riderVehicleRegistrationNumber
+                ? _value.riderVehicleRegistrationNumber
+                : riderVehicleRegistrationNumber // ignore: cast_nullable_to_non_nullable
+                      as String?,
             distanceMeters: freezed == distanceMeters
                 ? _value.distanceMeters
                 : distanceMeters // ignore: cast_nullable_to_non_nullable
@@ -276,6 +285,7 @@ abstract class _$$SOSAlertImplCopyWith<$Res>
     String? riderVehicleType,
     String? riderVehicleBrand,
     String? riderVehicleModel,
+    String? riderVehicleRegistrationNumber,
     num? distanceMeters,
   });
 }
@@ -317,6 +327,7 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
     Object? riderVehicleType = freezed,
     Object? riderVehicleBrand = freezed,
     Object? riderVehicleModel = freezed,
+    Object? riderVehicleRegistrationNumber = freezed,
     Object? distanceMeters = freezed,
   }) {
     return _then(
@@ -413,6 +424,10 @@ class __$$SOSAlertImplCopyWithImpl<$Res>
             ? _value.riderVehicleModel
             : riderVehicleModel // ignore: cast_nullable_to_non_nullable
                   as String?,
+        riderVehicleRegistrationNumber: freezed == riderVehicleRegistrationNumber
+            ? _value.riderVehicleRegistrationNumber
+            : riderVehicleRegistrationNumber // ignore: cast_nullable_to_non_nullable
+                  as String?,
         distanceMeters: freezed == distanceMeters
             ? _value.distanceMeters
             : distanceMeters // ignore: cast_nullable_to_non_nullable
@@ -449,6 +464,7 @@ class _$SOSAlertImpl implements _SOSAlert {
     this.riderVehicleType,
     this.riderVehicleBrand,
     this.riderVehicleModel,
+    this.riderVehicleRegistrationNumber,
     this.distanceMeters,
   });
 
@@ -508,6 +524,8 @@ class _$SOSAlertImpl implements _SOSAlert {
   final String? riderVehicleBrand;
   @override
   final String? riderVehicleModel;
+  @override
+  final String? riderVehicleRegistrationNumber;
   // ADR-045 — server-computed distance from the viewer's own supplied lat/lng; only populated
   // on the active-alerts list (`GET /api/sos/alerts?lat=&lng=`), null elsewhere. Compensates
   // for latitude/longitude being redacted pre-assignment.
@@ -516,7 +534,7 @@ class _$SOSAlertImpl implements _SOSAlert {
 
   @override
   String toString() {
-    return 'SOSAlert(id: $id, userId: $userId, userName: $userName, userPhone: $userPhone, userEmail: $userEmail, type: $type, description: $description, latitude: $latitude, longitude: $longitude, city: $city, status: $status, severity: $severity, escalationTier: $escalationTier, currentRadiusMeters: $currentRadiusMeters, assignedHelperId: $assignedHelperId, resolvedAt: $resolvedAt, createdAt: $createdAt, placeName: $placeName, area: $area, formattedAddress: $formattedAddress, riderVehicleType: $riderVehicleType, riderVehicleBrand: $riderVehicleBrand, riderVehicleModel: $riderVehicleModel, distanceMeters: $distanceMeters)';
+    return 'SOSAlert(id: $id, userId: $userId, userName: $userName, userPhone: $userPhone, userEmail: $userEmail, type: $type, description: $description, latitude: $latitude, longitude: $longitude, city: $city, status: $status, severity: $severity, escalationTier: $escalationTier, currentRadiusMeters: $currentRadiusMeters, assignedHelperId: $assignedHelperId, resolvedAt: $resolvedAt, createdAt: $createdAt, placeName: $placeName, area: $area, formattedAddress: $formattedAddress, riderVehicleType: $riderVehicleType, riderVehicleBrand: $riderVehicleBrand, riderVehicleModel: $riderVehicleModel, riderVehicleRegistrationNumber: $riderVehicleRegistrationNumber, distanceMeters: $distanceMeters)';
   }
 
   @override
@@ -564,6 +582,12 @@ class _$SOSAlertImpl implements _SOSAlert {
                 other.riderVehicleBrand == riderVehicleBrand) &&
             (identical(other.riderVehicleModel, riderVehicleModel) ||
                 other.riderVehicleModel == riderVehicleModel) &&
+            (identical(
+                  other.riderVehicleRegistrationNumber,
+                  riderVehicleRegistrationNumber,
+                ) ||
+                other.riderVehicleRegistrationNumber ==
+                    riderVehicleRegistrationNumber) &&
             (identical(other.distanceMeters, distanceMeters) ||
                 other.distanceMeters == distanceMeters));
   }
@@ -595,6 +619,7 @@ class _$SOSAlertImpl implements _SOSAlert {
     riderVehicleType,
     riderVehicleBrand,
     riderVehicleModel,
+    riderVehicleRegistrationNumber,
     distanceMeters,
   ]);
 
@@ -637,6 +662,7 @@ abstract class _SOSAlert implements SOSAlert {
     String? riderVehicleType,
     String? riderVehicleBrand,
     String? riderVehicleModel,
+    String? riderVehicleRegistrationNumber,
     num? distanceMeters,
   }) = _$SOSAlertImpl;
 
@@ -692,11 +718,13 @@ abstract class _SOSAlert implements SOSAlert {
   @override
   String? get riderVehicleBrand;
   @override
-  String? get riderVehicleModel; // ADR-045 — server-computed distance from the viewer's own supplied lat/lng; only populated
+  String? get riderVehicleModel;
+  @override
+  String? get riderVehicleRegistrationNumber;
+  @override
+  num? get distanceMeters; // ADR-045 — server-computed distance from the viewer's own supplied lat/lng; only populated
   // on the active-alerts list (`GET /api/sos/alerts?lat=&lng=`), null elsewhere. Compensates
   // for latitude/longitude being redacted pre-assignment.
-  @override
-  num? get distanceMeters;
 
   /// Create a copy of SOSAlert
   /// with the given fields replaced by the non-null parameter values.

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../data/sos_model.dart';
 import '../data/sos_repository.dart';
 import '../domain/sos_providers.dart';
@@ -183,9 +184,15 @@ class _SendSosSheetState extends ConsumerState<SendSosSheet> {
             city: _cityController.text.trim().isNotEmpty ? _cityController.text.trim() : 'Unknown',
           );
       ref.invalidate(activeSosAlertsProvider);
-      if (mounted) setState(() => _result = result);
+      if (mounted) {
+        setState(() => _result = result);
+        showAppToast(context, 'SOS alert sent successfully', variant: AppToastVariant.success);
+      }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _sendError = e.message);
+      if (mounted) {
+        setState(() => _sendError = e.message);
+        showAppToast(context, e.message, variant: AppToastVariant.error);
+      }
     } finally {
       if (mounted) setState(() => _sending = false);
     }

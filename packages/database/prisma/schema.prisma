@@ -416,6 +416,9 @@ model RiderProfile {
   vehicleType           String?
   vehicleBrand          String?
   vehicleModel          String?
+  // ADR-059 — surfaced (unredacted, like the three fields above) on SOS alert dispatch to
+  // nearby riders/service providers via the DLT "BIKIE_SR" SMS template.
+  vehicleRegistrationNumber String?
   governmentIdType      GovernmentIdType?
   governmentIdNumber    String?
   riderFrequency        RiderFrequency?

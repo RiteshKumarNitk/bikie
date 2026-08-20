@@ -40,6 +40,7 @@ export function sampleAlert(overrides: Partial<RawSOSAlertDTO> = {}): RawSOSAler
     riderVehicleType: null,
     riderVehicleBrand: null,
     riderVehicleModel: null,
+    riderVehicleRegistrationNumber: null,
     ...overrides,
   };
 }

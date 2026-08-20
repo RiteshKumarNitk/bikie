@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "../../sos-maps";
 import { isValidIndianMobile, toE164Phone } from "./domain/phone";
 import {
@@ -81,6 +81,48 @@ describe("communications adapters (DEV fallback)", () => {
     });
 
     restoreEnv(prev);
+  });
+
+  describe("SMS DLT_TE_ID resolution (ADR-058)", () => {
+    const keys = ["MSG91_AUTH_KEY", "MSG91_SENDER_ID", "MSG91_ROUTE", "MSG91_TEMPLATE_ID"];
+    let prev: Record<string, string | undefined>;
+
+    afterEach(() => {
+      restoreEnv(prev);
+      vi.unstubAllGlobals();
+    });
+
+    it("an explicit templateId argument overrides the adapter's configured default", async () => {
+      prev = snapshotEnv(keys);
+      process.env.MSG91_AUTH_KEY = "test-authkey";
+      process.env.MSG91_SENDER_ID = "KSHIDL";
+      process.env.MSG91_TEMPLATE_ID = "sos-default-template";
+
+      const fetchSpy = vi.fn(async (_input: string | URL, _init?: RequestInit) => new Response('{"type":"success"}', { status: 200 }));
+      vi.stubGlobal("fetch", fetchSpy);
+
+      await createSmsAdapter().send("+919876543210", "Hello Rider Priya; ...", "membership-sub-template");
+
+      const [, init] = fetchSpy.mock.calls[0];
+      const body = JSON.parse((init as RequestInit).body as string);
+      expect(body.sms[0].DLT_TE_ID).toBe("membership-sub-template");
+    });
+
+    it("falls back to MSG91_TEMPLATE_ID when no explicit templateId is given (SOS alerts, unchanged)", async () => {
+      prev = snapshotEnv(keys);
+      process.env.MSG91_AUTH_KEY = "test-authkey";
+      process.env.MSG91_SENDER_ID = "KSHIDL";
+      process.env.MSG91_TEMPLATE_ID = "sos-default-template";
+
+      const fetchSpy = vi.fn(async (_input: string | URL, _init?: RequestInit) => new Response('{"type":"success"}', { status: 200 }));
+      vi.stubGlobal("fetch", fetchSpy);
+
+      await createSmsAdapter().send("+919876543210", "BIKIE SOS: alert");
+
+      const [, init] = fetchSpy.mock.calls[0];
+      const body = JSON.parse((init as RequestInit).body as string);
+      expect(body.sms[0].DLT_TE_ID).toBe("sos-default-template");
+    });
   });
 
   it("Email logs DEV when SMTP and Resend are unset", async () => {

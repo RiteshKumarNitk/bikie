@@ -9,6 +9,7 @@ import { OtpChannelToggle } from "@/components/auth/OtpChannelToggle";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { useMsg91Widget, type OtpChannel } from "@/lib/use-msg91-widget";
 import { LogoMark } from "@/components/layout/LogoMark";
+import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
 
 const inputClassName =
@@ -49,6 +50,7 @@ export default function SignUpPage() {
   const [verifying, setVerifying] = useState(false);
   const resendTimer = useResendCountdown(60);
   const widget = useMsg91Widget();
+  const toast = useToast();
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -74,7 +76,9 @@ export default function SignUpPage() {
       setStep("otp");
       resendTimer.start();
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : "Could not send the verification code. Please try again.");
+      const message = err instanceof Error ? err.message : "Could not send the verification code. Please try again.";
+      setServerError(message);
+      toast.error(message);
     } finally {
       setSendingOtp(false);
     }
@@ -121,8 +125,11 @@ export default function SignUpPage() {
     try {
       await widget.retryOtp(otpChannel);
       resendTimer.start();
+      toast.success("Verification code resent");
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : "Could not resend the verification code. Please try again.");
+      const message = err instanceof Error ? err.message : "Could not resend the verification code. Please try again.";
+      setServerError(message);
+      toast.error(message);
     } finally {
       setSendingOtp(false);
     }
@@ -140,7 +147,9 @@ export default function SignUpPage() {
       const widgetResult = await widget.verifyOtp(otpCode);
       const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: widgetResult.message });
       if (error) {
-        setServerError(error.message ?? "Invalid or expired code. Please try again.");
+        const message = error.message ?? "Invalid or expired code. Please try again.";
+        setServerError(message);
+        toast.error(message);
         return;
       }
 
@@ -160,11 +169,14 @@ export default function SignUpPage() {
         });
         if (!signupRes.ok) {
           const data = (await signupRes.json().catch(() => ({}))) as { error?: string };
-          setServerError(data.error ?? "Could not finish creating your account. Please try again.");
+          const message = data.error ?? "Could not finish creating your account. Please try again.";
+          setServerError(message);
+          toast.error(message);
           setVerifying(false);
           return;
         }
 
+        toast.success("Account created successfully");
         // Referral code is collected on the onboarding form itself now, not here —
         // forward it along as a query param so that step can prefill it.
         const nextPath = selectedRole === "SERVICE_PROVIDER" ? "/partner-onboarding" : "/onboarding";
@@ -189,7 +201,9 @@ export default function SignUpPage() {
       }
       window.location.href = dashboardHrefForRole(sessionData?.user.role, currentType);
     } catch (err) {
-      setServerError(err instanceof Error ? err.message : "Invalid or expired code. Please try again.");
+      const message = err instanceof Error ? err.message : "Invalid or expired code. Please try again.";
+      setServerError(message);
+      toast.error(message);
     } finally {
       setVerifying(false);
     }

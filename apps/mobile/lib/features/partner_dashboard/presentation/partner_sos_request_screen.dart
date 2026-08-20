@@ -333,6 +333,11 @@ class _NeedsResponseView extends StatelessWidget {
                         .join(' · '),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
+                if (alert.riderVehicleRegistrationNumber != null)
+                  Text(
+                    'Reg. no: ${alert.riderVehicleRegistrationNumber}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 if (alert.description != null) ...[
                   const SizedBox(height: 8),
                   Text(alert.description!),

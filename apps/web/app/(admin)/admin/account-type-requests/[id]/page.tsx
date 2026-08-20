@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import type { AccountTypeChangeRequestDTO } from "@bikie/types";
+import { useToast } from "@/components/ui/Toast";
 
 type Decision = "APPROVED" | "REJECTED" | "MORE_INFORMATION_REQUIRED";
 
@@ -25,6 +26,7 @@ export default function AdminAccountTypeRequestDetailPage() {
   const [remarks, setRemarks] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   async function load() {
     setLoading(true);
@@ -62,8 +64,11 @@ export default function AdminAccountTypeRequestDetailPage() {
       setPendingDecision(null);
       setRemarks("");
       await load();
+      toast.success("Request updated successfully");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      const message = err instanceof Error ? err.message : "Something went wrong.";
+      setError(message);
+      toast.error(message);
     } finally {
       setBusy(false);
     }

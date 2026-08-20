@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 type Plan = {
   id: string;
@@ -26,19 +27,30 @@ export function MembershipPlansManager({
 }) {
   const [list, setList] = useState<Plan[]>(initial);
   const [showForm, setShowForm] = useState(false);
+  const toast = useToast();
 
   async function toggleActive(p: Plan) {
-    await fetch(`${basePath}/${p.id}`, {
+    const res = await fetch(`${basePath}/${p.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ isActive: !p.isActive }),
     });
+    if (!res.ok) {
+      toast.error("Unable to complete the request. Please try again.");
+      return;
+    }
     setList((prev) => prev.map((x) => (x.id === p.id ? { ...x, isActive: !x.isActive } : x)));
+    toast.success("Plan updated successfully");
   }
 
   async function deletePlan(id: string) {
-    await fetch(`${basePath}/${id}`, { method: "DELETE" });
+    const res = await fetch(`${basePath}/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      toast.error("Unable to delete this plan. Please try again.");
+      return;
+    }
     setList((prev) => prev.filter((x) => x.id !== id));
+    toast.success("Plan deleted successfully");
   }
 
   return (
@@ -104,24 +116,33 @@ function PlanForm({
   const [durationDays, setDurationDays] = useState(defaultDurationDays);
   const [benefits, setBenefits] = useState("");
   const [loading, setLoading] = useState(false);
+  const toast = useToast();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    const res = await fetch(basePath, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        name,
-        description,
-        price,
-        durationDays,
-        benefits: benefits.split(",").map((b) => b.trim()).filter(Boolean),
-      }),
-    });
-    const data = await res.json();
-    onCreated(data.plan);
-    setLoading(false);
+    try {
+      const res = await fetch(basePath, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name,
+          description,
+          price,
+          durationDays,
+          benefits: benefits.split(",").map((b) => b.trim()).filter(Boolean),
+        }),
+      });
+      if (!res.ok) {
+        toast.error("Unable to create this plan. Please try again.");
+        return;
+      }
+      const data = await res.json();
+      onCreated(data.plan);
+      toast.success("Plan created successfully");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

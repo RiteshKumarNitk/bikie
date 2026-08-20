@@ -7,6 +7,7 @@ import Link from "next/link";
 import { riderProfileSchema } from "@bikie/validation";
 import { formatZodError } from "@/lib/format-zod-error";
 import { authClient } from "@/lib/auth-client";
+import { useToast } from "@/components/ui/Toast";
 import { LogoMark } from "@/components/layout/LogoMark";
 import {
   EmergencyContactsEditor,
@@ -49,6 +50,7 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [skipping, setSkipping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get("ref");
@@ -79,6 +81,7 @@ export default function OnboardingPage() {
       setPhotoUrl(url);
     } catch {
       setError("Couldn't upload that photo. Please try again.");
+      toast.error("Couldn't upload that photo. Please try again.");
     } finally {
       setUploadingPhoto(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -104,6 +107,7 @@ export default function OnboardingPage() {
       router.push("/");
     } catch {
       setError("Something went wrong skipping onboarding. Please try again.");
+      toast.error("Unable to complete the request. Please try again.");
       setSkipping(false);
     }
   }
@@ -132,6 +136,7 @@ export default function OnboardingPage() {
       vehicleType: extra.vehicleType || undefined,
       vehicleBrand: extra.vehicleBrand.trim() || undefined,
       vehicleModel: extra.vehicleModel.trim() || undefined,
+      vehicleRegistrationNumber: extra.vehicleRegistrationNumber.trim() || undefined,
       governmentIdType: (extra.governmentIdType || undefined) as "AADHAAR" | "PASSPORT" | undefined,
       governmentIdNumber: extra.governmentIdNumber.trim() || undefined,
       riderFrequency: (extra.riderFrequency || undefined) as
@@ -167,9 +172,11 @@ export default function OnboardingPage() {
         body: JSON.stringify(parsed.data),
       });
       if (!res.ok) throw new Error("Failed to save rider profile");
+      toast.success("Profile created successfully");
       router.push("/");
     } catch {
       setError("Something went wrong saving your details. Please try again.");
+      toast.error("Unable to complete the request. Please try again.");
     } finally {
       setSaving(false);
     }

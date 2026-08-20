@@ -20,17 +20,21 @@ export function createSmsAdapter(): SmsPort {
       return msg91Credentials() !== null;
     },
 
-    async send(to: string, message: string): Promise<ChannelResult> {
+    async send(to: string, message: string, templateId?: string): Promise<ChannelResult> {
       const credentials = msg91Credentials();
       if (!credentials) {
         console.log(`[SMS][DEV] To: ${to} | Message: ${message}`);
         return { ok: false, provider: "dev", error: "MSG91 credentials not configured" };
       }
 
-      const { authKey, senderId, route, templateId } = credentials;
+      const { authKey, senderId, route } = credentials;
+      // Explicit `templateId` (a specific transactional message, e.g. membership-subscribed —
+      // ADR-058) wins; otherwise falls back to the adapter's configured default (`MSG91_TEMPLATE_ID`,
+      // the SOS-alert template) — preserves every existing caller's behavior unchanged.
+      const resolvedTemplateId = templateId ?? credentials.templateId;
       const mobile = to.replace(/^\+/, "");
       const smsEntry: Record<string, unknown> = { message, to: [mobile] };
-      if (templateId) smsEntry.DLT_TE_ID = templateId;
+      if (resolvedTemplateId) smsEntry.DLT_TE_ID = resolvedTemplateId;
 
       const res = await fetchWithTimeout("https://api.msg91.com/api/v2/sendsms", {
         method: "POST",

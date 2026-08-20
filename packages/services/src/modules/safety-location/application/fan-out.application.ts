@@ -9,6 +9,7 @@ import {
 } from "../domain/channel-selection";
 import {
   buildEmailHtml,
+  buildSmsTemplateBody,
   buildTextBody,
   describeLocation,
   humanizeSosType,
@@ -25,6 +26,24 @@ import type { SafetyLocationPorts } from "../ports";
  * admins, emergency services) are unaffected — they're not "responders" in this sense. */
 function isCandidateResponder(role: SOSRecipient["role"]): boolean {
   return role === "NEARBY_RIDER" || role === "SERVICE_PROVIDER";
+}
+
+/** ADR-059 — MSG91 SMS is billed per message, and the DLT "BIKIE_SR" template names an actual
+ * rider by name; capping avoids blasting an unbounded, potentially large nearby pool. */
+export const SOS_SMS_RECIPIENT_LIMIT = 10;
+
+/**
+ * Marks the nearest `limit` candidate responders (by `distanceMeters`, ascending; a recipient
+ * with no distance sorts last) as SMS-eligible, the rest ineligible — only the SMS channel is
+ * capped: in-app push/WhatsApp/email still reach every recipient in the input array unchanged,
+ * since under-notifying there has real safety cost and neither is per-message billed the same
+ * way SMS is. Callers pass only the combined nearby-rider + service-provider pool for one
+ * dispatch batch — never emergency contacts/admins/emergency-services, which aren't capped.
+ */
+export function markSmsEligibility(recipients: SOSRecipient[], limit = SOS_SMS_RECIPIENT_LIMIT): SOSRecipient[] {
+  const sorted = [...recipients].sort((a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity));
+  const eligible = new Set(sorted.slice(0, limit));
+  return recipients.map((r) => ({ ...r, smsEligible: eligible.has(r) }));
 }
 
 export interface SOSDispatchSummary {
@@ -150,11 +169,23 @@ export async function dispatchToRecipient(
   if (recipient.phone) {
     const phone = toE164Phone(recipient.phone);
 
-    if (channels.sms) {
+    // ADR-059 — capped to the nearest SOS_SMS_RECIPIENT_LIMIT candidate responders
+    // (markSmsEligibility, applied by the caller); `smsEligible === false` skips SMS only —
+    // WhatsApp/email/in-app below are unaffected. Never set (undefined) for emergency
+    // contacts/admins/emergency services, which aren't capped.
+    if (channels.sms && recipient.smsEligible !== false) {
       summary.smsAttempted += 1;
+      // The DLT-approved "BIKIE_SR" template applies only to the two roles it's actually
+      // addressed to ("Hello Riders/Service Providers…"); every other recipient keeps the
+      // richer free-text body on the SOS-alert MSG91_TEMPLATE_ID default (a separate,
+      // still-open DLT-compliance gap for those roles — see ADR-059's Consequences).
+      const smsText = isCandidateResponder(recipient.role) ? buildSmsTemplateBody(dispatchAlert) : text;
+      const smsTemplateId = isCandidateResponder(recipient.role)
+        ? process.env.MSG91_SOS_HELP_TEMPLATE_ID?.trim() || undefined
+        : undefined;
       tasks.push(
         communications.sms
-          .send(phone, text)
+          .send(phone, smsText, smsTemplateId)
           .then((r) => {
             if (record("sms", phone, r)) summary.smsSent += 1;
           })

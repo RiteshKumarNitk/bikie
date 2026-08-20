@@ -11,6 +11,7 @@ import {
   type PartnerBusinessDetails,
 } from "@/components/auth/PartnerBusinessFields";
 import { LogoMark } from "@/components/layout/LogoMark";
+import { useToast } from "@/components/ui/Toast";
 
 const inputClassName =
   "mt-1.5 w-full rounded-xl border border-foreground/15 bg-transparent px-4 py-2.5 text-sm outline-none transition-colors focus:border-accent focus:ring-1 focus:ring-accent/30";
@@ -28,6 +29,7 @@ export default function PartnerOnboardingPage() {
   const [referralCode, setReferralCode] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
 
   useEffect(() => {
     const ref = new URLSearchParams(window.location.search).get("ref");
@@ -114,9 +116,12 @@ export default function PartnerOnboardingPage() {
       // stop is that screen — never the dashboard directly. `/partner/membership` itself has a
       // "Skip for Now" out, so this never blocks onboarding; it just makes the next required
       // step visible instead of leaving a brand-new provider to discover it by hitting a 403.
+      toast.success("Profile created successfully");
       router.push("/partner/membership?onboarding=1");
     } catch (err: any) {
-      setError(err.message || "Something went wrong saving your details. Please try again.");
+      const message = err.message || "Something went wrong saving your details. Please try again.";
+      setError(message);
+      toast.error(message);
     } finally {
       setSaving(false);
     }

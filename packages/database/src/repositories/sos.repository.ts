@@ -8,7 +8,9 @@ const ALERT_USER_INCLUDE = {
       name: true,
       phone: true,
       email: true,
-      riderProfile: { select: { vehicleType: true, vehicleBrand: true, vehicleModel: true } },
+      riderProfile: {
+        select: { vehicleType: true, vehicleBrand: true, vehicleModel: true, vehicleRegistrationNumber: true },
+      },
     },
   },
 } as const;
@@ -20,7 +22,12 @@ function toDTO(alert: {
     name: string;
     phone: string | null;
     email: string;
-    riderProfile: { vehicleType: string | null; vehicleBrand: string | null; vehicleModel: string | null } | null;
+    riderProfile: {
+      vehicleType: string | null;
+      vehicleBrand: string | null;
+      vehicleModel: string | null;
+      vehicleRegistrationNumber: string | null;
+    } | null;
   };
   type: string;
   description: string | null;
@@ -63,6 +70,8 @@ function toDTO(alert: {
     riderVehicleType: alert.user.riderProfile?.vehicleType ?? null,
     riderVehicleBrand: alert.user.riderProfile?.vehicleBrand ?? null,
     riderVehicleModel: alert.user.riderProfile?.vehicleModel ?? null,
+    // ADR-059 — feeds the "BIKIE_SR" dispatch SMS template's Vehicle Registration Number slot.
+    riderVehicleRegistrationNumber: alert.user.riderProfile?.vehicleRegistrationNumber ?? null,
     // ADR-045 — only set when the caller supplied viewer coordinates (getActiveAlerts' location
     // filter already computes this for radius filtering; previously discarded before returning).
     ...(distanceMeters !== undefined ? { distanceMeters: Math.round(distanceMeters) } : {}),

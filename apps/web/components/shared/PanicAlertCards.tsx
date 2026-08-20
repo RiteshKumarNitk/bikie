@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useToast } from "@/components/ui/Toast";
 
 type SOSType =
   | "ACCIDENT"
@@ -275,6 +276,7 @@ export function PanicAlertCards({
   const [sendError, setSendError] = useState<string | null>(null);
   const [profileWarning, setProfileWarning] = useState<string | null>(null);
   const [dispatch, setDispatch] = useState<DispatchSummary | null>(null);
+  const toast = useToast();
 
   function getLocation() {
     if (!navigator.geolocation) {
@@ -334,16 +336,21 @@ export function PanicAlertCards({
         const warning = data.profileWarning ?? null;
         setProfileWarning(warning);
         onSent?.(warning);
+        toast.success("SOS alert sent successfully");
         return;
       }
       const data = await res.json().catch(() => null);
       if (res.status === 403 && data?.error === "MEMBERSHIP_REQUIRED") {
         setSendError("Your BIKIE membership is no longer active.");
+        toast.error("Your BIKIE membership is no longer active.");
         return;
       }
-      setSendError(data?.message ?? data?.error ?? "Could not send the alert. Please try again.");
+      const message = data?.message ?? data?.error ?? "Could not send the alert. Please try again.";
+      setSendError(message);
+      toast.error(message);
     } catch {
       setSendError("Could not send the alert. Please try again.");
+      toast.error("Could not send the alert. Please try again.");
     } finally {
       setSending(false);
     }

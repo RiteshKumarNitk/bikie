@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../../auth/domain/role_provider.dart';
 import '../../notifications/domain/notification_providers.dart';
@@ -184,7 +185,7 @@ class _PartnerProfileSectionState extends ConsumerState<_PartnerProfileSection> 
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        showAppToast(context, e.message, variant: AppToastVariant.error);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -306,11 +307,11 @@ class _PhoneFieldState extends ConsumerState<_PhoneField> {
     try {
       await ref.read(profileRepositoryProvider).updatePhone(_controller.text.trim());
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Phone number updated')));
+        showAppToast(context, 'Profile updated successfully', variant: AppToastVariant.success);
       }
     } on ApiException catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+        showAppToast(context, e.message, variant: AppToastVariant.error);
       }
     } finally {
       if (mounted) setState(() => _isSaving = false);

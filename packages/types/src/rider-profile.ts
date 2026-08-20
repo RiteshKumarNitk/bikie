@@ -27,6 +27,8 @@ export interface RiderProfileDTO {
   vehicleType: string | null;
   vehicleBrand: string | null;
   vehicleModel: string | null;
+  /** ADR-059 — feeds the DLT "BIKIE_SR" SOS dispatch SMS template. */
+  vehicleRegistrationNumber: string | null;
   governmentIdType: "AADHAAR" | "PASSPORT" | null;
   governmentIdNumber: string | null;
   riderFrequency: "OCCASIONAL" | "WEEKLY" | "DAILY" | null;

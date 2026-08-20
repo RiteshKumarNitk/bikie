@@ -4,6 +4,7 @@ import { useState, useRef } from "react";
 import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ui/Toast";
 
 export function ProfileSettings({ name, email, image: initialImage, phone: initialPhone }: { name: string; email: string; image: string | null; phone: string | null }) {
   const [phone, setPhone] = useState(initialPhone ?? "");
@@ -14,6 +15,7 @@ export function ProfileSettings({ name, email, image: initialImage, phone: initi
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
+  const toast = useToast();
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -41,7 +43,7 @@ export function ProfileSettings({ name, email, image: initialImage, phone: initi
       router.refresh(); // Refresh to update session data everywhere
     } catch (err) {
       console.error(err);
-      alert("Failed to upload image. Please try again.");
+      toast.error("Failed to upload image. Please try again.");
     } finally {
       setUploadingImage(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -59,6 +61,9 @@ export function ProfileSettings({ name, email, image: initialImage, phone: initi
     if (res.ok) {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
+      toast.success("Profile updated successfully");
+    } else {
+      toast.error("Unable to save your details. Please try again.");
     }
     setSaving(false);
   }

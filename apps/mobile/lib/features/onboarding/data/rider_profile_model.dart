@@ -41,6 +41,7 @@ class RiderProfileInput with _$RiderProfileInput {
     String? vehicleType,
     String? vehicleBrand,
     String? vehicleModel,
+    String? vehicleRegistrationNumber,
     String? governmentIdType, // "AADHAAR" | "PASSPORT"
     String? governmentIdNumber,
     String? riderFrequency, // "OCCASIONAL" | "WEEKLY" | "DAILY"

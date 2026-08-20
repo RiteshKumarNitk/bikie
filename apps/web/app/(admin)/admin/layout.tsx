@@ -1,7 +1,6 @@
 import { redirect } from "next/navigation";
 import { getServerSession } from "@/lib/get-session";
 import { DashboardSidebar } from "@/components/dashboard/DashboardSidebar";
-import { ToastProvider } from "@/components/ui/Toast";
 import { Breadcrumbs } from "@/components/dashboard/Breadcrumbs";
 import { LogoMark } from "@/components/layout/LogoMark";
 import { AdminSignOutButton } from "@/components/admin/AdminSignOutButton";
@@ -77,46 +76,44 @@ export default async function AdminLayout({ children }: { children: React.ReactN
     .slice(0, 2);
 
   return (
-    <ToastProvider>
-      <div className="flex min-h-screen flex-col bg-background text-foreground">
-        <header className="sticky top-0 z-40 border-b border-foreground/10 bg-background/80 backdrop-blur-md">
-          <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6">
-            <div className="flex items-center gap-3">
-              <LogoMark size="sm" />
-              <div>
-                <p className="text-sm font-semibold">BIKIE Admin</p>
-                <p className="text-xs text-foreground/50">Platform dashboard</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Link
-                href="/"
-                className="text-sm font-medium text-foreground/60 transition-colors hover:text-foreground"
-              >
-                View site
-              </Link>
-              <div className="flex items-center gap-2">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/20 text-xs font-semibold text-accent-text">
-                  {initials}
-                </div>
-                <div className="hidden sm:block">
-                  <p className="text-sm font-medium leading-tight">{session.user.name}</p>
-                  <p className="text-xs leading-tight text-foreground/50">Admin</p>
-                </div>
-              </div>
-              <AdminSignOutButton />
+    <div className="flex min-h-screen flex-col bg-background text-foreground">
+      <header className="sticky top-0 z-40 border-b border-foreground/10 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 md:px-6">
+          <div className="flex items-center gap-3">
+            <LogoMark size="sm" />
+            <div>
+              <p className="text-sm font-semibold">BIKIE Admin</p>
+              <p className="text-xs text-foreground/50">Platform dashboard</p>
             </div>
           </div>
-        </header>
-
-        <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6 md:py-8">
-          <Breadcrumbs />
-          <div className="flex flex-col gap-6 md:flex-row md:gap-8">
-            <DashboardSidebar groups={navGroups} items={flatNav} title="Admin" />
-            <div className="min-w-0 flex-1">{children}</div>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="text-sm font-medium text-foreground/60 transition-colors hover:text-foreground"
+            >
+              View site
+            </Link>
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent/20 text-xs font-semibold text-accent-text">
+                {initials}
+              </div>
+              <div className="hidden sm:block">
+                <p className="text-sm font-medium leading-tight">{session.user.name}</p>
+                <p className="text-xs leading-tight text-foreground/50">Admin</p>
+              </div>
+            </div>
+            <AdminSignOutButton />
           </div>
         </div>
+      </header>
+
+      <div className="mx-auto w-full max-w-7xl flex-1 px-4 py-6 md:px-6 md:py-8">
+        <Breadcrumbs />
+        <div className="flex flex-col gap-6 md:flex-row md:gap-8">
+          <DashboardSidebar groups={navGroups} items={flatNav} title="Admin" />
+          <div className="min-w-0 flex-1">{children}</div>
+        </div>
       </div>
-    </ToastProvider>
+    </div>
   );
 }

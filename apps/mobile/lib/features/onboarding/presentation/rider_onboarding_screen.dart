@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/app_toast.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../data/rider_profile_model.dart';
@@ -67,6 +68,7 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
   final _allergies = TextEditingController();
   final _vehicleBrand = TextEditingController();
   final _vehicleModel = TextEditingController();
+  final _vehicleRegistrationNumber = TextEditingController();
   final _governmentIdNumber = TextEditingController();
   final _clubName = TextEditingController();
 
@@ -129,6 +131,7 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
         _vehicleType = profile.vehicleType;
         _vehicleBrand.text = profile.vehicleBrand ?? '';
         _vehicleModel.text = profile.vehicleModel ?? '';
+        _vehicleRegistrationNumber.text = profile.vehicleRegistrationNumber ?? '';
         _governmentIdType = profile.governmentIdType;
         _governmentIdNumber.text = profile.governmentIdNumber ?? '';
         _riderFrequency = profile.riderFrequency;
@@ -173,6 +176,7 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
       _allergies,
       _vehicleBrand,
       _vehicleModel,
+      _vehicleRegistrationNumber,
       _governmentIdNumber,
       _clubName,
     ]) {
@@ -208,7 +212,11 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
       final url = await ref.read(riderProfileRepositoryProvider).uploadPhoto(_photoFile!);
       if (mounted) setState(() => _photoUrl = url);
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = "Couldn't upload that photo: ${e.message}");
+      if (mounted) {
+        final message = "Couldn't upload that photo: ${e.message}";
+        setState(() => _error = message);
+        showAppToast(context, message, variant: AppToastVariant.error);
+      }
     } finally {
       if (mounted) setState(() => _uploadingPhoto = false);
     }
@@ -242,6 +250,7 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
       vehicleType: _vehicleType,
       vehicleBrand: _vehicleBrand.text,
       vehicleModel: _vehicleModel.text,
+      vehicleRegistrationNumber: _vehicleRegistrationNumber.text,
       governmentIdType: _governmentIdType,
       governmentIdNumber: _governmentIdNumber.text,
       riderFrequency: _riderFrequency,
@@ -279,17 +288,24 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
       await _saveNameAndPhoto();
       await ref.read(riderProfileRepositoryProvider).save(_buildInput());
       if (mounted) {
+        showAppToast(context, 'Profile updated successfully', variant: AppToastVariant.success);
         context.go('/');
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile saved')));
       }
     } on ApiException catch (e) {
-      if (mounted) setState(() => _error = e.message);
+      if (mounted) {
+        setState(() => _error = e.message);
+        showAppToast(context, e.message, variant: AppToastVariant.error);
+      }
     } catch (e) {
       // Anything other than ApiException (a bad response shape, a dropped connection Dio
       // didn't wrap cleanly, etc.) used to fall through both this catch and the caller — no
       // error shown, no navigation, "Save" just went quiet. Catch broadly so a real failure is
       // always visible instead of indistinguishable from nothing happening at all.
-      if (mounted) setState(() => _error = "Couldn't save your profile. Please try again.");
+      if (mounted) {
+        const message = "Couldn't save your profile. Please try again.";
+        setState(() => _error = message);
+        showAppToast(context, message, variant: AppToastVariant.error);
+      }
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -368,6 +384,12 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
                           controller: _vehicleModel,
                           label: 'Model',
                           hint: 'e.g. Classic 350',
+                          enabled: _editing,
+                        ),
+                        OnboardingTextField(
+                          controller: _vehicleRegistrationNumber,
+                          label: 'Registration number (optional)',
+                          hint: 'e.g. MH12AB1234',
                           enabled: _editing,
                         ),
                       ],
