@@ -1,6 +1,7 @@
 import type { PartnerActiveSessionDTO, PartnerHistorySessionDTO, PartnerNearbyRequestDTO, PartnerSosDashboardDTO } from "@bikie/types";
 import { haversineDistanceMeters } from "../domain/eta";
 import { partnerMatchesAlertType } from "../domain/partner-mapping";
+import { deriveSeverity } from "../domain/severity";
 import { getReputationModule, type ReputationApplication } from "../../reputation/public";
 import type { SafetyLocationPorts } from "../ports";
 
@@ -31,7 +32,12 @@ export function createPartnerDashboardApplication(
    * admin-SUSPENDED partners get an empty list, not an error, since this also backs the
    * dashboard's best-effort "activeRequests" count. Verification is deliberately NOT a filter
    * (FINAL PRODUCT MODEL): unverified providers operate the platform and can accept assistance
-   * requests; only a SUSPENDED profile loses the capability. */
+   * requests; only a SUSPENDED profile loses the capability.
+   *
+   * Severity-filtered the same way `resolveServiceProviders` (escalation.application.ts) gates
+   * automatic dispatch: a RED/EMERGENCY alert never reaches Service Providers, whether by
+   * notification or by browsing here — was previously missing on this path specifically, so a
+   * RED alert could still be *browsed* into even though it was never auto-dispatched to them. */
   async function listNearbyOpenRequests(
     userId: string,
     location: { latitude: number; longitude: number },
@@ -44,7 +50,9 @@ export function createPartnerDashboardApplication(
       location.longitude,
       SOS_PARTNER_ELIGIBILITY_RADIUS_METERS,
     );
-    const typeMatched = open.filter((a) => partnerMatchesAlertType(partner, a.type));
+    const typeMatched = open.filter(
+      (a) => deriveSeverity(a.type) !== "EMERGENCY" && partnerMatchesAlertType(partner, a.type),
+    );
 
     // ADR-045 — an alert this partner already offered on or declined shouldn't keep reappearing
     // as if it were new; declining in particular would otherwise have no visible effect at all.

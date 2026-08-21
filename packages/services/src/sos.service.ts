@@ -24,9 +24,16 @@ export const SOSService = {
     return getSafetyLocationModule().ports.sosTimeline.listForAlert(alertId);
   },
 
-  /** Backs "Share Mechanic" / "Share Fuel Contact" quick-actions on an open SOS session. */
-  async findNearbyPartners(city: string, type?: string) {
-    return getSafetyLocationModule().ports.partnerDispatch.findByCity(city, 10, { type, verifiedOnly: true });
+  /** Backs "Share Mechanic" / "Share Fuel Contact" quick-actions on an open SOS session.
+   * Radius-based off the alert's own coordinates (25km, the same "nearby" meaning used
+   * everywhere else partner proximity matters) — not the alert's free-text `city`, which could
+   * mismatch a genuinely nearby partner's own free-text `city` on spelling/casing/boundary and
+   * hide them for no real reason. */
+  async findNearbyPartners(latitude: number, longitude: number, type?: string) {
+    return getSafetyLocationModule().ports.partnerDispatch.findNearPoint(latitude, longitude, 25_000, 10, {
+      type,
+      verifiedOnly: true,
+    });
   },
 
   async resolveAlert(alertId: string, userId: string, isAdmin: boolean) {

@@ -678,7 +678,7 @@ describe("fan-out dispatch", () => {
           findEligibleForAlert: vi.fn(async () => []),
           getEligibilityFields: vi.fn(async () => null),
           hasActivePartnerMembership: vi.fn(async () => true),
-          findByCity: vi.fn(async () => [
+          findNearPoint: vi.fn(async () => [
             {
               userId: "partner-1",
               businessName: "Bangalore Garage",
@@ -1380,11 +1380,11 @@ describe("escalation application — tier advancement", () => {
     // for tickEscalation to clean up.
     const claimAlertForEscalation = vi.fn(async () => false);
     const updateEscalationState = vi.fn(async () => undefined);
-    const findByCity = vi.fn();
+    const findNearPoint = vi.fn();
     const findEligibleForAlert = vi.fn(async () => []);
     const module = createSafetyLocationModule({
       ...emptyRepos({
-        partnerDispatch: { ...emptyRepos().partnerDispatch, findByCity, findEligibleForAlert } as any,
+        partnerDispatch: { ...emptyRepos().partnerDispatch, findNearPoint, findEligibleForAlert } as any,
         sosAlerts: { ...emptyRepos().sosAlerts, claimAlertForEscalation, updateEscalationState } as any,
       }),
       communications: fakeCommunications(),
@@ -1394,7 +1394,7 @@ describe("escalation application — tier advancement", () => {
 
     expect(claimAlertForEscalation).toHaveBeenCalledWith("alert-1", expect.any(Date));
     expect(updateEscalationState).not.toHaveBeenCalled();
-    expect(findByCity).not.toHaveBeenCalled();
+    expect(findNearPoint).not.toHaveBeenCalled();
     expect(findEligibleForAlert).not.toHaveBeenCalled();
   });
 

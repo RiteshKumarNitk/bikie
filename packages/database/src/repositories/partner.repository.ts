@@ -267,26 +267,43 @@ export async function getPartnerDashboardStats(userId: string) {
 }
 
 /**
- * Same-city partners for SOS fan-out — includes contact-person mobiles. `type`/`verifiedOnly`
- * (ADR-033) finally give the general emergency-provider blast a way to target just, say,
- * MECHANIC partners for a breakdown instead of every partner type in the city.
+ * Nearby partners for "Share Mechanic"/"Share Fuel Contact" — includes contact-person mobiles.
+ * `type`/`verifiedOnly` (ADR-033) target just, say, MECHANIC partners for a breakdown instead of
+ * every partner type in range.
+ *
+ * Radius-based (Haversine over the alert's own lat/lng), not the exact-string `city` match this
+ * replaced (`findPartnersByCityForDispatch`, city: { equals: city.trim(), mode: "insensitive" }).
+ * That match failed whenever the rider's free-text `city` and a nearby partner's free-text `city`
+ * didn't agree on spelling/casing/exact boundary — e.g. "Jaipur" vs "Jaipur City" vs a rider who
+ * mistyped their own city at onboarding — even for a partner two streets away, since it was never
+ * actually a distance query. A wrong or inconsistent city string must not be able to hide a
+ * genuinely nearby partner from someone requesting emergency help; only real distance should.
  */
-export async function findPartnersByCityForDispatch(
-  city: string,
+export async function findPartnersNearPointForDispatch(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
   take = 25,
   options: { type?: string; verifiedOnly?: boolean } = {},
 ) {
-  return prisma.partner.findMany({
+  const partners = await prisma.partner.findMany({
     where: {
-      city: { equals: city.trim(), mode: "insensitive" },
+      latitude: { not: null },
+      longitude: { not: null },
       ...(options.type ? { type: options.type as any } : {}),
       ...(options.verifiedOnly ? { isVerified: true } : {}),
     },
     include: {
       user: { select: { id: true, name: true, email: true, phone: true } },
     },
-    take,
   });
+
+  return partners
+    .filter((p): p is typeof p & { latitude: number; longitude: number } => p.latitude !== null && p.longitude !== null)
+    .map((p) => ({ ...p, distanceMeters: haversineDistanceMeters(latitude, longitude, p.latitude, p.longitude) }))
+    .filter((p) => p.distanceMeters <= radiusMeters)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters)
+    .slice(0, take);
 }
 
 /**

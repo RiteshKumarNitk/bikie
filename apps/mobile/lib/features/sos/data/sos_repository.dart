@@ -136,11 +136,14 @@ class SosRepository {
         ));
   }
 
-  Future<List<SOSPartner>> getNearbyPartners(String city, {String? type}) {
+  /// Radius-based off the alert's own coordinates — not the alert's free-text `city`, which could
+  /// mismatch a genuinely nearby partner's own free-text `city` on spelling/casing/boundary and
+  /// hide them for no real reason (mirrors web's identical fix to `GET /api/sos/partners`).
+  Future<List<SOSPartner>> getNearbyPartners(double latitude, double longitude, {String? type}) {
     return apiGuard(() async {
       final res = await _dio.get(
         '/api/sos/partners',
-        queryParameters: {'city': city, if (type != null) 'type': type},
+        queryParameters: {'lat': latitude, 'lng': longitude, if (type != null) 'type': type},
       );
       return (res.data['partners'] as List).map((e) => SOSPartner.fromJson(e as Map<String, dynamic>)).toList();
     });

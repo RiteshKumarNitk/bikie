@@ -174,8 +174,9 @@ class _SosDetailScreenState extends ConsumerState<SosDetailScreen> {
     }
   }
 
-  Future<void> _loadPartners(String city, String type) async {
-    final partners = await ref.read(sosRepositoryProvider).getNearbyPartners(city, type: type);
+  Future<void> _loadPartners(num latitude, num longitude, String type) async {
+    final partners =
+        await ref.read(sosRepositoryProvider).getNearbyPartners(latitude.toDouble(), longitude.toDouble(), type: type);
     if (mounted) setState(() => _partners = partners);
   }
 
@@ -433,7 +434,7 @@ class _SessionPanel extends StatelessWidget {
   final ValueChanged<int> onRatingChanged;
   final ValueChanged<String> onStatus;
   final VoidCallback onRate;
-  final Future<void> Function(String city, String type) onLoadPartners;
+  final Future<void> Function(num latitude, num longitude, String type) onLoadPartners;
 
   @override
   Widget build(BuildContext context) {
@@ -486,12 +487,12 @@ class _SessionPanel extends StatelessWidget {
                   OutlinedButton.icon(
                     icon: const Icon(Icons.build_outlined, size: 18),
                     label: const Text('Share Mechanic'),
-                    onPressed: () => onLoadPartners(alert.city, 'MECHANIC'),
+                    onPressed: () => onLoadPartners(lat, lng, 'MECHANIC'),
                   ),
                   OutlinedButton.icon(
                     icon: const Icon(Icons.local_gas_station_outlined, size: 18),
                     label: const Text('Share Fuel Contact'),
-                    onPressed: () => onLoadPartners(alert.city, 'FUEL_DELIVERY'),
+                    onPressed: () => onLoadPartners(lat, lng, 'FUEL_DELIVERY'),
                   ),
                 ],
               ],

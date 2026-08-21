@@ -276,8 +276,8 @@ export default function SOSAlertDetailPage() {
   }
 
   async function loadPartners(type?: string) {
-    if (!alert) return;
-    const url = `/api/sos/partners?city=${encodeURIComponent(alert.city)}${type ? `&type=${type}` : ""}`;
+    if (!alert || alert.latitude == null || alert.longitude == null) return;
+    const url = `/api/sos/partners?lat=${alert.latitude}&lng=${alert.longitude}${type ? `&type=${type}` : ""}`;
     const res = await fetch(url);
     const data = await res.json().catch(() => ({ partners: [] }));
     setPartners(data.partners ?? []);

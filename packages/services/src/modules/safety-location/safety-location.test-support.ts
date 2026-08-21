@@ -93,7 +93,7 @@ export function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partia
       getReceiveSosAlerts: vi.fn(async () => true),
     },
     partnerDispatch: {
-      findByCity: vi.fn(async () => []),
+      findNearPoint: vi.fn(async () => []),
       findEligibleForAlert: vi.fn(async () => []),
       getEligibilityFields: vi.fn(async () => null),
       hasActivePartnerMembership: vi.fn(async () => true),

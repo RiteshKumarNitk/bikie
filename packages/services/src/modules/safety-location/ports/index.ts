@@ -266,8 +266,13 @@ export interface PartnerDispatchRow {
 }
 
 export interface PartnerDispatchPort {
-  findByCity(
-    city: string,
+  /** "Share Mechanic"/"Share Fuel Contact" — radius-based (Haversine), not city-string matching;
+   * see `findPartnersNearPointForDispatch`'s doc comment for why a `city` match was never safe
+   * to gate emergency-contact lookup on. */
+  findNearPoint(
+    latitude: number,
+    longitude: number,
+    radiusMeters: number,
     take?: number,
     options?: { type?: string; verifiedOnly?: boolean },
   ): Promise<PartnerDispatchRow[]>;

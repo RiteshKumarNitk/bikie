@@ -152,13 +152,14 @@ export function createRiderLocationRepositoryAdapter(): RiderLocationRepositoryP
 
 export function createPartnerDispatchAdapter(): PartnerDispatchPort {
   return {
-    // `options` (type/verifiedOnly) was previously dropped here entirely — findByCity's callers
-    // (SOSService.findNearbyPartners, escalation.application.ts) always passed it, but it never
-    // reached the repository query, so "Share Mechanic" / "Share Fuel Contact" and the
-    // SERVICE_PROVIDERS escalation tier were all silently returning every partner type in the
-    // city rather than the one actually requested. Fixed here, not a behavior change to accept.
-    async findByCity(city, take = 25, options) {
-      const partners = await partnerRepository.findPartnersByCityForDispatch(city, take, options);
+    async findNearPoint(latitude, longitude, radiusMeters, take = 25, options) {
+      const partners = await partnerRepository.findPartnersNearPointForDispatch(
+        latitude,
+        longitude,
+        radiusMeters,
+        take,
+        options,
+      );
       return partners.map((p: {
         userId: string;
         businessName: string;

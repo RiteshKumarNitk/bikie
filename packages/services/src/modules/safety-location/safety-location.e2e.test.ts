@@ -293,7 +293,7 @@ describe("SOS end-to-end (ADR-045)", () => {
     const module = buildModule({
       ...fake.ports,
       partnerDispatch: {
-        findByCity: vi.fn(async () => []),
+        findNearPoint: vi.fn(async () => []),
         findEligibleForAlert: vi.fn(async () => [generalPartner, mechanicOnlyPartner]),
         getEligibilityFields: vi.fn(async () => null),
         hasActivePartnerMembership: vi.fn(async () => true),
@@ -312,7 +312,7 @@ describe("SOS end-to-end (ADR-045)", () => {
     const module = buildModule({
       ...fake.ports,
       partnerDispatch: {
-        findByCity: vi.fn(async () => []),
+        findNearPoint: vi.fn(async () => []),
         findEligibleForAlert: vi.fn(async () => []),
         getEligibilityFields: vi.fn(async (userId: string) =>
           userId === "partner-offline"
@@ -340,7 +340,7 @@ describe("SOS end-to-end (ADR-045)", () => {
     const module = buildModule({
       ...fake.ports,
       partnerDispatch: {
-        findByCity: vi.fn(async () => []),
+        findNearPoint: vi.fn(async () => []),
         findEligibleForAlert: vi.fn(async () => []),
         getEligibilityFields: vi.fn(async () => ({
           providerId: null,
@@ -417,7 +417,7 @@ describe("SOS end-to-end (ADR-045)", () => {
     const module = buildModule({
       ...fake.ports,
       partnerDispatch: {
-        findByCity: vi.fn(async () => []),
+        findNearPoint: vi.fn(async () => []),
         findEligibleForAlert: vi.fn(async () => []),
         getEligibilityFields: vi.fn(async () => ({
           providerId: null,
@@ -519,7 +519,7 @@ describe("SOS end-to-end (ADR-045)", () => {
       },
       riderLocation: { ...(emptyRepos().riderLocation as SafetyLocationPorts["riderLocation"]), findNearbyAroundPoint: vi.fn(async () => []) },
       partnerDispatch: {
-        findByCity: vi.fn(async () => []),
+        findNearPoint: vi.fn(async () => []),
         findEligibleForAlert,
         getEligibilityFields: vi.fn(async () => null),
         hasActivePartnerMembership: vi.fn(async () => true),
@@ -589,7 +589,7 @@ describe("SOS end-to-end (ADR-045)", () => {
     const module = buildModule({
       riderLocation: { ...(emptyRepos().riderLocation as SafetyLocationPorts["riderLocation"]), findNearbyAroundPoint },
       partnerDispatch: {
-        findByCity: vi.fn(async () => []),
+        findNearPoint: vi.fn(async () => []),
         findEligibleForAlert: vi.fn(async () => []),
         getEligibilityFields: vi.fn(async () => null),
         hasActivePartnerMembership: vi.fn(async () => true),
