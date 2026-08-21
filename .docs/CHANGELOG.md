@@ -1,5 +1,14 @@
 # BIKIE Changelog
 
+## 2026-08-21 — Fixed back-press exiting the app from a deep-linked notification; added a rider "active SOS alert" Home banner (ADR-063)
+
+Found live-testing yesterday's fix: tapping a push notification, then pressing back, closed the
+app instead of returning to the previous screen — a cold-start deep link replaced the whole
+navigation stack with just the tapped screen, leaving nothing to return to. Fixed by always
+landing on Home first, then pushing the target screen on top; applies to every deep-linked entity,
+not just notifications. Also added a "your SOS alert is active" banner to Home on both platforms —
+a rider previously had no reliable way back to an alert they'd just sent. Full details in ADR-063.
+
 ## 2026-08-21 — A partner's own SOS offer had no visible home on Home, Requests, or Active (ADR-062)
 
 Reported: an SOS request wasn't visible on the Service Provider's Home, Requests, or Active tabs.

@@ -26,6 +26,9 @@ export type SosLocationFilter = { latitude: number; longitude: number; radiusMet
 export interface SosAlertRepositoryPort {
   createAlert(data: SosAlertCreateData): Promise<RawSOSAlertDTO>;
   getActiveAlerts(location?: SosLocationFilter): Promise<RawSOSAlertDTO[]>;
+  /** A reporter's own open alerts, independent of their location-sharing state — for "is my
+   * alert still open," not the nearby-community browse list `getActiveAlerts` serves. */
+  getActiveAlertsForReporter(userId: string): Promise<RawSOSAlertDTO[]>;
   getAlertById(alertId: string): Promise<RawSOSAlertDTO | null>;
   resolveAlert(alertId: string, userId: string): Promise<void>;
   /** Deprecated alias target for the old /respond route — new callers use SosOfferRepositoryPort. */

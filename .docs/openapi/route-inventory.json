@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-21T11:42:06.184Z",
-  "count": 143,
+  "generatedAt": "2026-08-21T13:20:32.276Z",
+  "count": 144,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -952,6 +952,14 @@
       ],
       "auth": "session",
       "file": "apps/web/app/api/sos/alerts/history/route.ts"
+    },
+    {
+      "path": "/api/sos/alerts/mine",
+      "methods": [
+        "GET"
+      ],
+      "auth": "membership",
+      "file": "apps/web/app/api/sos/alerts/mine/route.ts"
     },
     {
       "path": "/api/sos/alerts",

@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Back-press exited the app from a deep-linked notification; a rider's own SOS alert had no Home visibility (2026-08-21, ADR-063)
+
+While live-testing ADR-062: tapping a push notification as a Service Provider, then pressing back,
+closed the app instead of returning to the previous screen — the deep-link handler replaced the
+whole navigation stack with just the tapped screen, leaving nothing to pop back to. Also: a rider
+had no reliable way to find their way back to an SOS alert they'd just sent, short of a one-time
+confirmation button or digging through a location-gated community list. See ADR-063.
+
+| Task | Status |
+|---|---|
+| Deep-link navigation (`main.dart`) now lands on Home first, then pushes the target screen on top, instead of replacing the whole stack — applies to every deep-linked entity (SOS alert/session, Trip, conversation, the Notifications fallback), not just the one reported | Completed |
+| Added `GET /api/sos/alerts/mine` (`getActiveAlertsForReporter` end to end) — a rider's own open alerts, no location required | Completed |
+| Surfaced as a banner on Home on both platforms: mobile's `HomeScreen` and web's `/dashboard`, linking straight to the alert | Completed |
+| `pnpm openapi:generate` re-run (144 routes, from 143); `pnpm -w run test` (214/214), `tsc --noEmit` clean on `@bikie/services`/`apps/web`, `flutter analyze`/`flutter test` (112/112) after a full `flutter clean` rebuild | Completed |
+
 ## A partner's own SOS offer was invisible on Home, Requests, and Active alike (2026-08-21, ADR-062)
 
 Reported: an SOS request wasn't showing up on the Service Provider's Home tab, Requests tab, or
@@ -18,8 +33,8 @@ Accept/Decline again for an alert already offered on, once the app was reopened.
 | Mobile: `PartnerSosRequestScreen` now falls back to the pending-offers list to seed `_myOffer` on cold open, fixing the "shows Accept/Decline again" bug at its source | Completed |
 | Web: `/partner` (Overview) previously showed zero SOS content — added `PartnerSosPreview`; `/partner/sos` gained the matching "Waiting for Confirmation" section; `/partner/sos/[id]` gained the same cold-open fallback fix as mobile | Completed |
 | `pnpm openapi:generate` re-run for the new route; `pnpm -w run test` (214/214), `tsc --noEmit` clean on `@bikie/services`/`apps/web` | Completed |
-| Mobile codegen (`build_runner`) for the new `PartnerPendingOffer` model + `flutter analyze`/`flutter test` | In Progress |
-| Manual smoke test against the live "ritedh" account that surfaced this bug | **Not done** — recommended next |
+| Mobile codegen for the new `PartnerPendingOffer` model + `flutter analyze`/`flutter test` — `build_runner` itself crashes on this project's current SDK/analyzer version combo, so the generated code was restored from git history and hand-completed instead (see ADR-063) | Completed |
+| Manual smoke test against the live "ritedh" account that surfaced this bug — found its own separate issue (session expired 2026-08-19, 2 days before this was tested); user needs to log out/back in on the test device | **Not done** — pending user re-test |
 
 ## Service Providers got the Rider-membership upsell error on every SOS action route (2026-08-21, ADR-061)
 

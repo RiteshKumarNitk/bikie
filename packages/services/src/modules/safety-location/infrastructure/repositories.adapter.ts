@@ -28,6 +28,7 @@ export function createSosAlertRepositoryAdapter(): SosAlertRepositoryPort {
   return {
     createAlert: (data) => sosRepository.createAlert(data),
     getActiveAlerts: (location) => sosRepository.getActiveAlerts(location),
+    getActiveAlertsForReporter: (userId) => sosRepository.getActiveAlertsForReporter(userId),
     getAlertById: (alertId) => sosRepository.getAlertById(alertId),
     resolveAlert: (alertId, userId) => sosRepository.resolveAlert(alertId, userId),
     respondToAlert: (alertId, responderId, message) =>

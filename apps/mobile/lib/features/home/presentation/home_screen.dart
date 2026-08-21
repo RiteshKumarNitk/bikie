@@ -10,6 +10,8 @@ import '../../destinations/domain/destination_providers.dart';
 import '../../nearby_riders/data/nearby_riders_repository.dart';
 import '../../nearby_riders/domain/nearby_riders_providers.dart';
 import '../../onboarding/domain/rider_profile_providers.dart';
+import '../../sos/data/sos_model.dart';
+import '../../sos/domain/sos_providers.dart';
 import '../../sos/presentation/send_sos_sheet.dart';
 import '../domain/home_providers.dart';
 
@@ -42,6 +44,7 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: _SosPanicCards(onOpen: () => showSendSosSheet(context)),
             ),
+            const _MyActiveSosAlertBanner(),
             const _LocationSharingBanner(),
             const SizedBox(height: 20),
             Padding(
@@ -265,6 +268,63 @@ class _SosAlertCard extends StatelessWidget {
                     .toList(),
               ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A rider's own open SOS alert, if any, surfaced directly on Home — previously the only way to
+/// find your way back to an alert you'd just sent was the "View Alert" button on the one-time
+/// confirmation sheet (easy to dismiss without noticing) or digging through the SOS tab's full
+/// nearby-community list (which also requires sharing location, unlike this banner).
+class _MyActiveSosAlertBanner extends ConsumerWidget {
+  const _MyActiveSosAlertBanner();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final alerts = ref.watch(mySosAlertsProvider).valueOrNull ?? const [];
+    if (alerts.isEmpty) return const SizedBox.shrink();
+
+    final alert = alerts.first;
+    final isEmergency = alert.severity == 'EMERGENCY';
+    final color = isEmergency ? Theme.of(context).colorScheme.error : const Color(0xFFFFAA00);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Material(
+        color: color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () => context.push('/sos/${alert.id}'),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Icon(Icons.sos, color: color),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Your SOS alert is active',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: color),
+                      ),
+                      Text(
+                        alert.assignedHelperId != null
+                            ? '${sosTypeLabels[alert.type] ?? alert.type} · Helper assigned'
+                            : '${sosTypeLabels[alert.type] ?? alert.type} · Searching for help nearby',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
           ),
         ),
       ),

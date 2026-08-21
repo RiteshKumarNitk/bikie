@@ -145,6 +145,19 @@ export async function getActiveAlerts(location?: { latitude: number; longitude: 
     .map((a) => toDTO(a.alert, a.distanceMeters));
 }
 
+/** A reporter's own currently-open alerts, regardless of their own location-sharing state —
+ * `getActiveAlerts` above requires viewer coordinates and shows the whole nearby community, which
+ * is the wrong shape for "is MY alert still open," the thing a rider actually wants to check
+ * right after sending one. */
+export async function getActiveAlertsForReporter(userId: string) {
+  const alerts = await prisma.sOSAlert.findMany({
+    where: { userId, status: "ACTIVE" },
+    orderBy: { createdAt: "desc" },
+    include: ALERT_USER_INCLUDE,
+  });
+  return alerts.map((a) => toDTO(a));
+}
+
 export async function getAlertById(alertId: string) {
   const alert = await prisma.sOSAlert.findUnique({
     where: { id: alertId },

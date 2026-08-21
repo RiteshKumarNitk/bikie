@@ -27,6 +27,15 @@ class SosRepository {
     });
   }
 
+  /// `GET /api/sos/alerts/mine` — this rider's own currently-open alert(s), for a "your active
+  /// SOS alert" Home banner. Unlike [getActive], needs no GPS fix and never returns anyone else's.
+  Future<List<SOSAlert>> getMyActive() {
+    return apiGuard(() async {
+      final res = await _dio.get('/api/sos/alerts/mine');
+      return (res.data['alerts'] as List).map((e) => SOSAlert.fromJson(e as Map<String, dynamic>)).toList();
+    });
+  }
+
   Future<List<SOSHistoryEntry>> getHistory() {
     return apiGuard(() async {
       final res = await _dio.get('/api/sos/alerts/history');

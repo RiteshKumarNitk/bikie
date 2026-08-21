@@ -107,6 +107,7 @@ export function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partia
     sosAlerts: {
       createAlert: vi.fn(),
       getActiveAlerts: vi.fn(async () => []),
+      getActiveAlertsForReporter: vi.fn(async () => []),
       getAlertById: vi.fn(async () => null),
       resolveAlert: vi.fn(),
       respondToAlert: vi.fn(),

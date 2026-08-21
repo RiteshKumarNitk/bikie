@@ -3108,3 +3108,42 @@ changes:
   `@bikie/services` and `apps/web`; mobile verified via `flutter analyze`/`flutter test` after
   regenerating freezed/json codegen for the new `PartnerPendingOffer` model. Not yet manually
   smoke-tested against the live "ritedh" account that surfaced this bug — recommended next.
+
+## ADR-063: A deep-linked notification tap could exit the app on back-press; a rider's own open SOS alert had no visible home on either dashboard
+
+- **Context.** Two reports while testing ADR-062 live. First: opening Notifications as a Service
+  Provider and pressing the hardware back button closed the app entirely instead of returning to
+  the previous screen. Traced to `main.dart`'s push-tap handler: a notification tapped while the
+  app was killed resolves to a route (`/notifications`, `/sos/:id`, etc. — `notification_deep_
+  link.dart`) and calls `router.go(next)`, which — by design, per its own comment ("the app never
+  renders Home first") — replaces the *entire* navigation stack with just that one screen. Since
+  none of these deep-link targets are nested inside the app's `ShellRoute`, there was nothing left
+  in the stack once that screen was open; Android's default for an empty Navigator stack is to
+  exit the app rather than fall back to any screen. Second: after sending an SOS alert, a rider
+  had no reliable way back to it — the only paths were the one-time "View Alert" button on the
+  send confirmation (easy to dismiss without tapping) or the SOS tab's full nearby-community list
+  (which requires sharing location and mixes in everyone else's alerts, unlike a "my alerts" view).
+- **Decision.**
+  1. `main.dart`'s deep-link listener now does `router.go('/')` then `router.push(next)` instead
+     of a bare `router.go(next)` — landing on Home first, then pushing the actual target on top,
+     so the target screen is still what's shown (deep link kept its promise) but back-press now
+     has Home to return to instead of nothing.
+  2. Added a "my own open alerts" read, independent of location-sharing state: `getActiveAlertsForReporter`
+     (repository) → `SosAlertRepositoryPort.getActiveAlertsForReporter` → `SosApplication.getMyActiveAlerts`
+     → `SOSService.getMyActiveAlerts` → new `GET /api/sos/alerts/mine` (`requireMembership`, no
+     `lat`/`lng` needed). Surfaced as a banner on both dashboards' Home page — mobile's rider
+     `HomeScreen` (`_MyActiveSosAlertBanner`, right where the "SOS leads Home" panic cards already
+     live) and web's `/dashboard` (`MyActiveSosAlertBanner.tsx`) — linking straight to the alert's
+     own detail page when one is open, hidden otherwise.
+- **Consequences.** The back-button fix applies to every deep-linked entity (`sos_alert`,
+  `sos_session`, `Trip`, `conversation`, the generic `/notifications` fallback), not just
+  Notifications — all of them shared the same unguarded `go()` call. The new "my alerts" read
+  is a plain additive query (`status: "ACTIVE", userId`), no schema change, and reuses the exact
+  redaction/DTO path `getActiveAlerts`/`getAlertById` already go through. `pnpm openapi:generate`
+  re-run for the new route (144 routes, from 143). Verified with `pnpm -w run test` (214/214),
+  `tsc --noEmit` clean on `@bikie/services`/`apps/web`, and `flutter analyze`/`flutter test`
+  (112/112) after a full `flutter clean` + fresh `flutter build apk --debug` (also the concrete
+  fix for a still-open, separate issue this same session: an interrupted `build_runner` run had
+  left several generated Dart files deleted mid-regeneration, which had gotten committed as-is —
+  restored from the prior commit and hand-completed the one new class's generated code, since the
+  code-gen toolchain itself currently crashes on this SDK/analyzer version mismatch).

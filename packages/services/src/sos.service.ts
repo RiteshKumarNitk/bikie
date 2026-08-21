@@ -20,6 +20,12 @@ export const SOSService = {
     return getSafetyLocationModule().sos.getAlertById(alertId, viewer);
   },
 
+  /** A rider's own open alerts, regardless of location-sharing state — for a "your active SOS
+   * alert" Home banner, distinct from `getActiveAlerts`'s location-gated community browse list. */
+  async getMyActiveAlerts(userId: string): Promise<SOSAlertDTO[]> {
+    return getSafetyLocationModule().sos.getMyActiveAlerts(userId);
+  },
+
   async getTimeline(alertId: string) {
     return getSafetyLocationModule().ports.sosTimeline.listForAlert(alertId);
   },

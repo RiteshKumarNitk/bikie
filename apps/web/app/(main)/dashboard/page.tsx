@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DashboardOverviewDTO, RideJoinRequestDTO } from "@bikie/types";
 import { authClient } from "@/lib/auth-client";
 import { Skeleton } from "@bikie/ui";
+import { MyActiveSosAlertBanner } from "@/components/sos/MyActiveSosAlertBanner";
 
 export default function DashboardHomePage() {
   const { data: session } = authClient.useSession();
@@ -58,9 +59,11 @@ export default function DashboardHomePage() {
 
   return (
     <div className="space-y-8">
+      <MyActiveSosAlertBanner />
+
       <div>
         <h1 className="text-3xl font-semibold">👋 Good {new Date().getHours() < 12 ? 'Morning' : new Date().getHours() < 18 ? 'Afternoon' : 'Evening'}, {session?.user.name.split(" ")[0]}</h1>
-        
+
         <div className="mt-6 flex flex-wrap gap-4">
           <div className="rounded-2xl bg-card border border-foreground/10 p-5 min-w[140px] flex-1">
             <p className="text-2xl font-bold">{overview?.stats.upcomingRides}</p>

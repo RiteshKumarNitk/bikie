@@ -16,6 +16,13 @@ final activeSosAlertsProvider = FutureProvider.autoDispose<List<SOSAlert>>((ref)
   return ref.watch(sosRepositoryProvider).getActive(latitude: location?.latitude, longitude: location?.longitude);
 });
 
+/// This rider's own currently-open alert(s), for a "your active SOS alert" Home banner —
+/// independent of [sosActiveAlertsLocationProvider], since a rider should see their own alert
+/// whether or not they've shared their location for the nearby-community browse list.
+final mySosAlertsProvider = FutureProvider.autoDispose<List<SOSAlert>>((ref) {
+  return ref.watch(sosRepositoryProvider).getMyActive();
+});
+
 final sosHistoryProvider = FutureProvider.autoDispose<List<SOSHistoryEntry>>((ref) {
   return ref.watch(sosRepositoryProvider).getHistory();
 });

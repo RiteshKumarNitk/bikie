@@ -37,6 +37,15 @@ export function createSosApplication(ports: SafetyLocationPorts) {
       return alerts.map((alert) => redactAlertForViewer(alert, isPrivilegedViewer(alert, viewer)));
     },
 
+    /** A rider's own currently-open alerts — for surfacing "your active SOS alert" on Home,
+     * independent of whether they've shared their location (`getActiveAlerts` above requires it
+     * and returns the whole nearby community, the wrong shape for this). Never redacted: a
+     * reporter is always the privileged viewer of their own alert. */
+    async getMyActiveAlerts(userId: string): Promise<SOSAlertDTO[]> {
+      const alerts = await ports.sosAlerts.getActiveAlertsForReporter(userId);
+      return alerts.map((alert) => redactAlertForViewer(alert, isPrivilegedViewer(alert, { userId, isAdmin: false })));
+    },
+
     async getAlertById(alertId: string, viewer: AlertViewer): Promise<SOSAlertDTO | null> {
       const alert = await ports.sosAlerts.getAlertById(alertId);
       if (!alert) return null;

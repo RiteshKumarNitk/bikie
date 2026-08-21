@@ -51,12 +51,22 @@ class BikieApp extends ConsumerWidget {
     final router = ref.watch(routerProvider);
 
     // A push tap resolved to a route (possibly moments ago, via getInitialMessage — see main())
-    // is applied here once we actually have a router and a settled auth state. `go`, not
-    // `push`, so the target screen replaces whatever the router's initial location would have
-    // shown — the app never renders Home first.
+    // is applied here once we actually have a router and a settled auth state.
+    //
+    // `go('/')` first, then `push(next)` — NOT a bare `go(next)`. A bare `go` replaces the
+    // entire navigation stack with just the target screen; for a cold start (app was killed,
+    // launched by tapping the notification) that leaves nothing beneath it, so the hardware back
+    // button has nowhere to pop to and Android exits the app outright instead of returning to
+    // Home. Landing on Home first, then pushing the target on top, keeps the deep link's own
+    // promise (the target screen is what's shown) while giving back a real screen to return to.
     ref.listen<String?>(pendingDeepLinkRouteProvider, (previous, next) {
       if (next == null || status != AuthStatus.authenticated) return;
-      router.go(next);
+      if (next != '/') {
+        router.go('/');
+        router.push(next);
+      } else {
+        router.go(next);
+      }
       ref.read(pendingDeepLinkRouteProvider.notifier).state = null;
     });
 
