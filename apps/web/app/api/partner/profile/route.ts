@@ -30,9 +30,13 @@ export async function GET() {
  * Service Provider *starts* their business profile (first call creates a DRAFT row) and how an
  * existing applicant edits it. A `RIDER`-accountType account can no longer reach this at all —
  * changing account type first requires an admin-approved Account Type Change Request
- * (`/account-type-request`), never a bare API call. Refuses (409) while
- * PENDING_VERIFICATION/APPROVED/SUSPENDED — those need an explicit transition (submit/reapply, or
- * an admin action) first. */
+ * (`/account-type-request`), never a bare API call. Refuses (409) only while `SUSPENDED` — every
+ * other status (DRAFT/PENDING_VERIFICATION/MORE_INFORMATION_REQUIRED/REJECTED/APPROVED) is
+ * editable, per ADR-049/050: verification status is a trust badge, never a permission-to-operate
+ * (or permission-to-edit) gate. This route previously also refused PENDING_VERIFICATION/APPROVED —
+ * a leftover from the pre-ADR-049 admin-approval model that meant any already-approved,
+ * *operating* provider could never again fix their address or service radius; see
+ * `upsertPartnerProfileIfEditable`'s doc comment in packages/database for the full history. */
 export async function PUT(request: Request) {
   const { session, error } = await requireSession();
   if (error) return error;
@@ -51,7 +55,11 @@ export async function PUT(request: Request) {
   const result = await PartnerService.upsertProfileIfEditable(session.user.id, parsed.data);
   if (!result.ok) {
     return NextResponse.json(
-      { error: "NOT_EDITABLE", status: result.status },
+      {
+        error:
+          "Your Service Provider account is suspended, so your profile can't be edited right now. Contact support for help.",
+        status: result.status,
+      },
       { status: 409 },
     );
   }

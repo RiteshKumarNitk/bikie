@@ -167,21 +167,27 @@ export type PartnerProfileWriteResult =
   | { ok: true; partner: ReturnType<typeof toPartnerDTO> }
   | { ok: false; reason: "NOT_EDITABLE"; status: string };
 
-const EDITABLE_STATUSES = new Set(["DRAFT", "MORE_INFORMATION_REQUIRED", "REJECTED"]);
-
-/** Guarded write for the self-service profile form (`PUT /api/partner/profile`) — a submitted
- * application (PENDING_VERIFICATION), an already-approved one, or a suspended one must go
- * through an explicit transition (reapply, admin action) before its fields can change again. A
- * brand-new applicant (no row yet) always passes — `findUnique` returns `null`, and creating the
- * row also seeds `User.partnerStatus` to DRAFT so a session read reflects "has started an
- * application" from the very first save. */
+/** Guarded write for the self-service profile form (`PUT /api/partner/profile`) — only a
+ * `SUSPENDED` partner is blocked from editing. Previously also blocked `PENDING_VERIFICATION`
+ * and `APPROVED` (an `EDITABLE_STATUSES` allowlist of only DRAFT/MORE_INFORMATION_REQUIRED/
+ * REJECTED) — a leftover from the pre-ADR-049 admin-approval model, never updated once ADR-049/050
+ * established that verification status is a trust badge, never a permission-to-operate gate, and
+ * ADR-050 explicitly removed admin approval from between "profile exists" and "provider operates"
+ * entirely. In practice this meant any partner whose application had ever been approved (i.e.
+ * every provider actually operating) could never again fix a wrong address or change their
+ * service radius — exactly backwards, since those are the fields a provider most needs to update
+ * *after* they're already live, not before. `SUSPENDED` alone stays blocked, mirroring
+ * `evaluatePartnerCapability` (ADR-049): it's the one deliberate admin trust/safety action that
+ * revokes capability too, not just the verification badge. A brand-new applicant (no row yet)
+ * always passes — `findUnique` returns `null`, and creating the row also seeds `User.partnerStatus`
+ * to DRAFT so a session read reflects "has started an application" from the very first save. */
 export async function upsertPartnerProfileIfEditable(
   userId: string,
   data: Parameters<typeof upsertPartnerProfile>[1],
 ): Promise<PartnerProfileWriteResult> {
   return prisma.$transaction(async (tx) => {
     const existing = await tx.partner.findUnique({ where: { userId }, select: { verificationStatus: true } });
-    if (existing && !EDITABLE_STATUSES.has(existing.verificationStatus)) {
+    if (existing && existing.verificationStatus === "SUSPENDED") {
       return { ok: false, reason: "NOT_EDITABLE", status: existing.verificationStatus };
     }
     const shared = toUpsertData(data);
