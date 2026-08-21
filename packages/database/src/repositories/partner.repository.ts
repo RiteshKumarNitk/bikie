@@ -120,7 +120,7 @@ export type PartnerProfileWriteInput = {
 };
 
 // Deliberately never touches verificationStatus/isVerified/reviewedAt/etc. — a brand-new row
-// gets `verificationStatus: DRAFT` from the schema default; an existing row's status is only
+// gets `verifissssssssssscationStatus: DRAFT` from the schema default; an existing row's status is only
 // ever advanced by submitPartnerApplication/reapplyPartner (self-service) or
 // adminRepository.transitionPartnerVerification (admin), never by a profile-field edit.
 function toUpsertData(data: PartnerProfileWriteInput) {
