@@ -1,5 +1,23 @@
 # BIKIE — Roadmap
 
+## Service Providers Wrongly Blocked From SOS Requests By The Rider Membership Gate (2026-08-21, ADR-061)
+Fixed: a Service Provider could see an SOS notification but clicking into it returned the Rider
+Membership upsell error ("This is a BIKIE Membership perk"), even with an active, separate Partner
+Membership. Cause: `GET /api/sos/alerts/[id]` and every other SOS route a helper acts on (offer,
+decline, withdraw offer, session view/status) checked only Rider membership, which a
+Service-Provider-only account never has. Added a membership gate that reads whichever system
+matches the caller's own account type, applied to every route a helper — Rider community-responder
+or Service Provider — actually touches. One backend fix covers both platforms, since mobile and
+web's partner SOS screens already call the same routes; web also gained the "Subscribe" action
+mobile already had for this error. See ADR-061.
+
+## No Cron Scheduler Was Actually Running The 3 `/api/cron/*` Routes In Production (2026-08-21, ADR-060)
+Asked whether cron errors could happen in the future; found `sos-escalate`, `sos-resolve`, and
+`rider-location-cleanup` were fully implemented but never triggered in production — the real
+deployment is a self-hosted VPS via `docker-compose`, not Vercel, and had no cron mechanism at
+all. Added a `cron` service to `docker-compose.yml` scheduling all three at their documented
+frequencies. See ADR-060.
+
 ## SOS Dispatch Moves To The DLT "BIKIE_SR" SMS Template — And A Real Delivery Bug Found (2026-08-20, ADR-059)
 Wired MSG91's DLT-approved "BIKIE_SR" template to SOS dispatch SMS for nearby riders and Service
 Providers, capped to the nearest 10 recipients per dispatch batch (in-app/WhatsApp/email still

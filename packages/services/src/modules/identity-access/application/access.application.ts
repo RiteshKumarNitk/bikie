@@ -104,6 +104,35 @@ export function createAccessApplication(ports: IdentityAccessPorts) {
       const active = await ports.membership.hasActiveMembership(session!.userId);
       return active ? ALLOWED : denied("MEMBERSHIP_REQUIRED");
     },
+
+    /**
+     * SOS alert/session participation gate — both Riders (as reporters or community-helper
+     * responders) and Service Providers (as AMBER-category helpers, FINAL PRODUCT MODEL) view
+     * and act on the same alert/offer/session rows, but the two account types hold membership in
+     * two completely separate systems (ADR-051). `evaluateMembership` above only ever reads the
+     * Rider `MembershipPort`, so a Service-Provider-only account (no Rider membership) was being
+     * denied with the Rider upsell message on every SOS route — this branches by `accountType`
+     * instead, reading each account's own membership system. Deliberately membership-only, not
+     * full `evaluatePartnerCapability`: category/availability/capacity matching for the "accept"
+     * action is layered separately by `SOSSessionService.offerHelp`'s `requireAvailableAndCapacity`
+     * option, not this baseline gate.
+     */
+    async evaluateSosAccess(session: SessionSnapshot | null | undefined): Promise<AccessDecision> {
+      const sessionDecision = evaluateSession(session);
+      if (!sessionDecision.allowed) return sessionDecision;
+      if (isAdmin(session!.role)) return ALLOWED;
+      if (isServiceProviderAccountType(session)) {
+        if (session!.partnerStatus == null || session!.partnerStatus === "SUSPENDED") {
+          return denied("PARTNER_NOT_APPROVED");
+        }
+        const activePartnerMembership = await ports.partnerMembership.hasActivePartnerMembership(
+          session!.userId,
+        );
+        return activePartnerMembership ? ALLOWED : denied("MEMBERSHIP_REQUIRED");
+      }
+      const active = await ports.membership.hasActiveMembership(session!.userId);
+      return active ? ALLOWED : denied("MEMBERSHIP_REQUIRED");
+    },
   };
 }
 

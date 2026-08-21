@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { SOSService, SOSSessionService } from "@bikie/services";
-import { requireMembership } from "@/lib/require-role";
+import { requireSosAccess } from "@/lib/require-role";
 
 /** Alert detail + timeline — same visibility posture as the active-alerts list (any member,
  * not just the reporter/admin; that list already shows full reporter contact info by city).
- * The active session, if one exists, is only attached for its participants or an admin. */
+ * The active session, if one exists, is only attached for its participants or an admin.
+ * `requireSosAccess` (not `requireMembership`) — a Service Provider clicking in from "Nearby
+ * Requests" holds a Partner membership, not a Rider one. */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { session: authSession, error } = await requireMembership();
+  const { session: authSession, error } = await requireSosAccess();
   if (error) return error;
 
   const { id } = await params;

@@ -2,6 +2,24 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Service Providers got the Rider-membership upsell error on every SOS action route (2026-08-21, ADR-061)
+
+Reported: a Service Provider could see an SOS notification but clicking it showed "This is a
+BIKIE Membership perk, join a plan to continue" — despite holding a separate, active Partner
+Membership. Root cause: almost every `/api/sos/**` route a helper touches (alert detail, offer,
+decline, withdraw offer, session view/status) was gated by `requireMembership()`, which only ever
+reads the Rider `MembershipPort`. A Service-Provider-only account (no Rider membership at all)
+failed that check unconditionally, before its own Partner membership was ever considered. See
+ADR-061.
+
+| Task | Status |
+|---|---|
+| Added `evaluateSosAccess` to the identity-access module — branches by `accountType` (ADR-053), reading Partner membership for Service Providers and Rider membership for everyone else, admins bypass | Completed |
+| Added `requireSosAccess()` (`apps/web/lib/require-role.ts`), picking the matching denial copy ("partner" vs "rider" context) from the branch actually evaluated | Completed |
+| Swapped `requireMembership()` → `requireSosAccess()` on every route a helper (rider community-responder or Service Provider) can hit: `GET /api/sos/alerts/[id]`, `POST .../offer`, `.../respond` (deprecated alias), `.../decline`, `.../offers/[offerId]/withdraw`, `GET /api/sos/sessions/[id]`, `.../status` — left reporter/admin-only and rider-only routes (create/cancel/resolve alert, accept/reject an offer, rate a session, list offers, nearby-partners lookup) on `requireMembership()` unchanged | Completed |
+| Confirmed both platforms hit the identical fixed routes — mobile's `PartnerSosRequestScreen` and web's `/partner/sos/[id]` both call the same `GET/POST /api/sos/**` endpoints, so one backend fix covers both (mobile already had a "Subscribe" action wired to `e.isMembershipRequired`; added the equivalent Subscribe link to web's page, which previously fell through to a generic "Something went wrong") | Completed |
+| Verified: `pnpm -w run test` (214/214), `tsc --noEmit` clean on `@bikie/services` and `apps/web` | Completed |
+
 ## No cron scheduler was actually running any of the 3 `/api/cron/*` routes in production (2026-08-21, ADR-060)
 
 Asked "will we get a cron error in future" — investigation found the real state was worse than a

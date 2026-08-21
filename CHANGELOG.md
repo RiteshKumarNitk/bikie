@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-08-21 — Fixed Service Providers getting the Rider-membership error on SOS request routes (ADR-061)
+
+Reported: a Service Provider could see an SOS notification but clicking it said "This is a BIKIE
+Membership perk, join a plan to continue," despite holding an active, separate Partner
+Membership. Root cause: `GET /api/sos/alerts/[id]` and every other SOS route a helper touches
+(offer, decline, withdraw offer, session view/status) were gated by `requireMembership()`, which
+only checks Rider membership — a Service-Provider-only account failed it outright regardless of
+its own Partner Membership status.
+
+Added `evaluateSosAccess()`/`requireSosAccess()`, which reads whichever membership system matches
+the caller's own account type (Rider vs. Service Provider) and returns the matching error message.
+Swapped it in on every route a helper (Rider community-responder or Service Provider) can hit,
+leaving reporter/admin-only and Rider-only routes unchanged. Mobile and web both call the same
+backend routes, so this one fix covers both platforms; also added a missing "Subscribe" link to
+web's partner SOS detail page for parity with mobile's existing one. Full details in ADR-061.
+
 ## 2026-08-21 — Found that no cron scheduler was actually running any of the 3 `/api/cron/*` routes in production; added one (ADR-060)
 
 Asked whether cron errors could happen in the future — investigation found the real state was

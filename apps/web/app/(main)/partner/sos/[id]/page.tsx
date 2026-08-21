@@ -110,6 +110,7 @@ export default function PartnerSosRequestPage() {
   const [myOffer, setMyOffer] = useState<Offer | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [membershipRequired, setMembershipRequired] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/sos/alerts/${alertId}`);
@@ -131,11 +132,17 @@ export default function PartnerSosRequestPage() {
   async function handleAccept() {
     setBusy(true);
     setActionError(null);
+    setMembershipRequired(false);
     try {
       const res = await fetch(`/api/sos/alerts/${alertId}/offer`, { method: "POST" });
       const data = await res.json();
       if (!res.ok) {
-        setActionError(friendlyError(data.error));
+        if (data.error === "MEMBERSHIP_REQUIRED") {
+          setMembershipRequired(true);
+          setActionError(data.message ?? friendlyError(data.error));
+        } else {
+          setActionError(friendlyError(data.error));
+        }
         return;
       }
       setMyOffer(data.offer);
@@ -228,7 +235,14 @@ export default function PartnerSosRequestPage() {
       </Link>
 
       {actionError && (
-        <div className="mt-3 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">{actionError}</div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">
+          <span>{actionError}</span>
+          {membershipRequired && (
+            <Link href="/partner/membership" className="shrink-0 font-semibold underline">
+              Subscribe
+            </Link>
+          )}
+        </div>
       )}
 
       {needsResponse && (

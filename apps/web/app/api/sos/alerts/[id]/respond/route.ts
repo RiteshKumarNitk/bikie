@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 import { SOSSessionService } from "@bikie/services";
-import { requireMembership } from "@/lib/require-role";
+import { requireSosAccess } from "@/lib/require-role";
 
 /** Deprecated alias — kept only so older clients still work (ADR-028: no facade deletion
  * without zero-use proof). New callers should use POST /api/sos/alerts/[id]/offer. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireMembership();
+  const { session, error } = await requireSosAccess();
   if (error) return error;
 
   const { id } = await params;

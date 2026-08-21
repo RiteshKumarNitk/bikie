@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   getIdentityAccessModule,
+  isServiceProviderAccountType,
   type AccessDecision,
   type AccessDenialReason,
   type Permission,
@@ -104,6 +105,39 @@ export async function requireMembership() {
   // MEMBERSHIP_REQUIRED still hands back the session — callers historically read it for
   // logging/upsell context even though they return the 403.
   if (session && !decision.allowed && decision.reason === "MEMBERSHIP_REQUIRED") {
+    return { session, error };
+  }
+
+  return { session: null, error };
+}
+
+/** SOS alert/session participation gate — use this instead of `requireMembership()` on any
+ * `/api/sos/**` route a Service Provider can also legitimately hit (viewing an alert, offering
+ * help, viewing/withdrawing offers, active-session actions). `requireMembership()` only reads
+ * Rider membership, so a Service-Provider-only account was denied with "This is a BIKIE
+ * Membership perk" — the Rider upsell message — on every one of those routes even with a fully
+ * active, separate Partner membership. This reads whichever membership system matches the
+ * caller's own `accountType` (ADR-051/053) and picks the matching denial copy. */
+export async function requireSosAccess() {
+  const session = await getServerSession();
+  const { access } = getIdentityAccessModule();
+  const snapshot = session ? toSnapshot(session) : null;
+  const decision = await access.evaluateSosAccess(snapshot);
+  const context = isServiceProviderAccountType(snapshot) ? "partner" : "rider";
+
+  if (decision.allowed && session) {
+    return { session, error: null };
+  }
+
+  const error = toResponse(decision.allowed ? "UNAUTHENTICATED" : decision.reason, context);
+
+  // MEMBERSHIP_REQUIRED/PARTNER_NOT_APPROVED still hand back the session — callers historically
+  // read it for logging/upsell context even though they return the error response.
+  if (
+    session &&
+    !decision.allowed &&
+    (decision.reason === "MEMBERSHIP_REQUIRED" || decision.reason === "PARTNER_NOT_APPROVED")
+  ) {
     return { session, error };
   }
 

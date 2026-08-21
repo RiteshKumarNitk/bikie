@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server";
 import { SOSSessionService } from "@bikie/services";
 import { sosDeclineSchema } from "@bikie/validation";
-import { requireMembership } from "@/lib/require-role";
+import { requireSosAccess } from "@/lib/require-role";
 
 /** A responder (typically a partner browsing "Nearby Requests") declines without ever offering
- * (ADR-045) — a persisted decision, not a local UI-only dismissal. */
+ * (ADR-045) — a persisted decision, not a local UI-only dismissal. `requireSosAccess`, not
+ * `requireMembership`: that "typically a partner" caller holds a Partner membership. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireMembership();
+  const { session, error } = await requireSosAccess();
   if (error) return error;
 
   const { id } = await params;

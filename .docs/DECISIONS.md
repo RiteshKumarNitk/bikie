@@ -3004,3 +3004,51 @@ changes:
   Kubernetes CronJob), this `cron` service becomes redundant and `vercel.json`'s existing (still
   unused) `crons` gap would need revisiting instead — noted here so a future reader doesn't assume
   both mechanisms are simultaneously required.
+
+## ADR-061: `requireMembership()` was gating Service-Provider SOS actions against Rider membership — added `requireSosAccess()`
+
+- **Context.** Reported: a Service Provider could see an SOS request in "Nearby Requests" but
+  clicking into it returned "This is a BIKIE Membership perk, join a plan to continue" — the exact
+  copy `toResponse()` (`apps/web/lib/require-role.ts`) reserves for the Rider `Membership` upsell —
+  despite the provider holding an active, completely separate Partner Membership (ADR-051 already
+  established these as two independent systems). Tracing it: `GET /api/sos/alerts/[id]` (the alert
+  detail fetch both `sos_detail_screen.dart`/`PartnerSosRequestScreen` on mobile and
+  `/dashboard/sos/[id]`/`/partner/sos/[id]` on web call) was gated by `requireMembership()`, whose
+  `evaluateMembership()` (`identity-access/application/access.application.ts`) reads only
+  `MembershipPort.hasActiveMembership` — the Rider table — and admins aside, denies everyone else
+  outright. A pure Service-Provider account (never a Rider member, correctly so under the
+  dual-capability model, ADR-053) fails this unconditionally, regardless of its own Partner
+  membership status. The same gate turned out to sit on nearly every SOS action a helper performs:
+  `POST .../offer` (a Service Provider's "ACCEPT" reuses this endpoint per the FINAL PRODUCT
+  MODEL), `.../decline` ("typically a partner browsing Nearby Requests" per its own doc comment),
+  `.../offers/[offerId]/withdraw`, and the active-session `GET`/`.../status` routes — every one of
+  these already had its own internal ownership/capability logic layered on top
+  (`requireAvailableAndCapacity`, `SOSSessionService`'s per-action ownership checks), but none of
+  that mattered because `requireMembership()` rejected the request before any of it ran.
+- **Decision.** Added `evaluateSosAccess()` to the identity-access module: same session/admin-
+  bypass fast paths as `evaluateMembership()`, but branches on `accountType` (ADR-053) before
+  picking which membership system to read — Service Provider sessions check
+  `PartnerMembershipPort.hasActivePartnerMembership` (plus the existing non-`SUSPENDED` profile
+  check `evaluatePartnerCapability` already applies), everyone else keeps reading the Rider
+  `MembershipPort`, unchanged. Added `requireSosAccess()` (`require-role.ts`) as the route-level
+  wrapper, mirroring `requireMembership()`'s shape exactly but resolving the `toResponse()` context
+  ("rider" vs "partner") from whichever branch was actually evaluated, so the denial copy always
+  matches the caller's own membership system. Swapped `requireMembership()` → `requireSosAccess()`
+  on exactly the routes a helper (Rider community-responder *or* Service Provider) can hit:
+  alert detail, offer, the deprecated `respond` alias, decline, withdraw-offer, session detail, and
+  session status. Left every reporter/admin-only or Rider-only route (create/cancel/resolve an
+  alert, accept/reject one of several offers, rate a completed session, list an alert's offers,
+  the nearby-partners lookup) on `requireMembership()` — those actions are never performed by a
+  Service Provider account, so branching them would be undefended surface for no benefit.
+- **Consequences.** Both platforms share the identical fix with zero client-side changes needed for
+  the underlying bug, since mobile and web's partner SOS screens already call these same
+  `/api/sos/**` routes (ADR-044/045's explicit "no separate partner backend flow" design paying
+  off here). Mobile's existing `ApiException.isMembershipRequired` → "Subscribe" snackbar action
+  now fires with the correct Service-Provider message instead of the Rider one; web's parallel
+  `/partner/sos/[id]` page previously had no equivalent handling at all (a failed ACCEPT there
+  just fell through to a generic "Something went wrong" toast) — added the same Subscribe-link
+  treatment for parity. Verified with `pnpm -w run test` (214/214 passing, no test relied on the
+  old rider-only behavior for any of the swapped routes) and a clean `tsc --noEmit` on both
+  `@bikie/services` and `apps/web`. Not yet manually smoke-tested against a live database with an
+  actual Service-Provider test account (`partner@bikie.app`) clicking through a real SOS alert on
+  either platform — recommended before considering this fully closed.

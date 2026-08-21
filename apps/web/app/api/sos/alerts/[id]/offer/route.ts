@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
 import { SOSSessionService } from "@bikie/services";
 import { sosOfferCreateSchema } from "@bikie/validation";
-import { requireMembership } from "@/lib/require-role";
+import { requireSosAccess } from "@/lib/require-role";
 import { enforceRateLimit } from "@/lib/rate-limit";
 
-/** Helper taps "I'm Coming." */
+/** Helper taps "I'm Coming." — `requireSosAccess`, not `requireMembership`: a Service Provider's
+ * "ACCEPT" reuses this endpoint and holds a Partner membership, not a Rider one (see comment
+ * below on the additive capacity/capability gate this then layers on top). */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireMembership();
+  const { session, error } = await requireSosAccess();
   if (error) return error;
 
   const rateLimitError = await enforceRateLimit("sos-offer", session.user.id, { requests: 10, windowSeconds: 300 });

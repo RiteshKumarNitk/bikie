@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { SOSSessionService } from "@bikie/services";
 import { sosSessionStatusSchema } from "@bikie/validation";
-import { requireMembership } from "@/lib/require-role";
+import { requireSosAccess } from "@/lib/require-role";
 
 /** Timeline transitions: Helper Arrived / Assistance Started / Completed / Cancelled.
  * Ownership rule enforced in the application layer — helper drives ARRIVED/IN_PROGRESS,
- * rider drives COMPLETED, either can CANCEL, admin can always override. */
+ * rider drives COMPLETED, either can CANCEL, admin can always override. `requireSosAccess`,
+ * not `requireMembership`: the helper driving ARRIVED/IN_PROGRESS may be a Service Provider. */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireMembership();
+  const { session, error } = await requireSosAccess();
   if (error) return error;
 
   const { id } = await params;

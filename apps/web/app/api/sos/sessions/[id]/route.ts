@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import { SOSSessionService } from "@bikie/services";
-import { requireMembership } from "@/lib/require-role";
+import { requireSosAccess } from "@/lib/require-role";
 
+/** `requireSosAccess`, not `requireMembership`: a session's helper participant may be a
+ * Service Provider with a Partner membership, not a Rider one. */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { session, error } = await requireMembership();
+  const { session, error } = await requireSosAccess();
   if (error) return error;
 
   const { id } = await params;
