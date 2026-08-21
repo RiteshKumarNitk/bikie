@@ -1,19 +1,20 @@
-import 'package:sendotp_flutter_sdk/sendotp_flutter_sdk.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../../core/network/api_exception.dart';
-import '../../../core/network/app_config.dart';
+import 'msg91_webview_bridge.dart';
 
 /// ADR-057 — mirrors `apps/web/lib/use-msg91-widget.ts`'s `OtpChannel`. Voice/Email exist on
 /// MSG91's side too but aren't offered in this app's UI.
 enum OtpChannel { sms, whatsapp }
 
-/// MSG91 retryOTP channel codes, per `sendotp_flutter_sdk`'s own numeric convention (the JS
-/// widget web uses instead takes string codes like `'WHATSAPP-12'` — same underlying MSG91
-/// backend, different SDK wrapper). Source: pub.dev's `sendotp_flutter_sdk` reference.
-int _retryChannelCode(OtpChannel channel) => switch (channel) {
-      OtpChannel.sms => 11,
-      OtpChannel.whatsapp => 12,
-    };
+/// MSG91 JS widget's `retryOtp` channel codes — identical to
+/// `apps/web/lib/use-msg91-widget.ts`'s `RETRY_CHANNEL_CODE`, since mobile now runs the exact
+/// same JS widget (see `Msg91WidgetHost`), not `sendotp_flutter_sdk`'s numeric convention this
+/// used before.
+const Map<OtpChannel, String> _retryChannelCode = {
+  OtpChannel.sms: 'SMS-11',
+  OtpChannel.whatsapp: 'WHATSAPP-12',
+};
 
 class Msg91SendResult {
   const Msg91SendResult({required this.reqId});
@@ -23,29 +24,28 @@ class Msg91SendResult {
   final String reqId;
 }
 
-bool _widgetInitialized = false;
-
-void _ensureWidgetInitialized() {
-  if (_widgetInitialized) return;
-  OTPWidget.initializeWidget(kMsg91WidgetId, kMsg91WidgetTokenAuth);
-  _widgetInitialized = true;
-}
-
-/// ADR-057 — MSG91's OTP Widget SDK, called directly from the app to MSG91 (mirrors
-/// `apps/web/lib/use-msg91-widget.ts`'s browser-side widget exactly, same underlying MSG91
-/// product). Our backend never sees the send/verify legs here, only the final access token —
-/// [verifyOtp] returns that token unchanged; the caller must still send it to
-/// `POST /api/auth/phone-number/verify` (via `AuthRepository.verifyOtp`) for server-side
-/// re-verification against MSG91 (`packages/services/.../msg91-widget-verify.adapter.ts`) before
-/// Better Auth issues a session. This class never creates a user or a session by itself — it
-/// only decides "is this OTP correct," identically to how the web widget's role is scoped.
+/// ADR-057 (revised 2026-08-20) — MSG91's OTP Widget, same product web already uses successfully
+/// in production. Originally implemented via the native `sendotp_flutter_sdk` package, calling
+/// MSG91's REST API directly from the device — but this account's widget rejects that path
+/// outright ("mobile requests are not allowed for this widget", confirmed live: MSG91's own
+/// dashboard shows no distinct native-SDK integration for this widget, even under its "Mobile SDK
+/// for custom UI" tab, only the same browser JS widget web uses). Rewritten to run that exact JS
+/// widget headlessly inside a WebView (`Msg91WidgetHost`/`Msg91WebviewBridge`) instead — reusing
+/// what's proven to work rather than a code path this widget was never provisioned for.
+///
+/// Our backend never sees the send/verify legs here, only the final access token — [verifyOtp]
+/// returns that token unchanged; the caller must still send it to `POST /api/auth/phone-number/verify`
+/// (via `AuthRepository.verifyOtp`) for server-side re-verification against MSG91
+/// (`packages/services/.../msg91-widget-verify.adapter.ts`) before Better Auth issues a session.
+/// This class never creates a user or a session by itself — it only decides "is this OTP
+/// correct," identically to how the web widget's role is scoped.
 ///
 /// This is the release-build OTP path only. Debug builds keep using the older backend-proxied
 /// native-API flow (`AuthRepository.sendOtp`'s `kDebugMode` branch) so the dev-bypass and
 /// `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE` fixed-code mechanisms
 /// (`packages/services/.../domain/test-otp-bypass.ts`) keep working for local/automated testing —
-/// MSG91's widget always talks to real MSG91 and would reject a fake test code before our
-/// backend ever saw it, so those two flows can't share one code path. See ADR-057.
+/// MSG91's real widget would reject a fake test code before our backend ever saw it, so those two
+/// flows can't share one code path. See ADR-057.
 class Msg91OtpRepository {
   /// [phoneNumber] must be E.164 (`+91XXXXXXXXXX`); MSG91 wants the identifier as digits only,
   /// country code without the `+` — converted here, never left to the caller.
@@ -53,18 +53,18 @@ class Msg91OtpRepository {
   /// Throws [ApiException] (never a raw exception) on any failure — `AuthRepository`'s callers
   /// only ever catch `ApiException` (matching every other repository in this app), and this class
   /// sits *outside* `apiGuard`'s `DioException`-only catch (nothing here goes through `Dio` — the
-  /// widget SDK talks to MSG91 directly), so it has to do its own conversion.
+  /// widget talks to MSG91 directly from its own WebView), so it has to do its own conversion.
   Future<Msg91SendResult> sendOtp(String phoneNumber, {OtpChannel channel = OtpChannel.sms}) async {
-    _ensureWidgetInitialized();
     final identifier = phoneNumber.startsWith('+') ? phoneNumber.substring(1) : phoneNumber;
-    final response = await _guarded(() => OTPWidget.sendOTP({'identifier': identifier}));
-    final reqId = _isErrorResponse(response) ? null : _extractReqId(response);
+    final response = await _guarded(() => Msg91WebviewBridge.instance.sendOtp(identifier));
+    final reqId = _extractMessage(response, requireOk: true);
     if (reqId == null) {
-      throw ApiException(statusCode: 0, message: _withReason('Could not send the verification code.', response));
+      _logReason('sendOtp rejected', response);
+      throw ApiException(statusCode: 0, message: 'Could not send the verification code. Please try again.');
     }
 
     // ADR-057 — MSG91's widget has no channel parameter on the *initial* send (confirmed against
-    // MSG91's public docs; only `retryOTP` takes one), so `channel: whatsapp` here means: let the
+    // MSG91's public docs; only `retryOtp` takes one), so `channel: whatsapp` here means: let the
     // default-channel send above go out, then immediately retry on WhatsApp. This is a real,
     // documented MSG91 limitation, not a workaround invented here (see ADR-057) — concretely, if
     // the widget's configured default channel is SMS, the phone may receive both an SMS and a
@@ -75,96 +75,69 @@ class Msg91OtpRepository {
     return Msg91SendResult(reqId: reqId);
   }
 
+  /// [reqId] is accepted for signature/call-site compatibility (mirrors the resend flows'
+  /// existing shape) but not forwarded to the widget — unlike the native API this replaced, the
+  /// JS widget tracks its own session state inside the WebView page itself, exactly as it does
+  /// for web; only the retry channel is a real parameter (`window.retryOtp(channel, ...)`).
   Future<void> retryOtp(String reqId, {OtpChannel channel = OtpChannel.sms}) async {
-    _ensureWidgetInitialized();
-    final response = await _guarded(() => OTPWidget.retryOTP({'reqId': reqId, 'retryChannel': _retryChannelCode(channel)}));
-    if (_isErrorResponse(response)) {
-      throw ApiException(statusCode: 0, message: _withReason('Could not send the verification code.', response));
+    final response = await _guarded(() => Msg91WebviewBridge.instance.retryOtp(_retryChannelCode[channel]!));
+    if (_extractMessage(response, requireOk: true) == null) {
+      _logReason('retryOtp rejected', response);
+      throw ApiException(statusCode: 0, message: 'Could not send the verification code. Please try again.');
     }
   }
 
   /// Returns MSG91's access token (an opaque, JWT-like string) on success — pass this straight
-  /// through as `AuthRepository.verifyOtp`'s `code` argument, unchanged. Throws [ApiException] on
-  /// rejection (wrong/expired code) with a generic message, same reasoning as [sendOtp]'s doc
-  /// comment — never surfaces the SDK's raw error text, which isn't confirmed safe to show a user.
+  /// through as `AuthRepository.verifyOtp`'s `code` argument, unchanged. Throws [ApiException]
+  /// with a plain, user-friendly message on rejection (wrong/expired code) — see [_logReason]'s
+  /// doc comment for where the real reason still goes.
   Future<String> verifyOtp(String reqId, String otp) async {
-    _ensureWidgetInitialized();
-    final response = await _guarded(() => OTPWidget.verifyOTP({'reqId': reqId, 'otp': otp}));
-    final token = _isErrorResponse(response) ? null : _extractToken(response);
+    final response = await _guarded(() => Msg91WebviewBridge.instance.verifyOtp(otp));
+    final token = _extractMessage(response, requireOk: true);
     if (token == null) {
+      _logReason('verifyOtp rejected', response);
       throw ApiException(
         statusCode: 400,
-        message: _withReason('Invalid or expired code.', response),
+        message: 'Invalid or expired code. Please try again.',
         errorCode: 'INVALID_OTP',
       );
     }
     return token;
   }
 
-  /// Converts anything `sendotp_flutter_sdk` might throw (its own exception type isn't confirmed
-  /// from public docs — could be a plain `String`, a `PlatformException`, or something else
-  /// entirely) into an [ApiException], so every caller of this class can rely on catching exactly
-  /// one exception type, matching the rest of this app's repositories.
+  /// Converts anything the bridge might throw (a WebView JS error, a malformed message, the
+  /// 15s/20s timeouts in `Msg91WebviewBridge`) into an [ApiException] with a plain, generic
+  /// message, so every caller of this class can rely on catching exactly one exception type
+  /// (matching the rest of this app's repositories) and every user sees the same simple text
+  /// regardless of cause. The real reason still goes to [_logReason] instead of being discarded.
   Future<T> _guarded<T>(Future<T> Function() call) async {
     try {
       return await call();
     } on ApiException {
       rethrow;
     } catch (e) {
-      throw ApiException(
-        statusCode: 0,
-        message: 'Could not reach the verification service. Please try again. (${_shortReason(e)})',
-      );
+      debugPrint('[MSG91-OTP] request failed: $e');
+      throw ApiException(statusCode: 0, message: 'Could not reach the verification service. Please try again.');
     }
   }
 
-  /// The underlying reason, kept visible on screen rather than silently discarded — this app is
-  /// still in active testing and a generic "please try again" gives no way to tell "MSG91
-  /// rejected the request" apart from "no internet" apart from "widget misconfigured" apart from
-  /// a dozen other causes. `sendotp_flutter_sdk`'s own exceptions stringify as
-  /// `Exception: Error exception OTP: Exception: Error sending OTP: Exception: Failed to post
-  /// data: \<code\>, \<body\>` — strip the `Exception: ` noise so what's left reads as one sentence.
-  String _shortReason(Object e) => e.toString().replaceAll('Exception: ', '').trim();
-
-  /// Appends MSG91's own rejection reason (e.g. `"IPBlocked"`) to a safe, user-facing prefix — see
-  /// [_shortReason]'s doc comment for why this stays visible instead of being swallowed.
-  String _withReason(String prefix, dynamic response) {
-    if (response is Map && response['message'] is String && (response['message'] as String).isNotEmpty) {
-      return '$prefix (${response['message']})';
-    }
-    return '$prefix Please try again.';
+  /// [Msg91WebviewBridge]'s calls all resolve to `{ok: bool, message: String}` — `message` is
+  /// the reqId/token on success, MSG91's own rejection text on failure. Returns `message` only
+  /// when [requireOk] is satisfied (`ok == true`), so a rejection's text can never be
+  /// misread as a successful reqId/token — this was a real bug in the previous
+  /// `sendotp_flutter_sdk`-based implementation.
+  String? _extractMessage(Map<String, dynamic> response, {required bool requireOk}) {
+    if (response['ok'] != requireOk) return null;
+    final message = response['message'];
+    return (message is String && message.isNotEmpty) ? message : null;
   }
 
-  /// Live-device confirmed (2026-08-20): MSG91's widget API returns HTTP 200 with
-  /// `{"type": "error", "message": "<reason>"}` on rejection (e.g. `"IPBlocked"`) — a normal,
-  /// non-throwing response, since MSG91 uses HTTP status only for transport-level failures, not
-  /// business-logic ones (same quirk as `sms.adapter.ts`'s plain sendsms API). Every call site
-  /// must check this *before* reading `message` as a success value — `message` is reused as both
-  /// the success payload and the error text depending on `type`. Was a real bug here previously:
-  /// `_extractReqId` had no such check, so an `"IPBlocked"`-style rejection was silently read as
-  /// a valid `reqId` and treated as a successful send.
-  bool _isErrorResponse(dynamic response) => response is Map && response['type'] == 'error';
-
-  /// `sendotp_flutter_sdk`'s exact response shape for a successful send is not confirmed from
-  /// public docs alone (its README shows the call, not the response body) — this reads every
-  /// plausible key defensively rather than assuming one.
-  String? _extractReqId(dynamic response) {
-    if (response is Map) {
-      final candidate = response['message'] ?? response['reqId'] ?? response['req_id'] ?? response['reqID'];
-      if (candidate is String && candidate.isNotEmpty) return candidate;
-    }
-    if (response is String && response.isNotEmpty) return response;
-    return null;
-  }
-
-  /// Same caveat as [_extractReqId].
-  String? _extractToken(dynamic response) {
-    if (response is Map) {
-      final candidate =
-          response['message'] ?? response['token'] ?? response['access-token'] ?? response['accessToken'];
-      if (candidate is String && candidate.isNotEmpty) return candidate;
-    }
-    if (response is String && response.isNotEmpty) return response;
-    return null;
+  /// The real MSG91 rejection reason (e.g. `"IPBlocked"`, `"mobile requests are not allowed for
+  /// this widget"`) — logged via `debugPrint` (visible over `adb logcat`, in every build mode,
+  /// not just debug) rather than shown on screen. Every user seeing raw technical text for a
+  /// production auth flow is worse than a plain "please try again," even while this integration
+  /// is still being stabilized — the reason is one `adb logcat` away when needed, not gone.
+  void _logReason(String context, Map<String, dynamic> response) {
+    debugPrint('[MSG91-OTP] $context: ${response['message']}');
   }
 }

@@ -44,12 +44,13 @@ dependencies:
   # Networking
   dio: ^5.7.0
 
-  # MSG91 OTP Widget SDK (ADR-057) — release-build OTP send/verify, replacing the debug-only
-  # backend-proxied native API path for real devices. Only two versions ever published
-  # (0.0.1/0.0.2, msg91's own verified publisher) — pinned exactly rather than with a caret,
-  # since a 0.0.x package's own semver gives no guarantee a "compatible" bump wouldn't break
-  # the API shape this integration depends on.
-  sendotp_flutter_sdk: 0.0.2
+  # MSG91 OTP Widget, release-build OTP send/verify (ADR-057, revised). `sendotp_flutter_sdk`'s
+  # native REST calls were rejected outright by this MSG91 account's widget ("mobile requests
+  # are not allowed for this widget", confirmed live 2026-08-20 — MSG91's own dashboard shows no
+  # distinct native-SDK integration for this widget, only the browser JS widget, even under its
+  # "Mobile SDK" tab). Replaced with `webview_flutter` running that exact same JS widget
+  # (`verify.msg91.com/otp-provider.js`) headlessly — see `Msg91WidgetHost`/`Msg91WebviewBridge`.
+  webview_flutter: ^4.10.0
 
   # Immutable models / JSON
   freezed_annotation: ^2.4.4

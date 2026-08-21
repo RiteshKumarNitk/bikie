@@ -46,7 +46,8 @@ export function MembershipPlansManager({
   async function deletePlan(id: string) {
     const res = await fetch(`${basePath}/${id}`, { method: "DELETE" });
     if (!res.ok) {
-      toast.error("Unable to delete this plan. Please try again.");
+      const data = await res.json().catch(() => ({}) as { error?: string });
+      toast.error(typeof data.error === "string" ? data.error : "Unable to delete this plan. Please try again.");
       return;
     }
     setList((prev) => prev.filter((x) => x.id !== id));

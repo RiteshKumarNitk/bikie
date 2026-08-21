@@ -1,6 +1,7 @@
 import { resolveChannelAvailability, type ChannelAvailability } from "../domain/channel-selection";
 import type { CommunicationsPorts } from "../../communications/public";
 import { partnerMatchesAlertType } from "../domain/partner-mapping";
+import { deriveSeverity } from "../domain/severity";
 import type { SOSRecipient } from "../domain/dispatch-message";
 import type { RawSOSAlertDTO, SafetyLocationPorts } from "../ports";
 import { dispatchToRecipient, emptySummary, markSmsEligibility, type SOSDispatchSummary } from "./fan-out.application";
@@ -63,6 +64,13 @@ async function resolveNearbyRiders(
  * an ineligible partner "better than nobody" — `tickEscalation` still advances to ADMIN
  * unconditionally once radius is maxed with no acceptance, so the "SOS must never reach nobody"
  * guarantee (ADR-030) holds without one.
+ *
+ * Severity-gated (requested explicitly, not inferred): a RED/EMERGENCY alert (`deriveSeverity`
+ * — ACCIDENT/MEDICAL/LIFE_THREATENING) is community-support only and never reaches Service
+ * Providers at all, regardless of type-matching/radius/availability/membership — only an
+ * AMBER/ASSISTANCE alert (breakdown, flat tyre, fuel, battery, lost, other) does. A
+ * life-threatening situation should reach the rider community immediately, not also page paid
+ * providers whose response scope is mechanical/fuel help, not emergency response.
  */
 async function resolveServiceProviders(
   alert: Pick<RawSOSAlertDTO, "latitude" | "longitude" | "type">,
@@ -75,6 +83,8 @@ async function resolveServiceProviders(
    * built, not on the generated recipient rows). */
   excludeUserIds: Set<string> = new Set(),
 ): Promise<SOSRecipient[]> {
+  if (deriveSeverity(alert.type) === "EMERGENCY") return [];
+
   const candidates = await ports.partnerDispatch.findEligibleForAlert({
     latitude: alert.latitude,
     longitude: alert.longitude,
@@ -135,7 +145,9 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
    *
    * ADR-047: eligible Service Providers are dispatched in this SAME round, at the same starting
    * radius, regardless of which rider tier was chosen — they're a parallel responder pool, not a
-   * later fallback reached only once every rider tier has been exhausted (see `resolveServiceProviders`).
+   * later fallback reached only once every rider tier has been exhausted (see
+   * `resolveServiceProviders`) — except for a RED/EMERGENCY alert, which never reaches Service
+   * Providers at all (see `resolveServiceProviders`'s severity gate).
    *
    * Returns the tier-1 summary AND the *total* nearby-rider count found (not just who was
    * notified this round) so the caller (sos.application.ts's createAlert) can fold

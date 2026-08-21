@@ -268,7 +268,12 @@ describe("SOS end-to-end (ADR-045)", () => {
   });
 
   it("Rider → Service Provider: an unmapped category only reaches general-responder partners, not type-matched ones", async () => {
-    const fake = createFakePorts({ userId: "rider-1", type: "MEDICAL", latitude: 10, longitude: 10 });
+    // type: "OTHER" — an AMBER/ASSISTANCE category (deriveSeverity) with no PartnerType mapping
+    // (partner-mapping.ts). Must stay AMBER, not RED/EMERGENCY: a RED alert now excludes Service
+    // Providers entirely regardless of general-responder status (see the dedicated test for that
+    // gate), so this test needs its own severity to isolate what it's actually exercising —
+    // type-matching vs. general-responder fallback.
+    const fake = createFakePorts({ userId: "rider-1", type: "OTHER", latitude: 10, longitude: 10 });
     const generalPartner = {
       userId: "partner-general",
       businessName: "General Responders Co",
@@ -493,7 +498,15 @@ describe("SOS end-to-end (ADR-045)", () => {
   });
 
   it("Escalation: tiers advance community → general (riders + providers together) → admin in order (ADR-047)", async () => {
-    const communityAlert = sampleAlert({ userId: "rider-1", currentRadiusMeters: 5000, escalationTier: "NEARBY_RIDERS_COMMUNITY" });
+    // type: "BIKE_BREAKDOWN" — must be AMBER/ASSISTANCE (deriveSeverity), not the default
+    // ACCIDENT (RED), since this test exercises Service Providers being searched alongside
+    // riders — a RED alert now excludes them from that search entirely (severity gate).
+    const communityAlert = sampleAlert({
+      userId: "rider-1",
+      type: "BIKE_BREAKDOWN",
+      currentRadiusMeters: 5000,
+      escalationTier: "NEARBY_RIDERS_COMMUNITY",
+    });
     const updateEscalationState = vi.fn(async () => undefined);
     const findAdminContacts = vi.fn(async () => [{ id: "admin-1", name: "Admin", email: "admin@bikie.app", phone: null }]);
     const findEligibleForAlert = vi.fn(async () => []);

@@ -29,7 +29,16 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (error) return error;
 
   const { id } = await params;
-  await AdminService.deleteMembershipPlan(id);
+  const result = await AdminService.deleteMembershipPlan(id);
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        error:
+          "This plan has active or past subscribers and can't be deleted. Deactivate it instead so it stops being offered to new members.",
+      },
+      { status: 409 },
+    );
+  }
   await logAdminAction({
     userId: session.user.id,
     action: "DELETE_MEMBERSHIP_PLAN",

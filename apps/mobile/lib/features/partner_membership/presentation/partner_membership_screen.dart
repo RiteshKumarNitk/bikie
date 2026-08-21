@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -55,39 +56,93 @@ class PartnerMembershipScreen extends ConsumerWidget {
                         ),
                       ),
                     )
-                  : Card(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Active: ${membership.plan.name}', style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 4),
-                            Text('${membership.daysLeft} days left · ${membership.status}'),
-                          ],
-                        ),
-                      ),
-                    ),
+                  // Mirrors web's `/dashboard/membership` — full details (plan, benefits,
+                  // remaining time) once active, instead of also leaving the purchasable plan
+                  // list below rendered (previously unconditional — a provider who'd just
+                  // activated still saw a live "Purchase"/"Activate" button for the same plan).
+                  : _ActivePartnerMembershipCard(membership: membership),
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
             ),
-            const SizedBox(height: 16),
-            Text('Plans', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            AsyncValueView(
-              value: plans,
-              onRetry: () => ref.invalidate(partnerMembershipPlansProvider),
-              data: (list) => Column(
-                children: list.where((p) => p.isActive).map((plan) => _PlanCard(plan: plan)).toList(),
-              ),
-            ),
             if (!hasActiveMembership) ...[
+              const SizedBox(height: 16),
+              Text('Plans', style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 12),
+              AsyncValueView(
+                value: plans,
+                onRetry: () => ref.invalidate(partnerMembershipPlansProvider),
+                data: (list) => Column(
+                  children: list.where((p) => p.isActive).map((plan) => _PlanCard(plan: plan)).toList(),
+                ),
+              ),
               const SizedBox(height: 12),
               Center(
                 child: TextButton(
                   onPressed: () => context.go('/'),
                   child: const Text('Skip for Now — explore the dashboard first'),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActivePartnerMembershipCard extends StatelessWidget {
+  const _ActivePartnerMembershipCard({required this.membership});
+
+  final PartnerMembership membership;
+
+  @override
+  Widget build(BuildContext context) {
+    final expiry = DateTime.tryParse(membership.endDate);
+    return Card(
+      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'ACTIVE',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppTheme.accentTextOf(context),
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text('${membership.plan.name} Plan', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(
+              expiry == null
+                  ? '${membership.daysLeft} days remaining'
+                  : '${membership.daysLeft} days remaining · Expires ${DateFormat('d MMMM y').format(expiry)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (membership.plan.benefits.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Benefits included', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              ...membership.plan.benefits.map(
+                (b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.check_circle, size: 16, color: AppTheme.accentTextOf(context)),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(b)),
+                    ],
+                  ),
                 ),
               ),
             ],

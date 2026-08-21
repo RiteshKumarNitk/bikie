@@ -279,9 +279,12 @@ class _SosAlertCard extends StatelessWidget {
 /// Someone who doesn't care about browsing nearby riders would reasonably skip that toggle
 /// without realizing it's the same switch SOS's nearby-rider dispatch tier depends on.
 /// Enabling here pushes an immediate location fix too, same as the Nearby Riders screen's own
-/// toggle, so this banner is fully self-sufficient — no detour required. Dismissal is local
-/// widget state only (mirrors `_ProfileCompletionBanner` below), so it naturally reappears next
-/// time Home is rebuilt rather than being silenced forever after one "Not now."
+/// toggle, so this banner is fully self-sufficient — no detour required. Dismissal ("Not now",
+/// OFF state only) is local widget state (mirrors `_ProfileCompletionBanner` below), so it
+/// naturally reappears next time Home is rebuilt rather than being silenced forever. The banner
+/// itself stays visible once turned on (showing an ON-state switch/copy) rather than hiding —
+/// it was this app's only surfaced control for the setting, so hiding it entirely on enable left
+/// no way back to turn it off short of finding the Nearby Riders screen's own copy of the switch.
 class _LocationSharingBanner extends ConsumerStatefulWidget {
   const _LocationSharingBanner();
 
@@ -330,11 +333,14 @@ class _LocationSharingBannerState extends ConsumerState<_LocationSharingBanner> 
 
   @override
   Widget build(BuildContext context) {
+    // Only ever hidden by an explicit "Not now" on the OFF state below — previously also hid
+    // itself once `enabled` turned true, which left no way back to this switch at all once a
+    // rider turned it on: this was the app's only surfaced control for the setting, so "not
+    // findable here anymore" read as the feature having vanished, not as "now enabled."
     if (_dismissed) return const SizedBox.shrink();
 
     final sharingAsync = ref.watch(sharingEnabledProvider);
     final enabled = sharingAsync.valueOrNull ?? false;
-    if (enabled) return const SizedBox.shrink();
 
     final accent = Theme.of(context).colorScheme.primary;
     return Padding(
@@ -371,18 +377,23 @@ class _LocationSharingBannerState extends ConsumerState<_LocationSharingBanner> 
             ),
             const SizedBox(height: 4),
             Text(
-              "Off right now — nearby riders won't be alerted if you send an SOS, and you won't "
-              "be alerted if someone near you does. It never tracks you in the background; your "
-              "location only updates when you turn this on or refresh it yourself.",
+              enabled
+                  ? "On — nearby riders will be alerted if you send an SOS, and you'll be alerted "
+                      "if someone near you does. It never tracks you in the background; your "
+                      "location only updates when you refresh it yourself."
+                  : "Off right now — nearby riders won't be alerted if you send an SOS, and you won't "
+                      "be alerted if someone near you does. It never tracks you in the background; your "
+                      "location only updates when you turn this on or refresh it yourself.",
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: () => setState(() => _dismissed = true),
-                child: const Text('Not now'),
+            if (!enabled)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => setState(() => _dismissed = true),
+                  child: const Text('Not now'),
+                ),
               ),
-            ),
           ],
         ),
       ),

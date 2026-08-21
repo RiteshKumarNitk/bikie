@@ -493,8 +493,22 @@ export async function updateMembershipPlan(
   return mapPlan(plan);
 }
 
-export async function deleteMembershipPlan(id: string) {
-  await prisma.membershipPlan.delete({ where: { id } });
+export async function deleteMembershipPlan(
+  id: string,
+): Promise<{ ok: true } | { ok: false; reason: "HAS_DEPENDENCIES" }> {
+  try {
+    await prisma.membershipPlan.delete({ where: { id } });
+    return { ok: true };
+  } catch (err) {
+    // Any Membership row still pointing at this plan (RESTRICT, see schema.prisma) blocks the
+    // delete — surface that as a clean 409 instead of a raw 500, same pattern as deleteUser
+    // above. This was previously uncaught: the delete silently failed with an unhandled 500,
+    // and the admin UI's generic error toast gave no indication why the plan didn't disappear.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+      return { ok: false, reason: "HAS_DEPENDENCIES" };
+    }
+    throw err;
+  }
 }
 
 // --- Partner (Service Provider) Membership Plans — ADR-051, separate from the Rider plans above ---
@@ -541,8 +555,24 @@ export async function updatePartnerMembershipPlan(
   return mapPlan(plan);
 }
 
-export async function deletePartnerMembershipPlan(id: string) {
-  await prisma.partnerMembershipPlan.delete({ where: { id } });
+export async function deletePartnerMembershipPlan(
+  id: string,
+): Promise<{ ok: true } | { ok: false; reason: "HAS_DEPENDENCIES" }> {
+  try {
+    await prisma.partnerMembershipPlan.delete({ where: { id } });
+    return { ok: true };
+  } catch (err) {
+    // Any PartnerMembership row still pointing at this plan (RESTRICT, see schema.prisma)
+    // blocks the delete — most notably the grandfathered "legacy-free-partner-plan" every
+    // pre-ADR-051 provider was backfilled onto (see seed.ts), which can never be deleted while
+    // any of those providers' rows still reference it, only deactivated. Surfaced as a clean 409
+    // instead of a raw 500 — previously uncaught, so the delete silently 500'd and the admin UI's
+    // generic error toast gave no indication why the plan didn't disappear.
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
+      return { ok: false, reason: "HAS_DEPENDENCIES" };
+    }
+    throw err;
+  }
 }
 
 // --- Trips ---

@@ -1226,9 +1226,11 @@ describe("escalation application — tier advancement", () => {
   });
 
   it("dispatches eligible Service Providers together with riders on a widening tick, not as a later fallback (ADR-047)", async () => {
-    // sampleAlert() defaults to type "ACCIDENT", which has no natural PartnerType mapping — only
-    // a general-responder partner is eligible, exactly the case ADR-044 was written to fix
-    // (previously this would have broadened to *every* partner type via the removed fallback).
+    // type: "BIKE_BREAKDOWN" — an AMBER/ASSISTANCE category (see deriveSeverity) — Service
+    // Providers are only ever dispatched for these, never for RED/EMERGENCY alerts (the new
+    // severity gate this suite also covers below). MECHANIC is BIKE_BREAKDOWN's natural
+    // PartnerType match (partner-mapping.ts), so this partner is eligible on type alone, not
+    // only via the isGeneralResponder fallback the ADR-044 test below still exercises.
     const findEligibleForAlert = vi.fn(async () => [
       {
         userId: "partner-1",
@@ -1261,7 +1263,7 @@ describe("escalation application — tier advancement", () => {
     // Still widening (currentRadiusMeters < max) — riders and providers are searched/notified
     // in the SAME tick, at the SAME widened radius, not gated behind a separate later tier.
     await module.escalation.tickEscalation(
-      sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
+      sampleAlert({ type: "BIKE_BREAKDOWN", escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
     );
 
     expect(findEligibleForAlert).toHaveBeenCalledWith(expect.objectContaining({ radiusMeters: 10000 }));
@@ -1300,13 +1302,51 @@ describe("escalation application — tier advancement", () => {
       communications: fakeCommunications(),
     });
 
-    // type: "ACCIDENT" (sampleAlert's default) has no natural PartnerType — a non-general-
-    // responder FUEL_DELIVERY partner must not be dispatched a medical/accident emergency.
+    // type: "BIKE_BREAKDOWN" (AMBER) has a natural PartnerType (MECHANIC) — a non-matching,
+    // non-general-responder FUEL_DELIVERY partner must still not be dispatched.
+    await module.escalation.tickEscalation(
+      sampleAlert({ type: "BIKE_BREAKDOWN", escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
+    );
+
+    expect(notify.mock.calls.map((c) => c[0])).not.toContain("fuel-partner");
+  });
+
+  it("never dispatches Service Providers for a RED/EMERGENCY alert, even an eligible general responder (requested explicitly)", async () => {
+    // type: "ACCIDENT" (sampleAlert's default) is a RED/EMERGENCY category (deriveSeverity) —
+    // Service Providers must never be candidates at all for these, only for AMBER/ASSISTANCE
+    // alerts. This partner would otherwise be eligible (isGeneralResponder: true, matches the
+    // ADR-047 test above for an AMBER alert) — the only variable here is severity.
+    const findEligibleForAlert = vi.fn(async () => [
+      {
+        userId: "partner-1",
+        businessName: "Garage",
+        type: "MECHANIC",
+        isGeneralResponder: true,
+        contactPerson1Name: null,
+        contactPerson1Mobile: null,
+        contactPerson2Name: null,
+        contactPerson2Mobile: null,
+        latitude: 12.98,
+        longitude: 77.6,
+        user: { id: "partner-1", name: "Partner", email: "p@example.com", phone: "9000000000" },
+        distanceMeters: 1200,
+      },
+    ]);
+    const notify = notifyMock();
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        partnerDispatch: { ...emptyRepos().partnerDispatch, findEligibleForAlert } as any,
+        notifications: { notify },
+      }),
+      communications: fakeCommunications(),
+    });
+
     await module.escalation.tickEscalation(
       sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
     );
 
-    expect(notify.mock.calls.map((c) => c[0])).not.toContain("fuel-partner");
+    expect(findEligibleForAlert).not.toHaveBeenCalled();
+    expect(notify.mock.calls.map((c) => c[0])).not.toContain("partner-1");
   });
 
   it("advances straight from NEARBY_RIDERS_GENERAL to ADMIN once radius is maxed — no separate SERVICE_PROVIDERS tier", async () => {

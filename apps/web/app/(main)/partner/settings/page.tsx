@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { PartnerProfileDTO } from "@bikie/types";
 import { getJsonOrFallback } from "@/lib/api";
 import { PartnerSettingsForm } from "@/components/dashboard/PartnerSettingsForm";
+import { PushNotificationToggle } from "@/components/dashboard/PushNotificationToggle";
 
 export const metadata: Metadata = { title: "Partner Settings" };
 
@@ -22,6 +23,17 @@ export default async function PartnerSettingsPage() {
         <p className="font-semibold">Business Profile</p>
         <div className="mt-4">
           <PartnerSettingsForm profile={profile} />
+        </div>
+      </section>
+
+      <section className="mt-6 rounded-3xl bg-card p-6">
+        <p className="font-semibold">Notifications</p>
+        <p className="mt-2 text-sm text-foreground/60">
+          This is what SOS assistance requests and other alerts on the web use to reach you — with
+          this off, they only reach you by SMS/WhatsApp/email, never in-browser.
+        </p>
+        <div className="mt-4">
+          <PushNotificationToggle />
         </div>
       </section>
 

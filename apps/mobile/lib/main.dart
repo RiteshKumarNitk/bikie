@@ -10,6 +10,7 @@ import 'core/storage/app_preferences.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/domain/auth_controller.dart';
 import 'features/auth/domain/auth_state.dart';
+import 'features/auth/presentation/widgets/msg91_widget_host.dart';
 import 'features/onboarding/presentation/splash_screen.dart';
 
 void main() async {
@@ -66,6 +67,15 @@ class BikieApp extends ConsumerWidget {
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
       routerConfig: router,
+      // Mounts the headless MSG91 widget WebView once, above every route, so it's ready before
+      // login/signup need it and survives navigation between them — see Msg91WidgetHost's doc
+      // comment for why OTP send/verify runs through a WebView at all.
+      builder: (context, child) => Stack(
+        children: [
+          if (child != null) child,
+          const Msg91WidgetHost(),
+        ],
+      ),
     );
   }
 }

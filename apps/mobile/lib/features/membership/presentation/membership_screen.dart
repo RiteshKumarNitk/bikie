@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -17,6 +18,7 @@ class MembershipScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final active = ref.watch(activeMembershipProvider);
     final plans = ref.watch(membershipPlansProvider);
+    final hasActiveMembership = active.valueOrNull != null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Membership')),
@@ -29,35 +31,97 @@ class MembershipScreen extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           children: [
             active.when(
-              data: (membership) => membership == null
-                  ? const SizedBox.shrink()
-                  : Card(
-                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Active: ${membership.plan.name}', style: Theme.of(context).textTheme.titleMedium),
-                            const SizedBox(height: 4),
-                            Text('${membership.daysLeft} days left · ${membership.status}'),
-                          ],
-                        ),
-                      ),
-                    ),
+              // Mirrors web's `/dashboard/membership` — once a rider has an active membership,
+              // this shows its full details (plan, benefits, remaining time) instead of the
+              // purchasable plan list below, which only renders when there's nothing active yet.
+              // Previously the details card and the "Purchase" plan list both rendered
+              // unconditionally, so a rider who'd just paid still saw a live "Purchase" button
+              // for the exact plan they were already on — this is the fix for that.
+              data: (membership) =>
+                  membership == null ? const SizedBox.shrink() : _ActiveMembershipCard(membership: membership),
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
             ),
-            const SizedBox(height: 16),
-            Text('Plans', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            AsyncValueView(
-              value: plans,
-              onRetry: () => ref.invalidate(membershipPlansProvider),
-              data: (list) => Column(
-                children: list.where((p) => p.isActive).map((plan) => _PlanCard(plan: plan)).toList(),
+            hasActiveMembership
+                ? const SizedBox.shrink()
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const SizedBox(height: 16),
+                      Text('Plans', style: Theme.of(context).textTheme.titleMedium),
+                      const SizedBox(height: 12),
+                      AsyncValueView(
+                        value: plans,
+                        onRetry: () => ref.invalidate(membershipPlansProvider),
+                        data: (list) => Column(
+                          children: list.where((p) => p.isActive).map((plan) => _PlanCard(plan: plan)).toList(),
+                        ),
+                      ),
+                    ],
+                  ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ActiveMembershipCard extends StatelessWidget {
+  const _ActiveMembershipCard({required this.membership});
+
+  final UserMembership membership;
+
+  @override
+  Widget build(BuildContext context) {
+    final expiry = DateTime.tryParse(membership.endDate);
+    return Card(
+      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                'ACTIVE',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppTheme.accentTextOf(context),
+                      fontWeight: FontWeight.bold,
+                    ),
               ),
             ),
+            const SizedBox(height: 10),
+            Text('${membership.plan.name} Plan', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 4),
+            Text(
+              expiry == null
+                  ? '${membership.daysLeft} days remaining'
+                  : '${membership.daysLeft} days remaining · Expires ${DateFormat('d MMMM y').format(expiry)}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            if (membership.plan.benefits.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Text('Benefits included', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 8),
+              ...membership.plan.benefits.map(
+                (b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(Icons.check_circle, size: 16, color: AppTheme.accentTextOf(context)),
+                      const SizedBox(width: 8),
+                      Expanded(child: Text(b)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
