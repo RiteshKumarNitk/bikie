@@ -2952,3 +2952,55 @@ changes:
   free-text body that likely fails MSG91's DLT filter — needs its own approved template before
   it's actually fixable, and applying "BIKIE_SR" to a role it doesn't address would be worse than
   the current silent failure, not better.
+
+## ADR-060: Cron routes were fully implemented but nothing scheduled them in production — `docker-compose` cron service added
+
+- **Context.** Asked "will we get a cron error in future" — a forward-looking question that
+  turned out to have a present-tense answer. ADR-052 (2026-08-11) hardened the three
+  `/api/cron/*` routes (`sos-escalate`, `sos-resolve`, `rider-location-cleanup`) for concurrency
+  safety and flagged one unresolved item: `vercel.json`'s Hobby-plan cron-frequency cap (once/day)
+  is too coarse for `sos-escalate` (needs ~1min) and `sos-resolve` (needs ~5min). Re-investigating
+  that item now surfaces something more fundamental: **this app was never actually deployed to
+  Vercel at all.** `.github/workflows/deploy.yml` SSHes into a self-hosted VPS and runs
+  `docker compose build web && docker compose up -d --no-deps web` — a single-service Compose
+  stack with no cron mechanism of any kind. `vercel.json` at the repo root is inert leftover
+  config from an earlier deployment plan; it does nothing on the actual host. Net effect: all
+  three cron routes have been fully implemented, tested, and documented since ADR-030/044/052 —
+  and **none of them have ever been triggered automatically in production.** SOS alerts that
+  don't find a nearby responder at their *initial* radius have no path to widen further or
+  eventually reach admins on timeout; stale alerts never auto-resolve; stale rider-location
+  sharing never auto-disables. This is a live safety-feature gap, not a hypothetical future one.
+- **Decision.** Added a fourth, minimal service to `docker-compose.yml`: `cron`, built from a new
+  `docker/cron/` image (Alpine + busybox `crond`, no heavier scheduler needed for three periodic
+  HTTP calls). It runs alongside `web` in the same Compose stack, so it ships and redeploys with
+  everything else — no separate VPS-side setup, no new external dependency/account.
+  - **Schedule** (`docker/cron/entrypoint.sh`, written into `/etc/crontabs/root` at container
+    start): `sos-escalate` every 1 minute, `sos-resolve` every 5 minutes,
+    `rider-location-cleanup` every 15 minutes — matching the frequencies already documented in
+    `PRODUCTION_INTEGRATIONS.md` and `API.md`, just finally actually running them.
+  - **Reaches `web` over the internal Compose network** (`http://web:3000`, the service name and
+    the container's own listen port — see `docker-compose.yml`'s existing `PORT: "3000"`), not
+    the public `bikie.app` domain. Never depends on DNS, the reverse proxy, or TLS being up —
+    matters for a scheduler whose whole job is noticing when something else has gone wrong.
+  - **Same secret, no new credential to provision**: `CRON_SECRET` comes from the identical
+    `env_file: ./apps/.env` the `web` service already reads — the same value `/api/cron/*` already
+    requires via `Authorization: Bearer`.
+  - **The secret never appears in the crontab file or in `crond`'s own execution log.** `crond -l
+    2` (needed so job runs are visible via `docker logs`, not just crond's own lifecycle) logs the
+    literal command line it executed for each job. Putting the curl call with its bearer token
+    directly in the crontab would have leaked the secret into container logs on every single tick.
+    Instead, the crontab only ever invokes `/usr/local/bin/run-cron.sh <route-name>` — a separate
+    script that reads `CRON_SECRET` from its own environment (inherited from the container,
+    exactly like the crontab's own environment is) at execution time. `crond` only ever logs the
+    script name and argument.
+- **Consequences.** No code/business-logic changes — the cron *routes* were already correct
+  (ADR-052's atomic-claim work stands unchanged); this is purely deployment infrastructure closing
+  a gap between "implemented" and "actually running." `.docs/TASKS.md`'s ADR-052 follow-up item is
+  closed (differently than originally framed — not a Vercel plan upgrade, since Vercel was never
+  in the picture). **Not verified in this environment**: no Docker available here to actually
+  build/run the `cron` image or confirm `web` receives its traffic — needs a real deploy plus a
+  `docker logs` check on the VPS (`docker compose logs cron` should show a job line every minute).
+  If a different deployment target is ever adopted later (e.g. an actual move to Vercel, or a
+  Kubernetes CronJob), this `cron` service becomes redundant and `vercel.json`'s existing (still
+  unused) `crons` gap would need revisiting instead — noted here so a future reader doesn't assume
+  both mechanisms are simultaneously required.

@@ -2,6 +2,26 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## No cron scheduler was actually running any of the 3 `/api/cron/*` routes in production (2026-08-21, ADR-060)
+
+Asked "will we get a cron error in future" — investigation found the real state was worse than a
+future risk: none of `sos-escalate`, `sos-resolve`, `rider-location-cleanup` were being triggered
+by anything at all, right now. `vercel.json`'s Hobby-plan cron-frequency cap (flagged as unresolved
+in ADR-052) turned out to be moot — this app was never actually deployed to Vercel; the real
+deployment (`.github/workflows/deploy.yml`) is a self-hosted VPS running `docker-compose.yml`,
+which has exactly one service (`web`) and no cron mechanism whatsoever. Every periodic SOS
+safety-net (radius widening, tier advancement, stale-alert auto-resolve, stale-location cleanup)
+has been fully implemented in code but silently never running. See ADR-060.
+
+| Task | Status |
+|---|---|
+| Confirmed actual deployment target (VPS + docker-compose via GitHub Actions, not Vercel) and confirmed no cron mechanism exists anywhere in the stack | Completed |
+| Added `docker/cron/` (Dockerfile, entrypoint.sh, run-cron.sh) — a minimal Alpine + busybox `crond` service scheduling all 3 routes at their documented frequencies (1min/5min/15min) | Completed |
+| New `cron` service in `docker-compose.yml`, reading the same `CRON_SECRET` from `./apps/.env` the `web` service already uses, reaching `web` over the internal compose network (not the public domain) | Completed |
+| Kept the bearer secret out of the crontab file and out of `crond -l 2`'s per-job log line — `run-cron.sh` reads it from its own environment at execution time, so only the script name/argument is ever logged, never the token | Completed |
+| Docs: `TASKS.md` (this entry, closing the ADR-052 follow-up), `DECISIONS.md` ADR-060, `CHANGELOG.md` | Completed |
+| Live verification on the actual VPS (does the container build/start cleanly there, do the 3 endpoints actually receive traffic) | **Not done** — no Docker available in this environment to build/run the image; needs a real deploy + `docker logs bikie-cron-1` check |
+
 ## SOS dispatch moves to the DLT "BIKIE_SR" SMS template; SMS capped to nearest 10 (2026-08-20, ADR-059)
 
 Requested a third DLT SMS template for SOS dispatch to nearby riders/Service Providers, capped to
@@ -185,7 +205,7 @@ duplicate-notify. No new infrastructure introduced — see ADR-052 for full reas
 | New `apps/web/app/api/cron/cron-auth.test.ts` — valid/invalid/missing secret + plausible-but-wrong bearer, all 3 cron routes; `vitest.config.ts` widened to cover `apps/web/app/api/cron/**/*.test.ts` (no route-handler test existed anywhere in `apps/web` before this) | Completed |
 | Docs: `SOS.md` §4b, `PRODUCTION_INTEGRATIONS.md` (cron table + manual-test curl + Hobby-plan caveat), `DECISIONS.md` ADR-052 | Completed |
 | Verified: full `vitest run` (184/184, 16 files), `apps/web` `tsc --noEmit` clean, full `next build` clean | Completed |
-| `vercel.json`'s Hobby-plan cron-frequency limit | **Not resolved** — billing/plan decision left to the user (upgrade to Pro, or move `sos-escalate`/`sos-resolve` to an external scheduler hitting the same URLs with the same bearer token) |
+| `vercel.json`'s Hobby-plan cron-frequency limit | **Resolved differently (ADR-060)** — this app was never actually deployed to Vercel (docker-compose + VPS via GitHub Actions instead), so `vercel.json` was dead config; the real gap was that *nothing at all* scheduled the 3 cron routes in the actual deployment. Fixed with a dedicated `cron` service in `docker-compose.yml`. |
 | Follow-up: mapped current `SOSStatus`/`SOSSessionStatus`/`SOSEscalationTier` model against a proposed richer lifecycle — confirmed it already implements nearly all of it, denormalized differently | Completed |
 | Follow-up: `updateSessionStatus`'s `COMPLETED` branch now resolves the parent alert immediately (`reason: "session-completed"` in the timeline), instead of leaving it `ACTIVE` for the 120-min cron to mislabel as `"auto-resolve-timeout"` | Completed |
 

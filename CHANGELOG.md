@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-08-21 — Found that no cron scheduler was actually running any of the 3 `/api/cron/*` routes in production; added one (ADR-060)
+
+Asked whether cron errors could happen in the future — investigation found the real state was
+already worse: `sos-escalate`, `sos-resolve`, and `rider-location-cleanup` are all fully
+implemented and hardened (ADR-052) but **nothing has ever triggered them in production.**
+`vercel.json`'s Hobby-plan cron cap, flagged as an open item in ADR-052, turned out to be moot —
+this app deploys to a self-hosted VPS via `docker-compose`, not Vercel, and that Compose stack had
+no cron mechanism at all. Every periodic SOS safety-net (radius widening, tier advancement,
+stale-alert/location cleanup) has been silently not running since it shipped.
+
+Added a `cron` service to `docker-compose.yml` (new `docker/cron/` image, Alpine + busybox
+`crond`) scheduling all three routes at their documented frequencies, reusing the existing
+`CRON_SECRET` and reaching `web` over the internal Compose network rather than the public domain.
+Deliberately keeps the bearer secret out of the crontab file and out of `crond`'s own execution
+log by routing each call through a small wrapper script that reads the secret from its own
+environment at run time. Full details in ADR-060.
+
 ## 2026-08-20 — SOS dispatch moves to the DLT "BIKIE_SR" SMS template; found a real DLT-compliance bug; SMS capped to nearest 10 (ADR-059)
 
 Requested: a third DLT template ("BIKIE_SR") for SOS SMS to nearby riders/Service Providers, capped

@@ -35,3 +35,18 @@ services:
 
       NEXT_PUBLIC_MSG91_WIDGET_ID: ${NEXT_PUBLIC_MSG91_WIDGET_ID}
       NEXT_PUBLIC_MSG91_WIDGET_TOKEN_AUTH: ${NEXT_PUBLIC_MSG91_WIDGET_TOKEN_AUTH}
+
+  # Schedules the three GET /api/cron/* tickers (sos-escalate every 1min, sos-resolve every
+  # 5min, rider-location-cleanup every 15min) — previously nothing triggered these at all in
+  # production. This app deploys to a VPS via docker-compose, not Vercel, so there's no
+  # platform-native cron; see docker/cron/entrypoint.sh for the actual schedule. Reaches
+  # `web` over compose's internal network (service name resolves automatically) rather than
+  # the public domain, so it never depends on DNS/reverse-proxy/TLS.
+  cron:
+    build:
+      context: ./docker/cron
+    restart: unless-stopped
+    env_file:
+      - ./apps/.env
+    depends_on:
+      - web
