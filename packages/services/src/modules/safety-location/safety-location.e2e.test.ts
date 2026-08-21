@@ -166,6 +166,22 @@ function createFakePorts(alertOverrides: Partial<RawSOSAlertDTO> = {}) {
         .map((o) => o.alertId);
       return new Set(ids);
     }),
+    listPendingOffersForResponder: vi.fn(async (responderId) =>
+      [...offers.values()]
+        .filter(
+          (o) => o.responderId === responderId && o.status === "OFFERED" && alert.status === "ACTIVE" && !alert.assignedHelperId,
+        )
+        .map((o) => ({
+          offerId: o.id,
+          alertId: o.alertId,
+          alertType: alert.type,
+          city: alert.city,
+          severity: alert.severity,
+          distanceMeters: o.distanceMeters ?? null,
+          etaMinutes: o.etaMinutes ?? null,
+          createdAt: o.createdAt,
+        })),
+    ),
   };
 
   const sosSessions: SafetyLocationPorts["sosSessions"] = {

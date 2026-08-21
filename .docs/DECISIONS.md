@@ -3052,3 +3052,59 @@ changes:
   `@bikie/services` and `apps/web`. Not yet manually smoke-tested against a live database with an
   actual Service-Provider test account (`partner@bikie.app`) clicking through a real SOS alert on
   either platform — recommended before considering this fully closed.
+
+## ADR-062: A partner's own offer was invisible everywhere once made — added a "Pending Responses" list, and Home/Requests/Active all surface SOS now
+
+- **Context.** Reported: on the Service Provider side, an SOS request wasn't visible on Home,
+  wasn't visible on the Requests tab, and wasn't visible on the Active tab either — checked all
+  three, found nothing. A live-database read (`packages/database`, direct Prisma query against
+  production) traced the exact case: partner "ritedh" (MECHANIC, available, `verificationStatus:
+  DRAFT` — correctly still operational per ADR-049) is 3.9km from an open `BIKE_BREAKDOWN` alert
+  and matches it by every rule `partnerMatchesAlertType`/`listNearbyOpenRequests` applies — but an
+  `SOSAlertResponse` row already exists for that exact `[alertId, responderId]` pair, status
+  `OFFERED`, created 9 days earlier. `listNearbyOpenRequests`'s `responded` filter (ADR-045)
+  correctly excludes it from "Nearby Requests" — that filter's entire job is to stop an
+  already-answered alert from reappearing as if it were new. But the rider never accepted or
+  rejected that offer, so no `SOSSession` was ever created, meaning "Active Assistance"
+  (`listActiveSessionsForHelper`, which only reads `SOSSession` rows) never picks it up either.
+  Result: the instant a partner taps Accept, their own request vanishes from every list in the
+  app until a rider acts on it — which, per this production data, can simply never happen. The
+  only place the pending state was ever visible was the specific alert's own detail screen
+  (`PartnerSosRequestScreen`/`/partner/sos/[id]`), and only within the *same app session* that made
+  the offer — `_myOffer` was tracked purely as local widget state (ADR-045's own comment: `GET
+  /api/sos/alerts/[id]/offers` is reporter/admin-only, so the original design never expected to
+  need this from anywhere else). Reopening the alert later, or opening it fresh from a
+  notification, re-derived `needsResponse` (Accept/Decline) as if no offer had ever been made,
+  since `myOffer` was `null` again — a second Accept tap would then 409 with `ALREADY_RESPONDED`.
+- **Decision.** Added `SOSAlertResponse`-status `OFFERED` as a first-class, independently visible
+  state: `listPendingOffersForResponder` (`sos-session.repository.ts`) returns this partner's own
+  offers still awaiting the rider, scoped to alerts still `ACTIVE`/unassigned (an offer whose alert
+  already resolved is not "pending" anymore, just stale). Wired through the existing
+  `SosOfferRepositoryPort` → `PartnerDashboardApplication.listPendingOffers` →
+  `SOSSessionService.listPendingOffers` → new `GET /api/partner/sos/pending` route, mirroring
+  `/nearby` and `/active`'s exact shape (`PartnerPendingOfferDTO`, `@bikie/types`). Surfaced on
+  both platforms:
+  - **Mobile Home** — new "Waiting for Confirmation" preview section (mirrors the existing
+    "Nearby Requests"/"Active Assistance" sections), linking to the Active tab.
+  - **Mobile Active tab** — now shows two sections, "Waiting for Confirmation" (pending offers)
+    above "Confirmed" (the existing `SOSSession` list) — the natural home for this state, since
+    tapping an entry opens the same `/sos/{id}` detail screen either way.
+  - **Mobile Requests tab** — a compact banner ("You have N responses waiting for rider
+    confirmation") linking to Active, so a partner checking Requests isn't left thinking their
+    offer silently vanished.
+  - **`PartnerSosRequestScreen`/`/partner/sos/[id]` (web)** — `_resolveMyOffer` (mobile) / a
+    dedicated `useEffect` (web) now falls back to this same pending-offers list to seed
+    `myOffer`/`_myOffer` on cold open, fixing the "shows Accept/Decline again for an alert already
+    offered on" bug at its actual source, not just the visibility gap.
+  - **Web Overview page** (`/partner`) — previously showed zero SOS content at all (only fleet
+    stats); added `PartnerSosPreview`, a client-side glance (confirmed sessions, pending offers,
+    then nearby requests, first 3 total) linking to `/partner/sos`, matching what mobile's Home
+    tab has always shown. `/partner/sos` itself gained the matching "Waiting for Confirmation"
+    section between "Nearby Requests" and "Active Assistance".
+- **Consequences.** No change to the offer/accept/session state machine itself — this is purely a
+  new read path plus two UI bugs (stale local `myOffer` state, and Web Overview's total absence of
+  SOS content) fixed at the same root cause. `pnpm openapi:generate` re-run for the new route (143
+  routes now, from 142). Verified with `pnpm -w run test` (214/214) and a clean `tsc --noEmit` on
+  `@bikie/services` and `apps/web`; mobile verified via `flutter analyze`/`flutter test` after
+  regenerating freezed/json codegen for the new `PartnerPendingOffer` model. Not yet manually
+  smoke-tested against the live "ritedh" account that surfaced this bug — recommended next.

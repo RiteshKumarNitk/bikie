@@ -6,6 +6,7 @@ import { getServerSession } from "@/lib/get-session";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { PartnerVerificationBanner } from "@/components/partner/PartnerVerificationBanner";
 import { PartnerActivationCard } from "@/components/partner/PartnerMembershipStatus";
+import { PartnerSosPreview } from "@/components/partner/PartnerSosPreview";
 import { formatCurrency } from "@bikie/utils";
 
 export const metadata: Metadata = { title: "Partner Dashboard" };
@@ -37,6 +38,10 @@ export default async function PartnerOverviewPage() {
         <StatCard label="Total Earnings" value={formatCurrency(stats.totalEarnings)} />
         <StatCard label="Rating" value={stats.ratingCount > 0 ? `★ ${stats.ratingAvg.toFixed(1)}` : "No ratings yet"} />
       </div>
+
+      {/* Previously nothing on this page hinted an SOS request existed — a Service Provider had
+      to already know to click "SOS Emergency" in the sidebar to find one. */}
+      <PartnerSosPreview />
     </div>
   );
 }

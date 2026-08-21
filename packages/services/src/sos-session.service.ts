@@ -51,6 +51,9 @@ export const SOSSessionService = {
   listNearbyOpenRequests(userId: string, location: { latitude: number; longitude: number }) {
     return getSafetyLocationModule().partnerDashboard.listNearbyOpenRequests(userId, location);
   },
+  listPendingOffers(userId: string) {
+    return getSafetyLocationModule().partnerDashboard.listPendingOffers(userId);
+  },
   listActiveAssistance(userId: string) {
     return getSafetyLocationModule().partnerDashboard.listActiveAssistance(userId);
   },

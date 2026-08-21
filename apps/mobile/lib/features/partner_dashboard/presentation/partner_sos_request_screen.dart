@@ -198,6 +198,29 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
     );
   }
 
+  /// `_myOffer` only ever gets set locally, right after this screen's own `_handleAccept` call —
+  /// reopening this screen later (a fresh app session, or navigating back in from Home/Requests)
+  /// previously left it `null` even though a pending offer already exists server-side, incorrectly
+  /// showing "Accept/Decline" again instead of "Waiting for Rider Confirmation". Falls back to
+  /// `partnerPendingOffersProvider` (the same list Home/Active read) for exactly that case —
+  /// `GET /api/sos/alerts/[id]/offers` still can't be used here (reporter/admin only, ADR-045).
+  SOSOffer? _resolveMyOffer(String? currentUserId) {
+    if (_myOffer != null) return _myOffer;
+    final pending = ref.watch(partnerPendingOffersProvider).valueOrNull;
+    final match = pending?.where((o) => o.alertId == widget.alertId).firstOrNull;
+    if (match == null) return null;
+    return SOSOffer(
+      id: match.offerId,
+      alertId: match.alertId,
+      responderId: currentUserId ?? '',
+      responderName: '',
+      status: 'OFFERED',
+      distanceMeters: match.distanceMeters,
+      etaMinutes: match.etaMinutes,
+      createdAt: match.createdAt,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final detailAsync = ref.watch(sosAlertDetailProvider(widget.alertId));
@@ -209,7 +232,7 @@ class _PartnerSosRequestScreenState extends ConsumerState<PartnerSosRequestScree
         data: (detail) {
           final alert = detail.alert;
           final session = detail.session;
-          final myOffer = _myOffer;
+          final myOffer = _resolveMyOffer(me?.id);
 
           final requestState = derivePartnerRequestState(
             alert: alert,

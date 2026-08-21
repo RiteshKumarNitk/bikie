@@ -114,6 +114,23 @@ export interface SosOfferRepositoryPort {
   /** §28 — expire every outstanding OFFERED offer on the alert and return the responders who had
    * one, so the caller can tell them the request is no longer available. */
   expireOpenOffersForAlert(alertId: string): Promise<string[]>;
+  /** This responder's own outstanding OFFERED responses on alerts still open (ACTIVE, unassigned)
+   * — the "waiting for rider confirmation" state, invisible to "Nearby Requests" (excluded on
+   * purpose, see `findRespondedAlertIds`) and to "Active Assistance" (no `SOSSession` exists yet). */
+  listPendingOffersForResponder(responderId: string): Promise<PartnerPendingOfferRow[]>;
+}
+
+/** Row shape for a partner's "Pending Responses" list — an offer they made that the rider hasn't
+ * accepted (or rejected/expired) yet. */
+export interface PartnerPendingOfferRow {
+  offerId: string;
+  alertId: string;
+  alertType: string;
+  city: string;
+  severity: string;
+  distanceMeters: number | null;
+  etaMinutes: number | null;
+  createdAt: Date;
 }
 
 export interface SosSessionRow {

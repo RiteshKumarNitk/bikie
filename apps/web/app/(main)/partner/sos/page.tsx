@@ -33,6 +33,17 @@ interface PartnerActiveSession {
   etaMinutes: number | null;
 }
 
+interface PartnerPendingOffer {
+  offerId: string;
+  alertId: string;
+  alertType: string;
+  severity: string;
+  city: string;
+  distanceMeters: number | null;
+  etaMinutes: number | null;
+  createdAt: string;
+}
+
 const TYPE_LABEL: Record<string, string> = {
   ACCIDENT: "🚨 Accident",
   LIFE_THREATENING: "🔥 Life Threatening",
@@ -54,6 +65,7 @@ function formatDistance(meters: number): string {
 export default function PartnerSosDashboardPage() {
   const [stats, setStats] = useState<PartnerSosStats | null>(null);
   const [nearby, setNearby] = useState<PartnerNearbyRequest[] | null>(null);
+  const [pending, setPending] = useState<PartnerPendingOffer[] | null>(null);
   const [active, setActive] = useState<PartnerActiveSession[] | null>(null);
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -79,6 +91,9 @@ export default function PartnerSosDashboardPage() {
     });
     fetch("/api/partner/sos/active").then(async (r) => {
       setActive(r.ok ? ((await r.json()).sessions ?? []) : []);
+    });
+    fetch("/api/partner/sos/pending").then(async (r) => {
+      setPending(r.ok ? ((await r.json()).offers ?? []) : []);
     });
   }, [location]);
 
@@ -148,6 +163,40 @@ export default function PartnerSosDashboardPage() {
                   className="shrink-0 rounded-lg bg-accent px-4 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent-hover"
                 >
                   View
+                </Link>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="mt-8">
+        <h2 className="text-lg font-semibold">Waiting for Confirmation</h2>
+        <p className="mt-1 text-sm text-foreground/50">
+          Requests you&apos;ve offered to help with, not yet accepted by the rider.
+        </p>
+      </div>
+      <div className="mt-3 space-y-3">
+        {membershipRequired ? null : pending === null ? (
+          <p className="text-sm text-foreground/40">Loading…</p>
+        ) : pending.length === 0 ? (
+          <p className="text-sm text-foreground/40">Nothing waiting on a rider right now.</p>
+        ) : (
+          pending.map((o) => (
+            <div key={o.offerId} className="rounded-2xl border border-foreground/10 bg-card p-5">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <span className="text-sm font-semibold">{TYPE_LABEL[o.alertType] ?? o.alertType}</span>
+                  <p className="mt-1 text-sm text-foreground/60">
+                    {o.distanceMeters != null ? `${formatDistance(o.distanceMeters)} · ` : ""}
+                    {o.city}
+                  </p>
+                </div>
+                <Link
+                  href={`/partner/sos/${o.alertId}`}
+                  className="shrink-0 rounded-lg border border-foreground/15 px-4 py-1.5 text-xs font-medium hover:bg-foreground/5"
+                >
+                  Open
                 </Link>
               </div>
             </div>

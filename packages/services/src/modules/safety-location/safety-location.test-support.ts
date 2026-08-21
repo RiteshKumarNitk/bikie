@@ -127,6 +127,7 @@ export function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partia
       listOffersForAlert: vi.fn(async () => []),
       declineAlert: vi.fn(),
       findRespondedAlertIds: vi.fn(async () => new Set<string>()),
+      listPendingOffersForResponder: vi.fn(async () => []),
       expireOpenOffersForAlert: vi.fn(async () => []),
     },
     sosSessions: {

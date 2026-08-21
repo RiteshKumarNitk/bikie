@@ -32,6 +32,26 @@ class PartnerNearbyRequest with _$PartnerNearbyRequest {
   factory PartnerNearbyRequest.fromJson(Map<String, dynamic> json) => _$PartnerNearbyRequestFromJson(json);
 }
 
+/// Mirrors `PartnerPendingOfferDTO` — an offer this partner made that the rider hasn't yet
+/// accepted/rejected (or that hasn't expired/been withdrawn). Distinct from
+/// `PartnerNearbyRequest` (excludes anything already responded to) and `PartnerActiveSession`
+/// (only exists once a rider has accepted).
+@freezed
+class PartnerPendingOffer with _$PartnerPendingOffer {
+  const factory PartnerPendingOffer({
+    required String offerId,
+    required String alertId,
+    required String alertType,
+    required String severity,
+    required String city,
+    num? distanceMeters,
+    int? etaMinutes,
+    required String createdAt,
+  }) = _PartnerPendingOffer;
+
+  factory PartnerPendingOffer.fromJson(Map<String, dynamic> json) => _$PartnerPendingOfferFromJson(json);
+}
+
 /// Mirrors `PartnerActiveSessionDTO`.
 @freezed
 class PartnerActiveSession with _$PartnerActiveSession {

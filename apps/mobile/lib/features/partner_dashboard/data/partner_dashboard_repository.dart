@@ -41,6 +41,18 @@ class PartnerDashboardRepository {
     });
   }
 
+  /// `GET /api/partner/sos/pending` — offers this partner made that the rider hasn't yet
+  /// accepted/rejected. Invisible to `getNearbyRequests` (excluded on purpose) and to
+  /// `getActiveAssistance` (no session exists until the rider accepts).
+  Future<List<PartnerPendingOffer>> getPendingOffers() {
+    return apiGuard(() async {
+      final res = await _dio.get('/api/partner/sos/pending');
+      return (res.data['offers'] as List)
+          .map((e) => PartnerPendingOffer.fromJson(e as Map<String, dynamic>))
+          .toList();
+    });
+  }
+
   Future<List<PartnerActiveSession>> getActiveAssistance() {
     return apiGuard(() async {
       final res = await _dio.get('/api/partner/sos/active');

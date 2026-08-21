@@ -113,6 +113,33 @@ export async function findRespondedAlertIds(responderId: string, alertIds: strin
   return new Set(rows.map((r) => r.alertId));
 }
 
+/** A partner's own outstanding responses — offered but not yet accepted, rejected, withdrawn, or
+ * expired, on an alert that's still open. Distinct from "Nearby Requests" (which excludes these
+ * on purpose, see `findRespondedAlertIds`) and from "Active Assistance" (which only exists once a
+ * rider has accepted, creating an `SOSSession`) — without this, an offer a partner made has no
+ * visible home anywhere in the app between those two states. */
+export async function listPendingOffersForResponder(responderId: string) {
+  const offers = await prisma.sOSAlertResponse.findMany({
+    where: {
+      responderId,
+      status: "OFFERED",
+      alert: { status: "ACTIVE", assignedHelperId: null },
+    },
+    orderBy: { createdAt: "desc" },
+    include: { alert: { select: { type: true, city: true, severity: true } } },
+  });
+  return offers.map((o) => ({
+    offerId: o.id,
+    alertId: o.alertId,
+    alertType: o.alert.type,
+    city: o.alert.city,
+    severity: o.alert.severity,
+    distanceMeters: o.distanceMeters,
+    etaMinutes: o.etaMinutes,
+    createdAt: o.createdAt,
+  }));
+}
+
 /**
  * The transactional accept — the single mechanism preventing two helpers from both being
  * assigned to the same alert. The guard is `WHERE assignedHelperId IS NULL` embedded inside

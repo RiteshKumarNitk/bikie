@@ -102,6 +102,20 @@ export interface PartnerNearbyRequestDTO {
   createdAt: string;
 }
 
+/** A partner's own offer that's still awaiting the rider's decision (accept/reject) — distinct
+ * from `PartnerNearbyRequestDTO` (excludes anything already responded to) and
+ * `PartnerActiveSessionDTO` (only exists once a rider has accepted). */
+export interface PartnerPendingOfferDTO {
+  offerId: string;
+  alertId: string;
+  alertType: string;
+  severity: string;
+  city: string;
+  distanceMeters: number | null;
+  etaMinutes: number | null;
+  createdAt: string;
+}
+
 export interface PartnerActiveSessionDTO {
   id: string;
   alertId: string;

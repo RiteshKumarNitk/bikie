@@ -82,6 +82,8 @@ export function createSosOfferRepositoryAdapter(): SosOfferRepositoryPort {
     },
     findRespondedAlertIds: (responderId, alertIds) =>
       sosSessionRepository.findRespondedAlertIds(responderId, alertIds),
+    listPendingOffersForResponder: (responderId) =>
+      sosSessionRepository.listPendingOffersForResponder(responderId),
     expireOpenOffersForAlert: (alertId) => sosSessionRepository.expireOpenOffersForAlert(alertId),
   };
 }

@@ -24,6 +24,7 @@ class PartnerHomeScreen extends ConsumerWidget {
     final me = ref.watch(authControllerProvider).user;
     final statsAsync = ref.watch(partnerSosDashboardProvider);
     final nearbyAsync = ref.watch(partnerNearbyRequestsProvider);
+    final pendingAsync = ref.watch(partnerPendingOffersProvider);
     final activeAsync = ref.watch(partnerActiveSessionsProvider);
 
     return Scaffold(
@@ -32,6 +33,7 @@ class PartnerHomeScreen extends ConsumerWidget {
         onRefresh: () async {
           ref.invalidate(partnerSosDashboardProvider);
           ref.invalidate(partnerNearbyRequestsProvider);
+          ref.invalidate(partnerPendingOffersProvider);
           ref.invalidate(partnerActiveSessionsProvider);
           ref.invalidate(activePartnerMembershipProvider);
         },
@@ -59,6 +61,18 @@ class PartnerHomeScreen extends ConsumerWidget {
                       children: requests.take(3).map((r) => _NearbyRequestTile(request: r)).toList(),
                     ),
               loading: () => const LinearProgressIndicator(),
+              error: (_, __) => const SizedBox.shrink(),
+            ),
+            const SizedBox(height: 24),
+            _SectionHeader(title: 'Waiting for Confirmation', onSeeAll: () => context.push('/partner/active')),
+            const SizedBox(height: 8),
+            pendingAsync.when(
+              data: (offers) => offers.isEmpty
+                  ? const SizedBox.shrink()
+                  : Column(
+                      children: offers.take(3).map((o) => _PendingOfferTile(offer: o)).toList(),
+                    ),
+              loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
             ),
             const SizedBox(height: 24),
@@ -209,6 +223,27 @@ class _NearbyRequestTile extends StatelessWidget {
         trailing: FilledButton(
           onPressed: () => context.push('/sos/${request.id}'),
           child: const Text('View'),
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingOfferTile extends StatelessWidget {
+  const _PendingOfferTile({required this.offer});
+
+  final PartnerPendingOffer offer;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.hourglass_top, color: Colors.orange),
+        title: Text(sosTypeLabels[offer.alertType] ?? offer.alertType),
+        subtitle: const Text('Waiting for rider to confirm'),
+        trailing: OutlinedButton(
+          onPressed: () => context.push('/sos/${offer.alertId}'),
+          child: const Text('Open'),
         ),
       ),
     );

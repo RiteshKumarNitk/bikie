@@ -1,4 +1,10 @@
-import type { PartnerActiveSessionDTO, PartnerHistorySessionDTO, PartnerNearbyRequestDTO, PartnerSosDashboardDTO } from "@bikie/types";
+import type {
+  PartnerActiveSessionDTO,
+  PartnerHistorySessionDTO,
+  PartnerNearbyRequestDTO,
+  PartnerPendingOfferDTO,
+  PartnerSosDashboardDTO,
+} from "@bikie/types";
 import { haversineDistanceMeters } from "../domain/eta";
 import { partnerMatchesAlertType } from "../domain/partner-mapping";
 import { deriveSeverity } from "../domain/severity";
@@ -71,6 +77,25 @@ export function createPartnerDashboardApplication(
       .sort((a, b) => a.distanceMeters - b.distanceMeters);
   }
 
+  /** A partner's own outstanding offers — made, but not yet accepted/rejected/withdrawn/expired,
+   * on an alert still open. Without this list, an offer disappears from "Nearby Requests" the
+   * instant it's made (by design, see `listNearbyOpenRequests`) and never appears in "Active
+   * Assistance" unless the rider accepts it — leaving the partner with no way to see it's still
+   * pending anywhere in the app once they navigate away from that alert's own detail screen. */
+  async function listPendingOffers(userId: string): Promise<PartnerPendingOfferDTO[]> {
+    const offers = await ports.sosOffers.listPendingOffersForResponder(userId);
+    return offers.map((o) => ({
+      offerId: o.offerId,
+      alertId: o.alertId,
+      alertType: o.alertType,
+      severity: o.severity,
+      city: o.city,
+      distanceMeters: o.distanceMeters,
+      etaMinutes: o.etaMinutes,
+      createdAt: o.createdAt.toISOString(),
+    }));
+  }
+
   async function listActiveAssistance(userId: string): Promise<PartnerActiveSessionDTO[]> {
     const sessions = await ports.sosSessions.listActiveSessionsForHelper(userId);
     return sessions.map((s) => ({
@@ -120,7 +145,7 @@ export function createPartnerDashboardApplication(
     }));
   }
 
-  return { getDashboard, listNearbyOpenRequests, listActiveAssistance, listHistory };
+  return { getDashboard, listNearbyOpenRequests, listPendingOffers, listActiveAssistance, listHistory };
 }
 
 export type PartnerDashboardApplication = ReturnType<typeof createPartnerDashboardApplication>;

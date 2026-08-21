@@ -43,6 +43,13 @@ final partnerActiveSessionsProvider = FutureProvider.autoDispose<List<PartnerAct
   return ref.watch(partnerDashboardRepositoryProvider).getActiveAssistance();
 });
 
+/// Offers this partner made that the rider hasn't yet accepted/rejected — otherwise invisible
+/// once made (excluded from "Nearby Requests" on purpose, not yet in "Active Assistance" since
+/// no session exists until the rider accepts).
+final partnerPendingOffersProvider = FutureProvider.autoDispose<List<PartnerPendingOffer>>((ref) {
+  return ref.watch(partnerDashboardRepositoryProvider).getPendingOffers();
+});
+
 /// ADR-046b — "Completed Assistance"/"Assistance History".
 final partnerHistoryProvider = FutureProvider.autoDispose<List<PartnerHistorySession>>((ref) {
   return ref.watch(partnerDashboardRepositoryProvider).getHistory();

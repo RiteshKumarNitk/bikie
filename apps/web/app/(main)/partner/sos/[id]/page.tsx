@@ -129,6 +129,31 @@ export default function PartnerSosRequestPage() {
     load();
   }, [load]);
 
+  // `myOffer` otherwise only ever gets set locally, right after this page's own `handleAccept`
+  // call — reloading the page later (or navigating back in from the SOS list) left it `null` even
+  // though a pending offer already exists server-side, incorrectly showing Accept/Decline again
+  // instead of "Waiting for Rider Confirmation". `GET /api/sos/alerts/[id]/offers` still can't be
+  // used here (reporter/admin only, ADR-045) — `/api/partner/sos/pending` is the same list the
+  // SOS Emergency dashboard's "Waiting for Confirmation" section reads.
+  useEffect(() => {
+    if (myOffer) return;
+    fetch("/api/partner/sos/pending").then(async (r) => {
+      if (!r.ok) return;
+      const data = await r.json();
+      const match = (data.offers ?? []).find((o: { alertId: string }) => o.alertId === alertId);
+      if (match) {
+        setMyOffer({
+          id: match.offerId,
+          responderId: userId ?? "",
+          status: "OFFERED",
+          distanceMeters: match.distanceMeters,
+          etaMinutes: match.etaMinutes,
+        });
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [alertId, myOffer]);
+
   async function handleAccept() {
     setBusy(true);
     setActionError(null);

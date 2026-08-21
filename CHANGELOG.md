@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-21 — A partner's own SOS offer had no visible home on Home, Requests, or Active (ADR-062)
+
+Reported: an SOS request wasn't visible on the Service Provider's Home, Requests, or Active tabs.
+Traced against live data to a real gap: once a partner accepts, their offer correctly drops off
+"Nearby Requests" but doesn't appear in "Active Assistance" until the rider accepts it — leaving
+no visible trace of it anywhere if the rider never responds. Added a "Pending Responses"/"Waiting
+for Confirmation" list (new `GET /api/partner/sos/pending`) surfaced on Home, Requests, and Active
+on mobile, and on the Overview and SOS Emergency pages on web — plus fixed the alert detail screen
+incorrectly showing Accept/Decline again for an alert already offered on. Full details in ADR-062.
+
 ## 2026-08-21 — Fixed Service Providers getting the Rider-membership error on SOS request routes (ADR-061)
 
 Reported: a Service Provider could see an SOS notification but clicking it said "This is a BIKIE

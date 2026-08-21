@@ -2,6 +2,25 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## A partner's own SOS offer was invisible on Home, Requests, and Active alike (2026-08-21, ADR-062)
+
+Reported: an SOS request wasn't showing up on the Service Provider's Home tab, Requests tab, or
+Active tab. Live production data traced it to a real gap, not a display bug: once a partner taps
+Accept, their offer correctly disappears from "Nearby Requests" (already responded to) but doesn't
+yet appear in "Active Assistance" (no session exists until the rider accepts) — leaving it with no
+visible home anywhere if the rider never responds. Also fixed the alert detail screen showing
+Accept/Decline again for an alert already offered on, once the app was reopened. See ADR-062.
+
+| Task | Status |
+|---|---|
+| Added `listPendingOffersForResponder` (repository) → `listPendingOffers` (application/service) → `GET /api/partner/sos/pending` (new route, `PartnerPendingOfferDTO`) | Completed |
+| Mobile: "Waiting for Confirmation" section on Home (preview) and Active tab (full list, above "Confirmed"); a linking banner on the Requests tab | Completed |
+| Mobile: `PartnerSosRequestScreen` now falls back to the pending-offers list to seed `_myOffer` on cold open, fixing the "shows Accept/Decline again" bug at its source | Completed |
+| Web: `/partner` (Overview) previously showed zero SOS content — added `PartnerSosPreview`; `/partner/sos` gained the matching "Waiting for Confirmation" section; `/partner/sos/[id]` gained the same cold-open fallback fix as mobile | Completed |
+| `pnpm openapi:generate` re-run for the new route; `pnpm -w run test` (214/214), `tsc --noEmit` clean on `@bikie/services`/`apps/web` | Completed |
+| Mobile codegen (`build_runner`) for the new `PartnerPendingOffer` model + `flutter analyze`/`flutter test` | In Progress |
+| Manual smoke test against the live "ritedh" account that surfaced this bug | **Not done** — recommended next |
+
 ## Service Providers got the Rider-membership upsell error on every SOS action route (2026-08-21, ADR-061)
 
 Reported: a Service Provider could see an SOS notification but clicking it showed "This is a

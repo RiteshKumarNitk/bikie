@@ -1,5 +1,15 @@
 # BIKIE — Roadmap
 
+## A Partner's Own SOS Offer Was Invisible On Home, Requests, And Active Alike (2026-08-21, ADR-062)
+Fixed: an SOS request wasn't visible on a Service Provider's Home, Requests, or Active tab. Traced
+against live production data to a real gap, not a display bug — once a partner accepts, their
+offer correctly drops off "Nearby Requests" (already responded to) but doesn't appear in "Active
+Assistance" until the rider accepts, leaving it invisible everywhere if the rider never responds.
+Added a "Pending Responses"/"Waiting for Confirmation" list surfaced on Home, Requests, and Active
+on mobile and on the Overview and SOS Emergency pages on web (which previously showed zero SOS
+content on its Overview page at all) — also fixed the alert detail screen on both platforms
+incorrectly re-showing Accept/Decline for an alert already offered on. See ADR-062.
+
 ## Service Providers Wrongly Blocked From SOS Requests By The Rider Membership Gate (2026-08-21, ADR-061)
 Fixed: a Service Provider could see an SOS notification but clicking into it returned the Rider
 Membership upsell error ("This is a BIKIE Membership perk"), even with an active, separate Partner

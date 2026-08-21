@@ -5872,6 +5872,57 @@
         }
       }
     },
+    "/api/partner/sos/pending": {
+      "get": {
+        "operationId": "get_api_partner_sos_pending",
+        "tags": [
+          "partner"
+        ],
+        "summary": "GET /api/partner/sos/pending",
+        "description": "Source: `apps/web/app/api/partner/sos/pending/route.ts`. Auth class: `partner`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "partner",
+        "x-bikie-source": "apps/web/app/api/partner/sos/pending/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
     "/api/partners/nearby": {
       "get": {
         "operationId": "get_api_partners_nearby",
@@ -6740,16 +6791,9 @@
           "sos"
         ],
         "summary": "POST /api/sos/alerts/{id}/decline",
-        "description": "Source: `apps/web/app/api/sos/alerts/[id]/decline/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
-        "security": [
-          {
-            "SessionCookie": []
-          },
-          {
-            "BearerAuth": []
-          }
-        ],
-        "x-bikie-auth": "membership",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/decline/route.ts`. Auth class: `public-or-unclassified`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [],
+        "x-bikie-auth": "public-or-unclassified",
         "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/decline/route.ts",
         "responses": {
           "200": {
@@ -6791,16 +6835,9 @@
           "sos"
         ],
         "summary": "POST /api/sos/alerts/{id}/offer",
-        "description": "Source: `apps/web/app/api/sos/alerts/[id]/offer/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
-        "security": [
-          {
-            "SessionCookie": []
-          },
-          {
-            "BearerAuth": []
-          }
-        ],
-        "x-bikie-auth": "membership",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/offer/route.ts`. Auth class: `public-or-unclassified`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [],
+        "x-bikie-auth": "public-or-unclassified",
         "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/offer/route.ts",
         "responses": {
           "200": {
@@ -6944,16 +6981,9 @@
           "sos"
         ],
         "summary": "POST /api/sos/alerts/{id}/offers/{offerId}/withdraw",
-        "description": "Source: `apps/web/app/api/sos/alerts/[id]/offers/[offerId]/withdraw/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
-        "security": [
-          {
-            "SessionCookie": []
-          },
-          {
-            "BearerAuth": []
-          }
-        ],
-        "x-bikie-auth": "membership",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/offers/[offerId]/withdraw/route.ts`. Auth class: `public-or-unclassified`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [],
+        "x-bikie-auth": "public-or-unclassified",
         "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/offers/[offerId]/withdraw/route.ts",
         "responses": {
           "200": {
@@ -7097,16 +7127,9 @@
           "sos"
         ],
         "summary": "POST /api/sos/alerts/{id}/respond",
-        "description": "Source: `apps/web/app/api/sos/alerts/[id]/respond/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
-        "security": [
-          {
-            "SessionCookie": []
-          },
-          {
-            "BearerAuth": []
-          }
-        ],
-        "x-bikie-auth": "membership",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/respond/route.ts`. Auth class: `public-or-unclassified`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [],
+        "x-bikie-auth": "public-or-unclassified",
         "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/respond/route.ts",
         "responses": {
           "200": {
@@ -7148,16 +7171,9 @@
           "sos"
         ],
         "summary": "GET /api/sos/alerts/{id}",
-        "description": "Source: `apps/web/app/api/sos/alerts/[id]/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
-        "security": [
-          {
-            "SessionCookie": []
-          },
-          {
-            "BearerAuth": []
-          }
-        ],
-        "x-bikie-auth": "membership",
+        "description": "Source: `apps/web/app/api/sos/alerts/[id]/route.ts`. Auth class: `public-or-unclassified`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [],
+        "x-bikie-auth": "public-or-unclassified",
         "x-bikie-source": "apps/web/app/api/sos/alerts/[id]/route.ts",
         "responses": {
           "200": {
@@ -7452,16 +7468,9 @@
           "sos"
         ],
         "summary": "GET /api/sos/sessions/{id}",
-        "description": "Source: `apps/web/app/api/sos/sessions/[id]/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
-        "security": [
-          {
-            "SessionCookie": []
-          },
-          {
-            "BearerAuth": []
-          }
-        ],
-        "x-bikie-auth": "membership",
+        "description": "Source: `apps/web/app/api/sos/sessions/[id]/route.ts`. Auth class: `public-or-unclassified`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [],
+        "x-bikie-auth": "public-or-unclassified",
         "x-bikie-source": "apps/web/app/api/sos/sessions/[id]/route.ts",
         "responses": {
           "200": {
@@ -7503,16 +7512,9 @@
           "sos"
         ],
         "summary": "POST /api/sos/sessions/{id}/status",
-        "description": "Source: `apps/web/app/api/sos/sessions/[id]/status/route.ts`. Auth class: `membership`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
-        "security": [
-          {
-            "SessionCookie": []
-          },
-          {
-            "BearerAuth": []
-          }
-        ],
-        "x-bikie-auth": "membership",
+        "description": "Source: `apps/web/app/api/sos/sessions/[id]/status/route.ts`. Auth class: `public-or-unclassified`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [],
+        "x-bikie-auth": "public-or-unclassified",
         "x-bikie-source": "apps/web/app/api/sos/sessions/[id]/status/route.ts",
         "responses": {
           "200": {
