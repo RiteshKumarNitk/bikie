@@ -65,7 +65,8 @@ async function resolveNearbyRiders(
  * unconditionally once radius is maxed with no acceptance, so the "SOS must never reach nobody"
  * guarantee (ADR-030) holds without one.
  *
- * Severity-gated (requested explicitly, not inferred): a RED/EMERGENCY alert (`deriveSeverity`
+ * Severity-gated (requested explicitly, not inferred; formalized as ADR-064 after a full dispatch
+ * audit confirmed it's the intended behavior, not an oversight): a RED/EMERGENCY alert (`deriveSeverity`
  * — ACCIDENT/MEDICAL/LIFE_THREATENING) is community-support only and never reaches Service
  * Providers at all, regardless of type-matching/radius/availability/membership — only an
  * AMBER/ASSISTANCE alert (breakdown, flat tyre, fuel, battery, lost, other) does. A

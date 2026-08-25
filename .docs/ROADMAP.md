@@ -1,5 +1,13 @@
 # BIKIE — Roadmap
 
+## Full SOS Dispatch Audit: Who Gets Notified, Confirmed Correct (2026-08-21, ADR-064)
+Audited SOS dispatch end-to-end against the intended rule (every alert reaches both nearby Riders
+and nearby Service Providers). Found the code already correctly narrows this to Amber/Assistance
+alerts only — a Red/Emergency alert is riders-only, per an explicit earlier instruction — and kept
+that behavior. Closed the gap that prompted the audit: `.docs/SOS.md`/`API.md` didn't state the
+split clearly, and the browse-list copy of the same severity gate had no test coverage. No
+dispatch/eligibility/membership/availability/privacy/notification logic changed. See ADR-064.
+
 ## Back-Press Could Exit The App From A Deep-Linked Notification; Riders Couldn't Find Their Own Active Alert (2026-08-21, ADR-063)
 Found while live-testing the ADR-062 fix: tapping a push notification, then pressing back, closed
 the app instead of returning to the previous screen — a cold-start deep link replaced the entire

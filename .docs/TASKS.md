@@ -2,6 +2,26 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Full SOS dispatch audit — confirmed correct, closed a documentation/test gap (2026-08-21, ADR-064)
+
+Requested a full audit of who actually receives an SOS alert (code, not docs) and whether it
+matches the intended "every SOS reaches both nearby Riders and nearby Service Providers" rule.
+Found the code already enforces the right, narrower rule — Service Providers only join Amber/
+Assistance dispatch, never Red/Emergency — because it was built to an explicit instruction earlier
+in this same project's history. Confirmed to keep this behavior as-is; the only real gaps were
+`.docs/SOS.md` describing dispatch as unconditional, `.docs/API.md` still describing the
+pre-ADR-047 tier-fallback model, and the browse-list path's copy of the severity gate having zero
+test coverage. See ADR-064.
+
+| Task | Status |
+|---|---|
+| Verified end-to-end from code: rider eligibility (`findNearbyAroundPoint`), Service Provider eligibility (`findEligiblePartnersNearPoint`), the severity gate on both the automatic-dispatch and browse-list paths, decline → continued search on the next cron tick, reporter exclusion, and every notification channel (SMS/WhatsApp/Email/in-app+FCM) | Completed |
+| Rewrote `.docs/SOS.md` (intro, §2 Alert kinds, §3 sequence, §4 staged escalation prose + both Mermaid diagrams, §7 route table) to state the Red/Amber split explicitly everywhere Service Provider dispatch is mentioned | Completed |
+| Rewrote `.docs/API.md`'s `POST /api/sos/alerts` and `GET /api/partner/sos/nearby` rows, replacing a stale pre-ADR-047 description with the actual current (and severity-gated) behavior | Completed |
+| Added 2 unit tests for `listNearbyOpenRequests`'s severity gate (previously untested on this path): Red excluded even for an otherwise-eligible general-responder partner; Amber included for a type-matched partner | Completed |
+| Added ADR-064, formalizing the rule and correcting a pre-existing mislabel (code comments cited "ADR-047" for this behavior; that number belongs to an unrelated decision) | Completed |
+| `pnpm -w run test` (216/216, up from 214) | Completed |
+
 ## Back-press exited the app from a deep-linked notification; a rider's own SOS alert had no Home visibility (2026-08-21, ADR-063)
 
 While live-testing ADR-062: tapping a push notification as a Service Provider, then pressing back,

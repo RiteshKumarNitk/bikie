@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-08-21 — Full SOS dispatch audit: confirmed correct, closed a documentation/test gap (ADR-064)
+
+Audited SOS dispatch end-to-end from code against the rule "every alert reaches both nearby
+Riders and nearby Service Providers." Found the code already correctly narrows this to
+Amber/Assistance alerts only — Red/Emergency stays riders-only, per an explicit earlier decision —
+and kept that behavior unchanged. `.docs/SOS.md` and `API.md` previously described dispatch as
+unconditional; rewrote both to state the split explicitly. Added test coverage for the one path
+that lacked it (the partner browse-list's copy of the same severity gate). No dispatch,
+eligibility, membership, availability, privacy, or notification code changed. Full details in
+ADR-064.
+
 ## 2026-08-21 — Fixed back-press exiting the app from a deep-linked notification; added a rider "active SOS alert" Home banner (ADR-063)
 
 Found live-testing yesterday's fix: tapping a push notification, then pressing back, closed the

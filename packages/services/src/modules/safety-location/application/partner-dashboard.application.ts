@@ -43,7 +43,8 @@ export function createPartnerDashboardApplication(
    * Severity-filtered the same way `resolveServiceProviders` (escalation.application.ts) gates
    * automatic dispatch: a RED/EMERGENCY alert never reaches Service Providers, whether by
    * notification or by browsing here — was previously missing on this path specifically, so a
-   * RED alert could still be *browsed* into even though it was never auto-dispatched to them. */
+   * RED alert could still be *browsed* into even though it was never auto-dispatched to them.
+   * Confirmed as intended (not a gap to close) by a full dispatch audit — see ADR-064. */
   async function listNearbyOpenRequests(
     userId: string,
     location: { latitude: number; longitude: number },

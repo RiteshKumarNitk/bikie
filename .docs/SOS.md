@@ -1,10 +1,12 @@
 # BIKIE — SOS Feature
 
 Membership-gated emergency / assistance alerts. A rider sends a **Red** or **Amber** alert with
-live GPS; BIKIE fans out in stages — emergency contacts immediately, then nearby Riders and
-eligible Service Providers *together* as a shared, radius-widening candidate pool, admins as the
-terminal fallback (ADR-047) — over **SMS / WhatsApp / Email / in-app** (only where each channel is
-configured and the recipient has the matching contact detail). Exact contact info and GPS are
+live GPS; BIKIE fans out in stages — emergency contacts immediately, then nearby Riders always,
+joined by eligible Service Providers *only for an Amber/Assistance alert* (ADR-064; a Red/Emergency
+alert is community-support only and never reaches Service Providers at all, regardless of
+type-match/radius/availability/membership) — as a shared, radius-widening candidate pool, admins as
+the terminal fallback (ADR-047) — over **SMS / WhatsApp / Email / in-app** (only where each channel
+is configured and the recipient has the matching contact detail). Exact contact info and GPS are
 withheld from every candidate responder until one of them is actually assigned (ADR-045, extended
 to every dispatch channel by ADR-048). A responder offers to help, the reporter accepts one offer
 (atomically locking assignment — every other pending offer is auto-expired and those responders
@@ -13,7 +15,7 @@ to completion.
 
 Related: `API.md` (routes), `PRODUCTION_INTEGRATIONS.md` (vendors), ADR-016 / ADR-018 / ADR-020 /
 ADR-028 / ADR-029 / ADR-030 / ADR-033 / ADR-036 / ADR-038 / ADR-042 / ADR-044 / ADR-045 / ADR-047 /
-ADR-048 in `DECISIONS.md`.
+ADR-048 / ADR-064 in `DECISIONS.md`.
 
 ---
 
@@ -28,7 +30,7 @@ flowchart LR
   D --> E[Confirm modal]
   E --> F[POST /api/sos/alerts]
   F --> G[Alert saved + immediate fan-out]
-  G --> H[Staged escalation: community-first, then Riders + Service Providers together, then admin]
+  G --> H[Staged escalation: community-first, then Riders always<br/>+ Service Providers only if Amber, then admin]
   H --> I[Someone offers to help]
   I --> J[Reporter accepts one offer]
   J --> K[Session: chat, status updates, rating]
@@ -47,9 +49,21 @@ flowchart LR
 **Categories** (API `type`, `SOSAlertType` enum): `ACCIDENT` · `LIFE_THREATENING` · `MEDICAL` ·
 `BIKE_BREAKDOWN` · `FLAT_TYRE` · `FUEL_EMPTY` · `BATTERY_ISSUE` · `LOST` · `OTHER`.
 
-`ACCIDENT` / `LIFE_THREATENING` / `MEDICAL` have no natural `Partner.type` mapping and only reach
-service providers who've opted in as a general responder (`isGeneralResponder`, ADR-044); the
-rest map to a specific partner type (`partnerTypeForAlertType`, `domain/partner-mapping.ts`).
+**RED = Riders only, never Service Providers (ADR-064).** `deriveSeverity(type)` maps `ACCIDENT` /
+`LIFE_THREATENING` / `MEDICAL` to `EMERGENCY` (Red) and everything else to `ASSISTANCE` (Amber).
+`ACCIDENT`/`LIFE_THREATENING`/`MEDICAL` alerts reach eligible nearby Riders only — Service
+Providers are never candidates for them, on either the automatic-dispatch path
+(`resolveServiceProviders` returns `[]` outright) or a partner's own "Nearby Requests" browse list
+(`listNearbyOpenRequests` filters them out the same way) — regardless of type-match, radius,
+availability, or membership. Only an Amber/Assistance alert (`BIKE_BREAKDOWN` / `FLAT_TYRE` /
+`FUEL_EMPTY` / `BATTERY_ISSUE` / `LOST` / `OTHER`) reaches both Riders and Service Providers. A
+life-threatening situation reaches the rider community immediately, not paid providers whose
+response scope is mechanical/fuel help rather than emergency response.
+
+Within the Amber categories that do reach Service Providers: `BIKE_BREAKDOWN` / `FLAT_TYRE` /
+`BATTERY_ISSUE` / `FUEL_EMPTY` each map to a specific `Partner.type` (`partnerTypeForAlertType`,
+`domain/partner-mapping.ts`); `LOST` and `OTHER` have no natural mapping and only reach providers
+who've opted in as a general responder (`isGeneralResponder`, ADR-044).
 
 ---
 
@@ -82,7 +96,7 @@ sequenceDiagram
   API->>RT: publishGlobal sos_alert
   par
     API->>Fan: fanOut(alert) — emergency contacts + optional emergency-services number
-    API->>Esc: seedEscalation(alert) — tier-1 nearby riders (community-first if any share a group)<br/>+ eligible Service Providers at the same starting radius (ADR-047)
+    API->>Esc: seedEscalation(alert) — tier-1 nearby riders (community-first if any share a group)<br/>+ eligible Service Providers at the same starting radius, Amber alerts only (ADR-047/064)
   end
   API-->>UI: { alert, dispatch, profileWarning }
 ```
@@ -96,24 +110,30 @@ sentence (ADR-030).
 ## 4. Staged escalation (who gets notified, and when)
 
 Emergency contacts and an optional configured emergency-services number go out immediately at
-creation. Nearby Riders and eligible Service Providers go out **together**, as one shared,
-radius-widening candidate pool (ADR-047) — a Service Provider is a parallel responder type, not a
-later fallback reached only once every rider tier has timed out. A cron ticker
+creation. Nearby Riders always go out; eligible Service Providers join them **only for an
+Amber/Assistance alert** (ADR-064) — together, as one shared, radius-widening candidate pool
+(ADR-047: when they do join, a Service Provider is a parallel responder type, not a later fallback
+reached only once every rider tier has timed out). A **Red/Emergency alert never resolves any
+Service Provider candidates at all** — `resolveServiceProviders` short-circuits to an empty list
+before even querying, regardless of type-match/radius/availability/membership. A cron ticker
 (`GET /api/cron/sos-escalate`) widens the search over time if nobody has been assigned yet.
 
 ```mermaid
 flowchart TB
-  Create[Alert created] --> Immediate[Immediate: emergency contacts<br/>+ optional emergency services<br/>+ tier-1 nearby riders 5km<br/>+ eligible Service Providers @ 5km]
-  Immediate --> Zero{Any recipients<br/>found anywhere?}
+  Create[Alert created] --> Sev{Severity?}
+  Sev -->|Red/Emergency| ImmediateRed[Immediate: emergency contacts<br/>+ optional emergency services<br/>+ tier-1 nearby riders 5km<br/>NO Service Providers]
+  Sev -->|Amber/Assistance| ImmediateAmber[Immediate: emergency contacts<br/>+ optional emergency services<br/>+ tier-1 nearby riders 5km<br/>+ eligible Service Providers @ 5km]
+  ImmediateRed --> Zero{Any recipients<br/>found anywhere?}
+  ImmediateAmber --> Zero
   Zero -->|None| EscAdmin1[Escalate to admins immediately<br/>ADR-030 guarantee]
   Zero -->|Some| Wait[Wait for nextEscalationAt]
 
   Wait --> Tick[Cron tick: GET /api/cron/sos-escalate]
   Tick --> Community{Tier ==<br/>NEARBY_RIDERS_COMMUNITY?}
-  Community -->|Yes, timed out| General[Advance to NEARBY_RIDERS_GENERAL<br/>notify the rest of the nearby pool<br/>+ any newly-eligible Service Providers]
+  Community -->|Yes, timed out| General[Advance to NEARBY_RIDERS_GENERAL<br/>notify the rest of the nearby pool<br/>+ any newly-eligible Service Providers, Amber only]
   Community -->|No| RiderTier{Tier ==<br/>NEARBY_RIDERS_GENERAL<br/>and radius not maxed?}
-  RiderTier -->|Yes| Widen[Widen radius +5km together —<br/>notify newly-in-range riders<br/>AND newly-in-range Service Providers]
-  RiderTier -->|No, radius maxed| EscAdmin2[Escalate to admins — terminal tier<br/>neither a rider nor a provider accepted]
+  RiderTier -->|Yes| Widen[Widen radius +5km —<br/>notify newly-in-range riders<br/>+ newly-in-range Service Providers, Amber only]
+  RiderTier -->|No, radius maxed| EscAdmin2[Escalate to admins — terminal tier<br/>nobody accepted]
 
   General --> Notify[notifyRecipients → SMS/WhatsApp/Email/in-app]
   Widen --> Notify
@@ -123,19 +143,28 @@ flowchart TB
 
 **Community-first (ADR-033 Phase D).** If any nearby rider shares a Community/Club with the
 reporter, the tier starts at `NEARBY_RIDERS_COMMUNITY` (shorter timeout, notifies only that rider
-subset — Service Providers aren't "community members," so they're dispatched in this same round
-regardless) before falling through to the full nearby pool at `NEARBY_RIDERS_GENERAL`. No shared
-group members nearby → starts at `NEARBY_RIDERS_GENERAL` directly.
+subset — Service Providers aren't "community members," so on an Amber alert they're dispatched in
+this same round regardless of the rider tier chosen; on a Red alert they're still never dispatched
+at all) before falling through to the full nearby pool at `NEARBY_RIDERS_GENERAL`. No shared group
+members nearby → starts at `NEARBY_RIDERS_GENERAL` directly.
 
-**Service-provider eligibility (ADR-044, ordering corrected by ADR-047).** A partner is only ever
-dispatched an alert if: verified, currently `isAvailable`, within the **same widening radius the
-rider search is currently using** (previously a fixed, unrelated 25km — now shared, so "nearby"
-means one radius for both responder types at any given moment), category-matched
-(`partnerTypeForAlertType`) or opted in as `isGeneralResponder` for unmapped categories, and not
-already the assigned helper on another active session. There is **no** "broaden to anyone if the
-strict search comes up empty" fallback — a fuel-delivery partner will never receive a medical
-emergency. The alert never reaches nobody regardless: `tickEscalation` still advances to `ADMIN`
+**Service-provider eligibility (ADR-044, ordering corrected by ADR-047, severity gate formalized
+by ADR-064).** A partner is only ever dispatched an alert if: **the alert is Amber/Assistance, not
+Red/Emergency** (checked first, before any of the following — a Red alert never even reaches the
+eligibility query), verified (not admin-`SUSPENDED`), currently `isAvailable`, an active Partner
+membership, within the **same widening radius the rider search is currently using** (previously a
+fixed, unrelated 25km — now shared, so "nearby" means one radius for both responder types at any
+given moment), category-matched (`partnerTypeForAlertType`) or opted in as `isGeneralResponder` for
+unmapped categories, and not already the assigned helper on another active session. There is **no**
+"broaden to anyone if the strict search comes up empty" fallback — a fuel-delivery partner will
+never receive a medical emergency (doubly true now: `MEDICAL` is Red, so no partner receives it at
+all). The alert never reaches nobody regardless: `tickEscalation` still advances to `ADMIN`
 unconditionally once radius is maxed with no acceptance from either pool.
+
+This same severity gate applies identically to a partner's own **"Nearby Requests" browse list**
+(`GET /api/partner/sos/nearby`, `listNearbyOpenRequests` in `partner-dashboard.application.ts`) —
+a Red alert is filtered out there too, so a Service Provider can never accept one even by browsing
+in rather than waiting for a dispatch notification.
 
 **Rider SOS opt-out (ADR-045).** A rider with `RiderLocation.receiveSosAlerts = false` never
 appears in the nearby-rider candidate pool (`findNearbyAroundPoint`'s SQL, alongside the existing
@@ -289,7 +318,7 @@ exactly where).
 | Route | Method | Who | Notes |
 | ----------------------------------------------- | ------ | ------------------ | -------------------------------------------------------------------- |
 | `/api/sos/alerts` | GET | Member | `?lat=&lng=` (ADR-042) — 25km radius around the viewer; non-admin must supply both. Results redacted per §6. Admin sees every alert network-wide, unfiltered. Open to approved Service Providers too (ADR-046b) — they're always also Riders. |
-| `/api/sos/alerts` | POST | Member | Create + immediate fan-out + tier-1 escalation seed. |
+| `/api/sos/alerts` | POST | Member | Create + immediate fan-out + tier-1 escalation seed. Tier-1 Service Providers only seeded for an Amber/Assistance alert (ADR-064) — a Red/Emergency alert's tier-1 leg is riders-only. |
 | `/api/sos/alerts/history` | GET | Session | Caller's own past alerts. |
 | `/api/sos/alerts/[id]` | GET | Member | Alert + timeline. Redacted per §6 unless privileged. |
 | `/api/sos/alerts/[id]/offer` | POST | Member | "I'm Coming" / partner "ACCEPT". Callers with an APPROVED Partner application (ADR-046b — checked via `session.user.partnerStatus`, not `role`) are additionally gated: verified, available, category-matched, not at capacity — applied regardless of the caller's current UI mode. |
@@ -308,7 +337,7 @@ exactly where).
 | `/api/rider-location/sos-opt-out` | GET/PUT | Member | ADR-045 — independent of consent above: whether this rider is paged for SOS at all. |
 | `/api/partner/availability` | PATCH | Partner | 🟢/⚫ toggle (ADR-044). |
 | `/api/partner/sos/dashboard` | GET | Partner | Stats (ADR-044). |
-| `/api/partner/sos/nearby` | GET | Partner | Eligible open requests, excludes already-offered/declined (ADR-045). |
+| `/api/partner/sos/nearby` | GET | Partner | Eligible open requests, excludes already-offered/declined (ADR-045) and any Red/Emergency alert (ADR-064 — Service Providers can never see or accept one, dispatch or browse). |
 | `/api/partner/sos/active` | GET | Partner | Current active-helper sessions. |
 | `/api/partner/sos/history` | GET | Partner | Completed Assistance / Assistance History — finished (COMPLETED/CANCELLED) sessions (ADR-046b). |
 | `/api/cron/sos-resolve` | GET | Cron Bearer | Auto-resolves alerts inactive 120+ min. |

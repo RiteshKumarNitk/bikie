@@ -3147,3 +3147,47 @@ changes:
   left several generated Dart files deleted mid-regeneration, which had gotten committed as-is —
   restored from the prior commit and hand-completed the one new class's generated code, since the
   code-gen toolchain itself currently crashes on this SDK/analyzer version mismatch).
+
+## ADR-064: Formalizing the RED/AMBER severity split on Service Provider dispatch — confirmed correct, documentation/tests brought in line with the code
+
+- **Context.** A full audit of SOS dispatch was requested: verify from the actual code (not
+  documentation) exactly who receives an SOS alert, compare against the intended rule ("every SOS
+  reaches both eligible nearby Riders and eligible nearby Service Providers"), and fix any
+  mismatch. The audit found the code already enforces a narrower, severity-conditional version of
+  that rule — `resolveServiceProviders` (`escalation.application.ts`) returns zero candidates
+  outright when `deriveSeverity(alert.type) === "EMERGENCY"`, and the same gate is independently
+  applied to the partner-facing browse list (`listNearbyOpenRequests`,
+  `partner-dashboard.application.ts`). This exact behavior was implemented and tested earlier in
+  the same working session, on an explicit prior instruction: *"when the rider request for the red
+  alert emergency then you have to send that alert to the riders only for community support not to
+  the service provider."* Presented with the discrepancy against this audit's literal "always
+  both" framing, the outcome was to **keep the existing behavior** — the RED/AMBER split is the
+  actual, intended business rule, not a bug, and "both" in the original ask was always scoped to
+  AMBER/ASSISTANCE alerts. Two real gaps surfaced during the audit, unrelated to the dispatch logic
+  itself: (1) `.docs/SOS.md`, this project's authoritative SOS spec, described Service Providers as
+  going out "together" with riders unconditionally, with no mention anywhere of the RED exclusion
+  — a reader would reasonably conclude every alert reaches both; (2) `.docs/API.md`'s description
+  of `POST /api/sos/alerts` was stale in a different way, still describing the *pre*-ADR-047 model
+  ("same-city partners are reached later, as the SERVICE_PROVIDERS escalation tier") that the
+  actual "together, at every radius step" behavior replaced; (3) the severity gate itself had never
+  had a dedicated ADR — the code comments loosely cite "ADR-047," but that number belongs to an
+  unrelated earlier decision (the ADR-046b migration/orphaned-account repair), a copy-paste-era
+  mislabel now impossible to silently correct without leaving the trail this entry provides; (4)
+  the severity gate was verified only on the automatic-dispatch path (`escalation.test.ts`
+  coverage) — the parallel browse-list path (`listNearbyOpenRequests`) had zero test coverage of
+  its own copy of the same gate.
+- **Decision.** No production code changed — this ADR is the formal record of a decision already
+  live in the codebase, correcting the process gap (a real behavior change shipped without one)
+  rather than the behavior itself. Concretely: (1) rewrote `.docs/SOS.md`'s intro, §2 "Alert
+  kinds," §3 create-sequence, and §4 staged-escalation section (prose + both Mermaid diagrams) to
+  state the RED/AMBER split explicitly everywhere Service Provider dispatch is mentioned, replacing
+  every unqualified "together"/"regardless" claim; (2) rewrote `.docs/API.md`'s `POST
+  /api/sos/alerts` row to describe the actual current fan-out (contacts + tier-1 riders +
+  tier-1 AMBER-only providers, together, ADR-047) instead of the stale pre-ADR-047 tier-fallback
+  description; (3) added two unit tests for `listNearbyOpenRequests`'s severity gate (RED excluded
+  even for an otherwise-eligible general-responder partner; AMBER included for a type-matched
+  partner), mirroring the existing `tickEscalation` coverage's shape exactly.
+- **Consequences.** Zero runtime/behavior change — `pnpm -w run test` 216/216 (214 prior + 2 new).
+  Every doc claim about SOS dispatch now traces to a real, dated ADR instead of a mislabeled one.
+  Future readers of `.docs/SOS.md`/`API.md` can no longer reasonably conclude RED alerts reach
+  Service Providers.

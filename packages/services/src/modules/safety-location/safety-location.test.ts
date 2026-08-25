@@ -1444,6 +1444,53 @@ describe("escalation application — tier advancement", () => {
   });
 });
 
+// ADR-064 (documentation-only pass, confirming the existing rule) — the same RED/EMERGENCY
+// severity gate `escalation.tickEscalation`/`seedEscalation` enforce for automatic dispatch above
+// also applies to a partner *browsing* "Nearby Requests" (`GET /api/partner/sos/nearby`) — a RED
+// alert must never be reachable through either path, not just the automatic one.
+describe("partnerDashboard.listNearbyOpenRequests severity gate", () => {
+  const eligiblePartner = {
+    providerId: "provider-1",
+    verificationStatus: "APPROVED" as const,
+    isAvailable: true,
+    isGeneralResponder: true,
+    type: "MECHANIC",
+  };
+
+  it("excludes a RED/EMERGENCY alert even from an otherwise-eligible general-responder partner", async () => {
+    const getOpenAlertsNearPoint = vi.fn(async () => [sampleAlert({ type: "ACCIDENT" })]);
+    const getEligibilityFields = vi.fn(async () => eligiblePartner);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts, getOpenAlertsNearPoint } as any,
+        partnerDispatch: { ...emptyRepos().partnerDispatch, getEligibilityFields } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const requests = await module.partnerDashboard.listNearbyOpenRequests("provider-1", { latitude: 12.9, longitude: 77.6 });
+
+    expect(requests).toHaveLength(0);
+  });
+
+  it("includes an AMBER/ASSISTANCE alert for a type-matched, eligible partner", async () => {
+    const getOpenAlertsNearPoint = vi.fn(async () => [sampleAlert({ type: "BIKE_BREAKDOWN" })]);
+    const getEligibilityFields = vi.fn(async () => eligiblePartner);
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts, getOpenAlertsNearPoint } as any,
+        partnerDispatch: { ...emptyRepos().partnerDispatch, getEligibilityFields } as any,
+      }),
+      communications: fakeCommunications(),
+    });
+
+    const requests = await module.partnerDashboard.listNearbyOpenRequests("provider-1", { latitude: 12.9, longitude: 77.6 });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].id).toBe("alert-1");
+  });
+});
+
 describe("dispatch PII redaction (ADR-047)", () => {
   it("withholds phone and exact GPS from a NEARBY_RIDER and a SERVICE_PROVIDER, but not an EMERGENCY_CONTACT", async () => {
     const alert = sampleAlert({ userPhone: "9999999999", latitude: 12.9716, longitude: 77.5946 });
