@@ -146,6 +146,13 @@ export const nearbyPartnersQuerySchema = z.object({
   lat: z.coerce.number().min(-90).max(90),
   lng: z.coerce.number().min(-180).max(180),
   type: partnerTypeEnum.optional(),
+  // Opt-in: only providers a rider could actually reach right now (available + active
+  // membership) — same eligibility rule SOS dispatch already uses. `"true"` only; anything else
+  // (including absent) keeps the existing unfiltered directory behavior.
+  eligibleOnly: z
+    .string()
+    .optional()
+    .transform((v) => v === "true"),
 });
 
 export type NearbyPartnersQueryInput = z.infer<typeof nearbyPartnersQuerySchema>;

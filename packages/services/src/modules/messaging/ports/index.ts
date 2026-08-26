@@ -27,6 +27,7 @@ export interface MessageStorePort {
   getConversationsForUser: typeof import("@bikie/database").messageRepository.getConversationsForUser;
   getMessagesRaw: typeof import("@bikie/database").messageRepository.getMessagesRaw;
   isParticipant: typeof import("@bikie/database").messageRepository.isParticipant;
+  isConversationLocked: typeof import("@bikie/database").messageRepository.isConversationLocked;
   markDelivered: typeof import("@bikie/database").messageRepository.markDelivered;
   sendMessage: typeof import("@bikie/database").messageRepository.sendMessage;
   getOtherParticipantIds: typeof import("@bikie/database").messageRepository.getOtherParticipantIds;

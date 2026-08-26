@@ -214,6 +214,53 @@ void main() {
     });
   });
 
+  group('TripRepository.cancelTrip', () {
+    test('posts to the cancel endpoint with an empty body when no reason is given', () async {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => okResponse('/api/trips/himalayan-run/cancel', {'success': true}),
+      );
+
+      await repository.cancelTrip('himalayan-run');
+
+      final captured =
+          verify(() => dio.post('/api/trips/himalayan-run/cancel', data: captureAny(named: 'data'))).captured.single
+              as Map<String, dynamic>;
+      expect(captured.containsKey('reason'), isFalse);
+    });
+
+    test('includes the reason when provided', () async {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenAnswer(
+        (_) async => okResponse('/api/trips/himalayan-run/cancel', {'success': true}),
+      );
+
+      await repository.cancelTrip('himalayan-run', reason: 'Weather');
+
+      final captured =
+          verify(() => dio.post('/api/trips/himalayan-run/cancel', data: captureAny(named: 'data'))).captured.single
+              as Map<String, dynamic>;
+      expect(captured['reason'], 'Weather');
+    });
+
+    test('surfaces a 409 NOT_UPCOMING error as a typed ApiException', () async {
+      when(() => dio.post(any(), data: any(named: 'data'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/trips/himalayan-run/cancel'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/api/trips/himalayan-run/cancel'),
+            statusCode: 409,
+            data: {'error': 'NOT_UPCOMING'},
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      expect(
+        () => repository.cancelTrip('himalayan-run'),
+        throwsA(isA<ApiException>().having((e) => e.statusCode, 'statusCode', 409)),
+      );
+    });
+  });
+
   group('TripRepository.getGroupConversationId', () {
     test('returns the conversation id once the ride has one', () async {
       when(() => dio.get(any())).thenAnswer(

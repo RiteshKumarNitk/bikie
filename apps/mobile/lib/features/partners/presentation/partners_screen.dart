@@ -61,7 +61,9 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
       }
       final position = await Geolocator.getCurrentPosition();
       final center = LatLng(position.latitude, position.longitude);
-      final partners = await ref.read(partnersRepositoryProvider).findNearby(position.latitude, position.longitude);
+      final partners = await ref
+          .read(partnersRepositoryProvider)
+          .findNearby(position.latitude, position.longitude, eligibleOnly: true);
       setState(() {
         _center = center;
         _partners = partners;
@@ -75,6 +77,50 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
     }
   }
 
+  void _showPartnerDetails(NearbyPartner p) {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Flexible(
+                  child: Text(p.businessName, style: Theme.of(context).textTheme.titleMedium, overflow: TextOverflow.ellipsis),
+                ),
+                const SizedBox(width: 8),
+                if (p.verificationStatus == 'APPROVED')
+                  const _Badge(label: '✓ Verified', color: Colors.green)
+                else
+                  const _Badge(label: '⚠ Unverified', color: Colors.amber),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              [
+                partnerTypeLabels[p.type] ?? p.type,
+                p.distanceMeters < 1000 ? '${p.distanceMeters.round()} m away' : '${(p.distanceMeters / 1000).toStringAsFixed(1)} km away',
+              ].join(' · '),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              p.isAvailable ? '🟢 Available' : '⚫ Offline',
+              style: TextStyle(color: p.isAvailable ? Colors.green : Colors.grey, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Business location, not live GPS',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -83,7 +129,7 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            "See BIKIE's registered mechanics, fuel delivery, and rental partners on a map — each with its verification status, so you know exactly who's been checked by BIKIE.",
+            "See BIKIE's currently available mechanics, fuel delivery, and rental partners on a map — each with its verification status, so you know exactly who's been checked by BIKIE. Markers show each provider's registered business location, not a live GPS position.",
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
@@ -104,7 +150,7 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
           if (_partners != null && _partners!.isEmpty)
             const EmptyState(
               icon: Icons.storefront_outlined,
-              title: 'No service providers found nearby yet',
+              title: 'No available service providers found nearby right now',
             ),
           if (_partners != null && _partners!.isNotEmpty) ...[
             ClipRRect(
@@ -130,13 +176,21 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
                           point: LatLng(p.latitude, p.longitude),
                           width: 40,
                           height: 40,
-                          child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                          child: GestureDetector(
+                            onTap: () => _showPartnerDetails(p),
+                            child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
+                          ),
                         ),
                     ]),
                     const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
                   ],
                 ),
               ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '📍 Pins mark each provider\'s business location, not their live position. Tap a pin for details.',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.grey),
             ),
             const SizedBox(height: 12),
             ..._partners!.map(

@@ -45,6 +45,28 @@ export async function isParticipant(conversationId: string, userId: string): Pro
   return participant !== null;
 }
 
+/** `null` means the conversation doesn't exist — distinguished from `false` (exists, not locked)
+ * so a caller can tell "nothing to send to" apart from "can't send here right now". */
+export async function isConversationLocked(conversationId: string): Promise<boolean | null> {
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: conversationId },
+    select: { isLocked: true },
+  });
+  return conversation?.isLocked ?? null;
+}
+
+/** Same underlying write `moderation.repository.ts`'s `lockConversation` uses for admin
+ * moderation — duplicated here (rather than imported cross-repository) so rides-community's own
+ * `ConversationLookupPort` adapter can lock a Ride Room on cancellation without depending on the
+ * trust-safety module. `lockedById` is a generic "who locked it" attribution, not admin-only by
+ * schema — a ride organizer cancelling their own ride is a legitimate value here. */
+export async function setConversationLocked(conversationId: string, lockedById: string, locked: boolean): Promise<void> {
+  await prisma.conversation.update({
+    where: { id: conversationId },
+    data: { isLocked: locked, lockedAt: locked ? new Date() : null, lockedById: locked ? lockedById : null },
+  });
+}
+
 export async function getMessagesRaw(conversationId: string, take = 200) {
   const limit = Math.min(Math.max(1, take), 500);
   // Newest-first fetch, then reverse so callers still receive chronological order.

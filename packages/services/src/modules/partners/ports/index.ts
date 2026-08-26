@@ -74,7 +74,7 @@ export interface PartnerRepositoryPort {
     latitude: number,
     longitude: number,
     radiusMeters: number,
-    options?: { type?: string; take?: number },
+    options?: { type?: string; take?: number; eligibleOnly?: boolean },
   ): Promise<NearbyPartnerRow[]>;
   /** ADR-044 — the SOS-availability toggle. */
   setAvailability(userId: string, isAvailable: boolean): Promise<{ isAvailable: boolean }>;

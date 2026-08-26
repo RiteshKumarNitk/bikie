@@ -13,6 +13,34 @@ export interface PartnersMapPin {
   name: string;
   latitude: number;
   longitude: number;
+  /** Optional detail fields — when provided, the marker opens a popup with them on click/tap
+   * instead of a bare name-only hover tooltip. */
+  typeLabel?: string;
+  isAvailable?: boolean;
+  distanceMeters?: number;
+}
+
+function formatDistance(meters: number): string {
+  return meters < 1000 ? `${Math.round(meters)} m away` : `${(meters / 1000).toFixed(1)} km away`;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function popupHtml(pin: PartnersMapPin): string {
+  const parts = [`<strong>${escapeHtml(pin.name)}</strong>`];
+  const meta: string[] = [];
+  if (pin.typeLabel) meta.push(escapeHtml(pin.typeLabel));
+  if (pin.distanceMeters != null) meta.push(formatDistance(pin.distanceMeters));
+  if (meta.length > 0) parts.push(`<div>${meta.join(" · ")}</div>`);
+  if (pin.isAvailable != null) {
+    parts.push(
+      `<div style="color:${pin.isAvailable ? "#22c55e" : "#888"}">${pin.isAvailable ? "🟢 Available" : "⚫ Offline"}</div>`,
+    );
+  }
+  parts.push(`<div style="margin-top:4px;font-size:11px;color:#888">Business location, not live GPS</div>`);
+  return parts.join("");
 }
 
 export function PartnersMap({
@@ -66,7 +94,7 @@ export function PartnersMap({
       shadowSize: [41, 41],
     });
     for (const pin of pins) {
-      L.marker([pin.latitude, pin.longitude], { icon: markerIcon }).bindTooltip(pin.name).addTo(layer);
+      L.marker([pin.latitude, pin.longitude], { icon: markerIcon }).bindPopup(popupHtml(pin)).addTo(layer);
     }
 
     const focus: [number, number] = center

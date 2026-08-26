@@ -3191,3 +3191,183 @@ changes:
   Every doc claim about SOS dispatch now traces to a real, dated ADR instead of a mislabeled one.
   Future readers of `.docs/SOS.md`/`API.md` can no longer reasonably conclude RED alerts reach
   Service Providers.
+
+## ADR-065: P0 security fixes from the Community/Provider-location audit — message-send authorization, conversation locking, ride-detail privacy
+
+- **Context.** A full functional/security audit (companion to ADR-064) of Rider Community and
+  Service Provider location found three P0 gaps, all confirmed directly from code, not
+  documentation: (1) `sendMessage` (`messages.application.ts`) had no conversation-membership
+  check at all — any authenticated user who obtained or guessed a `conversationId` could post
+  into a Ride Room chat they were never part of; (2) `Conversation.isLocked` existed and was
+  surfaced in DTOs, but `sendMessage` never checked it, so a moderator-locked conversation still
+  silently accepted new messages; (3) `GET /api/trips/[slug]` — deliberately public for discovery
+  — returned the exact meeting-point coordinates and the full approved-member roster to any
+  caller, authenticated or not, before they'd ever joined or been approved.
+- **Decision.**
+  1. `sendMessage` now checks `ports.store.isParticipant` first and returns `NOT_FOUND` (not a
+     distinguishable `FORBIDDEN`) for a non-participant — the same shape `getMessages` already
+     used on read, so probing a conversation id can't confirm it exists. No admin bypass added
+     (unlike `getMessages`' moderation-view path) — there's no prior precedent for an admin
+     injecting messages into a conversation they aren't part of.
+  2. Added `isConversationLocked`/`setConversationLocked` to `message.repository.ts` (the same
+     underlying write `moderation.repository.ts`'s admin-lock path uses, duplicated rather than
+     cross-imported so rides-community's own port doesn't depend on the trust-safety module) and
+     wired the read side into `sendMessage` as a `403 LOCKED` check.
+  3. Added `redactTripDetailForViewer` (`rides-community/domain/visibility.ts`), mirroring
+     `redactAlertForViewer`'s existing SOS pattern (ADR-045) exactly rather than inventing a new
+     privacy rule: `meetingPoint`/`meetingLat`/`meetingLng`/`members` are nulled/omitted for any
+     viewer who isn't the organizer, an approved member, or an admin. General discovery fields
+     (title, dates, price, seats, organizer name) stay public — the route's own public/
+     unauthenticated design is preserved, only the sensitive subset is gated. Removed the route's
+     `revalidate = 60` ISR hint, since a per-viewer response must never be cached and served to a
+     different viewer.
+- **Consequences.** `TripService.getBySlug` gained an optional `viewer` parameter
+  (`{userId, isAdmin}`, defaulting to unauthenticated) — the one call site (`GET /api/trips/[slug]`)
+  was updated; nothing else called it. Verified both platforms already null-guard
+  `meetingLat`/`meetingLng` (no crash risk) and neither renders `members` outside the
+  already-correctly-gated Ride Room, so no client-side UI changes were needed for the redaction
+  itself. Added 10 new tests (3 messaging, 7 rides-community) covering participant/lock rejection,
+  successful send, and redaction for bystander/unauthenticated/organizer/member/admin viewers.
+  `pnpm -w run test` 226/226, `tsc --noEmit` clean on `@bikie/services`/`@bikie/database`/
+  `apps/web`, `flutter analyze`/`flutter test` unaffected (112/112) since no mobile code changed
+  for this ADR.
+
+## ADR-066: Rider-facing "Nearby Service Providers" map — reused existing Leaflet/flutter_map + OpenStreetMap infrastructure, no Google Maps
+
+- **Context.** Requested a map showing nearby Service Providers, explicitly ruling out Google Maps
+  or any paid map subscription. Before writing anything, confirmed via a codebase audit
+  (companion to ADR-064) that this infrastructure already exists almost in full: web already had
+  `leaflet` installed and two working OSM-tile components (`LocationPicker.tsx`,
+  `PartnersMap.tsx`); mobile already had `flutter_map`/`latlong2`/`geolocator` and a working
+  `PartnersScreen` with its own `FlutterMap`; both already called the real
+  `GET /api/partners/nearby` endpoint with a working "find providers near me" flow
+  (`NearbyPartnersPanel.tsx` on web). The only gaps against the ask: markers carried no
+  category/availability/distance detail (only a bare name), nothing filtered out offline or
+  lapsed-membership providers, and nothing stated that a pin is a business location rather than a
+  live position.
+- **Decision.** Extended rather than replaced the existing components (no new map package on
+  either platform):
+  1. `PartnersMap.tsx`'s `PartnersMapPin` gained optional `typeLabel`/`isAvailable`/
+     `distanceMeters`; markers switched from a bare `.bindTooltip(name)` to `.bindPopup(...)` with
+     that detail plus a "Business location, not live GPS" line. Mobile's `PartnersScreen` markers
+     gained a `GestureDetector` opening a `showModalBottomSheet` with the same information (no
+     popup plugin needed — core Flutter widgets only).
+  2. Added an opt-in `eligibleOnly` query param to `GET /api/partners/nearby` (threaded through
+     `findPartnersNearPoint` → the partners module's port/application/service → the validation
+     schema), applying the exact same eligibility rule SOS dispatch already uses
+     (`isAvailable` + an active `PartnerMembership`). Defaults to off, so the endpoint's other
+     existing behavior (a general public directory that shows an offline partner with a badge
+     rather than hiding them) is unchanged for any caller that doesn't ask for it. Both
+     `NearbyPartnersPanel.tsx` and mobile's `PartnersScreen` now pass `eligibleOnly=true`.
+  3. Added the "business location, not live GPS" disclaimer in three places per platform: the
+     panel/screen's intro copy, a caption under the map, and inside every marker's detail popup.
+- **Consequences.** `PartnerService.findNearby`'s `options` type gained `eligibleOnly?: boolean`
+  end to end (repository → port → application → service → validation → route); no repository-level
+  test added (this codebase has no existing direct-Prisma-repository test harness — verified via
+  `tsc --noEmit`, which is clean across `@bikie/database`/`@bikie/validation`/`@bikie/services`/
+  `apps/web`). `pnpm -w run test` 226/226, `flutter analyze` clean (one pre-existing unrelated
+  info-level lint), `flutter test` 112/112. **Confirmed and delivered without Google Maps or any
+  paid map provider** — OpenStreetMap tiles via Leaflet (web) and flutter_map (Android) end to
+  end, exactly as requested. Not yet addressed (out of this ADR's scope): the SOS "Share
+  Mechanic/Fuel Contact" quick-action query (`findPartnersNearPointForDispatch`) still has no
+  availability/membership filter — flagged in the original audit, not part of the map ask.
+
+## ADR-067: Ride cancellation lifecycle implemented — schema enum and code both existed, nothing ever triggered the transition
+
+- **Context.** The Community audit (ADR-064's companion report) found `TripStatus.CANCELLED` and
+  dashboard "Cancelled"/"Completed" tabs already existed, but zero code anywhere ever set a
+  `Trip.status` to `CANCELLED` — there was no cancel endpoint at all. `getRideStatsForUser`'s
+  `ridesCancelled` field (already returned by the API) counts `TripParticipant.status ===
+  "CANCELLED"` (an individual leaving a ride) — a different, already-working concept, left
+  untouched.
+- **Decision.** Added the missing lifecycle end to end, reusing every adjacent piece that already
+  existed rather than inventing new ones:
+  - `cancelTrip(tripId)` (repository): `UPDATE ... WHERE status = 'UPCOMING'` — a conditional
+    update, not a plain one, mirroring `approveParticipantAtomically`'s existing idempotency
+    pattern; returns the row count so a double-submit or a cancel racing a completion both read
+    back as `NOT_UPCOMING` rather than silently double-processing.
+  - `TripApplication.cancelTrip(slug, userId, isAdmin, reason?)`: organizer-or-admin only: on
+    success, locks the Ride Room conversation (new `ConversationLookupPort.setLocked`, backed by
+    the same underlying write moderation's admin-lock uses) and posts a system message
+    announcing it *before* locking (visible in history); notifies every approved member and every
+    still-pending requester (the latter has no other way to learn the ride they applied to is
+    gone) via a new `TRIP_CANCELLED` notification type — added to `NotificationType` (`@bikie/
+    types`) and to both hand-duplicated copies of that union that already existed
+    (`notification.repository.ts`'s `NotificationTypeValue`, the Postgres `NotificationType` enum
+    itself) and to both Android-notification-channel mappings that already existed and already
+    carried an explicit "keep in sync" comment (`push-channel.ts` and Flutter's
+    `push_channels.dart`) — routed into the existing `ride_channel`, not the default one.
+  - `POST /api/trips/[slug]/cancel` (web) + `TripRepository.cancelTrip` (mobile) — both call the
+    identical shared endpoint. Added a "Cancel Ride" control to both platforms' organizer-facing
+    trip detail view (web: inline two-step confirm in `RideActionsPanel.tsx`; mobile: a native
+    confirmation `AlertDialog`), since neither had one.
+  - Discovery automatically excludes a cancelled ride once this ships — `findTrips`' existing
+    `status: "UPCOMING"` default filter already did the right thing, it just never had a
+    `CANCELLED` row to exclude before now. The dashboard's "Cancelled" tab
+    (`dashboard/trips/page.tsx`) was already correctly wired to bucket by `status` client-side —
+    also just never had a real row to show.
+  - **Incidental fix, found while checking migration status for this work**: a *prior* session's
+    migration (`20260820090000_rider_vehicle_registration_number`, ADR-059) had been committed to
+    the repo but never actually applied to the live database — `RiderProfile.vehicleRegistrationNumber`
+    genuinely did not exist as a column, `prisma migrate status` confirmed it directly against the
+    live DB. Purely additive/nullable, so applied it together with this work's own new migration
+    (`ALTER TYPE "NotificationType" ADD VALUE 'TRIP_CANCELLED'`) via `prisma migrate deploy`, then
+    regenerated the Prisma client. Flagging here since it was a live, latent gap (any query
+    explicitly selecting that column would have failed with a real SQL error) unrelated to this
+    ADR's own scope — same "committed but never deployed" failure mode as ADR-060's cron gap.
+- **Consequences.** Added 6 new `cancelTrip` application tests (not-found, forbidden, admin
+  override, the idempotency 0-rows case, full success path asserting lock+system-message+
+  notifications+actor-dedup, and the no-conversation-yet case) plus 3 new mobile repository tests.
+  `pnpm openapi:generate` re-run for the new route (145 routes, from 144). `pnpm -w run test`
+  232/232, `tsc --noEmit` clean across every touched package, `flutter analyze` clean (one
+  pre-existing unrelated info lint), `flutter test` 115/115. Not yet addressed: rescheduling still
+  has no notification/validation (P2, separate item), and pending `TripParticipant` rows on a
+  cancelled trip are left as-is rather than explicitly transitioned — harmless since
+  `evaluateJoinRequest`'s trip-status check already blocks any further action on them.
+
+## ADR-068: P2 fixes from the Community audit — destination filter, reschedule validation/notification, leave-ride notification, rate limiting
+
+- **Context.** Closing out the remaining items from the ADR-064 audit, in the requested priority
+  order.
+- **Decision.**
+  1. **Destination filter.** `findTrips`' `destination` filter matched only the legacy relational
+     `destination.slug` link, which ADR-037 stopped populating at ride creation (organizers now
+     type a freeform `destinationName`) — the filter had been matching zero post-ADR-037 rides.
+     The filter dropdown still legitimately offers the curated catalog as a list of place names,
+     so the fix resolves the selected slug to that destination's display name and matches
+     `destinationName` case-insensitively against it, OR'd with the legacy relational link for any
+     trip that still has one.
+  2. **Reschedule validation.** `createTripSchema`/`updateTripSchema` gained a shared
+     `refineDateOrder` check (`endDate` must be after `startDate`) — but a partial update can
+     change just one date, which the schema alone can't validate against the trip's own other
+     date. `TripApplication.update` now re-derives the effective start/end (incoming value or the
+     trip's current one) and rejects `INVALID_DATES` if still inverted. Also added
+     `SEATS_BELOW_APPROVED`: shrinking `seatsTotal` below the already-approved count is now
+     rejected outright (previously it silently left `seatsLeft` inconsistent — more "left" than
+     the new total allowed, while still letting new riders join past the organizer's actual
+     intent). `seatsLeft` is now explicitly recomputed alongside any `seatsTotal` change.
+  3. **Reschedule notification.** A date change now sends a direct `TRIP_RESCHEDULED` notification
+     to every approved member (excluding the organizer), not just a system chat message they might
+     not have open — mirroring the pattern ADR-067's cancellation notification already
+     established. A non-date field edit keeps the existing chat-message-only behavior unchanged.
+  4. **Leave-ride notification.** Leaving an APPROVED spot now also notifies the organizer directly
+     (reused the existing generic `"SYSTEM"` notification type rather than adding a new enum value
+     for a single, low-frequency event) — previously only a system chat message existed, easy to
+     miss. Withdrawing a still-`PENDING` request (never occupied a seat) still doesn't notify,
+     matching the existing scope of the seat-related side effects.
+  5. **Rate limiting.** Added `enforceRateLimit` to `POST /api/trips` (10/hour) and
+     `POST /api/trips/[slug]/requests` (20/10min) — both previously unlimited despite the same
+     utility already guarding message-send and SOS-alert-create elsewhere in the codebase.
+- **Consequences.** `TRIP_RESCHEDULED` added to `NotificationType` (`@bikie/types`, the
+  hand-duplicated `notification.repository.ts` copy, the Postgres enum via a new migration, and
+  both Android-channel mappings) — same four-places pattern ADR-067's `TRIP_CANCELLED` addition
+  established. Added 9 new tests (destination filter has no direct unit — covered by the
+  `findTrips` repository function's own behavior, not separately mocked — the rest: 7 for
+  `update()`'s validation/reschedule paths, 2 for `leaveRide`'s new notification). `pnpm -w run
+  test` 241/241, `tsc --noEmit` clean on every touched package, `flutter analyze`/`flutter test`
+  115/115 (no mobile code touched — every P2 fix is server-side and reached identically by both
+  clients through the same endpoints). **Found but out of this ADR's scope**: mobile has no
+  edit/reschedule UI at all (no `updateTrip` method, no edit screen) — the reschedule fix is
+  fully correct and reachable from web today, but a mobile organizer currently has no way to
+  reschedule a ride in the first place. Flagged for a decision, not built unprompted, since it's a
+  new mobile feature rather than a fix to something that already existed there.

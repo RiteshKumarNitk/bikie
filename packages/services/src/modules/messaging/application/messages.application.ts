@@ -117,6 +117,17 @@ export function createMessagesApplication(ports: MessagingPorts) {
         attachments?: Parameters<MessagingPorts["store"]["sendMessage"]>[0]["attachments"];
       },
     ) {
+      // Same membership check `getMessages` already applies on read — a non-participant gets
+      // the same "not found" shape rather than a distinguishable 403, so probing a conversation
+      // id can't confirm it exists. No admin override here (unlike getMessages' moderation-view
+      // path): there's no existing precedent for an admin injecting messages into a conversation
+      // they aren't part of, so this stays strict.
+      const participant = await ports.store.isParticipant(conversationId, senderId);
+      if (!participant) return { ok: false as const, reason: "NOT_FOUND" as const };
+
+      const locked = await ports.store.isConversationLocked(conversationId);
+      if (locked) return { ok: false as const, reason: "LOCKED" as const };
+
       const status = await ports.accountStatus.getAccountStatus(senderId);
       if (isAccountMuted(status ?? {})) return { ok: false as const, reason: "MUTED" as const };
 

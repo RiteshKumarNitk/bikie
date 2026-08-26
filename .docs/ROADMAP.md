@@ -1,5 +1,26 @@
 # BIKIE — Roadmap
 
+## Community Audit Cleanup: Destination Filter, Reschedule, Leave Notification, Rate Limiting (2026-08-21, ADR-068)
+Closed out the remaining P2 items from the Community audit. The Discover page's destination
+filter had been silently matching zero rides since an earlier change let organizers type a
+destination name freely instead of picking from the curated catalog — fixed to match on the
+freeform name. Rescheduling a ride now validates the new date range and actually notifies
+approved members instead of relying on a chat message. Leaving an approved spot now notifies the
+organizer directly. Ride creation and join requests are now rate-limited like every other
+write action in the app. Found but not built: mobile has no edit/reschedule UI at all — flagged
+for a separate decision rather than added unprompted. See ADR-068.
+
+## Community/Provider-Location Audit → Security Fixes, Nearby-Providers Map, Ride Cancellation (2026-08-21, ADR-065/066/067)
+A full functional audit of Rider Community and Service Provider location (parallel to the SOS
+audit above) found three real security gaps, fixed first: chat messages could be sent into any
+conversation without membership, a locked conversation didn't actually stop accepting messages,
+and a public ride's exact meeting point and member list were visible to anyone. Then built the
+requested "nearby Service Providers" map by extending components that already existed —
+Leaflet/flutter_map on OpenStreetMap, no Google Maps, no paid subscription — with marker detail
+popups, an eligibility filter, and a "business location, not live GPS" disclaimer. Then
+implemented ride cancellation end to end, the one feature the audit found completely missing
+despite the schema and dashboard UI already expecting it. See ADR-065/066/067.
+
 ## Full SOS Dispatch Audit: Who Gets Notified, Confirmed Correct (2026-08-21, ADR-064)
 Audited SOS dispatch end-to-end against the intended rule (every alert reaches both nearby Riders
 and nearby Service Providers). Found the code already correctly narrows this to Amber/Assistance

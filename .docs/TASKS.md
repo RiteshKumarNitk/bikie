@@ -2,6 +2,29 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## P0/P1 fixes from the Community/Provider-location audit (2026-08-21, ADR-065/066/067)
+
+Following the ADR-064 audit: fixed the security gaps first, then built the nearby-providers map,
+then implemented ride cancellation (the audit's confirmed-missing feature). P2 items (destination
+filter, reschedule validation/notifications, leave-ride notifications, rate limiting) tracked
+separately below.
+
+| Task | Status |
+|---|---|
+| P0: `sendMessage` now requires real conversation membership (404, not a silent free-for-all) | Completed |
+| P0: conversation lock (`isLocked`) now actually enforced at message-send time | Completed |
+| P0: `GET /api/trips/[slug]` redacts exact meeting coordinates + member roster for non-participants, mirroring the existing SOS redaction pattern; general discovery info stays public | Completed |
+| P1: Nearby Service Providers map — extended the *existing* Leaflet(web)/flutter_map(mobile)+OSM components with marker detail popups, an eligibility filter (`eligibleOnly`, reuses `/api/partners/nearby`), and a "business location, not live GPS" disclaimer. No Google Maps, no new map package | Completed |
+| P1: Ride cancellation lifecycle — cancel endpoint (organizer/admin), Ride Room lock + system message, notifications to members and pending requesters, automatic exclusion from discovery, Cancel Ride UI on both platforms | Completed |
+| Incidental: applied a prior session's never-deployed migration (`vehicleRegistrationNumber` column, ADR-059) found while checking migration status for this work — was silently missing from the live DB | Completed |
+| `pnpm -w run test` 232/232, `tsc --noEmit` clean on every touched package, `flutter analyze`/`flutter test` 115/115, `pnpm openapi:generate` re-run | Completed |
+| P2: destination filter fixed (matched a legacy relation ADR-037 stopped populating) | Completed |
+| P2: reschedule validation (`INVALID_DATES`, `SEATS_BELOW_APPROVED`) + a real `TRIP_RESCHEDULED` notification to approved members | Completed |
+| P2: leave-ride now also notifies the organizer directly, not just a chat message | Completed |
+| P2: rate limiting added to `POST /api/trips` and `POST /api/trips/[slug]/requests` | Completed |
+| `pnpm -w run test` 241/241, `tsc --noEmit` clean, `flutter analyze`/`flutter test` 115/115 (all P2 fixes are server-side, reached identically by both clients) | Completed |
+| Found, not built: mobile has no edit/reschedule UI at all for organizers — a new feature, not a fix, so left for a separate decision | **Not done** — flagged for the user |
+
 ## Full SOS dispatch audit — confirmed correct, closed a documentation/test gap (2026-08-21, ADR-064)
 
 Requested a full audit of who actually receives an SOS alert (code, not docs) and whether it

@@ -145,6 +145,14 @@ class TripRepository {
     });
   }
 
+  /// Organizer (or admin) cancellation — locks the Ride Room, notifies every approved member
+  /// and pending requester, and moves the trip out of every discover/upcoming list.
+  Future<void> cancelTrip(String slug, {String? reason}) {
+    return apiGuard(() async {
+      await _dio.post('/api/trips/$slug/cancel', data: {if (reason != null && reason.isNotEmpty) 'reason': reason});
+    });
+  }
+
   /// `GET /api/trips/[slug]/group` — the ride's group-chat conversation id.
   /// Returns `null` if no one has been approved yet (`404 NOT_STARTED`),
   /// rather than surfacing that as an error — it's an expected pre-chat state.

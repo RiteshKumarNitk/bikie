@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-21T13:20:32.276Z",
-  "count": 144,
+  "generatedAt": "2026-08-25T17:05:02.169Z",
+  "count": 145,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -1017,6 +1017,14 @@
       ],
       "auth": "public-or-unclassified",
       "file": "apps/web/app/api/testimonials/route.ts"
+    },
+    {
+      "path": "/api/trips/{slug}/cancel",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/trips/[slug]/cancel/route.ts"
     },
     {
       "path": "/api/trips/{slug}/group",

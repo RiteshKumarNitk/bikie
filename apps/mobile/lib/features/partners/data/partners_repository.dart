@@ -16,12 +16,21 @@ class PartnersRepository {
 
   final Dio _dio;
 
-  Future<List<NearbyPartner>> findNearby(double latitude, double longitude, {String? type}) {
+  /// `eligibleOnly` applies the same availability + active-membership rule SOS dispatch already
+  /// uses, so a rider looking for help on the map isn't shown an offline/lapsed provider as a
+  /// live option.
+  Future<List<NearbyPartner>> findNearby(
+    double latitude,
+    double longitude, {
+    String? type,
+    bool eligibleOnly = false,
+  }) {
     return apiGuard(() async {
       final res = await _dio.get('/api/partners/nearby', queryParameters: {
         'lat': latitude,
         'lng': longitude,
         if (type != null) 'type': type,
+        if (eligibleOnly) 'eligibleOnly': 'true',
       });
       return (res.data['partners'] as List).map((e) => NearbyPartner.fromJson(e as Map<String, dynamic>)).toList();
     });

@@ -1,5 +1,27 @@
 # BIKIE Changelog
 
+## 2026-08-21 — Fixed destination filter, reschedule validation/notification, leave-ride notification, added rate limiting (ADR-068)
+
+The Discover page's destination filter had been silently matching zero rides since organizers
+started typing a destination name freely instead of picking from the curated catalog — fixed to
+match on the freeform name. Rescheduling now validates the new date range and notifies approved
+members directly instead of relying on a chat message they might not see; shrinking seat capacity
+below the already-approved count is now rejected instead of leaving the count inconsistent.
+Leaving an approved spot now also notifies the organizer. Ride creation and join requests are now
+rate-limited like every other write in the app. Full details in ADR-068.
+
+## 2026-08-21 — Fixed 3 security gaps, added a nearby-providers map, implemented ride cancellation (ADR-065/066/067)
+
+A full audit of Rider Community and Service Provider location found and fixed three real security
+gaps: chat messages could be sent into any conversation without membership, a locked conversation
+didn't actually stop accepting new messages, and a ride's exact meeting point and member list were
+publicly visible before anyone had joined. Then built the requested Nearby Service Providers map
+by extending the Leaflet/flutter_map + OpenStreetMap components that already existed — no Google
+Maps, no paid subscription — with marker popups, an availability/membership filter, and a
+"business location, not live GPS" disclaimer. Then implemented ride cancellation end to end: the
+schema and dashboard UI already expected it, but nothing had ever wired it up. Full details in
+ADR-065/066/067.
+
 ## 2026-08-21 — Full SOS dispatch audit: confirmed correct, closed a documentation/test gap (ADR-064)
 
 Audited SOS dispatch end-to-end from code against the rule "every alert reaches both nearby

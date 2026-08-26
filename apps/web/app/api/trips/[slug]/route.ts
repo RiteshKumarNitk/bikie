@@ -2,17 +2,23 @@ import { NextResponse } from "next/server";
 import { TripService } from "@bikie/services";
 import { updateTripSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
+import { getServerSession } from "@/lib/get-session";
 
-// Public, read-only ride detail with a dynamic `[slug]` segment — not eagerly
-// prerendered at build (no generateStaticParams), so a bare `revalidate` here is
-// enough for ISR without the build-time DB risk that fixed-path list routes have
-// (see apps/web/app/api/categories/route.ts). PATCH below is a mutation and is
-// never cached regardless of this setting.
-export const revalidate = 60;
-
+// Public, read-only ride detail with a dynamic `[slug]` segment. Staying public/unauthenticated
+// is deliberate (discovery), but the exact meeting point and member roster are not discovery
+// information — TripService.getBySlug redacts those to null/absent for any caller who isn't the
+// organizer, an approved member, or an admin (see rides-community/domain/visibility.ts). Reads
+// the session directly (not requireSession(), which would 401 an anonymous browser) purely to
+// know which viewer is asking. No `revalidate`/ISR here on purpose now that the response depends
+// on viewer identity — a cached response could otherwise serve one viewer's redacted (or
+// privileged) view to a different viewer. PATCH below is a mutation and was never cached anyway.
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const trip = await TripService.getBySlug(slug);
+  const session = await getServerSession();
+  const trip = await TripService.getBySlug(slug, {
+    userId: session?.user.id ?? null,
+    isAdmin: session?.user.role === "ADMIN",
+  });
   if (!trip) {
     return NextResponse.json({ error: "Trip not found" }, { status: 404 });
   }

@@ -324,7 +324,14 @@ export async function findPartnersNearPoint(
   latitude: number,
   longitude: number,
   radiusMeters: number,
-  options: { type?: string; take?: number } = {},
+  /** `eligibleOnly` applies the exact same business rule the SOS dispatch query
+   * (`findEligiblePartnersNearPoint`) already uses — currently `isAvailable` + an active
+   * `PartnerMembership` — so a caller like the "nearby providers" map can show only providers a
+   * rider could actually reach right now, without duplicating that eligibility definition.
+   * Defaults to off (unchanged behavior) since this endpoint also backs a general public
+   * directory listing where showing an offline/lapsed-membership partner with a badge, rather
+   * than hiding them outright, is the existing, intended UX. */
+  options: { type?: string; take?: number; eligibleOnly?: boolean } = {},
 ) {
   const partners = await prisma.partner.findMany({
     where: {
@@ -332,6 +339,12 @@ export async function findPartnersNearPoint(
       longitude: { not: null },
       verificationStatus: { not: "SUSPENDED" },
       ...(options.type ? { type: options.type as any } : {}),
+      ...(options.eligibleOnly
+        ? {
+            isAvailable: true,
+            user: { partnerMembership: { some: { status: "ACTIVE", endDate: { gte: new Date() } } } },
+          }
+        : {}),
     },
     select: {
       id: true,

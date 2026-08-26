@@ -44,7 +44,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
   const result = await MessageService.sendMessage(id, session.user.id, parsed.data);
   if (!result.ok) {
-    return NextResponse.json({ error: result.reason }, { status: 403 });
+    const status = result.reason === "NOT_FOUND" ? 404 : 403;
+    return NextResponse.json({ error: result.reason }, { status });
   }
   return NextResponse.json({ message: result.message });
 }

@@ -57,12 +57,23 @@ export function NearbyPartnersPanel() {
         const { latitude, longitude } = pos.coords;
         setCenter({ latitude, longitude });
         try {
-          const res = await fetch(`/api/partners/nearby?lat=${latitude}&lng=${longitude}`);
+          // eligibleOnly: same availability + active-membership rule SOS dispatch already uses —
+          // a rider looking for help on a map shouldn't be shown an offline or lapsed provider as
+          // a live option.
+          const res = await fetch(`/api/partners/nearby?lat=${latitude}&lng=${longitude}&eligibleOnly=true`);
           if (!res.ok) throw new Error("Failed");
           const data: { partners: NearbyPartner[] } = await res.json();
           setPartners(data.partners ?? []);
           setPins(
-            (data.partners ?? []).map((p) => ({ id: p.id, name: p.businessName, latitude: p.latitude, longitude: p.longitude })),
+            (data.partners ?? []).map((p) => ({
+              id: p.id,
+              name: p.businessName,
+              latitude: p.latitude,
+              longitude: p.longitude,
+              typeLabel: TYPE_LABEL[p.type] ?? p.type,
+              isAvailable: p.isAvailable,
+              distanceMeters: p.distanceMeters,
+            })),
           );
         } catch {
           setError("Couldn't load nearby service providers. Please try again.");
@@ -81,8 +92,9 @@ export function NearbyPartnersPanel() {
     <div className="rounded-2xl border border-foreground/10 bg-card p-6">
       <p className="text-lg font-semibold">Service providers near you</p>
       <p className="mt-1 text-sm text-foreground/50">
-        See BIKIE's registered mechanics, fuel delivery, and rental partners on a map — each with
-        its verification status, so you know exactly who's been checked by BIKIE.
+        See BIKIE's currently available mechanics, fuel delivery, and rental partners on a map —
+        each with its verification status, so you know exactly who's been checked by BIKIE.
+        Markers show each provider's registered business location, not a live GPS position.
       </p>
 
       <button
@@ -99,10 +111,13 @@ export function NearbyPartnersPanel() {
       {partners && !loading && (
         <div className="mt-4 space-y-3">
           {partners.length === 0 ? (
-            <p className="text-sm text-foreground/50">No registered service providers found nearby yet.</p>
+            <p className="text-sm text-foreground/50">No available service providers found nearby right now.</p>
           ) : (
             <>
               <PartnersMap pins={pins} center={center ?? undefined} height="18rem" />
+              <p className="text-xs text-foreground/40">
+                📍 Pins mark each provider's business location, not their live position. Tap a pin for details.
+              </p>
               <div className="space-y-2">
                 {partners.map((p) => (
                   <div

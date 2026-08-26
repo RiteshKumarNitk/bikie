@@ -23,6 +23,7 @@ export async function GET(request: Request) {
     lat: url.searchParams.get("lat") ?? undefined,
     lng: url.searchParams.get("lng") ?? undefined,
     type: url.searchParams.get("type") ?? undefined,
+    eligibleOnly: url.searchParams.get("eligibleOnly") ?? undefined,
   });
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
 
   const partners = await PartnerService.findNearby(parsed.data.lat, parsed.data.lng, SEARCH_RADIUS_METERS, {
     type: parsed.data.type,
+    eligibleOnly: parsed.data.eligibleOnly,
   });
   return NextResponse.json({ partners });
 }

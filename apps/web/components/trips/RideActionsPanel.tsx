@@ -179,6 +179,68 @@ function RiderPanel({ tripSlug, tripId, seatsLeft }: { tripSlug: string; tripId:
   );
 }
 
+function CancelRideControl({ tripSlug }: { tripSlug: string }) {
+  const router = useRouter();
+  const [confirming, setConfirming] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const toast = useToast();
+
+  async function cancelRide() {
+    setCancelling(true);
+    try {
+      const res = await fetch(`/api/trips/${tripSlug}/cancel`, { method: "POST" });
+      if (!res.ok) {
+        toast.error("Couldn't cancel this ride. Please try again.");
+        return;
+      }
+      toast.success("Ride cancelled");
+      router.push("/dashboard/trips?tab=cancelled");
+      router.refresh();
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  if (confirming) {
+    return (
+      <div className="mb-3 rounded-xl border border-red-500/20 bg-red-500/5 p-3">
+        <p className="text-xs text-foreground/70">
+          This cancels the ride for everyone, locks the Ride Room chat, and notifies every approved
+          member and pending requester. This can&apos;t be undone.
+        </p>
+        <div className="mt-2 flex gap-2">
+          <button
+            type="button"
+            onClick={cancelRide}
+            disabled={cancelling}
+            className="flex-1 rounded-lg bg-red-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-600 disabled:opacity-50"
+          >
+            {cancelling ? "Cancelling…" : "Yes, cancel ride"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirming(false)}
+            disabled={cancelling}
+            className="flex-1 rounded-lg border border-foreground/10 px-3 py-1.5 text-xs hover:bg-foreground/5 disabled:opacity-50"
+          >
+            Back
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setConfirming(true)}
+      className="mb-3 w-full rounded-xl border border-red-500/20 px-6 py-3 text-center text-sm font-semibold text-red-400 hover:bg-red-500/5"
+    >
+      Cancel Ride
+    </button>
+  );
+}
+
 function OrganizerPanel({ tripSlug }: { tripSlug: string }) {
   const [requests, setRequests] = useState<RideRequest[] | undefined>(undefined);
   const [decidingId, setDecidingId] = useState<string | null>(null);
@@ -213,6 +275,7 @@ function OrganizerPanel({ tripSlug }: { tripSlug: string }) {
       >
         Edit Ride
       </Link>
+      <CancelRideControl tripSlug={tripSlug} />
       <GroupChatLink tripSlug={tripSlug} />
       <p className="mt-4 text-sm font-medium">Join Requests</p>
       {requests === undefined ? (

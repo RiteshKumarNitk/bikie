@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { TripService } from "@bikie/services";
 import { joinRequestSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
+import { enforceRateLimit } from "@/lib/rate-limit";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { session, error } = await requireSession();
@@ -20,6 +21,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
 export async function POST(req: Request, { params }: { params: Promise<{ slug: string }> }) {
   const { session, error } = await requireSession();
   if (error) return error;
+
+  // Generous for a rider genuinely browsing and requesting several rides, blocks a bulk-spam
+  // loop against every ride on the platform — mirrors the pattern already used for trip-create.
+  const rateLimitError = await enforceRateLimit("trip-join-request", session.user.id, {
+    requests: 20,
+    windowSeconds: 600,
+  });
+  if (rateLimitError) return rateLimitError;
 
   const { slug } = await params;
   const body = await req.json();

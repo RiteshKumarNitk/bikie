@@ -50,6 +50,8 @@ class PushChannels {
       case 'RIDE_REQUEST_REJECTED':
       case 'RIDE_ANNOUNCEMENT':
       case 'GROUP_JOIN_APPROVED':
+      case 'TRIP_CANCELLED':
+      case 'TRIP_RESCHEDULED':
         return ride.id;
       default:
         return general.id;

@@ -50,11 +50,13 @@ export function setRidesCommunityModuleForTests(module: RidesCommunityModule | n
 
 export type { RidesCommunityPorts, TripListFilters } from "./ports";
 export type {
+  CancelTripResult,
   DecideRequestResult,
   GetGroupResult,
   GetRequestsResult,
   LeaveRideResult,
   RequestToJoinResult,
+  UpdateTripResult,
 } from "./application/trip.application";
 export type { RideRoomResult } from "./application/ride-room.application";
 export {
@@ -66,3 +68,5 @@ export {
 export { resolveRideRoomAccess, canManageRideRoom } from "./domain/room-access";
 export type { RideRoomRole } from "./domain/room-access";
 export { DEFAULT_TRIP_IMAGE } from "./domain/defaults";
+export { redactTripDetailForViewer } from "./domain/visibility";
+export type { TripViewer } from "./domain/visibility";

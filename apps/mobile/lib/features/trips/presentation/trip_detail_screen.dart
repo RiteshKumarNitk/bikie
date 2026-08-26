@@ -348,18 +348,67 @@ const _StatusBanner(
   }
 }
 
-class _OrganizerPanel extends ConsumerWidget {
+class _OrganizerPanel extends ConsumerStatefulWidget {
   const _OrganizerPanel({required this.trip});
 
   final TripDetail trip;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_OrganizerPanel> createState() => _OrganizerPanelState();
+}
+
+class _OrganizerPanelState extends ConsumerState<_OrganizerPanel> {
+  bool _cancelling = false;
+
+  Future<void> _cancelRide() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel this ride?'),
+        content: const Text(
+          'This cancels the ride for everyone, locks the Ride Room chat, and notifies every '
+          "approved member and pending requester. This can't be undone.",
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Back')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Yes, cancel ride', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _cancelling = true);
+    try {
+      await ref.read(tripRepositoryProvider).cancelTrip(widget.trip.slug);
+      ref.invalidate(tripDetailProvider(widget.trip.slug));
+      if (mounted) context.pop();
+    } on ApiException catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final trip = widget.trip;
     final requestsAsync = ref.watch(rideRequestsForProvider(trip.slug));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        OutlinedButton(
+          onPressed: _cancelling ? null : _cancelRide,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Theme.of(context).colorScheme.error,
+            side: BorderSide(color: Theme.of(context).colorScheme.error.withValues(alpha: 0.4)),
+          ),
+          child: Text(_cancelling ? 'Cancelling…' : 'Cancel Ride'),
+        ),
+        const SizedBox(height: 8),
         _GroupChatLink(slug: trip.slug),
         const SizedBox(height: 16),
         Text('Join Requests', style: Theme.of(context).textTheme.titleMedium),

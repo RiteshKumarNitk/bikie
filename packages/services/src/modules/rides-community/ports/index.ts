@@ -97,6 +97,11 @@ export interface TripRepositoryPort {
   cancelParticipant(participantId: string): Promise<void>;
   incrementSeatsLeft(tripId: string): Promise<void>;
   findConversationIdForTrip(tripId: string): Promise<string | null>;
+  /** Guarded by `WHERE status: "UPCOMING"` — returns how many rows actually transitioned (0 means
+   * it was already cancelled/completed by the time this ran), the same conditional-update
+   * idempotency pattern `approveParticipantAtomically` already uses. */
+  cancelTrip(tripId: string): Promise<number>;
+  findPendingRequesterIds(tripId: string): Promise<string[]>;
   approveParticipantAtomically(participantId: string, organizerId: string): Promise<ApproveAtomicResult>;
   getRoomInfo(tripId: string): Promise<{
     meetingPoint: string | null;
@@ -161,6 +166,9 @@ export interface UnreadMessagesPort {
 export interface ConversationLookupPort {
   getById(conversationId: string): Promise<{ isLocked: boolean } | null>;
   getOtherParticipantIds(conversationId: string, excludeUserId: string): Promise<string[]>;
+  /** Locks/unlocks the Ride Room's conversation — used on ride cancellation so the chat stops
+   * accepting new messages once there's nothing left to coordinate. */
+  setLocked(conversationId: string, lockedById: string, locked: boolean): Promise<void>;
 }
 
 export interface SystemMessagePort {

@@ -7,6 +7,7 @@ import {
   evaluateJoinRequest,
   evaluateLeaveRide,
 } from "../domain/participation";
+import { redactTripDetailForViewer, type TripViewer } from "../domain/visibility";
 
 export type RequestToJoinResult =
   | { ok: true }
@@ -17,6 +18,14 @@ export type DecideRequestResult =
   | { ok: false; reason: "NOT_FOUND" | "FORBIDDEN" | "ALREADY_DECIDED" | "NO_SEATS" };
 
 export type LeaveRideResult = { ok: true } | { ok: false; reason: "TRIP_NOT_FOUND" | "NOT_A_PARTICIPANT" };
+
+export type CancelTripResult =
+  | { ok: true }
+  | { ok: false; reason: "TRIP_NOT_FOUND" | "FORBIDDEN" | "NOT_UPCOMING" };
+
+export type UpdateTripResult =
+  | { ok: true; trip: TripSummaryDTO }
+  | { ok: false; reason: "NOT_FOUND" | "FORBIDDEN" | "INVALID_DATES" | "SEATS_BELOW_APPROVED" };
 
 export type GetRequestsResult =
   | { ok: true; requests: RideJoinRequestDTO[] }
@@ -32,8 +41,10 @@ export function createTripApplication(ports: RidesCommunityPorts) {
       return ports.trips.findTrips(tab, filters);
     },
 
-    getBySlug(slug: string) {
-      return ports.trips.findBySlug(slug);
+    async getBySlug(slug: string, viewer: TripViewer = { userId: null, isAdmin: false }) {
+      const trip = await ports.trips.findBySlug(slug);
+      if (!trip) return null;
+      return redactTripDetailForViewer(trip, viewer);
     },
 
     getRequestedBy(userId: string) {
@@ -114,10 +125,31 @@ export function createTripApplication(ports: RidesCommunityPorts) {
       });
     },
 
-    async update(slug: string, userId: string, input: UpdateTripInput) {
+    async update(slug: string, userId: string, input: UpdateTripInput): Promise<UpdateTripResult> {
       const trip = await ports.trips.findBySlug(slug);
-      if (!trip) return { ok: false as const, reason: "NOT_FOUND" };
-      if (trip.organizer.id !== userId) return { ok: false as const, reason: "FORBIDDEN" };
+      if (!trip) return { ok: false, reason: "NOT_FOUND" };
+      if (trip.organizer.id !== userId) return { ok: false, reason: "FORBIDDEN" };
+
+      // The Zod schema only catches an inverted date range when BOTH dates arrive in the same
+      // request — a partial reschedule of just one date needs the trip's own current other date
+      // to check against, which only the application layer (not the schema) has.
+      const effectiveStart = new Date(input.startDate ?? trip.startDate);
+      const effectiveEnd = new Date(input.endDate ?? trip.endDate);
+      if (effectiveEnd.getTime() <= effectiveStart.getTime()) {
+        return { ok: false, reason: "INVALID_DATES" };
+      }
+
+      // Shrinking capacity below what's already committed would otherwise leave `seatsLeft`
+      // inconsistent (more "left" than `seatsTotal` allows) and still silently let new riders
+      // join past the organizer's actual intent — reject outright instead of clamping quietly.
+      const approvedCount = trip.members?.length ?? 0;
+      if (input.seatsTotal !== undefined && input.seatsTotal < approvedCount) {
+        return { ok: false, reason: "SEATS_BELOW_APPROVED" };
+      }
+
+      const isReschedule =
+        (input.startDate !== undefined && input.startDate !== trip.startDate) ||
+        (input.endDate !== undefined && input.endDate !== trip.endDate);
 
       const updated = await ports.trips.updateTrip(slug, {
         title: input.title,
@@ -127,20 +159,48 @@ export function createTripApplication(ports: RidesCommunityPorts) {
         difficulty: input.difficulty as never,
         price: input.price,
         seatsTotal: input.seatsTotal,
+        // Recomputed alongside seatsTotal, not left stale — see the SEATS_BELOW_APPROVED guard
+        // above for why this can never go negative.
+        seatsLeft: input.seatsTotal !== undefined ? input.seatsTotal - approvedCount : undefined,
         meetingPoint: input.meetingPoint,
         meetingLat: input.meetingLat,
         meetingLng: input.meetingLng,
-        startDate: input.startDate ? new Date(input.startDate) : undefined,
-        endDate: input.endDate ? new Date(input.endDate) : undefined,
+        startDate: input.startDate ? effectiveStart : undefined,
+        endDate: input.endDate ? effectiveEnd : undefined,
         destinationName: input.destinationName,
         destinationId: input.destinationId,
       });
 
       const conversationId = await ports.trips.findConversationIdForTrip(trip.id);
       if (conversationId) {
-        await ports.systemMessages.create(conversationId, `The ride details were updated by the organizer.`, {
-          event: "TRIP_UPDATED",
-        });
+        await ports.systemMessages.create(
+          conversationId,
+          isReschedule
+            ? `The organizer rescheduled this ride to ${effectiveStart.toDateString()} – ${effectiveEnd.toDateString()}.`
+            : "The ride details were updated by the organizer.",
+          { event: "TRIP_UPDATED", rescheduled: isReschedule },
+        );
+      }
+
+      // A reschedule changes whether a member can actually show up — worth a direct notification,
+      // not just a chat message they might not see. Other field-only edits keep the existing
+      // chat-message-only behavior (title/price/meeting-point tweaks aren't as consequential).
+      if (isReschedule) {
+        const approvedMemberIds = (trip.members ?? []).map((m) => m.id).filter((id) => id !== userId);
+        await Promise.all(
+          approvedMemberIds.map((memberId) =>
+            ports.notifications
+              .notify(
+                memberId,
+                "TRIP_RESCHEDULED",
+                "Ride rescheduled",
+                `"${trip.title}" was rescheduled to ${effectiveStart.toDateString()} – ${effectiveEnd.toDateString()}.`,
+                "Trip",
+                trip.slug,
+              )
+              .catch(console.error),
+          ),
+        );
       }
 
       return { ok: true as const, trip: updated };
@@ -261,7 +321,72 @@ export function createTripApplication(ports: RidesCommunityPorts) {
             userName,
           });
         }
+        // Previously only surfaced as a chat message the organizer might not have open — a
+        // direct notification so a freed-up seat is actually noticed. Reuses the generic
+        // "SYSTEM" type rather than adding a new one for a single, low-frequency event.
+        await ports.notifications
+          .notify(
+            trip!.organizer.id,
+            "SYSTEM",
+            "A rider left your ride",
+            `${userName} left "${trip!.title}". A seat has opened up.`,
+            "Trip",
+            trip!.slug,
+          )
+          .catch(console.error);
       }
+
+      return { ok: true };
+    },
+
+    /**
+     * Organizer (or admin) cancellation. Guarded by `cancelTrip`'s `WHERE status: "UPCOMING"`
+     * conditional update (0 rows changed → `NOT_UPCOMING`, whether that's because it was already
+     * cancelled by a duplicate request or because it already completed) — the same idempotency
+     * shape `approveParticipantAtomically` already uses elsewhere in this file, so a double-tap
+     * or retried network request can't cancel-then-cancel-again into an inconsistent state.
+     *
+     * Ride Room behavior after cancellation: the conversation is locked (no new messages —
+     * `sendMessage`'s `isConversationLocked` check now has a real trigger) and a system message
+     * announces it before locking, so it's visible in history. Every approved member AND every
+     * still-pending requester is notified — a pending request has no other way to learn the ride
+     * it applied to is gone.
+     */
+    async cancelTrip(slug: string, userId: string, isAdmin = false, reason?: string): Promise<CancelTripResult> {
+      const trip = await ports.trips.findBySlug(slug);
+      if (!trip) return { ok: false, reason: "TRIP_NOT_FOUND" };
+      if (trip.organizer.id !== userId && !isAdmin) return { ok: false, reason: "FORBIDDEN" };
+
+      const cancelledCount = await ports.trips.cancelTrip(trip.id);
+      if (cancelledCount === 0) return { ok: false, reason: "NOT_UPCOMING" };
+
+      const conversationId = await ports.trips.findConversationIdForTrip(trip.id);
+      if (conversationId) {
+        await ports.systemMessages.create(
+          conversationId,
+          reason ? `This ride was cancelled by the organizer: ${reason}` : "This ride has been cancelled by the organizer.",
+          { event: "TRIP_CANCELLED", reason: reason ?? null },
+        );
+        await ports.conversations.setLocked(conversationId, userId, true);
+      }
+
+      const pendingRequesterIds = await ports.trips.findPendingRequesterIds(trip.id);
+      const recipientIds = new Set([...(trip.members ?? []).map((m) => m.id), ...pendingRequesterIds]);
+      recipientIds.delete(userId);
+      await Promise.all(
+        [...recipientIds].map((recipientId) =>
+          ports.notifications
+            .notify(
+              recipientId,
+              "TRIP_CANCELLED",
+              "Ride cancelled",
+              `"${trip.title}" was cancelled by the organizer.`,
+              "Trip",
+              trip.slug,
+            )
+            .catch(console.error),
+        ),
+      );
 
       return { ok: true };
     },

@@ -65,7 +65,20 @@ export async function findTrips(tab?: string, filters?: TripFilters) {
           : {};
 
   if (filters?.destination) {
-    where.destination = { slug: filters.destination };
+    // ADR-037: ride creation only ever sets the freeform `destinationName`, never the curated
+    // catalog's `destinationId` — matching on the relation alone (as this used to) matches zero
+    // trips created since then. The filter dropdown still offers the curated catalog (it's a
+    // reasonable list of place names to filter by), so resolve the selected slug to that
+    // destination's display name and match `destinationName` case-insensitively against it —
+    // OR'd with the legacy relational link, in case any older trip still has one.
+    const selected = await prisma.destination.findUnique({
+      where: { slug: filters.destination },
+      select: { name: true },
+    });
+    where.OR = [
+      { destination: { slug: filters.destination } },
+      ...(selected ? [{ destinationName: { equals: selected.name, mode: "insensitive" as const } }] : []),
+    ];
   }
   if (filters?.difficulty) {
     where.difficulty = filters.difficulty as never;
@@ -268,6 +281,25 @@ export async function updateTrip(slug: string, data: Partial<Omit<Prisma.TripUnc
     include: { destination: true },
   });
   return toSummary(trip);
+}
+
+/** Guarded by `WHERE status: "UPCOMING"` (not a plain update) so a double-submit or a cancel
+ * racing a completion can't both "succeed" — mirrors `approveParticipantAtomically`'s conditional-
+ * update idempotency pattern. Returns the number of rows actually transitioned. */
+export async function cancelTrip(tripId: string): Promise<number> {
+  const result = await prisma.trip.updateMany({
+    where: { id: tripId, status: "UPCOMING" },
+    data: { status: "CANCELLED" },
+  });
+  return result.count;
+}
+
+export async function findPendingRequesterIds(tripId: string): Promise<string[]> {
+  const rows = await prisma.tripParticipant.findMany({
+    where: { tripId, status: "PENDING" },
+    select: { userId: true },
+  });
+  return rows.map((r) => r.userId);
 }
 
 export async function getRoomInfo(tripId: string) {

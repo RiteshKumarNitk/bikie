@@ -41,6 +41,8 @@ export function createTripRepositoryAdapter(): TripRepositoryPort {
     },
     incrementSeatsLeft: (tripId) => tripRepository.incrementSeatsLeft(tripId),
     findConversationIdForTrip: (tripId) => tripRepository.findConversationIdForTrip(tripId),
+    cancelTrip: (tripId) => tripRepository.cancelTrip(tripId),
+    findPendingRequesterIds: (tripId) => tripRepository.findPendingRequesterIds(tripId),
     approveParticipantAtomically: (participantId, organizerId) =>
       tripRepository.approveParticipantAtomically(participantId, organizerId),
     getRoomInfo: (tripId) => tripRepository.getRoomInfo(tripId),
@@ -78,6 +80,8 @@ export function createConversationLookupAdapter(): ConversationLookupPort {
     },
     getOtherParticipantIds: (conversationId, excludeUserId) =>
       messageRepository.getOtherParticipantIds(conversationId, excludeUserId),
+    setLocked: (conversationId, lockedById, locked) =>
+      messageRepository.setConversationLocked(conversationId, lockedById, locked),
   };
 }
 

@@ -15,7 +15,9 @@ export function channelIdForNotificationType(type: string): string {
     type === "RIDE_REQUEST_APPROVED" ||
     type === "RIDE_REQUEST_REJECTED" ||
     type === "RIDE_ANNOUNCEMENT" ||
-    type === "GROUP_JOIN_APPROVED"
+    type === "GROUP_JOIN_APPROVED" ||
+    type === "TRIP_CANCELLED" ||
+    type === "TRIP_RESCHEDULED"
   ) {
     return "ride_channel";
   }

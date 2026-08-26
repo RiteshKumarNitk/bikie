@@ -70,7 +70,7 @@ export const PartnerService = {
     latitude: number,
     longitude: number,
     radiusMeters: number,
-    options?: { type?: string; take?: number },
+    options?: { type?: string; take?: number; eligibleOnly?: boolean },
   ): Promise<NearbyPartnerRow[]> {
     return getPartnersModule().partners.findNearby(latitude, longitude, radiusMeters, options);
   },

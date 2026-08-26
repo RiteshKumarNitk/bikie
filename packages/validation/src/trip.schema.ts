@@ -34,10 +34,27 @@ function refineMeetingPin(data: { meetingLat?: number; meetingLng?: number }, ct
   }
 }
 
-export const createTripSchema = z.object(tripFields).superRefine(refineMeetingPin);
+/** Only catches the case both dates are present in the same payload — always true for create,
+ * only sometimes true for a partial update (e.g. rescheduling just `endDate` while `startDate`
+ * stays whatever it already is in the DB). The application layer's `update()` re-checks against
+ * the trip's actual current dates for the partial case, so order is enforced either way. */
+function refineDateOrder(data: { startDate?: string; endDate?: string }, ctx: z.RefinementCtx) {
+  if (!data.startDate || !data.endDate) return;
+  if (new Date(data.endDate).getTime() <= new Date(data.startDate).getTime()) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["endDate"], message: "endDate must be after startDate" });
+  }
+}
+
+export const createTripSchema = z.object(tripFields).superRefine((data, ctx) => {
+  refineMeetingPin(data, ctx);
+  refineDateOrder(data, ctx);
+});
 export type CreateTripInput = z.infer<typeof createTripSchema>;
 
-export const updateTripSchema = z.object(tripFields).partial().superRefine(refineMeetingPin);
+export const updateTripSchema = z.object(tripFields).partial().superRefine((data, ctx) => {
+  refineMeetingPin(data, ctx);
+  refineDateOrder(data, ctx);
+});
 export type UpdateTripInput = z.infer<typeof updateTripSchema>;
 
 export const joinRequestSchema = z.object({
@@ -45,3 +62,9 @@ export const joinRequestSchema = z.object({
 });
 
 export type JoinRequestInput = z.infer<typeof joinRequestSchema>;
+
+export const cancelTripSchema = z.object({
+  reason: z.string().max(300).optional(),
+});
+
+export type CancelTripInput = z.infer<typeof cancelTripSchema>;

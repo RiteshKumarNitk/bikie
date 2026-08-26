@@ -1,11 +1,14 @@
 import {
   getRidesCommunityModule,
+  type CancelTripResult,
   type DecideRequestResult,
   type GetGroupResult,
   type GetRequestsResult,
   type LeaveRideResult,
   type RequestToJoinResult,
   type TripListFilters,
+  type TripViewer,
+  type UpdateTripResult,
 } from "./modules/rides-community/public";
 import type {
   MyRideRequestStatusDTO,
@@ -17,12 +20,15 @@ import type {
 import type { CreateTripInput, UpdateTripInput } from "@bikie/validation";
 
 export type {
+  CancelTripResult,
   DecideRequestResult,
   GetGroupResult,
   GetRequestsResult,
   LeaveRideResult,
   RequestToJoinResult,
   TripListFilters,
+  TripViewer,
+  UpdateTripResult,
 };
 
 /** Compatibility facade — routes keep importing TripService. */
@@ -31,8 +37,8 @@ export const TripService = {
     return getRidesCommunityModule().trips.getByTab(tab, filters);
   },
 
-  getBySlug(slug: string): Promise<TripDetailDTO | null> {
-    return getRidesCommunityModule().trips.getBySlug(slug);
+  getBySlug(slug: string, viewer?: TripViewer): Promise<TripDetailDTO | null> {
+    return getRidesCommunityModule().trips.getBySlug(slug, viewer);
   },
 
   getRequestedBy(userId: string): Promise<TripSummaryDTO[]> {
@@ -63,7 +69,7 @@ export const TripService = {
     return getRidesCommunityModule().trips.create(organizerId, input);
   },
 
-  update(slug: string, userId: string, input: UpdateTripInput) {
+  update(slug: string, userId: string, input: UpdateTripInput): Promise<UpdateTripResult> {
     return getRidesCommunityModule().trips.update(slug, userId, input);
   },
 
@@ -89,6 +95,10 @@ export const TripService = {
 
   leaveRide(slug: string, userId: string, userName: string): Promise<LeaveRideResult> {
     return getRidesCommunityModule().trips.leaveRide(slug, userId, userName);
+  },
+
+  cancelTrip(slug: string, userId: string, isAdmin = false, reason?: string): Promise<CancelTripResult> {
+    return getRidesCommunityModule().trips.cancelTrip(slug, userId, isAdmin, reason);
   },
 
   getGroup(slug: string, userId: string): Promise<GetGroupResult> {
