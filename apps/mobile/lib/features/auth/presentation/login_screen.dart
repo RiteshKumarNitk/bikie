@@ -16,10 +16,16 @@ import 'widgets/resend_countdown.dart';
 
 const _noAccountError = 'NO_ACCOUNT';
 
-/// `/login` — phone + OTP is the primary path (ADR-013), mirroring the web
-/// exactly down to the "Log in with email instead" fallback (the seeded
-/// admin account, and any account that predates phone login, has no
-/// `phoneNumber` at all).
+/// ADR-071 — the mobile app is Rider / Service Provider only and, for this phase,
+/// login is **phone + OTP only**. Email/password sign-in is hidden: set this back
+/// to `true` to restore the "Log in with email instead" fallback for legacy
+/// accounts that predate phone login. The `_emailSignIn` handler and the email
+/// sub-form are left intact and dormant behind this flag — not deleted.
+/// Intentionally a mutable top-level (not `const`) so the gated code isn't dead.
+bool mobileEmailLoginEnabled = false;
+
+/// `/login` — phone + OTP (ADR-013). Email/password login is gated off for this
+/// phase (see `mobileEmailLoginEnabled`).
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -287,18 +293,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                         ),
                       ],
                       if (_mode == 'phone' && _step == 'phone') ...[
-                        Align(
-                          alignment: Alignment.centerLeft,
-                          child: TextButton(
-                            style: TextButton.styleFrom(padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
-                            onPressed: () => setState(() {
-                              _mode = 'email';
-                              _error = null;
-                            }),
-                            child: const Text('Admin or existing email? Log in with email instead', style: TextStyle(fontSize: 12)),
+                        if (mobileEmailLoginEnabled) ...[
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton(
+                              style: TextButton.styleFrom(padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
+                              onPressed: () => setState(() {
+                                _mode = 'email';
+                                _error = null;
+                              }),
+                              child: const Text('Have an email account? Log in with email instead',
+                                  style: TextStyle(fontSize: 12)),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 12),
+                          const SizedBox(height: 12),
+                        ],
                         PhoneNumberField(
                           onLocalNumberChanged: (v) => _localNumber = v,
                         ),

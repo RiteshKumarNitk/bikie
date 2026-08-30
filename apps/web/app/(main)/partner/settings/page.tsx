@@ -30,7 +30,7 @@ export default async function PartnerSettingsPage() {
         <p className="font-semibold">Notifications</p>
         <p className="mt-2 text-sm text-foreground/60">
           This is what SOS assistance requests and other alerts on the web use to reach you — with
-          this off, they only reach you by SMS/WhatsApp/email, never in-browser.
+          this off, they only reach you by SMS/email, never in-browser.
         </p>
         <div className="mt-4">
           <PushNotificationToggle />

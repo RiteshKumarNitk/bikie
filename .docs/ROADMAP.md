@@ -1,5 +1,38 @@
 # BIKIE — Roadmap
 
+## Phase Scoping: WhatsApp Hidden, Admin Removed From The Flutter App (2026-08-30, ADR-071)
+Two scope calls. WhatsApp is out of the current phase — hidden from every user-facing flow (the
+OTP delivery-channel toggle and the SOS/settings copy that claimed WhatsApp was used) behind a
+single flag, with all the adapter/service plumbing and env var names left intact and dormant for
+a later phase. The Flutter app is now Rider / Service Provider only, and mobile login is
+phone + OTP only — the "Log in with email instead" fallback (an admin-adjacent path) is hidden
+behind a flag, with the email sub-form and sign-in handler left dormant, and the defensive admin
+branch on the SOS detail screen is removed. The Web Admin panel is completely untouched. No
+schema, migration, env, or payment changes. See ADR-071.
+
+## Membership Billing: Immutable Invoices, Receipts, Payment History (2026-08-30, ADR-070)
+Membership purchases now leave a permanent, per-payment receipt. One immutable `MembershipInvoice`
+per activation (both account types) stores a snapshot of exactly what was charged — amount,
+currency, plan name, duration, membership dates, payer name/phone — so a later admin change to a
+plan's price or duration never rewrites history. New user-scoped API (`/api/billing/history`,
+`/api/billing/invoices/[id]`, `…/receipt`) with a printable HTML receipt (no PDF library), and
+read-only payment-history UI on both web and Flutter. Invoice creation is idempotent (a replayed
+payment yields the same single invoice), and the Rider confirmation SMS now fires after the
+invoice and records that it was sent. Nothing else changed — dynamic plan pricing, server-side
+order amounts, signature verification and the ADR-069 duplicate guards were all reused as-is.
+Still Milestone 4: the Razorpay webhook / async reconciliation, refunds, and mobile native
+checkout. See ADR-070.
+
+## Membership Payment Hardening: Idempotency, One-Active-Membership Guard, Production Dev-Mode Gate (2026-08-30, ADR-069)
+A read-only audit of the existing Razorpay membership flow (ADR-043/051) found three real gaps
+short of the Milestone-4 payments work. Fixed all three: a replayed Razorpay callback (or a
+double-submit) can no longer create a second membership — the payment id and order id are now
+unique in the database and the service returns the existing row on replay; a user who already
+holds an active membership is rejected with 409 instead of stacking another; and a production
+deploy that forgot to set the Razorpay keys now returns 503 rather than handing out free
+memberships through the dev-only simulated checkout. Still deferred to Milestone 4: the Razorpay
+webhook, a payments ledger table, mobile native checkout, and a renewal flow. See ADR-069.
+
 ## Community Audit Cleanup: Destination Filter, Reschedule, Leave Notification, Rate Limiting (2026-08-21, ADR-068)
 Closed out the remaining P2 items from the Community audit. The Discover page's destination
 filter had been silently matching zero rides since an earlier change let organizers type a

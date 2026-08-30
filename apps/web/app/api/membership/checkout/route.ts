@@ -20,6 +20,14 @@ export async function POST(request: Request) {
   }
 
   if (!RazorpayService.isConfigured()) {
+    // ADR-069 — in production, unconfigured Razorpay means payments are unavailable, not that
+    // the simulated (no-charge) checkout should stand in. Only dev/preview falls back.
+    if (!RazorpayService.isDevFallbackAllowed()) {
+      return NextResponse.json(
+        { error: "PAYMENTS_UNAVAILABLE", message: "Payments are temporarily unavailable. Please try again later." },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ razorpayConfigured: false });
   }
 

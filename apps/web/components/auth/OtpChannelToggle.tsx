@@ -8,9 +8,19 @@ interface Props {
   disabled?: boolean;
 }
 
+/**
+ * ADR-071 — WhatsApp is out of scope for the current phase. Flip this back to `true` to
+ * restore the WhatsApp OTP delivery option (the `retryOtp`/`OtpChannel` plumbing in
+ * `use-msg91-widget.ts` and `Msg91OtpRepository` is left intact and dormant). While `false`,
+ * SMS is the only channel and this control renders nothing (there is no choice to make).
+ */
+const WHATSAPP_OTP_ENABLED = false;
+
 const OPTIONS: { value: OtpChannel; label: string }[] = [
   { value: "sms", label: "📱 SMS" },
-  { value: "whatsapp", label: "🟢 WhatsApp" },
+  ...(WHATSAPP_OTP_ENABLED
+    ? ([{ value: "whatsapp", label: "🟢 WhatsApp" }] as { value: OtpChannel; label: string }[])
+    : []),
 ];
 
 /** ADR-057 — lets the user pick which channel their OTP arrives on, shared by `/login` and
@@ -18,6 +28,7 @@ const OPTIONS: { value: OtpChannel; label: string }[] = [
  * through the "otp" step too, since `retryOtp` (Resend) still reads it and can switch channel
  * on a resend even if the first send already went out on the other one. */
 export function OtpChannelToggle({ value, onChange, disabled }: Props) {
+  if (OPTIONS.length < 2) return null;
   return (
     <div className="flex items-center gap-2" role="radiogroup" aria-label="OTP delivery method">
       <span className="text-xs font-medium text-foreground/50">Send code via</span>

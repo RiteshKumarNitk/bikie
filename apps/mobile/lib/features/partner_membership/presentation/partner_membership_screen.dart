@@ -83,6 +83,15 @@ class PartnerMembershipScreen extends ConsumerWidget {
                 ),
               ),
             ],
+            const SizedBox(height: 8),
+            // ADR-070 — read-only payment / invoice history.
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.receipt_long_outlined),
+              title: const Text('Payment history'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => context.push('/billing'),
+            ),
           ],
         ),
       ),

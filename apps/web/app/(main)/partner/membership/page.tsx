@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PaymentModal } from "@/components/membership/PaymentModal";
+import { BillingHistory } from "@/components/membership/BillingHistory";
 
 interface Plan {
   id: string;
@@ -209,6 +210,13 @@ export default function PartnerMembershipPage() {
           <Link href="/partner" className="text-accent-text hover:underline">← Back to Partner Dashboard</Link>
         </p>
       )}
+
+      <section className="mt-12">
+        <h2 className="text-lg font-semibold">Payment history</h2>
+        <div className="mt-4">
+          <BillingHistory />
+        </div>
+      </section>
 
       {checkoutPlan && (
         <PaymentModal

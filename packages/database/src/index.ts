@@ -12,6 +12,7 @@ export * as adminRepository from "./repositories/admin.repository";
 export * as messageRepository from "./repositories/message.repository";
 export * as membershipRepository from "./repositories/membership.repository";
 export * as partnerMembershipRepository from "./repositories/partner-membership.repository";
+export * as billingRepository from "./repositories/billing.repository";
 export * as sosRepository from "./repositories/sos.repository";
 export * as sosSessionRepository from "./repositories/sos-session.repository";
 export * as sosTimelineRepository from "./repositories/sos-timeline.repository";

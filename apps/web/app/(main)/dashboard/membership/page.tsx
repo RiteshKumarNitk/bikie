@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { Skeleton } from "@bikie/ui";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { BillingHistory } from "@/components/membership/BillingHistory";
 
 interface Membership {
   id: string;
@@ -38,6 +39,12 @@ export default function DashboardMembershipPage() {
             actionLabel="View Membership Plans"
           />
         </div>
+        <section className="mt-10">
+          <h2 className="text-lg font-semibold">Payment history</h2>
+          <div className="mt-4">
+            <BillingHistory />
+          </div>
+        </section>
       </div>
     );
   }
@@ -77,6 +84,13 @@ export default function DashboardMembershipPage() {
           </ul>
         </div>
       </div>
+
+      <section className="mt-10">
+        <h2 className="text-lg font-semibold">Payment history</h2>
+        <div className="mt-4">
+          <BillingHistory />
+        </div>
+      </section>
     </div>
   );
 }

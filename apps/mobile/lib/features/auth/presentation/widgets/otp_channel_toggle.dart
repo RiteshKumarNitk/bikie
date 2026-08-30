@@ -1,12 +1,15 @@
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../../data/msg91_otp_repository.dart';
 
-/// ADR-057 — mirrors `apps/web/components/auth/OtpChannelToggle.tsx`. WhatsApp is disabled in
-/// debug builds: debug mode uses the backend-proxied native-API OTP path (preserved for the
-/// dev-bypass/test-number mechanisms — see `Msg91OtpRepository`'s doc comment), which only
-/// supports SMS, not the MSG91 Widget SDK's channels.
+/// ADR-071 — WhatsApp is out of scope for the current phase. Set this back to `true` to
+/// restore the WhatsApp OTP delivery option (mirrors `WHATSAPP_OTP_ENABLED` in
+/// `apps/web/components/auth/OtpChannelToggle.tsx`). While `false`, SMS is the only channel and
+/// this control renders nothing; the `OtpChannel`/`retryOtp` plumbing stays intact and dormant.
+/// Intentionally a mutable top-level (not `const`) so the disabled branch isn't dead code.
+bool otpWhatsAppChannelEnabled = false;
+
+/// ADR-057 — mirrors `apps/web/components/auth/OtpChannelToggle.tsx`.
 class OtpChannelToggle extends StatelessWidget {
   const OtpChannelToggle({super.key, required this.value, required this.onChanged, this.enabled = true});
 
@@ -16,7 +19,7 @@ class OtpChannelToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final whatsappAvailable = !kDebugMode;
+    if (!otpWhatsAppChannelEnabled) return const SizedBox.shrink();
     return Row(
       children: [
         Text('Send code via', style: Theme.of(context).textTheme.labelSmall),
@@ -28,14 +31,11 @@ class OtpChannelToggle extends StatelessWidget {
           onTap: () => onChanged(OtpChannel.sms),
         ),
         const SizedBox(width: 6),
-        Tooltip(
-          message: whatsappAvailable ? '' : 'WhatsApp OTP requires a release build',
-          child: _ChannelChip(
-            label: '🟢 WhatsApp',
-            selected: value == OtpChannel.whatsapp,
-            enabled: enabled && whatsappAvailable,
-            onTap: () => onChanged(OtpChannel.whatsapp),
-          ),
+        _ChannelChip(
+          label: '🟢 WhatsApp',
+          selected: value == OtpChannel.whatsapp,
+          enabled: enabled,
+          onTap: () => onChanged(OtpChannel.whatsapp),
         ),
       ],
     );

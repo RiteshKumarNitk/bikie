@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-25T17:05:02.169Z",
-  "count": 145,
+  "generatedAt": "2026-08-30T08:32:33.678Z",
+  "count": 148,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -387,6 +387,30 @@
       ],
       "auth": "public-or-unclassified",
       "file": "apps/web/app/api/bikes/route.ts"
+    },
+    {
+      "path": "/api/billing/history",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/billing/history/route.ts"
+    },
+    {
+      "path": "/api/billing/invoices/{id}/receipt",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/billing/invoices/[id]/receipt/route.ts"
+    },
+    {
+      "path": "/api/billing/invoices/{id}",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/billing/invoices/[id]/route.ts"
     },
     {
       "path": "/api/bookings",

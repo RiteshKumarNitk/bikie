@@ -72,7 +72,7 @@ const _themes = {
     color: _redColor,
     confirmTitle: 'RED ALERT — Are you sure?',
     confirmBody:
-        'This immediately alerts your emergency contacts and nearby BIKIE riders, sharing your live GPS via SMS and WhatsApp.',
+        'This immediately alerts your emergency contacts and nearby BIKIE riders, sharing your live GPS via SMS.',
     sendLabel: 'Yes, Send Alert Now',
   ),
   _AlertKind.amber: _KindTheme(
@@ -82,7 +82,7 @@ const _themes = {
     categories: _amberCategories,
     color: _amberColor,
     confirmTitle: 'AMBER ALERT — What do you need?',
-    confirmBody: 'Select your situation. BIKIE alerts nearby service providers and riders with your GPS via SMS and WhatsApp.',
+    confirmBody: 'Select your situation. BIKIE alerts nearby service providers and riders with your GPS via SMS.',
     sendLabel: 'Send Amber Alert',
   ),
 };
@@ -571,7 +571,7 @@ class _DispatchReport extends StatelessWidget {
     ];
     final off = [
       if (d.channels?.sms != true) 'SMS',
-      if (d.channels?.whatsapp != true) 'WhatsApp',
+      // ADR-071 — WhatsApp is out of scope this phase; not reported as a misconfigured channel.
       if (d.channels?.email != true) 'email',
     ];
 

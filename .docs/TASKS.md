@@ -2,6 +2,70 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Phase scoping: WhatsApp hidden (kept dormant), Admin removed from the Flutter app (2026-08-30, ADR-071)
+
+Actioned two product-scope calls after the payment/membership audit. Non-destructive: WhatsApp
+plumbing stays intact behind flags for a future phase; Web Admin is untouched.
+
+| Task | Status |
+|---|---|
+| WhatsApp OTP toggle hidden — `WHATSAPP_OTP_ENABLED` (web `OtpChannelToggle.tsx`) + `otpWhatsAppChannelEnabled` (mobile `otp_channel_toggle.dart`), both `false`; control renders nothing, SMS-only; `OtpChannel`/`retryOtp` plumbing left dormant | Completed |
+| WhatsApp copy removed — SOS confirm-body + RED/AMBER `channels` lists (web `PanicAlertCards.tsx`, mobile `send_sos_sheet.dart`), partner Settings blurb, and the "channel not configured" report line | Completed |
+| WhatsApp adapter/service/facade/`wa.me` fallback/env var names — left as-is (dormant; `isConfigured()` already `false`, SOS dispatch never calls `.send()`) | Completed (no change) |
+| Mobile login is now phone + OTP only — the "Log in with email instead" fallback is hidden behind `mobileEmailLoginEnabled` (`false`) in `login_screen.dart`; the `_emailSignIn` handler + email sub-form + `AuthRepository.signIn` left dormant for a flag flip; `me?.role == 'ADMIN'` branch removed from `sos_detail_screen.dart` (now reporter-gated, pure Rider/SP) | Completed |
+| Mobile — `UserModel.role` field and `RideRoom.canManage`'s ride-room-scoped `role == 'ADMIN'` left as-is (DTO mirror, not account detection) | Completed (no change) |
+| Web Admin (21 pages, 39 `/api/admin/*` routes) | Untouched |
+| Verification: `apps/web` `tsc --noEmit` clean; `next build` 165/165; backend `vitest` 261/261 (no backend touched); `flutter analyze` unchanged (1 pre-existing unrelated `http` info); `flutter test` 119/119 | Completed |
+| Not done: payment/Razorpay/invoice/webhook/renewal work from the audit — blocked on the §15 client decisions | Blocked |
+
+## Membership billing: immutable invoices, unified `/api/billing/*`, HTML receipts, web + Flutter history (2026-08-30, ADR-070)
+
+Audit against a full production-ready payment/invoice/SMS spec. Everything except the
+payment/invoice record already existed and was reused unchanged (dynamic DB plan config,
+server-side pricing, signature verification, ADR-069 idempotency/ALREADY_ACTIVE/prod-gate,
+ADR-058 Rider SMS). Built the missing piece: one immutable receipt per activation with a
+purchase-time snapshot, a user-scoped history/receipt API, and read-only history UI on both
+platforms.
+
+| Task | Status |
+|---|---|
+| Schema: `MembershipInvoice` model + `InvoiceStatus` enum; `paymentId`/`razorpayPaymentId`/`userMembershipId`/`partnerMembershipId` each `@unique`; snapshot columns (amount/currency/planName/durationDays/membership window/customer name+phone); `confirmationSmsSentAt` marker | Completed |
+| Migration `20260830120000_membership_invoice` (additive: enum + table + 3 FKs; hand-written, matches `prisma migrate diff` output) | Completed — **NOT applied** (generated only; apply on explicit go-ahead) |
+| `billingRepository` — `createInvoice` (idempotent per membership id + payment id, `P2002`-safe, `BIKIE-<year>-<6 digit>` receipt no with retry), `listForUser`, `findByIdForUser` (returns `null` for not-found AND not-owner), `markConfirmationSmsSent` (no-op if already stamped) | Completed |
+| `isUniqueViolation` extracted to `packages/database/src/lib/prisma-errors.ts` (was duplicated in the two membership repos by ADR-069) | Completed |
+| `MembershipService`/`PartnerMembershipService.purchaseMembership` — write the invoice after `createMembership`; Rider SMS moved after the invoice and now stamps `confirmationSmsSentAt` only on a non-failing send; SP path writes an invoice, sends no SMS; free-tier writes a ₹0 invoice | Completed |
+| `BillingService` (read facade) + `GET /api/billing/history`, `/api/billing/invoices/[id]`, `/api/billing/invoices/[id]/receipt` (inline printable HTML from `apps/web/lib/receipt-html.ts`, no PDF lib) | Completed |
+| Web: shared `BillingHistory` component on `/dashboard/membership` + `/partner/membership`; "View receipt" opens the HTML route | Completed |
+| Flutter: read-only `features/billing/` (repository + providers + history list + native receipt view, plain-class models — `build_runner` is broken on this toolchain); `/billing` + `/billing/:id` routes; "Payment history" tile on both membership screens | Completed |
+| Types: `InvoiceSummaryDTO`/`InvoiceDetailDTO`/`BillingHistoryDTO` in `@bikie/types` | Completed |
+| Tests: `billing.repository.test.ts` (receipt no format, snapshot immutability, idempotency, `P2002` recovery, IDOR ownership), route test (`invoices/[id]` — auth + 404-not-403 for another user), updated `membership.service.test.ts` (+ dynamic pricing, invoice snapshot args, SMS exactly-once, SMS-failure-doesn't-stamp/doesn't-roll-back, replay/ALREADY_ACTIVE write no invoice), new `partner-membership.service.test.ts` (SP invoice, free-tier ₹0, no Rider SMS), Flutter `billing_repository_test.dart` | Completed |
+| `pnpm openapi:generate` re-run (145 → 148 routes) | Completed |
+| Verification: backend `vitest` 261/261 (22 files); `tsc --noEmit` clean on types/validation/utils/database/services/web; `next build` green (3 new `ƒ` routes); `flutter test` 119/119; `flutter analyze` — 1 pre-existing unrelated `http`-import info, 0 in new code | Completed |
+| Not built (Milestone 4): Razorpay webhook + async reconciliation (a checkout the browser never confirms leaves no invoice), refund flow (`InvoiceStatus.REFUNDED` enum unused), confirmation-SMS retry job (marker is in place), mobile native `razorpay_flutter` checkout | Deferred |
+| Live end-to-end against real Razorpay + MSG91 | **Not done** — no credentials in this environment; verified by unit/build only |
+
+## Membership payment: idempotency + one-active-membership guard + production dev-mode gate (2026-08-30, ADR-069)
+
+Follow-up to a read-only audit of the ADR-043/051 Razorpay flow. Implemented the two hardening
+items that don't need Milestone-4 infra (webhook / payments ledger / mobile SDK stay unbuilt):
+replayed payments no longer mint duplicate memberships, an already-subscribed user can't stack a
+second membership, and a production deploy with unset Razorpay keys returns 503 instead of
+granting free memberships via the simulated checkout.
+
+| Task | Status |
+|---|---|
+| Schema: `UserMembership`/`PartnerMembership` `paymentId` + `razorpayOrderId` now `@unique` (nullable — free/legacy rows carry NULL, unaffected) | Completed |
+| Migration `20260830100000_membership_payment_idempotency` (4 × `CREATE UNIQUE INDEX`, hand-written per the ADR-043 precedent) | Completed — **not applied** (no DB creds in this env; apply on explicit go-ahead) |
+| `membershipRepository`/`partnerMembershipRepository`: new `findByPaymentReference`; `createMembership` catches `P2002` and returns the race winner's row | Completed |
+| `MembershipService`/`PartnerMembershipService.purchaseMembership` → discriminated result (`{ ok: true, membership } | { ok: false, reason: "ALREADY_ACTIVE" }`); idempotent replay returns the existing row and skips the confirmation SMS | Completed |
+| `RazorpayService.isDevFallbackAllowed()` (`NODE_ENV !== "production"`); all 4 checkout/purchase routes return `503 PAYMENTS_UNAVAILABLE` when unconfigured in prod — Service Provider free plan is checked first and never gated | Completed |
+| Routes map `ALREADY_ACTIVE` → `409 { error: "ALREADY_ACTIVE_MEMBERSHIP" }` | Completed |
+| Tests: `membership.service.test.ts` updated for the new result shape + 3 ADR-069 cases; new `partner-membership.service.test.ts` (3 cases). Full suite 241→247/247 (20 files); `tsc --noEmit` clean on `web`/`@bikie/services`/`@bikie/database` | Completed |
+| Docs: ADR-069, `API.md` (membership + partner-membership route rows), `ROADMAP.md`, `CHANGELOG.md` | Completed |
+| Not built (Milestone 4, per the audit): Razorpay webhook + signature verification, payments/transactions ledger table, mobile native `razorpay_flutter` checkout, renewal flow | Deferred |
+| Not built: `userId`-scoped active-membership uniqueness — two simultaneous first-time purchases with different payment ids still race past the service check; deliberate (collides with the future renewal/upgrade flow) | Deferred |
+| Excluded: membership-expiry cron — ADR-052 already closed this (lazy at query time) | N/A |
+
 ## P0/P1 fixes from the Community/Provider-location audit (2026-08-21, ADR-065/066/067)
 
 Following the ADR-064 audit: fixed the security gaps first, then built the nearby-providers map,

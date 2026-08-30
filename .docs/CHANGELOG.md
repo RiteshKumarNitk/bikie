@@ -1,5 +1,49 @@
 # BIKIE Changelog
 
+## 2026-08-30 — Phase scoping: WhatsApp hidden, Admin removed from the Flutter app (ADR-071)
+
+WhatsApp is out of the current phase and hidden from every user-facing flow: the OTP
+delivery-channel toggle on login/signup is gated off behind a single flag (SMS-only; control
+renders nothing), and the SOS confirm dialogs, panic-alert channel lists, and partner Settings
+copy no longer claim alerts go "via WhatsApp". The adapter, service, `wa.me` fallback, and every
+`WHATSAPP_*` env var name are left intact and dormant (SOS dispatch already sent no WhatsApp
+without credentials). The Flutter app is now Rider / Service Provider only. Mobile login is
+phone + OTP only — the "Log in with email instead" fallback is hidden behind a flag (the
+email/password sub-form and `AuthRepository.signIn` are left dormant for a one-line restore),
+and the `role == 'ADMIN'` branch on the SOS detail screen is removed. Web Admin is untouched.
+No schema, migration, env, or payment changes. Full details in ADR-071.
+
+## 2026-08-30 — Membership billing: immutable invoices, receipts, payment history (ADR-070)
+
+Membership purchases now produce a permanent receipt. Each activation writes one immutable
+`MembershipInvoice` (Rider or Service Provider) holding a purchase-time snapshot — amount,
+currency, plan name, duration, membership start/expiry, payer name and mobile — so a later admin
+change to a plan's price or duration never rewrites history. New user-scoped endpoints:
+`GET /api/billing/history`, `GET /api/billing/invoices/[id]`, and `…/receipt` (printable HTML,
+no PDF library). Another user's invoice id returns 404, not 403. Web adds a Payment history table
+on `/dashboard/membership` and `/partner/membership`; Flutter gets a read-only history + native
+receipt view. Invoice creation is idempotent (a replayed payment returns the same membership and
+the same single invoice); the Rider confirmation SMS fires after the invoice and records that it
+was sent (failed send left un-stamped for retry; never rolls back the purchase). Free Service
+Provider plan still activates with no payment and gets a ₹0 invoice. Migration
+`20260830120000_membership_invoice` is generated, NOT applied. Deferred to Milestone 4: Razorpay
+webhook / async reconciliation, refunds, mobile native checkout. Full details in ADR-070.
+
+## 2026-08-30 — Membership payment: idempotency, one-active-membership guard, production dev-mode gate (ADR-069)
+
+Follow-up to a read-only audit of the Razorpay membership flow. Three hardening fixes, no
+Milestone-4 payments infrastructure: (1) a replayed Razorpay callback or a double-submitted
+purchase can no longer mint a duplicate membership — `paymentId` and `razorpayOrderId` are now
+unique in the database, and `purchaseMembership` returns the existing membership on replay
+(without re-firing the confirmation SMS); (2) a user who already holds an active membership now
+gets `409 ALREADY_ACTIVE_MEMBERSHIP` instead of stacking a second one (the Service Provider
+free-tier "Activate" path is covered too); (3) when Razorpay keys are unset **and**
+`NODE_ENV=production`, the checkout/purchase routes return `503 PAYMENTS_UNAVAILABLE` rather than
+activating a membership from a client-supplied dummy `paymentId` — the simulated no-charge
+checkout is now dev/preview only. A free Service Provider plan still activates with no payment in
+any environment. Still deferred: Razorpay webhook, payments ledger, mobile native checkout,
+renewal flow. Full details in ADR-069.
+
 ## 2026-08-21 — Fixed destination filter, reschedule validation/notification, leave-ride notification, added rate limiting (ADR-068)
 
 The Discover page's destination filter had been silently matching zero rides since organizers

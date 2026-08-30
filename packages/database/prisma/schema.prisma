@@ -342,6 +342,7 @@ model User {
   messagesSent  Message[]
   membership    UserMembership[]
   partnerMembership PartnerMembership[]
+  membershipInvoices MembershipInvoice[]
   sosAlerts     SOSAlert[]
   sosResponses  SOSAlertResponse[]
   providerReviewsWritten ProviderReview[] @relation("ProviderReviewRider")
@@ -1023,11 +1024,17 @@ model UserMembership {
   startDate DateTime
   endDate   DateTime
   status    MembershipStatus @default(ACTIVE)
-  paymentId String?
+  // ADR-069: `@unique` (nullable — Postgres permits many NULLs, so free/legacy rows are
+  // unaffected) makes a replayed `/purchase` callback for the same payment idempotent at the
+  // DB level rather than minting a second membership.
+  paymentId String? @unique
   // ADR-043: Razorpay's own order id, kept alongside paymentId for support/reconciliation once
   // a purchase is a real, signature-verified payment rather than a client-supplied dummy string.
-  razorpayOrderId String?
+  // ADR-069: also `@unique` — one Razorpay order can activate at most one membership.
+  razorpayOrderId String? @unique
   createdAt DateTime         @default(now())
+  // ADR-070 — the immutable billing receipt for this activation (at most one).
+  invoice   MembershipInvoice?
 
   @@index([userId])
   @@index([status])
@@ -1064,13 +1071,73 @@ model PartnerMembership {
   startDate DateTime
   endDate   DateTime
   status    PartnerMembershipStatus  @default(ACTIVE)
-  paymentId String?
-  razorpayOrderId String?
+  // ADR-069 — payment idempotency, mirrors `UserMembership` (nullable unique: free-tier and
+  // grandfathered `legacy-free-partner-plan` rows carry NULL here and are unaffected).
+  paymentId String? @unique
+  razorpayOrderId String? @unique
   createdAt DateTime                 @default(now())
+  // ADR-070 — the immutable billing receipt for this activation (at most one).
+  invoice   MembershipInvoice?
 
   @@index([userId])
   @@index([status])
   @@map("partner_membership")
+}
+
+// --- Membership billing (ADR-070) ---
+// One immutable receipt per membership activation, for both account types. Every commercially
+// meaningful value (amount, currency, plan name, duration, membership window, payer identity) is
+// SNAPSHOT here at purchase time and never re-derived — an admin later changing a plan's price or
+// duration must not alter any historic invoice or membership. Exactly one of
+// `userMembershipId` / `partnerMembershipId` is set. `razorpayPaymentId` (real mode) and
+// `paymentId` (mirrors the membership row: the Razorpay payment id in real mode, a `DUMMY-…`
+// string in dev-fallback mode) are both `@unique`, so invoice creation is idempotent under a
+// replayed `/purchase` exactly like membership creation is (ADR-069).
+
+enum InvoiceStatus {
+  PAID
+  REFUNDED
+}
+
+model MembershipInvoice {
+  id          String      @id @default(cuid())
+  receiptNo   String      @unique
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accountType AccountType
+
+  userMembershipId    String?            @unique
+  userMembership      UserMembership?    @relation(fields: [userMembershipId], references: [id], onDelete: SetNull)
+  partnerMembershipId String?            @unique
+  partnerMembership   PartnerMembership? @relation(fields: [partnerMembershipId], references: [id], onDelete: SetNull)
+
+  // Snapshot at purchase time — never re-read from the plan.
+  planId              String
+  planName            String
+  amount              Decimal  @db.Decimal(10, 2)
+  currency            String   @default("INR")
+  durationDays        Int
+  membershipStartDate DateTime
+  membershipEndDate   DateTime
+
+  // Payer identity snapshot.
+  customerName  String
+  customerPhone String?
+
+  status            InvoiceStatus @default(PAID)
+  paymentId         String?  @unique
+  razorpayPaymentId String?  @unique
+  razorpayOrderId   String?
+  paidAt            DateTime
+
+  // Stamped once the DLT confirmation SMS is accepted by MSG91 — the persisted "sent exactly
+  // once" marker (ADR-058/070). NULL = not yet sent / send failed → safe to retry.
+  confirmationSmsSentAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("membership_invoice")
 }
 
 // --- SOS / Emergency ---

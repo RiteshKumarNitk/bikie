@@ -28,6 +28,14 @@ export async function POST(request: Request) {
   }
 
   if (!RazorpayService.isConfigured()) {
+    // ADR-069 — paid plan + unconfigured Razorpay in production = payments unavailable, not a
+    // free pass via simulated checkout. A free plan already returned above and is unaffected.
+    if (!RazorpayService.isDevFallbackAllowed()) {
+      return NextResponse.json(
+        { error: "PAYMENTS_UNAVAILABLE", message: "Payments are temporarily unavailable. Please try again later." },
+        { status: 503 },
+      );
+    }
     return NextResponse.json({ razorpayConfigured: false });
   }
 

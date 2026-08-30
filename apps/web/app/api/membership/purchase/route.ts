@@ -36,13 +36,28 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const membership = await MembershipService.purchaseMembership(
+    const result = await MembershipService.purchaseMembership(
       session.user.id,
       planId,
       razorpayPaymentId,
       razorpayOrderId,
     );
-    return NextResponse.json({ membership });
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: "ALREADY_ACTIVE_MEMBERSHIP", message: "You already have an active membership." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ membership: result.membership });
+  }
+
+  // ADR-069 — simulated-checkout path: never activate a membership from a client-supplied dummy
+  // paymentId in production (that would be a free membership for anyone). Dev/preview only.
+  if (!RazorpayService.isDevFallbackAllowed()) {
+    return NextResponse.json(
+      { error: "PAYMENTS_UNAVAILABLE", message: "Payments are temporarily unavailable. Please try again later." },
+      { status: 503 },
+    );
   }
 
   if (!paymentId) {
@@ -51,6 +66,12 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const membership = await MembershipService.purchaseMembership(session.user.id, planId, paymentId);
-  return NextResponse.json({ membership });
+  const result = await MembershipService.purchaseMembership(session.user.id, planId, paymentId);
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: "ALREADY_ACTIVE_MEMBERSHIP", message: "You already have an active membership." },
+      { status: 409 },
+    );
+  }
+  return NextResponse.json({ membership: result.membership });
 }

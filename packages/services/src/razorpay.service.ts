@@ -34,6 +34,16 @@ export const RazorpayService = {
     return credentials() !== null;
   },
 
+  /**
+   * ADR-069 — may the simulated / dummy-`paymentId` checkout still grant a membership when
+   * Razorpay is unconfigured? Only outside production. In production, missing keys means
+   * payments are genuinely unavailable, NOT "free" — the purchase/checkout routes return 503
+   * instead of accepting a client-supplied dummy payment.
+   */
+  isDevFallbackAllowed(): boolean {
+    return process.env.NODE_ENV !== "production";
+  },
+
   /** `amountRupees` — converted to paise (Razorpay's base unit) here so every caller works in
    * the same rupee amounts the rest of this codebase already uses (`MembershipPlan.price`). */
   async createOrder(amountRupees: number, receipt: string): Promise<RazorpayOrder | null> {

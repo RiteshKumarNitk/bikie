@@ -11,6 +11,7 @@ export { AdminService } from "./admin.service";
 export { MessageService } from "./message.service";
 export { MembershipService } from "./membership.service";
 export { PartnerMembershipService } from "./partner-membership.service";
+export { BillingService } from "./billing.service";
 export { AccountTypeRequestService } from "./account-type-request.service";
 export { RazorpayService } from "./razorpay.service";
 export { SOSService } from "./sos.service";

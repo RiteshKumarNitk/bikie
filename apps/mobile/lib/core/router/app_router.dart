@@ -9,6 +9,8 @@ import '../../features/auth/presentation/login_screen.dart';
 import '../../features/auth/presentation/signup_screen.dart';
 import '../../features/bikes/presentation/bike_detail_screen.dart';
 import '../../features/bikes/presentation/bikes_list_screen.dart';
+import '../../features/billing/presentation/billing_history_screen.dart';
+import '../../features/billing/presentation/invoice_detail_screen.dart';
 import '../../features/bookings/presentation/bookings_screen.dart';
 import '../../features/destinations/presentation/destination_detail_screen.dart';
 import '../../features/destinations/presentation/destinations_list_screen.dart';
@@ -170,6 +172,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/become-provider', builder: (context, state) => const BecomeProviderScreen()),
       GoRoute(path: '/membership', builder: (context, state) => const MembershipScreen()),
       GoRoute(path: '/partner-membership', builder: (context, state) => const PartnerMembershipScreen()),
+      // ADR-070 — read-only membership payment / invoice history (both account types).
+      GoRoute(path: '/billing', builder: (context, state) => const BillingHistoryScreen()),
+      GoRoute(
+        path: '/billing/:id',
+        builder: (context, state) => InvoiceDetailScreen(invoiceId: state.pathParameters['id']!),
+      ),
       GoRoute(path: '/referrals', builder: (context, state) => const ReferralsScreen()),
       GoRoute(path: '/account-type-request', builder: (context, state) => const AccountTypeRequestScreen()),
     ],

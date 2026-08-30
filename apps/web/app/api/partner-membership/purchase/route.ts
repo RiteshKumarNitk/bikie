@@ -26,8 +26,14 @@ export async function POST(request: Request) {
   }
 
   if (plan.price === 0) {
-    const membership = await PartnerMembershipService.purchaseMembership(session.user.id, planId);
-    return NextResponse.json({ membership });
+    const result = await PartnerMembershipService.purchaseMembership(session.user.id, planId);
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: "ALREADY_ACTIVE_MEMBERSHIP", message: "You already have an active membership." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ membership: result.membership });
   }
 
   if (RazorpayService.isConfigured()) {
@@ -48,13 +54,27 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
-    const membership = await PartnerMembershipService.purchaseMembership(
+    const result = await PartnerMembershipService.purchaseMembership(
       session.user.id,
       planId,
       razorpayPaymentId,
       razorpayOrderId,
     );
-    return NextResponse.json({ membership });
+    if (!result.ok) {
+      return NextResponse.json(
+        { error: "ALREADY_ACTIVE_MEMBERSHIP", message: "You already have an active membership." },
+        { status: 409 },
+      );
+    }
+    return NextResponse.json({ membership: result.membership });
+  }
+
+  // ADR-069 — simulated-checkout path: no dummy-paymentId activation in production.
+  if (!RazorpayService.isDevFallbackAllowed()) {
+    return NextResponse.json(
+      { error: "PAYMENTS_UNAVAILABLE", message: "Payments are temporarily unavailable. Please try again later." },
+      { status: 503 },
+    );
   }
 
   if (!paymentId) {
@@ -63,6 +83,12 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const membership = await PartnerMembershipService.purchaseMembership(session.user.id, planId, paymentId);
-  return NextResponse.json({ membership });
+  const result = await PartnerMembershipService.purchaseMembership(session.user.id, planId, paymentId);
+  if (!result.ok) {
+    return NextResponse.json(
+      { error: "ALREADY_ACTIVE_MEMBERSHIP", message: "You already have an active membership." },
+      { status: 409 },
+    );
+  }
+  return NextResponse.json({ membership: result.membership });
 }

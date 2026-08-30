@@ -191,11 +191,13 @@ class _SosDetailScreenState extends ConsumerState<SosDetailScreen> {
         data: (detail) {
           final alert = detail.alert;
           final session = detail.session;
+          // ADR-071 — the mobile app is Rider / Service Provider only (Admin is web-only), so
+          // there is no admin-viewer branch here: cancel / offers / session panels are
+          // reporter-gated, offering help is for any non-reporter.
           final isReporter = alert.userId == me?.id;
-          final isAdmin = me?.role == 'ADMIN';
           final isAssignedHelper = alert.assignedHelperId == me?.id;
           final isOpen = alert.assignedHelperId == null;
-          final canOffer = isOpen && !isReporter && !isAdmin && _myOfferId == null;
+          final canOffer = isOpen && !isReporter && _myOfferId == null;
 
           return RefreshIndicator(
             onRefresh: _refresh,
@@ -215,14 +217,14 @@ class _SosDetailScreenState extends ConsumerState<SosDetailScreen> {
                     onPressed: _busy ? null : _handleWithdraw,
                     child: const Text('Cannot Help — Withdraw Offer'),
                   ),
-                if (alert.status == 'ACTIVE' && (isReporter || isAdmin))
+                if (alert.status == 'ACTIVE' && isReporter)
                   OutlinedButton.icon(
                     onPressed: _busy ? null : _handleCancel,
                     icon: const Icon(Icons.cancel_outlined),
                     style: OutlinedButton.styleFrom(foregroundColor: Theme.of(context).colorScheme.error),
                     label: const Text('Cancel SOS'),
                   ),
-                if (isOpen && (isReporter || isAdmin)) ...[
+                if (isOpen && isReporter) ...[
                   const SizedBox(height: 16),
                   _OffersSection(
                     alertId: widget.alertId,
@@ -231,7 +233,7 @@ class _SosDetailScreenState extends ConsumerState<SosDetailScreen> {
                     onReject: _handleReject,
                   ),
                 ],
-                if (session != null && (isAssignedHelper || isReporter || isAdmin)) ...[
+                if (session != null && (isAssignedHelper || isReporter)) ...[
                   const SizedBox(height: 16),
                   _SessionPanel(
                     alert: alert,

@@ -78,7 +78,7 @@ function DispatchReport({ dispatch }: { dispatch: DispatchSummary | null }) {
   const offChannels = channels
     ? [
         !channels.sms ? "SMS" : null,
-        !channels.whatsapp ? "WhatsApp" : null,
+        // ADR-071 — WhatsApp is out of scope this phase; don't report it as a misconfigured channel.
         !channels.email ? "email" : null,
       ].filter(Boolean)
     : [];
@@ -146,7 +146,7 @@ const THEME = {
     icon: "🆘",
     tagline: "Accident or life-threatening situation. Immediately alerts fellow riders with your GPS.",
     categories: RED_CATEGORIES,
-    channels: ["SMS", "WhatsApp", "Fellow Riders", "Emergency Services"],
+    channels: ["SMS", "Fellow Riders", "Emergency Services"],
     footer: "Live GPS shared instantly",
     border: "border-[#e8000d]/30",
     cardBg: "linear-gradient(135deg, rgba(232, 0, 13, .12), rgba(232, 0, 13, .05))",
@@ -157,14 +157,14 @@ const THEME = {
     titleColor: "text-[#e8000d]",
     confirmTitle: "RED ALERT — Are you sure?",
     confirmBody:
-      "This immediately alerts your emergency contacts and nearby BIKIE riders, sharing your live GPS via SMS and WhatsApp.",
+      "This immediately alerts your emergency contacts and nearby BIKIE riders, sharing your live GPS via SMS.",
   },
   AMBER: {
     label: "Amber Alert — Assistance",
     icon: "⚠️",
     tagline: "Non-emergency. Select your issue and BIKIE connects nearby support.",
     categories: AMBER_CATEGORIES,
-    channels: ["SMS", "WhatsApp", "Service Provider", "Fellow Riders"],
+    channels: ["SMS", "Service Provider", "Fellow Riders"],
     footer: "GPS shared so help finds you faster",
     border: "border-[#ffaa00]/30",
     cardBg: "linear-gradient(135deg, rgba(255, 170, 0, .12), rgba(255, 170, 0, .05))",
@@ -175,7 +175,7 @@ const THEME = {
     titleColor: "text-[#ffaa00]",
     confirmTitle: "AMBER ALERT — What do you need?",
     confirmBody:
-      "Select your situation. BIKIE alerts nearby service providers and riders with your GPS via SMS and WhatsApp.",
+      "Select your situation. BIKIE alerts nearby service providers and riders with your GPS via SMS.",
   },
 } as const;
 
