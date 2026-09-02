@@ -43,3 +43,10 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Firebase config — environment-specific, obtained from the Firebase console, NEVER committed.
+# google-services.json / GoogleService-Info.plist embed an auto-created Google API key that
+# GitHub secret scanning flags. flutterfire's firebase_options.dart is generated from them.
+**/google-services.json
+**/GoogleService-Info.plist
+lib/firebase_options.dart

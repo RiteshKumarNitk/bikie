@@ -12,3 +12,11 @@ GeneratedPluginRegistrant.java
 key.properties
 **/*.keystore
 **/*.jks
+
+# Firebase — pulled from the Firebase console per environment, never committed. Contains the
+# auto-created Android API key (GitHub secret scanning flags it). The gradle `google-services`
+# plugin is applied only when this file is present (see app/build.gradle.kts), so the app still
+# builds without it. Template: app/google-services.json.example.
+google-services.json
+app/google-services.json
+**/google-services.json

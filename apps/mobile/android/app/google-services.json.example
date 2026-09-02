@@ -1,0 +1,33 @@
+{
+  "//": "TEMPLATE ONLY. Copy to google-services.json (gitignored) with real values from the",
+  "//2": "Firebase console: Project settings > Your apps > Android app > Download google-services.json.",
+  "//3": "The gradle google-services plugin is applied only when google-services.json is present",
+  "//4": "(app/build.gradle.kts), so the app still builds without it (FCM/push just won't work).",
+  "project_info": {
+    "project_number": "000000000000",
+    "project_id": "your-firebase-project-id",
+    "storage_bucket": "your-firebase-project-id.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:000000000000:android:0000000000000000000000",
+        "android_client_info": {
+          "package_name": "com.bikie.mobile"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "REPLACE_WITH_ANDROID_API_KEY_FROM_FIREBASE_CONSOLE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
