@@ -1,5 +1,16 @@
 # BIKIE Changelog
 
+## 2026-09-02 — Fix: store-review test number rejected as "does not exist" (ADR-072 follow-up)
+
+Both login screens check `GET /api/auth-helpers/phone-exists` before the OTP step, so a bypass
+number only works once the demo account carries it as `User.phoneNumber` — and the seed's ADR-072
+block was never run against production, so the reviewer got "No account found for this number".
+New scoped, idempotent `packages/database/prisma/patch-store-review-phones.ts` (npm script
+`db:patch:store-review`) patches only `rider@bikie.app` / `partner@bikie.app`: `phoneNumber` +
+verified from `TEST_RIDER_PHONE` / `TEST_SERVICE_PROVIDER_PHONE`, plus SP `accountType`/`role`,
+APPROVED `Partner` profile and one ACTIVE `PartnerMembership`. Refuses to run if the two numbers
+match or if a number is already on another account. `.env.example` clarified. No schema change.
+
 ## 2026-08-30 — Store-review sign-in, mobile "Delete Account", web email-login button (ADR-072)
 
 The test Rider / Service Provider phone numbers + fixed `TEST_OTP` now sign in against the

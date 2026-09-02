@@ -16,6 +16,7 @@ Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 | Verification: backend `vitest` 261→262; `tsc --noEmit` clean on `web`/`@bikie/services`/`@bikie/database`; `next build` 165/165; `flutter analyze` unchanged (1 pre-existing unrelated `http` info); `flutter test` 119/119 | Completed |
 | Follow-up: real account-deletion endpoint behind the mobile "Delete Account" button; decide whether to keep the demo numbers wired after each review cycle (rotate `TEST_OTP`) | Backlog |
 | Operator action needed: set `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`/`TEST_OTP` + the two `NEXT_PUBLIC_` copies in `apps/web/.env`; re-run the seed; for mobile pass the two `--dart-define`s (or fill the fallbacks in `app_config.dart`) | Blocked (client) |
+| **Fix — reviewer got "number does not exist, sign up instead":** the login screens call `GET /api/auth-helpers/phone-exists` *before* the OTP step, so the bypass number only works once the demo account carries it — and the seed's ADR-072 block was never run against prod. New scoped `packages/database/prisma/patch-store-review-phones.ts` (+ `db:patch:store-review` script) patches only `rider@bikie.app`/`partner@bikie.app` (`phoneNumber` + verified, SP `accountType`/`role`/APPROVED profile/ACTIVE membership), idempotent. `.env.example` now notes the two numbers must differ and the account must carry the number. | Completed — **run `db:patch:store-review` against prod** |
 
 ## Phase scoping: WhatsApp hidden (kept dormant), Admin removed from the Flutter app (2026-08-30, ADR-071)
 
