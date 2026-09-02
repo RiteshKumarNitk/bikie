@@ -45,6 +45,17 @@ const SEED_ACCOUNTS = {
  * so seeded nearby riders + the Bangalore partner are in range. */
 const SOS_SEED_GPS = { lat: 12.9716, lng: 77.5946, city: "Bangalore" };
 
+/** ADR-072 — the demo Rider / Service Provider accounts double as the Play Store / App Store
+ * review credentials: they are given a real `phoneNumber` so the fixed-`TEST_OTP` sign-in bypass
+ * (`packages/services/.../test-otp-bypass.ts`) resolves to them. Set `TEST_RIDER_PHONE` /
+ * `TEST_SERVICE_PROVIDER_PHONE` in the seed's environment to the exact numbers you want the
+ * bypass to accept; otherwise these placeholders are used. Comma-separated lists collapse to the
+ * first entry here (one account per persona). */
+const firstPhone = (raw: string | undefined, fallback: string): string =>
+  (raw?.split(",")[0]?.trim() || fallback);
+const DEMO_RIDER_PHONE = firstPhone(process.env.TEST_RIDER_PHONE, "+919900001111");
+const DEMO_PROVIDER_PHONE = firstPhone(process.env.TEST_SERVICE_PROVIDER_PHONE, "+919876543200");
+
 // Real password hashing (Better Auth's scrypt scheme) only happens through its own
 // HTTP API, so seed accounts are created via the running dev server rather than
 // inserted directly into User/Account — this guarantees they can actually log in.
@@ -89,13 +100,21 @@ async function main() {
   // seeded database produced provider personas that `proxy.ts` and `partner/layout.tsx` both
   // routed as Riders, since neither reads `partnerStatus` for routing any more (ADR-053).
 
+  // ADR-072 — set both the legacy `phone` (display) and Better Auth's `phoneNumber` (login
+  // identity, what `phone-exists` / OTP verify look up), plus mark it verified, so the
+  // fixed-TEST_OTP sign-in bypass resolves to these demo accounts.
   await prisma.user.update({
     where: { id: partnerUser.id },
-    data: { phone: "+919876543200" },
+    data: { phone: DEMO_PROVIDER_PHONE, phoneNumber: DEMO_PROVIDER_PHONE, phoneNumberVerified: true },
   });
   await prisma.user.update({
     where: { id: demoUser.id },
-    data: { phone: "+919900001111", name: "Demo Rider" },
+    data: {
+      phone: DEMO_RIDER_PHONE,
+      phoneNumber: DEMO_RIDER_PHONE,
+      phoneNumberVerified: true,
+      name: "Demo Rider",
+    },
   });
 
   // --- Service Provider personas (ADR-046b/047) ---
@@ -254,6 +273,29 @@ async function main() {
     where: { id: "legacy-free-partner-plan" },
     data: { isActive: false },
   });
+
+  // ADR-072 — give the verified Service Provider demo account an ACTIVE PartnerMembership so a
+  // Play Store reviewer signing in as it can actually exercise the gated features (SOS accept,
+  // availability, fleet) instead of hitting the "Activate membership" wall everywhere.
+  {
+    const spPlan = await prisma.partnerMembershipPlan.findFirst({
+      where: { name: "Service Provider Membership" },
+    });
+    if (spPlan) {
+      const existing = await prisma.partnerMembership.findFirst({
+        where: { userId: partnerUser.id, status: "ACTIVE", endDate: { gte: new Date() } },
+      });
+      if (!existing) {
+        const start = new Date();
+        const end = new Date(start);
+        end.setDate(end.getDate() + spPlan.durationDays);
+        await prisma.partnerMembership.create({
+          data: { userId: partnerUser.id, planId: spPlan.id, startDate: start, endDate: end, status: "ACTIVE" },
+        });
+        console.log("Seeded ACTIVE Service Provider membership for the demo provider.");
+      }
+    }
+  }
 
   // --- SOS E2E fixtures (membership + emergency contacts + nearby riders with GPS) ---
   console.log("Seeding SOS E2E fixtures around", SOS_SEED_GPS, "...");

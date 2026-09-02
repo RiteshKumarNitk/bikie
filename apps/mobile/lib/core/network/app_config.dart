@@ -45,3 +45,47 @@ String get kMsg91WidgetId => _msg91WidgetIdDefine.isNotEmpty ? _msg91WidgetIdDef
 
 String get kMsg91WidgetTokenAuth =>
     _msg91WidgetTokenAuthDefine.isNotEmpty ? _msg91WidgetTokenAuthDefine : _productionMsg91WidgetTokenAuth;
+
+/// ADR-072 — a small allowlist of dedicated test phone numbers (Rider / Service Provider) that
+/// skip the MSG91 OTP round-trip: no code is sent, and `verifyOtp` posts the typed code straight
+/// to the backend, which accepts it only if it equals the server-side `TEST_OTP`
+/// (`packages/services/.../test-otp-bypass.ts`, ADR-072 also gates that on the backend env being
+/// configured). This exists so Google Play / App Store review can sign in without a real SMS.
+///
+/// Supply at build time, comma-separated E.164:
+///   flutter build appbundle --dart-define=TEST_RIDER_PHONE=+9198... --dart-define=TEST_SERVICE_PROVIDER_PHONE=+9198...
+///
+/// The numbers are not secret — they unlock only non-privileged demo accounts, and the fixed
+/// code stays server-side. To ship a review build with zero extra flags, replace the empty
+/// fallbacks below with the real test numbers (same pattern as the MSG91 widget id above).
+const String _testRiderPhoneDefine = String.fromEnvironment('TEST_RIDER_PHONE');
+const String _testServiceProviderPhoneDefine = String.fromEnvironment('TEST_SERVICE_PROVIDER_PHONE');
+
+const String _testRiderPhoneFallback = '';
+const String _testServiceProviderPhoneFallback = '';
+
+/// Canonicalise to `+91` + 10 digits so the configured value matches regardless of how it was
+/// written (`9876543210`, `+919876543210`, `91 98765 43210`, …).
+String? _canonicalPhone(String raw) {
+  final digits = raw.replaceAll(RegExp(r'\D'), '');
+  final local = digits.length > 10 ? digits.substring(digits.length - 10) : digits;
+  return local.length == 10 ? '+91$local' : null;
+}
+
+Iterable<String> _parsePhones(String raw) =>
+    raw.split(',').map((n) => _canonicalPhone(n.trim())).whereType<String>();
+
+final Set<String> kTestPhoneNumbers = {
+  ..._parsePhones(_testRiderPhoneDefine.isNotEmpty ? _testRiderPhoneDefine : _testRiderPhoneFallback),
+  ..._parsePhones(
+    _testServiceProviderPhoneDefine.isNotEmpty
+        ? _testServiceProviderPhoneDefine
+        : _testServiceProviderPhoneFallback,
+  ),
+};
+
+/// [phoneNumber] is normally E.164 (`+9198…`) but any format is tolerated.
+bool isTestPhoneNumber(String phoneNumber) {
+  final c = _canonicalPhone(phoneNumber);
+  return c != null && kTestPhoneNumbers.contains(c);
+}

@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-08-30 — Store-review sign-in, mobile "Delete Account", web email-login button (ADR-072)
+
+Google Play / App Store review can't verify a real SMS OTP, so the test Rider / Service Provider
+phone numbers plus the fixed `TEST_OTP` now sign in against the **production** backend too — but
+only when those env vars are explicitly set (a deploy that leaves them blank has no bypass at
+all, exactly as before). On the website, entering an allowlisted number
+(`NEXT_PUBLIC_TEST_RIDER_PHONE` / `NEXT_PUBLIC_TEST_SERVICE_PROVIDER_PHONE`) skips the MSG91
+widget entirely and posts the typed code straight to the backend; on the mobile app the same
+works in release builds, not just debug. The seeded `rider@bikie.app` / `partner@bikie.app` demo
+accounts are the review credentials — they now carry a real phone number, and the Service
+Provider one is seeded with an active membership so a reviewer can actually use the gated
+features. The mobile Profile screen gains a **"Delete Account"** button for both account types;
+for now it signs the user out on that device only and does **not** delete any data (the confirm
+dialog says so) — a stopgap for the Play Store requirement, to be wired to a real deletion flow
+later. On the website, the "Admin or existing email account? Log in with email instead" text link
+is now a proper button. No schema or migration change; `.env` is untouched (the operator sets the
+values — see `.env.example`). Full details in ADR-072.
+
 ## 2026-08-30 — Phase scoping: WhatsApp hidden, Admin removed from the Flutter app (ADR-071)
 
 WhatsApp is out of the current phase and no longer appears anywhere users can see it: the "🟢

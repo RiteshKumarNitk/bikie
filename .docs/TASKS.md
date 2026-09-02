@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Store-review sign-in: production test-number bypass, mobile "Delete Account", web email-login button (2026-08-30, ADR-072)
+
+| Task | Status |
+|---|---|
+| `test-otp-bypass.ts` — `isTestOtpBypassEnabled()` now `true` in production **only when** `TEST_OTP` + at least one test phone are set; no separate master switch | Completed |
+| Web (`login/page.tsx` + new `lib/test-phone.ts`) — `NEXT_PUBLIC_TEST_RIDER_PHONE`/`NEXT_PUBLIC_TEST_SERVICE_PROVIDER_PHONE` allowlist; a matching number skips the MSG91 widget (no send / no verifyOtp) and posts the typed code straight to `authClient.phoneNumber.verify` | Completed |
+| Mobile (`app_config.dart` + `auth_repository.dart`) — `--dart-define=TEST_RIDER_PHONE=…`/`TEST_SERVICE_PROVIDER_PHONE=…` (empty fallbacks); `sendOtp`/`resendOtp` short-circuit for a test number, `verifyOtp` posts directly — works in **release** builds | Completed |
+| Seed (`prisma/seed.ts`) — demo `rider@bikie.app` / `partner@bikie.app` get Better Auth `phoneNumber` (+ verified) from `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`; the Service Provider gets an ACTIVE `PartnerMembership` so gated features work for a reviewer | Completed — **not run** (needs `pnpm dev` + DB; re-seed on your side) |
+| Mobile "Delete Account" button (`profile_screen.dart`) — both account types; confirm dialog states it signs out on this device only and does **not** delete data (stopgap for the Play Store requirement) | Completed |
+| Web "Admin or existing email account? Log in with email instead" — restyled from a text link to a full-width outlined button; text unchanged (web Admin is supported) | Completed |
+| `.env.example` — documents `NEXT_PUBLIC_TEST_RIDER_PHONE`/`NEXT_PUBLIC_TEST_SERVICE_PROVIDER_PHONE` + the new production semantics of `TEST_*` | Completed |
+| Verification: backend `vitest` 261→262; `tsc --noEmit` clean on `web`/`@bikie/services`/`@bikie/database`; `next build` 165/165; `flutter analyze` unchanged (1 pre-existing unrelated `http` info); `flutter test` 119/119 | Completed |
+| Follow-up: real account-deletion endpoint behind the mobile "Delete Account" button; decide whether to keep the demo numbers wired after each review cycle (rotate `TEST_OTP`) | Backlog |
+| Operator action needed: set `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE`/`TEST_OTP` + the two `NEXT_PUBLIC_` copies in `apps/web/.env`; re-run the seed; for mobile pass the two `--dart-define`s (or fill the fallbacks in `app_config.dart`) | Blocked (client) |
+
 ## Phase scoping: WhatsApp hidden (kept dormant), Admin removed from the Flutter app (2026-08-30, ADR-071)
 
 Actioned two product-scope calls after the payment/membership audit. Non-destructive: WhatsApp

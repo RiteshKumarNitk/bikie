@@ -51,6 +51,8 @@ class ProfileScreen extends ConsumerWidget {
           _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
           const SizedBox(height: 24),
           const _SignOutButton(),
+          const SizedBox(height: 12),
+          const _DeleteAccountButton(),
           const SizedBox(height: 16),
           const _AppVersionFooter(),
         ],
@@ -111,6 +113,61 @@ class _SignOutButtonState extends ConsumerState<_SignOutButton> {
           ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
           : const Icon(Icons.logout),
       label: Text(_busy ? 'Signing out…' : 'Sign out'),
+    );
+  }
+}
+
+/// ADR-072 — "Delete Account" entry point (both account types). Google Play requires an
+/// in-app way to initiate account deletion; for now this **signs the user out only and does not
+/// remove any server-side data** — the confirm copy says so plainly. Wire it to a real deletion
+/// request endpoint when that flow is built.
+class _DeleteAccountButton extends ConsumerStatefulWidget {
+  const _DeleteAccountButton();
+
+  @override
+  ConsumerState<_DeleteAccountButton> createState() => _DeleteAccountButtonState();
+}
+
+class _DeleteAccountButtonState extends ConsumerState<_DeleteAccountButton> {
+  bool _busy = false;
+
+  Future<void> _handleDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: const Text(
+          'This signs you out of the app on this device. Your account and data are not deleted '
+          'and can be accessed again by signing in. To permanently delete your account and data, '
+          'contact BIKIE support.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Theme.of(ctx).colorScheme.error),
+            child: const Text('Delete Account'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _busy = true);
+    await ref.read(authControllerProvider.notifier).signOut();
+    if (mounted) setState(() => _busy = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final error = Theme.of(context).colorScheme.error;
+    return OutlinedButton.icon(
+      onPressed: _busy ? null : _handleDelete,
+      style: OutlinedButton.styleFrom(foregroundColor: error, side: BorderSide(color: error)),
+      icon: _busy
+          ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+          : const Icon(Icons.delete_outline),
+      label: Text(_busy ? 'Please wait…' : 'Delete Account'),
     );
   }
 }

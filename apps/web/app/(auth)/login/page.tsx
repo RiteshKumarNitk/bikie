@@ -8,6 +8,7 @@ import { PhoneNumberInput, composePhoneNumber } from "@/components/auth/PhoneNum
 import { OtpChannelToggle } from "@/components/auth/OtpChannelToggle";
 import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { useMsg91Widget, type OtpChannel } from "@/lib/use-msg91-widget";
+import { isTestPhoneNumber } from "@/lib/test-phone";
 import { LogoMark } from "@/components/layout/LogoMark";
 import { useToast } from "@/components/ui/Toast";
 import Link from "next/link";
@@ -65,6 +66,14 @@ export default function LoginPage() {
    * redirect — there's no session yet at that point) can reach it without duplicating the
    * MSG91 call. */
   async function sendOtpTo(normalized: string) {
+    // ADR-072 — a dedicated test number (Play Store / App Store review) skips MSG91 entirely:
+    // there is no real code to send, the reviewer enters the fixed server-side TEST_OTP.
+    if (isTestPhoneNumber(normalized)) {
+      setPhoneNumber(normalized);
+      setStep("otp");
+      resendTimer.start();
+      return;
+    }
     setSendingOtp(true);
     try {
       await widget.sendOtp(normalized, otpChannel);
@@ -124,6 +133,11 @@ export default function LoginPage() {
   async function handleResend() {
     if (!resendTimer.canResend) return;
     setServerError(null);
+    // ADR-072 — nothing to resend for a test number; just reset the timer.
+    if (isTestPhoneNumber(phoneNumber)) {
+      resendTimer.start();
+      return;
+    }
     setSendingOtp(true);
     try {
       await widget.retryOtp(otpChannel);
@@ -143,11 +157,14 @@ export default function LoginPage() {
     setServerError(null);
     setVerifying(true);
     try {
-      // The widget verifies the code directly against MSG91 in-browser and hands back an
-      // opaque access token — our backend re-verifies that token server-side (never trusts the
-      // client's mere claim of success) before Better Auth issues a session (ADR-034).
-      const widgetResult = await widget.verifyOtp(otpCode);
-      const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: widgetResult.message });
+      // ADR-072 — a test number's typed code is the fixed server-side TEST_OTP; post it straight
+      // to the backend, which accepts it only via the `test-otp-bypass` allowlist. Otherwise the
+      // widget verifies the code against MSG91 in-browser and hands back an opaque access token —
+      // our backend re-verifies that token server-side before Better Auth issues a session.
+      const codeForBackend = isTestPhoneNumber(phoneNumber)
+        ? otpCode
+        : (await widget.verifyOtp(otpCode)).message;
+      const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: codeForBackend });
       if (error) {
         const message = error.message ?? "Invalid or expired code. Please try again.";
         setServerError(message);
@@ -292,18 +309,16 @@ export default function LoginPage() {
           )}
 
           {mode === "phone" && step === "phone" && (
-            <p className="mt-4">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("email");
-                  setServerError(null);
-                }}
-                className="text-xs font-medium text-accent-text hover:text-accent-hover"
-              >
-                Admin or existing email account? Log in with email instead
-              </button>
-            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("email");
+                setServerError(null);
+              }}
+              className="mt-4 w-full rounded-xl border border-foreground/15 px-4 py-2.5 text-sm font-medium text-foreground/80 transition-colors hover:border-accent/40 hover:bg-foreground/[0.03] hover:text-foreground"
+            >
+              Admin or existing email account? Log in with email instead
+            </button>
           )}
 
           {mode === "email" && (

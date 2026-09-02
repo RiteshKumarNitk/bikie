@@ -1,5 +1,16 @@
 # BIKIE — Roadmap
 
+## Store-Review Sign-In + Mobile "Delete Account" (2026-08-30, ADR-072)
+Google Play / App Store review can't receive a real OTP, so a dedicated test Rider / Service
+Provider number + a fixed code now signs in against the production backend — but only when the
+operator explicitly sets those env vars (blank on any other deploy = no bypass, no change). On
+web the login page skips the MSG91 widget for an allowlisted number and verifies the typed code
+directly; on mobile it works in release builds, not just debug. The demo `rider@bikie.app` /
+`partner@bikie.app` accounts are the review credentials (the Service Provider one now seeded with
+an active membership so gated features are reachable). The mobile Profile screen gains a "Delete
+Account" button (currently signs out only, keeps data — a stopgap for the Play Store
+requirement). The web email-login link is now a proper button. See ADR-072.
+
 ## Phase Scoping: WhatsApp Hidden, Admin Removed From The Flutter App (2026-08-30, ADR-071)
 Two scope calls. WhatsApp is out of the current phase — hidden from every user-facing flow (the
 OTP delivery-channel toggle and the SOS/settings copy that claimed WhatsApp was used) behind a

@@ -3543,3 +3543,55 @@ changes:
   nit on `PanicAlertCards.tsx` line 97 (`don't`) is in `HEAD`, not introduced here. **Re-enabling
   WhatsApp later:** flip the two flags, restore the copy, and (if real delivery is wanted through
   our own adapter rather than MSG91's widget) set the `WHATSAPP_*` or `TWILIO_WHATSAPP_*` creds.
+
+## ADR-072: Store-review sign-in — fixed-code bypass works in production for a test-number allowlist; mobile "Delete Account"; web email-login button
+
+- **Context.** Google Play / App Store review verifies the app against the **production**
+  backend and can't receive a real SMS OTP, so it needs demo credentials that sign in without
+  one. The existing `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE` + `TEST_OTP` bypass
+  (ADR-047) was hard-gated `NODE_ENV !== "production"`, so it was useless for review. Also: the
+  web "Log in with email instead" affordance was a bare text link that didn't read as a control,
+  and the mobile app had no in-app "Delete Account" entry point (a Play Store requirement).
+- **Decision.**
+  - **`isTestOtpBypassEnabled()` (`test-otp-bypass.ts`) now returns `true` in production too —
+    but only when `TEST_OTP` **and** at least one of `TEST_RIDER_PHONE` /
+    `TEST_SERVICE_PROVIDER_PHONE` are explicitly set.** A prod deploy that leaves them blank has
+    no bypass at all. The blast radius is exactly the allowlisted accounts (plain Rider / Service
+    Provider — no admin, no real user data); the fixed code is useless without one of the exact
+    numbers, which are unique and operator-chosen. Chosen over a separate
+    `TEST_OTP_BYPASS_IN_PRODUCTION=true` master switch — "the vars being set is the switch" — and
+    over keeping it non-prod (which would force a separate staging build for every review).
+  - **Web** (`login/page.tsx` + new `lib/test-phone.ts`): a client-visible allowlist
+    `NEXT_PUBLIC_TEST_RIDER_PHONE` / `NEXT_PUBLIC_TEST_SERVICE_PROVIDER_PHONE`. When the entered
+    number matches, the page **skips the MSG91 widget entirely** — no send, no `verifyOtp` — and
+    posts the typed code straight to `authClient.phoneNumber.verify`, which the backend accepts
+    only via the `test-otp-bypass` allowlist. The *numbers* are public by design (they unlock
+    only the demo accounts); `TEST_OTP` stays server-side.
+  - **Mobile** (`app_config.dart` + `auth_repository.dart`): `--dart-define=TEST_RIDER_PHONE=…`
+    / `TEST_SERVICE_PROVIDER_PHONE=…` (empty fallbacks; replace with the real numbers for a
+    zero-flag review build, same pattern as the embedded MSG91 widget id). `sendOtp`/`resendOtp`
+    short-circuit for a matching number (no widget, no `/api/otp/mobile/send`), and `verifyOtp`'s
+    existing `reqId == null` path posts the typed code directly — so this works in **release**
+    builds, not just debug (the pre-existing debug-only native path is unchanged).
+  - **Seed** (`prisma/seed.ts`): the `rider@bikie.app` / `partner@bikie.app` demo accounts are
+    the review credentials. They now get Better Auth's `phoneNumber` (+ `phoneNumberVerified`)
+    set from `TEST_RIDER_PHONE` / `TEST_SERVICE_PROVIDER_PHONE` (placeholders otherwise), and the
+    Service Provider gets an **ACTIVE `PartnerMembership`** so a reviewer signing in as it can
+    exercise the gated features instead of hitting the "Activate ₹99/month" wall. Not run here.
+  - **Mobile "Delete Account"** (`profile_screen.dart`): a destructive-styled button for both
+    account types, below "Sign out". A confirm dialog states plainly that it **signs out on this
+    device only and does not delete account data** (contact support for real deletion) — a
+    stopgap for the Play Store requirement; wire to a real deletion endpoint when built.
+  - **Web email-login link → button** (`login/page.tsx`): the "Admin or existing email account?
+    Log in with email instead" text link is now a full-width outlined button. Text unchanged —
+    web Admin is supported (ADR-071 only removed the *mobile* framing).
+- **Consequences.** No schema or migration change. `.env.example` documents the two new
+  `NEXT_PUBLIC_TEST_*` names and the new production semantics of `TEST_*`. `.env` untouched (the
+  operator sets the values). One identity-access test rewritten (prod-bypass now *works* when
+  configured, still absent when not) — backend `vitest` 261→262, `tsc --noEmit` clean on
+  `web`/`@bikie/services`/`@bikie/database`, `next build` 165/165, `flutter analyze` unchanged
+  (1 pre-existing unrelated `http` info), `flutter test` 119/119. **Security note:** production
+  now has a sign-in path that doesn't touch MSG91 for the allowlisted numbers — acceptable
+  because it is opt-in via env, scoped to non-privileged demo accounts, and the fixed code is
+  inert without an exact allowlisted number. Rotate `TEST_OTP` / retire the numbers after a
+  review cycle if desired.

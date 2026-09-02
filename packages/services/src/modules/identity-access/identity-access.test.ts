@@ -491,10 +491,26 @@ describe("otp send/verify applications (ADR-034)", () => {
       expect(nativeVerify).not.toHaveBeenCalled();
     });
 
-    it("never bypasses in production, even for a configured test number and correct code", async () => {
+    it("ADR-072: in production, bypasses for a configured test number + fixed code (Play Store review path)", async () => {
       process.env.NODE_ENV = "production";
       process.env.TEST_RIDER_PHONE = "+919876500001";
       process.env.TEST_OTP = "123456";
+      const nativeVerify = vi.fn(async () => false);
+      const { otp } = createIdentityAccessModule(
+        fakePorts({ msg91NativeOtp: { send: vi.fn(), verify: nativeVerify } }),
+      );
+
+      const result = await otp.verifyLoginOtp({ phoneNumber: "+919876500001", code: "123456" });
+
+      expect(result).toBe(true);
+      expect(nativeVerify).not.toHaveBeenCalled();
+    });
+
+    it("ADR-072: in production with the test vars unset, there is no bypass — falls through to MSG91", async () => {
+      process.env.NODE_ENV = "production";
+      delete process.env.TEST_RIDER_PHONE;
+      delete process.env.TEST_SERVICE_PROVIDER_PHONE;
+      delete process.env.TEST_OTP;
       const nativeVerify = vi.fn(async () => false);
       const { otp } = createIdentityAccessModule(
         fakePorts({ msg91NativeOtp: { send: vi.fn(), verify: nativeVerify } }),

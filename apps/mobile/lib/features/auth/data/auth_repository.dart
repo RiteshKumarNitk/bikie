@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_guard.dart';
+import '../../../core/network/app_config.dart' show isTestPhoneNumber;
 import '../../../core/network/dio_client.dart';
 import '../../../core/providers.dart';
 import '../../../core/storage/secure_storage.dart';
@@ -60,6 +61,12 @@ class AuthRepository {
   /// would reject a fake test code before our backend ever saw it, so those two flows can't share
   /// one code path (see `Msg91OtpRepository`'s doc comment for the full reasoning).
   Future<OtpSendResult> sendOtp(String phoneNumber, {OtpChannel channel = OtpChannel.sms}) {
+    // ADR-072 — a dedicated test number (Play Store / App Store review) skips MSG91 entirely:
+    // no real code is sent, the reviewer enters the fixed server-side TEST_OTP, and `verifyOtp`
+    // (reqId == null) posts it straight to the backend's test-bypass allowlist.
+    if (isTestPhoneNumber(phoneNumber)) {
+      return Future.value(const OtpSendResult());
+    }
     if (kDebugMode) {
       return apiGuard(() async {
         await _dio.post('/api/otp/mobile/send', data: {'phoneNumber': phoneNumber});
@@ -78,6 +85,8 @@ class AuthRepository {
   /// send — [reqId] must be non-null on that path (the caller's responsibility to track it,
   /// same as web's `use-msg91-widget.ts` tracks widget session state internally).
   Future<void> resendOtp(String phoneNumber, {String? reqId, OtpChannel channel = OtpChannel.sms}) {
+    // ADR-072 — nothing to resend for a test number.
+    if (isTestPhoneNumber(phoneNumber)) return Future.value();
     if (kDebugMode) {
       return apiGuard(() async {
         await _dio.post('/api/otp/mobile/send', data: {'phoneNumber': phoneNumber});
