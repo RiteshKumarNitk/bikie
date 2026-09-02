@@ -16,6 +16,18 @@ and one ACTIVE `PartnerMembership`. It reclaims the number from an un-onboarded
 `phone-…@bikie.local` stub but refuses to take it from a real account, and refuses to run if the
 two numbers are equal. Ends with a read-back verification block. No schema or migration change.
 
+Second fix, same day — after the accounts existed the web login then failed with *"MSG91 widget
+not ready"*: `phone-exists` passed, but the page still tried to send a real OTP because the
+client-side `NEXT_PUBLIC_TEST_*` allowlist wasn't compiled into the deployed build.
+`GET /api/auth-helpers/phone-exists` now also returns **`testOtpBypass`** (server-side, from the
+runtime `TEST_*_PHONE` + `TEST_OTP` env via `isTestBypassPhoneNumber`), and both the web
+(`login/page.tsx`) and mobile (`auth_repository.dart` + `login_screen.dart`) login flows use it to
+skip MSG91 entirely — so a review test number works even when the client build never received the
+`NEXT_PUBLIC_TEST_*` / `--dart-define` allowlist. The mobile `app_config.dart` fallbacks are also
+now filled with the two review numbers (belt-and-suspenders). `UserService.phoneNumberExists`
+return type gains `testOtpBypass: boolean`. No schema change; backend vitest 262/262,
+`flutter test` green.
+
 ## 2026-08-30 — Store-review sign-in, mobile "Delete Account", web email-login button (ADR-072)
 
 Google Play / App Store review can't verify a real SMS OTP, so the test Rider / Service Provider

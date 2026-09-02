@@ -15,6 +15,12 @@ to take it from a real account, refuses equal numbers. Prints a verification rea
 production inside the `web` container (`docker compose exec … tsx prisma/patch-store-review-phones.ts`).
 No schema change.
 
+Follow-on: web login then hit *"MSG91 widget not ready"* because the client build lacked the
+`NEXT_PUBLIC_TEST_*` allowlist. `phone-exists` now also returns **`testOtpBypass`** (server-side,
+from the runtime `TEST_*_PHONE`/`TEST_OTP` env), and web + mobile login use it to skip MSG91
+regardless of what the client build was compiled with. Mobile `app_config.dart` fallbacks filled
+with the two numbers too. `UserService.phoneNumberExists` gains `testOtpBypass: boolean`.
+
 ## 2026-08-30 — Store-review sign-in, mobile "Delete Account", web email-login button (ADR-072)
 
 The test Rider / Service Provider phone numbers + fixed `TEST_OTP` now sign in against the

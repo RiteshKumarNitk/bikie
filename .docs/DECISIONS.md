@@ -3595,3 +3595,24 @@ changes:
   because it is opt-in via env, scoped to non-privileged demo accounts, and the fixed code is
   inert without an exact allowlisted number. Rotate `TEST_OTP` / retire the numbers after a
   review cycle if desired.
+- **Addendum (2026-09-02).** Two production gaps surfaced when a reviewer actually tried the
+  numbers:
+  1. **Accounts didn't exist.** The seed is never run in production (`SEED_DB=false`), so
+     `rider@bikie.app` / `partner@bikie.app` weren't there and `phone-exists` returned
+     "no account". Fix: `packages/database/prisma/patch-store-review-phones.ts` (+ `.sql` twin) —
+     a scoped, idempotent script that **creates** the two accounts if missing (phone+OTP needs no
+     password row) then sets `phoneNumber`/verified, `accountType`/`role`, and for the SP an
+     APPROVED `Partner` row + `partnerStatus` (`partner/layout.tsx` bounces `null` to
+     `/partner-onboarding`) + one ACTIVE `PartnerMembership`. Run it inside the prod `web`
+     container or via `psql` in the `postgres` container.
+  2. **`NEXT_PUBLIC_TEST_*` isn't in the deployed build.** Those are inlined at `next build`, and
+     the VPS build args don't pass them, so `isTestPhoneNumber()` was always false on the
+     deployed site → the page tried a real MSG91 send → *"MSG91 widget not ready"*. Fix:
+     `GET /api/auth-helpers/phone-exists` now also returns **`testOtpBypass`** (server-side, from
+     `isTestBypassPhoneNumber` — the same runtime `TEST_*_PHONE`/`TEST_OTP` env the verify hook
+     uses). Web `login/page.tsx` and mobile `auth_repository.dart` + `login_screen.dart` skip
+     MSG91 whenever that flag (or the pre-existing client allowlist) is set, so the build-time
+     `NEXT_PUBLIC_TEST_*` / `--dart-define` allowlist is now an optimization, not a requirement.
+     `UserService.phoneNumberExists` return type gains `testOtpBypass: boolean`. Mobile
+     `app_config.dart` fallbacks are also filled with the two live review numbers. No schema
+     change; backend `vitest` 262/262, `flutter analyze`/`flutter test` unchanged.

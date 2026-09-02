@@ -61,8 +61,11 @@ String get kMsg91WidgetTokenAuth =>
 const String _testRiderPhoneDefine = String.fromEnvironment('TEST_RIDER_PHONE');
 const String _testServiceProviderPhoneDefine = String.fromEnvironment('TEST_SERVICE_PROVIDER_PHONE');
 
-const String _testRiderPhoneFallback = '';
-const String _testServiceProviderPhoneFallback = '';
+// ADR-072 — filled with the live app-store review numbers so a review build needs no
+// --dart-define flags. The backend also returns `testOtpBypass` from `phone-exists`, so the
+// login flow skips MSG91 even if these ever drift; keeping them here is belt-and-suspenders.
+const String _testRiderPhoneFallback = '+919000000001';
+const String _testServiceProviderPhoneFallback = '+919000000002';
 
 /// Canonicalise to `+91` + 10 digits so the configured value matches regardless of how it was
 /// written (`9876543210`, `+919876543210`, `91 98765 43210`, …).

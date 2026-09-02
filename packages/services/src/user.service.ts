@@ -1,5 +1,7 @@
 import { userRepository } from "@bikie/database";
 
+import { isTestBypassPhoneNumber } from "./modules/identity-access/domain/test-otp-bypass";
+
 /** ADR-053 — how long after account creation `completePhoneSignup` is still allowed to set
  * `accountType`. Generous enough for a slow onboarding form, tight enough that it can't be used
  * as a delayed self-service switch against an established account. */
@@ -9,13 +11,27 @@ export const UserService = {
   /** `accountType` lets the login/signup UI detect a Rider-vs-Service-Provider mismatch and show
    * the "already registered as X" choice BEFORE ever sending an OTP (ADR-053) — no reason to
    * text a code just to find out the selection doesn't match the account. `null` when the number
-   * has no account yet. */
-  async phoneNumberExists(
-    phoneNumber: string,
-  ): Promise<{ exists: boolean; hasRealName: boolean; accountType: "RIDER" | "SERVICE_PROVIDER" | null }> {
+   * has no account yet.
+   *
+   * `testOtpBypass` (ADR-072) — true when this number is on the server-side test-OTP allowlist
+   * (`TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE` + `TEST_OTP`, runtime env). The web/mobile
+   * login screens use it to skip the MSG91 widget entirely, so a review test number works even
+   * when the client build never received the `NEXT_PUBLIC_TEST_*` / `--dart-define` allowlist. */
+  async phoneNumberExists(phoneNumber: string): Promise<{
+    exists: boolean;
+    hasRealName: boolean;
+    accountType: "RIDER" | "SERVICE_PROVIDER" | null;
+    testOtpBypass: boolean;
+  }> {
+    const testOtpBypass = isTestBypassPhoneNumber(phoneNumber);
     const user = await userRepository.findUserByPhoneNumber(phoneNumber);
-    if (!user) return { exists: false, hasRealName: false, accountType: null };
-    return { exists: true, hasRealName: user.name !== phoneNumber, accountType: user.accountType };
+    if (!user) return { exists: false, hasRealName: false, accountType: null, testOtpBypass };
+    return {
+      exists: true,
+      hasRealName: user.name !== phoneNumber,
+      accountType: user.accountType,
+      testOtpBypass,
+    };
   },
 
   async updatePhone(userId: string, phone: string | null): Promise<void> {

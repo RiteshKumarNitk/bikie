@@ -38,6 +38,10 @@ export default function LoginPage() {
   // means "actually log me in as that type," not "redirect me, I'm already signed in." Post-verify
   // mismatch (defensive fallback, session already exists) means the opposite. ADR-053.
   const [mismatchHasSession, setMismatchHasSession] = useState(false);
+  // ADR-072 — set from `phone-exists`'s `testOtpBypass` flag (server-side, driven by the runtime
+  // TEST_*_PHONE env), so a review test number skips the MSG91 widget even when the client-side
+  // NEXT_PUBLIC_TEST_* allowlist wasn't compiled into this build.
+  const [testBypass, setTestBypass] = useState(false);
 
   useEffect(() => {
     setSelectedRole(readSelectedRoleCookie());
@@ -65,10 +69,10 @@ export default function LoginPage() {
    * the pre-auth mismatch screen's "Continue as X" button (which needs to resume login, not
    * redirect — there's no session yet at that point) can reach it without duplicating the
    * MSG91 call. */
-  async function sendOtpTo(normalized: string) {
+  async function sendOtpTo(normalized: string, bypass = false) {
     // ADR-072 — a dedicated test number (Play Store / App Store review) skips MSG91 entirely:
     // there is no real code to send, the reviewer enters the fixed server-side TEST_OTP.
-    if (isTestPhoneNumber(normalized)) {
+    if (bypass || isTestPhoneNumber(normalized)) {
       setPhoneNumber(normalized);
       setStep("otp");
       resendTimer.start();
@@ -103,8 +107,14 @@ export default function LoginPage() {
       // auto-creates an account on any successful OTP verification (ADR-013), a
       // login page shouldn't text a code to a number with no account at all.
       const existsRes = await fetch(`/api/auth-helpers/phone-exists?phone=${encodeURIComponent(normalized)}`);
-      const existsData: { exists: boolean; hasRealName: boolean; accountType: SelectedRole | null } =
-        await existsRes.json();
+      const existsData: {
+        exists: boolean;
+        hasRealName: boolean;
+        accountType: SelectedRole | null;
+        testOtpBypass?: boolean;
+      } = await existsRes.json();
+      const bypass = existsData.testOtpBypass === true;
+      setTestBypass(bypass);
       if (!existsData.exists) {
         setServerError(NO_ACCOUNT);
         return;
@@ -120,7 +130,7 @@ export default function LoginPage() {
       }
 
       proceeded = true;
-      await sendOtpTo(normalized);
+      await sendOtpTo(normalized, bypass);
     } catch (err) {
       setServerError(err instanceof Error ? err.message : "Could not send the verification code. Please try again.");
     } finally {
@@ -134,7 +144,7 @@ export default function LoginPage() {
     if (!resendTimer.canResend) return;
     setServerError(null);
     // ADR-072 — nothing to resend for a test number; just reset the timer.
-    if (isTestPhoneNumber(phoneNumber)) {
+    if (testBypass || isTestPhoneNumber(phoneNumber)) {
       resendTimer.start();
       return;
     }
@@ -161,9 +171,8 @@ export default function LoginPage() {
       // to the backend, which accepts it only via the `test-otp-bypass` allowlist. Otherwise the
       // widget verifies the code against MSG91 in-browser and hands back an opaque access token —
       // our backend re-verifies that token server-side before Better Auth issues a session.
-      const codeForBackend = isTestPhoneNumber(phoneNumber)
-        ? otpCode
-        : (await widget.verifyOtp(otpCode)).message;
+      const codeForBackend =
+        testBypass || isTestPhoneNumber(phoneNumber) ? otpCode : (await widget.verifyOtp(otpCode)).message;
       const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: codeForBackend });
       if (error) {
         const message = error.message ?? "Invalid or expired code. Please try again.";
@@ -504,7 +513,7 @@ export default function LoginPage() {
                     setSelectedRole(mismatch.currentType);
                     setMismatch(null);
                     setStep("phone");
-                    void sendOtpTo(phoneNumber);
+                    void sendOtpTo(phoneNumber, testBypass);
                   }}
                 >
                   {sendingOtp

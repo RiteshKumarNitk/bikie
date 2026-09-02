@@ -45,6 +45,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
   // builds only — null in debug mode, where the backend-proxied path needs no session tracking).
   OtpChannel _otpChannel = OtpChannel.sms;
   String? _reqId;
+  // ADR-072 — from `phone-exists`'s `testOtpBypass`; skips MSG91 for a review test number even
+  // when this build never received the --dart-define test numbers.
+  bool _testBypass = false;
 
   final _emailFormKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -90,6 +93,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       // auto-creates an account on any successful verification (ADR-013),
       // so a login screen shouldn't OTP a number with no account at all.
       final result = await repo.phoneExists(normalized);
+      _testBypass = result.testOtpBypass;
       if (!result.exists) {
         setState(() => _error = _noAccountError);
         return;
@@ -106,7 +110,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
         });
         return;
       }
-      final sendResult = await repo.sendOtp(normalized, channel: _otpChannel);
+      final sendResult = await repo.sendOtp(normalized, channel: _otpChannel, testBypass: _testBypass);
       setState(() {
         _phoneNumber = normalized;
         _reqId = sendResult.reqId;
@@ -126,7 +130,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
     if (!canResend) return;
     setState(() => _sendingOtp = true);
     try {
-      await ref.read(authRepositoryProvider).resendOtp(_phoneNumber, reqId: _reqId, channel: _otpChannel);
+      await ref
+          .read(authRepositoryProvider)
+          .resendOtp(_phoneNumber, reqId: _reqId, channel: _otpChannel, testBypass: _testBypass);
       startResendCountdown();
       _fetchDevOtp(_phoneNumber);
       if (mounted) showAppToast(context, 'Verification code resent', variant: AppToastVariant.success);

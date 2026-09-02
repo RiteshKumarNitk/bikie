@@ -21,10 +21,13 @@ class OtpSendResult {
   final String? reqId;
 }
 
-/// `{ exists, hasRealName, accountType }` from `GET /api/auth-helpers/phone-exists`.
+/// `{ exists, hasRealName, accountType, testOtpBypass }` from `GET /api/auth-helpers/phone-exists`.
 /// ADR-053 — `accountType` ('RIDER' | 'SERVICE_PROVIDER') is null when `exists` is false; lets
 /// the caller catch a Rider-vs-Service-Provider mismatch before ever sending an OTP.
-typedef PhoneExistsResult = ({bool exists, bool hasRealName, String? accountType});
+/// ADR-072 — `testOtpBypass` is true when the backend's runtime `TEST_*_PHONE` allowlist covers
+/// this number, so the app can skip MSG91 even in a release build that never got the
+/// `--dart-define` test numbers.
+typedef PhoneExistsResult = ({bool exists, bool hasRealName, String? accountType, bool testOtpBypass});
 
 class AuthRepository {
   AuthRepository(this._dio, this._storage);
@@ -60,11 +63,16 @@ class AuthRepository {
   /// `TEST_RIDER_PHONE`/`TEST_SERVICE_PROVIDER_PHONE` fixed-code mechanisms — MSG91's real widget
   /// would reject a fake test code before our backend ever saw it, so those two flows can't share
   /// one code path (see `Msg91OtpRepository`'s doc comment for the full reasoning).
-  Future<OtpSendResult> sendOtp(String phoneNumber, {OtpChannel channel = OtpChannel.sms}) {
+  Future<OtpSendResult> sendOtp(
+    String phoneNumber, {
+    OtpChannel channel = OtpChannel.sms,
+    bool testBypass = false,
+  }) {
     // ADR-072 — a dedicated test number (Play Store / App Store review) skips MSG91 entirely:
     // no real code is sent, the reviewer enters the fixed server-side TEST_OTP, and `verifyOtp`
-    // (reqId == null) posts it straight to the backend's test-bypass allowlist.
-    if (isTestPhoneNumber(phoneNumber)) {
+    // (reqId == null) posts it straight to the backend's test-bypass allowlist. `testBypass`
+    // comes from `phone-exists` so this works even when the build lacks the --dart-define numbers.
+    if (testBypass || isTestPhoneNumber(phoneNumber)) {
       return Future.value(const OtpSendResult());
     }
     if (kDebugMode) {
@@ -84,9 +92,14 @@ class AuthRepository {
   /// in release mode it's a real MSG91 `retryOTP` against the session `reqId` from the original
   /// send — [reqId] must be non-null on that path (the caller's responsibility to track it,
   /// same as web's `use-msg91-widget.ts` tracks widget session state internally).
-  Future<void> resendOtp(String phoneNumber, {String? reqId, OtpChannel channel = OtpChannel.sms}) {
+  Future<void> resendOtp(
+    String phoneNumber, {
+    String? reqId,
+    OtpChannel channel = OtpChannel.sms,
+    bool testBypass = false,
+  }) {
     // ADR-072 — nothing to resend for a test number.
-    if (isTestPhoneNumber(phoneNumber)) return Future.value();
+    if (testBypass || isTestPhoneNumber(phoneNumber)) return Future.value();
     if (kDebugMode) {
       return apiGuard(() async {
         await _dio.post('/api/otp/mobile/send', data: {'phoneNumber': phoneNumber});
@@ -132,6 +145,7 @@ class AuthRepository {
         exists: res.data['exists'] as bool,
         hasRealName: res.data['hasRealName'] as bool,
         accountType: res.data['accountType'] as String?,
+        testOtpBypass: res.data['testOtpBypass'] as bool? ?? false,
       );
     });
   }
