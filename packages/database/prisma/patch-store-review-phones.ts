@@ -56,20 +56,41 @@ function requiredPhone(envVar: string): string {
   return e164;
 }
 
-/** Assign `phoneNumber` (unique) to the account behind `email`, refusing to steal it from a
- * different user. No-op when already set to the same value. */
+/** A Better Auth phone-signup stub: synthetic `phone-<digits>@bikie.local` email + `name` still
+ * equal to the raw phone number (`getTempName`/`tempEmailForPhone` in `@bikie/auth`), i.e. a
+ * number that was OTP-verified once and never onboarded — no real data. Safe to take the number
+ * back from. Anything else (a real onboarded account) is not touched. */
+function isPhoneSignupStub(u: { email: string; name: string }, phoneNumber: string): boolean {
+  const digits = phoneNumber.replace(/\D/g, "");
+  const nameDigits = u.name.replace(/\D/g, "");
+  return /^phone-\d+@bikie\.local$/.test(u.email) && (u.name === phoneNumber || nameDigits === digits);
+}
+
+/** Assign `phoneNumber` (unique) to the account behind `email`. Reclaims the number from an
+ * un-onboarded phone-signup stub; refuses to steal it from a real account. No-op when already
+ * set to the same value. */
 async function patchPhone(email: string, phoneNumber: string): Promise<string> {
   const user = await prisma.user.findUnique({ where: { email }, select: { id: true, phoneNumber: true } });
   if (!user) {
     throw new Error(`No user with email ${email} in this database — run the seed first, or check DATABASE_URL.`);
   }
 
-  const holder = await prisma.user.findUnique({ where: { phoneNumber }, select: { id: true, email: true } });
+  const holder = await prisma.user.findUnique({
+    where: { phoneNumber },
+    select: { id: true, email: true, name: true },
+  });
   if (holder && holder.id !== user.id) {
-    throw new Error(
-      `${phoneNumber} is already on a different account (${holder.email}). ` +
-        `Pick a test number that isn't in use, or clear it from that account first.`,
-    );
+    if (!isPhoneSignupStub(holder, phoneNumber)) {
+      throw new Error(
+        `${phoneNumber} is already on a real account (${holder.email}). ` +
+          `Pick a test number that isn't in use, or clear it from that account first.`,
+      );
+    }
+    await prisma.user.update({
+      where: { id: holder.id },
+      data: { phoneNumber: null, phoneNumberVerified: false },
+    });
+    console.log(`  ↺ reclaimed ${phoneNumber} from un-onboarded stub ${holder.email}`);
   }
 
   if (user.phoneNumber === phoneNumber) {
