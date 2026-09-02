@@ -4,15 +4,17 @@
 
 The Play Store reviewer hit "No account found for this number. Sign up instead." because both
 login screens call `GET /api/auth-helpers/phone-exists` *before* any OTP step, and the bypass
-number only resolves once the demo account actually carries it as `User.phoneNumber` — the seed's
-ADR-072 block was never run against production. Added a scoped, idempotent
+number only resolves once the demo account actually carries it as `user.phoneNumber` — and the
+seed (`SEED_DB=false` in `docker-compose.yml`) has never run against production, so
+`rider@bikie.app` / `partner@bikie.app` don't exist there at all. Added a scoped, idempotent
 `packages/database/prisma/patch-store-review-phones.ts` (npm script `db:patch:store-review`) that
-touches only `rider@bikie.app` / `partner@bikie.app`: sets `phoneNumber` + `phoneNumberVerified`
-from `TEST_RIDER_PHONE` / `TEST_SERVICE_PROVIDER_PHONE`, and for the Service Provider ensures
-`accountType`/`role`, an APPROVED `Partner` profile and one ACTIVE `PartnerMembership`. It refuses
-to run if the two numbers are equal or if a number already belongs to another account.
-`.env.example` now spells out that the two numbers must differ and that the account must carry the
-number for `phone-exists` to pass. No schema or migration change.
+**creates** those two accounts if missing (phone+OTP login needs no password row) and otherwise
+just updates them: `phoneNumber` + `phoneNumberVerified` from `TEST_RIDER_PHONE` /
+`TEST_SERVICE_PROVIDER_PHONE`, `accountType`/`role`, and for the Service Provider an APPROVED
+`Partner` profile (+ `partnerStatus`, else `partner/layout.tsx` bounces to `/partner-onboarding`)
+and one ACTIVE `PartnerMembership`. It reclaims the number from an un-onboarded
+`phone-…@bikie.local` stub but refuses to take it from a real account, and refuses to run if the
+two numbers are equal. Ends with a read-back verification block. No schema or migration change.
 
 ## 2026-08-30 — Store-review sign-in, mobile "Delete Account", web email-login button (ADR-072)
 

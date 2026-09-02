@@ -3,13 +3,17 @@
 ## 2026-09-02 — Fix: store-review test number rejected as "does not exist" (ADR-072 follow-up)
 
 Both login screens check `GET /api/auth-helpers/phone-exists` before the OTP step, so a bypass
-number only works once the demo account carries it as `User.phoneNumber` — and the seed's ADR-072
-block was never run against production, so the reviewer got "No account found for this number".
-New scoped, idempotent `packages/database/prisma/patch-store-review-phones.ts` (npm script
-`db:patch:store-review`) patches only `rider@bikie.app` / `partner@bikie.app`: `phoneNumber` +
-verified from `TEST_RIDER_PHONE` / `TEST_SERVICE_PROVIDER_PHONE`, plus SP `accountType`/`role`,
-APPROVED `Partner` profile and one ACTIVE `PartnerMembership`. Refuses to run if the two numbers
-match or if a number is already on another account. `.env.example` clarified. No schema change.
+number only works once the demo account carries it as `user.phoneNumber` — and the seed
+(`SEED_DB=false` in production) has never run there, so `rider@bikie.app` / `partner@bikie.app`
+don't exist in the prod DB. New scoped, idempotent
+`packages/database/prisma/patch-store-review-phones.ts` (npm script `db:patch:store-review`)
+**creates** the two accounts if missing (phone+OTP needs no password row) else updates them:
+`phoneNumber` + verified from `TEST_RIDER_PHONE` / `TEST_SERVICE_PROVIDER_PHONE`, `accountType`/
+`role`, and for the SP an APPROVED `Partner` profile + `partnerStatus` + one ACTIVE
+`PartnerMembership`. Reclaims the number from an un-onboarded `phone-…@bikie.local` stub, refuses
+to take it from a real account, refuses equal numbers. Prints a verification read-back. Run in
+production inside the `web` container (`docker compose exec … tsx prisma/patch-store-review-phones.ts`).
+No schema change.
 
 ## 2026-08-30 — Store-review sign-in, mobile "Delete Account", web email-login button (ADR-072)
 

@@ -1,38 +1,67 @@
-// ADR-072 — one-off, idempotent production patch.
+// ADR-072 — one-off, idempotent Play Store / App Store review sign-in fix.
 //
-// The Play Store / App Store reviewer signs in with a fixed test phone number + the server-side
-// `TEST_OTP`. Both login screens first call `GET /api/auth-helpers/phone-exists`
-// (`UserService.phoneNumberExists` -> `findUserByPhoneNumber`) and abort with
-// "No account found for this number. Sign up instead." when no `User.phoneNumber` matches — so the
-// OTP bypass in `packages/services/.../test-otp-bypass.ts` is never even reached.
+// The reviewer signs in with a fixed test phone number + the server-side `TEST_OTP`. Both login
+// screens first call `GET /api/auth-helpers/phone-exists` (`UserService.phoneNumberExists` ->
+// `findUserByPhoneNumber`) and abort with "No account found for this number. Sign up instead."
+// when no `user.phoneNumber` matches — so the OTP bypass in
+// `packages/services/.../test-otp-bypass.ts` is never even reached.
 //
-// The seed's ADR-072 block assigns those numbers to `rider@bikie.app` / `partner@bikie.app`, but a
-// full `prisma/seed.ts` run against production also rewrites SOS fixtures, personas and
-// memberships. This script does ONLY the ADR-072 slice, idempotently:
+// The demo accounts are only created by `prisma/seed.ts`, which is NOT run in production
+// (`SEED_DB=false` in docker-compose.yml) and, run in full, would also rewrite SOS fixtures,
+// personas and plans. This script does ONLY the ADR-072 slice, idempotently, and CREATES the two
+// accounts if they are missing (phone+OTP login needs no password row, so a plain upsert is
+// enough — no Better Auth HTTP sign-up required):
 //
-//   1. rider@bikie.app    -> phoneNumber = TEST_RIDER_PHONE            (+ phoneNumberVerified)
-//   2. partner@bikie.app  -> phoneNumber = TEST_SERVICE_PROVIDER_PHONE (+ phoneNumberVerified)
-//                         -> accountType SERVICE_PROVIDER / role PARTNER (ADR-055 safety)
-//                         -> Partner profile APPROVED + isVerified
-//                         -> one ACTIVE PartnerMembership so gated features are reachable
+//   1. rider@bikie.app    -> RIDER / RENTER,  phoneNumber = TEST_RIDER_PHONE            (verified)
+//   2. partner@bikie.app  -> SERVICE_PROVIDER / PARTNER, phoneNumber = TEST_SERVICE_PROVIDER_PHONE
+//                            (verified) + APPROVED Partner profile + partnerStatus APPROVED
+//                            (else `partner/layout.tsx` bounces to /partner-onboarding)
+//                          + one ACTIVE PartnerMembership so gated provider features are reachable
 //
-// Run it once against the target database. Locally:
+// It never touches any other row, and re-running changes nothing.
 //
-//   corepack pnpm --filter @bikie/database db:patch:store-review
+// --- Run it against the PRODUCTION database ---
 //
-// Against production, point DATABASE_URL at the prod database for this invocation, e.g.:
+// The prod DB host (`postgres`) only resolves inside the Compose network, and the prod
+// `DATABASE_URL` / `TEST_*_PHONE` are already in the running `web` container's env, so run it
+// there (the image ships the full monorepo source + tsx):
 //
-//   DATABASE_URL="postgres://…prod…" TEST_RIDER_PHONE=+9198… TEST_SERVICE_PROVIDER_PHONE=+9198… \
-//     corepack pnpm --filter @bikie/database exec tsx prisma/patch-store-review-phones.ts
+//   cd /opt/bikie
+//   git pull --ff-only origin master
+//   docker compose cp packages/database/prisma/patch-store-review-phones.ts \
+//     web:/app/packages/database/prisma/patch-store-review-phones.ts
+//   docker compose exec -w /app/packages/database web pnpm exec tsx prisma/patch-store-review-phones.ts
 //
-// TEST_RIDER_PHONE / TEST_SERVICE_PROVIDER_PHONE must be the SAME numbers configured on the web
-// backend env and baked into the mobile review build (see ADR-072). Re-running changes nothing.
+// Locally against a dev DB: `corepack pnpm --filter @bikie/database db:patch:store-review`
+// (reads apps/web/.env.local — do NOT use that against prod).
 
 import { prisma } from "../src/client";
 
-const RIDER_EMAIL = "rider@bikie.app";
-const PROVIDER_EMAIL = "partner@bikie.app";
 const SP_PLAN_NAME = "Service Provider Membership";
+const LEGACY_FREE_PLAN_ID = "legacy-free-partner-plan"; // inserted by 20260811100000 migration — always present
+
+type Persona = {
+  readonly email: string;
+  readonly envVar: string;
+  readonly name: string;
+  readonly accountType: "RIDER" | "SERVICE_PROVIDER";
+  readonly role: "RENTER" | "PARTNER";
+};
+
+const RIDER: Persona = {
+  email: "rider@bikie.app",
+  envVar: "TEST_RIDER_PHONE",
+  name: "Demo Rider",
+  accountType: "RIDER",
+  role: "RENTER",
+};
+const PROVIDER: Persona = {
+  email: "partner@bikie.app",
+  envVar: "TEST_SERVICE_PROVIDER_PHONE",
+  name: "Demo Service Provider",
+  accountType: "SERVICE_PROVIDER",
+  role: "PARTNER",
+};
 
 /** Same normalization as `toE164Phone` in `packages/services/.../communications/domain/phone.ts`
  * (inlined — `@bikie/database` sits below `@bikie/services` in the layering and must not import
@@ -66,113 +95,146 @@ function isPhoneSignupStub(u: { email: string; name: string }, phoneNumber: stri
   return /^phone-\d+@bikie\.local$/.test(u.email) && (u.name === phoneNumber || nameDigits === digits);
 }
 
-/** Assign `phoneNumber` (unique) to the account behind `email`. Reclaims the number from an
- * un-onboarded phone-signup stub; refuses to steal it from a real account. No-op when already
- * set to the same value. */
-async function patchPhone(email: string, phoneNumber: string): Promise<string> {
-  const user = await prisma.user.findUnique({ where: { email }, select: { id: true, phoneNumber: true } });
-  if (!user) {
-    throw new Error(`No user with email ${email} in this database — run the seed first, or check DATABASE_URL.`);
-  }
-
+/** Free the target phone number if an un-onboarded stub currently holds it; refuse if a real
+ * account does. */
+async function freePhoneNumber(phoneNumber: string, keepUserId: string | null): Promise<void> {
   const holder = await prisma.user.findUnique({
     where: { phoneNumber },
     select: { id: true, email: true, name: true },
   });
-  if (holder && holder.id !== user.id) {
-    if (!isPhoneSignupStub(holder, phoneNumber)) {
-      throw new Error(
-        `${phoneNumber} is already on a real account (${holder.email}). ` +
-          `Pick a test number that isn't in use, or clear it from that account first.`,
-      );
-    }
-    await prisma.user.update({
-      where: { id: holder.id },
-      data: { phoneNumber: null, phoneNumberVerified: false },
-    });
-    console.log(`  ↺ reclaimed ${phoneNumber} from un-onboarded stub ${holder.email}`);
+  if (!holder || holder.id === keepUserId) return;
+  if (!isPhoneSignupStub(holder, phoneNumber)) {
+    throw new Error(
+      `${phoneNumber} is already on a real account (${holder.email}). ` +
+        `Pick a test number that isn't in use, or clear it from that account first.`,
+    );
   }
+  await prisma.user.update({ where: { id: holder.id }, data: { phoneNumber: null, phoneNumberVerified: false } });
+  console.log(`  ↺ reclaimed ${phoneNumber} from un-onboarded stub ${holder.email}`);
+}
 
-  if (user.phoneNumber === phoneNumber) {
-    await prisma.user.update({ where: { id: user.id }, data: { phoneNumberVerified: true } });
-    console.log(`  = ${email}: phoneNumber already ${phoneNumber} (ensured verified)`);
-  } else {
-    await prisma.user.update({
-      where: { id: user.id },
-      data: { phone: phoneNumber, phoneNumber, phoneNumberVerified: true },
-    });
-    console.log(`  ✓ ${email}: phoneNumber -> ${phoneNumber} (verified)`);
-  }
+/** Create-or-update the persona's account with the verified phone number, account type and role. */
+async function ensureAccount(persona: Persona, phoneNumber: string): Promise<string> {
+  const existing = await prisma.user.findUnique({ where: { email: persona.email }, select: { id: true } });
+  await freePhoneNumber(phoneNumber, existing?.id ?? null);
+
+  const spFields = persona.accountType === "SERVICE_PROVIDER" ? { partnerStatus: "APPROVED" as const } : {};
+  const user = await prisma.user.upsert({
+    where: { email: persona.email },
+    update: {
+      phone: phoneNumber,
+      phoneNumber,
+      phoneNumberVerified: true,
+      accountType: persona.accountType,
+      role: persona.role,
+      accountStatus: "ACTIVE",
+      ...spFields,
+    },
+    create: {
+      email: persona.email,
+      name: persona.name,
+      emailVerified: true,
+      phone: phoneNumber,
+      phoneNumber,
+      phoneNumberVerified: true,
+      accountType: persona.accountType,
+      role: persona.role,
+      accountStatus: "ACTIVE",
+      ...spFields,
+    },
+    select: { id: true },
+  });
+
+  console.log(
+    `  ${existing ? "=" : "✓"} ${persona.email}: ${existing ? "updated" : "CREATED"} ` +
+      `(${persona.accountType}/${persona.role}, phoneNumber ${phoneNumber}, verified)`,
+  );
   return user.id;
 }
 
-async function ensureServiceProviderCapability(userId: string): Promise<void> {
-  // ADR-055 — role follows accountType. A prod row seeded before ADR-055 may still be RENTER/RIDER.
-  await prisma.user.update({
-    where: { id: userId },
-    data: { accountType: "SERVICE_PROVIDER", role: "PARTNER", partnerStatus: "APPROVED" },
+async function ensureServiceProviderRecords(userId: string): Promise<void> {
+  // `partner/layout.tsx` redirects to /partner-onboarding when `session.user.partnerStatus` is
+  // null, so the Partner row + the denormalized `user.partnerStatus` must both say APPROVED.
+  const now = new Date();
+  const partner = await prisma.partner.findUnique({ where: { userId }, select: { id: true } });
+  await prisma.partner.upsert({
+    where: { userId },
+    update: { verificationStatus: "APPROVED", isVerified: true, reviewedAt: now },
+    create: {
+      userId,
+      businessName: "BIKIE Demo Service Provider",
+      type: "MECHANIC",
+      city: "Bengaluru",
+      description: "Demo Service Provider account for app-store review.",
+      verificationStatus: "APPROVED",
+      isVerified: true,
+      submittedAt: now,
+      reviewedAt: now,
+    },
   });
-
-  const partner = await prisma.partner.findUnique({ where: { userId }, select: { id: true, verificationStatus: true } });
-  if (!partner) {
-    console.log(
-      `  ! ${PROVIDER_EMAIL} has no Partner profile — the reviewer can sign in but provider features stay gated. ` +
-        `Run the full seed, or create/approve the profile in /admin.`,
-    );
-  } else if (partner.verificationStatus !== "APPROVED") {
-    await prisma.partner.update({
-      where: { userId },
-      data: { verificationStatus: "APPROVED", isVerified: true, reviewedAt: new Date() },
-    });
-    console.log(`  ✓ ${PROVIDER_EMAIL}: Partner profile -> APPROVED`);
-  } else {
-    console.log(`  = ${PROVIDER_EMAIL}: Partner profile already APPROVED`);
-  }
+  console.log(`  ${partner ? "=" : "✓"} ${PROVIDER.email}: Partner profile ${partner ? "->" : "CREATED"} APPROVED`);
 
   const activeMembership = await prisma.partnerMembership.findFirst({
-    where: { userId, status: "ACTIVE", endDate: { gte: new Date() } },
+    where: { userId, status: "ACTIVE", endDate: { gte: now } },
     select: { id: true },
   });
   if (activeMembership) {
-    console.log(`  = ${PROVIDER_EMAIL}: already has an ACTIVE PartnerMembership`);
+    console.log(`  = ${PROVIDER.email}: already has an ACTIVE PartnerMembership`);
     return;
   }
 
   const plan =
     (await prisma.partnerMembershipPlan.findFirst({ where: { name: SP_PLAN_NAME } })) ??
-    (await prisma.partnerMembershipPlan.findFirst({
-      where: { isActive: true, price: { gt: 0 } },
-      orderBy: { sortOrder: "asc" },
-    }));
+    (await prisma.partnerMembershipPlan.findFirst({ where: { id: LEGACY_FREE_PLAN_ID } })) ??
+    (await prisma.partnerMembershipPlan.findFirst({ orderBy: { createdAt: "asc" } }));
   if (!plan) {
-    console.log(`  ! No PartnerMembershipPlan found — cannot grant a membership. Provider paywall stays up.`);
+    console.log(`  ! No PartnerMembershipPlan row exists — cannot grant a membership. Provider paywall stays up.`);
     return;
   }
 
-  const startDate = new Date();
+  const startDate = now;
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + plan.durationDays);
   await prisma.partnerMembership.create({
     data: { userId, planId: plan.id, startDate, endDate, status: "ACTIVE" },
   });
-  console.log(`  ✓ ${PROVIDER_EMAIL}: ACTIVE PartnerMembership on "${plan.name}" until ${endDate.toISOString().slice(0, 10)}`);
+  console.log(
+    `  ✓ ${PROVIDER.email}: ACTIVE PartnerMembership on "${plan.name}" until ${endDate.toISOString().slice(0, 10)}`,
+  );
+}
+
+async function verify(): Promise<void> {
+  console.log(`\nVerification (read-back from this database):`);
+  for (const persona of [RIDER, PROVIDER]) {
+    const u = await prisma.user.findUnique({
+      where: { email: persona.email },
+      select: { email: true, name: true, phoneNumber: true, phoneNumberVerified: true, accountType: true, role: true, partnerStatus: true },
+    });
+    console.log(`  ${persona.email}:`, JSON.stringify(u));
+  }
+  const membership = await prisma.partnerMembership.findFirst({
+    where: { user: { email: PROVIDER.email }, status: "ACTIVE" },
+    select: { status: true, endDate: true, plan: { select: { name: true } } },
+  });
+  console.log(`  ${PROVIDER.email} membership:`, JSON.stringify(membership));
 }
 
 async function main() {
-  const riderPhone = requiredPhone("TEST_RIDER_PHONE");
-  const providerPhone = requiredPhone("TEST_SERVICE_PROVIDER_PHONE");
+  const riderPhone = requiredPhone(RIDER.envVar);
+  const providerPhone = requiredPhone(PROVIDER.envVar);
   if (riderPhone === providerPhone) {
     throw new Error(
-      `TEST_RIDER_PHONE and TEST_SERVICE_PROVIDER_PHONE are the same number (${riderPhone}). ` +
+      `${RIDER.envVar} and ${PROVIDER.envVar} are the same number (${riderPhone}). ` +
         `They must differ — a phone number maps to exactly one account.`,
     );
   }
 
   console.log(`Patching store-review sign-in accounts on this database:`);
-  await patchPhone(RIDER_EMAIL, riderPhone);
-  const providerId = await patchPhone(PROVIDER_EMAIL, providerPhone);
-  await ensureServiceProviderCapability(providerId);
-  console.log(`Done. Sign in with the fixed TEST_OTP as either number.`);
+  await ensureAccount(RIDER, riderPhone);
+  const providerId = await ensureAccount(PROVIDER, providerPhone);
+  await ensureServiceProviderRecords(providerId);
+  await verify();
+  console.log(`\nDone. Sign in with the fixed TEST_OTP as either number.`);
 }
 
 main()
