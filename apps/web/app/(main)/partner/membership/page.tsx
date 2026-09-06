@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { PaymentModal } from "@/components/membership/PaymentModal";
+import { authClient } from "@/lib/auth-client";
+import { PaymentModal, prefillFromSessionUser } from "@/components/membership/PaymentModal";
 import { BillingHistory } from "@/components/membership/BillingHistory";
 
 interface Plan {
@@ -41,6 +42,7 @@ function billingPeriodLabel(durationDays: number): string {
  * match this app's existing pattern for optional query params on client pages (see
  * `(auth)/signup/page.tsx`) and avoid a Suspense-boundary requirement for one boolean flag. */
 export default function PartnerMembershipPage() {
+  const { data: session } = authClient.useSession();
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
@@ -221,6 +223,7 @@ export default function PartnerMembershipPage() {
       {checkoutPlan && (
         <PaymentModal
           plan={checkoutPlan}
+          prefill={prefillFromSessionUser(session?.user)}
           checkoutUrl="/api/partner-membership/checkout"
           purchaseUrl="/api/partner-membership/purchase"
           onClose={() => setCheckoutPlan(null)}

@@ -39,7 +39,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ razorpayConfigured: false });
   }
 
-  const order = await RazorpayService.createOrder(plan.price, `partner_membership_${session.user.id}_${Date.now()}`);
+  const order = await RazorpayService.createOrder(
+    plan.price,
+    `partner_membership_${session.user.id}_${Date.now()}`,
+    { userId: session.user.id, planId: plan.id, planName: plan.name, accountType: "SERVICE_PROVIDER" },
+  );
   if (!order) {
     return NextResponse.json({ error: "CHECKOUT_UNAVAILABLE", message: "Payment checkout is unavailable right now." }, { status: 503 });
   }

@@ -1,5 +1,13 @@
 # BIKIE — Roadmap
 
+## Razorpay Test Credentials + Checkout Client Hardening (2026-09-06, ADR-073)
+Wired a Razorpay test-mode key into the (already-built) membership checkout and brought the
+client up to Razorpay's own Standard Checkout guide: the order now carries buyer/plan `notes`
+for dashboard + future-webhook reconciliation, the checkout modal handles `payment.failed`,
+prefills the signed-in user's contact details, and uses the BIKIE brand colour. The Key ID is in
+place; adding the Key Secret is all that's left to run real test payments. Still deferred: the
+`order.paid` webhook, rejecting a plan/amount mismatch on purchase, and mobile checkout.
+
 ## Store-Review Sign-In + Mobile "Delete Account" (2026-08-30, ADR-072)
 Google Play / App Store review can't receive a real OTP, so a dedicated test Rider / Service
 Provider number + a fixed code now signs in against the production backend — but only when the

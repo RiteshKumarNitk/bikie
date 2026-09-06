@@ -1,5 +1,16 @@
 # BIKIE Changelog
 
+## 2026-09-06 — Razorpay test credentials wired in; checkout client brought up to Razorpay's docs (ADR-073)
+
+The membership Razorpay flow (built in ADR-043/069/070, never run) is activated with a test-mode
+Key ID. The checkout client was hardened against Razorpay's Standard Checkout guide: orders carry
+`notes` (buyer id / plan id / plan name / account type) for reconciliation and a future
+`order.paid` webhook; the modal handles `payment.failed`, prefills the signed-in user's contact
+details, and uses the brand colour. Server-side HMAC verification / idempotency / dev-fallback
+gate unchanged. Add `RAZORPAY_KEY_SECRET` to `apps/web/.env` and restart to run real test
+payments. Still deferred: `order.paid` webhook, plan/amount mismatch check on `/purchase`, mobile
+checkout. See ADR-073.
+
 ## 2026-09-02 — Fix: store-review test number rejected as "does not exist" (ADR-072 follow-up)
 
 Both login screens check `GET /api/auth-helpers/phone-exists` before the OTP step, so a bypass

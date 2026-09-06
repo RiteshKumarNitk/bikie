@@ -36,7 +36,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "PLAN_NOT_FOUND" }, { status: 404 });
   }
 
-  const order = await RazorpayService.createOrder(plan.price, `membership_${session.user.id}_${Date.now()}`);
+  const order = await RazorpayService.createOrder(
+    plan.price,
+    `membership_${session.user.id}_${Date.now()}`,
+    { userId: session.user.id, planId: plan.id, planName: plan.name, accountType: "RIDER" },
+  );
   if (!order) {
     return NextResponse.json({ error: "CHECKOUT_UNAVAILABLE", message: "Payment checkout is unavailable right now." }, { status: 503 });
   }

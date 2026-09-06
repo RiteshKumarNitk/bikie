@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-06 — Razorpay test credentials wired in; checkout client brought up to Razorpay's docs (ADR-073)
+
+The membership Razorpay flow (built in ADR-043/069/070 but never run — the keys were blank) is
+now activated with a Razorpay **test-mode** Key ID. Alongside it, the checkout client was
+hardened against Razorpay's own Standard Checkout guide: every order now carries `notes` with the
+buyer id, plan id, plan name and account type (for dashboard reconciliation and a future
+`order.paid` webhook); the checkout modal now handles `payment.failed` so a terminal failure
+shows in the UI instead of hanging; it prefills the signed-in user's name, email and phone; and
+it uses the BIKIE brand colour. The server-side HMAC signature verification, idempotency and
+dev-fallback gate were already correct and unchanged. **To go live for testing, add
+`RAZORPAY_KEY_SECRET` to `apps/web/.env`** (Razorpay Dashboard → Account & Settings → API Keys) and
+restart the dev server; until then the simulated checkout still runs. Still deferred: the
+`order.paid` webhook, rejecting a plan/amount mismatch on `/purchase`, and mobile checkout. See
+ADR-073.
+
 ## 2026-09-02 — Fix: store-review test number rejected as "does not exist" (ADR-072 follow-up)
 
 The Play Store reviewer hit "No account found for this number. Sign up instead." because both

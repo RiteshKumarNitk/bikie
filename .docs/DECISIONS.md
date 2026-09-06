@@ -3616,3 +3616,35 @@ changes:
      `UserService.phoneNumberExists` return type gains `testOtpBypass: boolean`. Mobile
      `app_config.dart` fallbacks are also filled with the two live review numbers. No schema
      change; backend `vitest` 262/262, `flutter analyze`/`flutter test` unchanged.
+
+## ADR-073: Razorpay activated with test credentials; Standard Checkout client hardened to match Razorpay's own docs
+
+- **Context.** ADR-043/069/070 built the full Razorpay Standard Checkout flow (server-side order
+  creation, `checkout.js` + handler function, server-side `HMAC-SHA256(order_id|payment_id, secret)`
+  verification, idempotency, dev-fallback gate) but it had never run — `RAZORPAY_KEY_ID` /
+  `RAZORPAY_KEY_SECRET` were blank. A Razorpay **test-mode** Key ID (`rzp_test_…`) is now available;
+  re-reading Razorpay's Standard Checkout integration guide surfaced a few client-side gaps.
+- **Decision.**
+  - **`RazorpayService.createOrder` now stamps `notes`** on the order — `{ userId, planId,
+    planName, accountType }`. Both checkout routes pass it. This is what a future `order.paid`
+    webhook (still the one unbuilt piece — ADR-070 §remaining) and the Razorpay dashboard need to
+    reconcile a payment back to a buyer/plan without trusting the client callback.
+  - **`PaymentModal.tsx`** gains, per Razorpay's guide: an `rzp.on("payment.failed", …)` handler
+    so a terminal failure surfaces in our UI instead of the modal sitting silent; `theme.color`
+    (BIKIE accent, literal hex — checkout runs in Razorpay's iframe); and `prefill`
+    (name/email/contact from the Better Auth session, placeholder `@bikie.local`/`@bikie.app`
+    emails dropped) — Razorpay's own recommendation for conversion. New optional `prefill` prop,
+    wired from `/membership` and `/partner/membership` (the latter gained `authClient.useSession()`).
+    A shared `prefillFromSessionUser()` helper is exported from the modal.
+  - **The test Key ID is set in `apps/web/.env`** (gitignored, key IDs are public anyway); the
+    **Key Secret is left for the operator** to add — `isConfigured()` needs both, so nothing
+    activates until then, and the dev-fallback simulated checkout keeps working meanwhile.
+  - **Not changed:** the signature-verification formula (already exactly Razorpay's), the
+    order↔user↔plan *binding* (the route still trusts the client's `planId` on `/purchase` — the
+    `notes` stamp is reconciliation data, not enforcement; tightening that to reject a
+    plan/amount mismatch against the stored order is still the audit's P0 item, deferred with the
+    webhook). No webhook. No mobile Razorpay (still Milestone-4).
+- **Consequences.** No schema/migration change. `.env.example` already documented the vars.
+  `tsc --noEmit` clean (`web`, `@bikie/services`); backend `vitest` 262/262; `next build` green.
+  Live end-to-end (test cards, `success@razorpay` UPI) is now possible once the Key Secret is
+  added — until then unverified beyond code review, same as ADR-043.

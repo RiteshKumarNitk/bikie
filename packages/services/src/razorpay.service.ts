@@ -45,8 +45,15 @@ export const RazorpayService = {
   },
 
   /** `amountRupees` — converted to paise (Razorpay's base unit) here so every caller works in
-   * the same rupee amounts the rest of this codebase already uses (`MembershipPlan.price`). */
-  async createOrder(amountRupees: number, receipt: string): Promise<RazorpayOrder | null> {
+   * the same rupee amounts the rest of this codebase already uses (`MembershipPlan.price`).
+   * `notes` — Razorpay's per-order key/value bag (max 15 pairs); we stamp the buyer + plan on
+   * it so a payment can be reconciled from the Razorpay dashboard or a future `order.paid`
+   * webhook without re-deriving anything from the client callback. */
+  async createOrder(
+    amountRupees: number,
+    receipt: string,
+    notes?: Record<string, string>,
+  ): Promise<RazorpayOrder | null> {
     const creds = credentials();
     if (!creds) return null;
 
@@ -54,6 +61,7 @@ export const RazorpayService = {
       amount: Math.round(amountRupees * 100),
       currency: "INR",
       receipt,
+      ...(notes ? { notes } : {}),
     });
     return { orderId: order.id, amount: Number(order.amount), currency: order.currency, keyId: creds.keyId };
   },

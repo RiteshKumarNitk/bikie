@@ -2,6 +2,18 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Razorpay test credentials + Standard Checkout client hardening (2026-09-06, ADR-073)
+
+| Task | Status |
+|---|---|
+| `RazorpayService.createOrder` stamps `notes` (`userId`/`planId`/`planName`/`accountType`); both checkout routes pass it | Completed |
+| `PaymentModal.tsx`: `rzp.on("payment.failed")` handler, `theme.color`, `prefill` (session name/email/contact, placeholder emails dropped); new `prefill` prop + exported `prefillFromSessionUser()` | Completed |
+| `/membership` + `/partner/membership` pass `prefill` (partner page gained `authClient.useSession()`) | Completed |
+| Test-mode `RAZORPAY_KEY_ID` set in `apps/web/.env` (gitignored) | Completed |
+| Verify: `tsc --noEmit` clean (web, services); `vitest` 262/262; `next build` green | Completed |
+| **Operator:** add `RAZORPAY_KEY_SECRET` to `apps/web/.env` (Razorpay Dashboard → API Keys), restart dev server, run a test payment | Blocked (client) |
+| Deferred (audit P0): reject a `planId`/amount mismatch on `/purchase` against the stored order; Razorpay `order.paid` webhook; mobile Razorpay checkout | Backlog |
+
 ## Store-review sign-in: production test-number bypass, mobile "Delete Account", web email-login button (2026-08-30, ADR-072)
 
 | Task | Status |

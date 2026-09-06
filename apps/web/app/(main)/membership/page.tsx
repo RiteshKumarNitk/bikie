@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
-import { PaymentModal } from "@/components/membership/PaymentModal";
+import { PaymentModal, prefillFromSessionUser } from "@/components/membership/PaymentModal";
 
 interface Plan {
   id: string;
@@ -169,6 +169,7 @@ export default function MembershipPage() {
       {checkoutPlan && (
         <PaymentModal
           plan={checkoutPlan}
+          prefill={prefillFromSessionUser(session?.user)}
           onClose={() => setCheckoutPlan(null)}
           onSuccess={() => handleCheckoutSuccess(checkoutPlan)}
         />

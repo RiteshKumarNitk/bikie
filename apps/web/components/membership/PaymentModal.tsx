@@ -23,10 +23,40 @@ type RazorpaySuccessResponse = {
   razorpay_signature: string;
 };
 
+type RazorpayFailureResponse = {
+  error?: { code?: string; description?: string; reason?: string; step?: string };
+};
+
+interface RazorpayInstance {
+  open: () => void;
+  on: (event: "payment.failed", handler: (response: RazorpayFailureResponse) => void) => void;
+}
+
 declare global {
   interface Window {
-    Razorpay?: new (options: Record<string, unknown>) => { open: () => void };
+    Razorpay?: new (options: Record<string, unknown>) => RazorpayInstance;
   }
+}
+
+/** Razorpay checkout `theme.color` — BIKIE accent. Kept as a literal hex (checkout runs in
+ * Razorpay's own iframe and can't read our CSS custom properties). */
+const RAZORPAY_THEME_COLOR = "#3B3A91";
+
+/** Map a Better Auth session user to Razorpay's `prefill` shape, dropping the placeholder email
+ * Better Auth generates for phone-only signups. */
+export function prefillFromSessionUser(
+  user: { name?: string | null; email?: string | null; phoneNumber?: string | null } | undefined,
+): { name?: string; email?: string; contact?: string } | undefined {
+  if (!user) return undefined;
+  const email =
+    user.email && user.email.includes("@") && !/@bikie\.(local|app)$/i.test(user.email)
+      ? user.email
+      : undefined;
+  return {
+    ...(user.name ? { name: user.name } : {}),
+    ...(email ? { email } : {}),
+    ...(user.phoneNumber ? { contact: user.phoneNumber } : {}),
+  };
 }
 
 const RAZORPAY_SCRIPT_URL = "https://checkout.razorpay.com/v1/checkout.js";
@@ -78,6 +108,7 @@ export function PaymentModal({
   onSuccess,
   checkoutUrl = "/api/membership/checkout",
   purchaseUrl = "/api/membership/purchase",
+  prefill,
 }: {
   plan: Plan;
   onClose: () => void;
@@ -86,6 +117,9 @@ export function PaymentModal({
    * this component unchanged against the separate Partner plan/checkout routes. */
   checkoutUrl?: string;
   purchaseUrl?: string;
+  /** Razorpay's `prefill` — the logged-in user's contact details, to skip re-entry and improve
+   * conversion (Razorpay's own recommendation). Only used on the real-checkout path. */
+  prefill?: { name?: string; email?: string; contact?: string };
 }) {
   const [checkoutMode, setCheckoutMode] = useState<"loading" | "simulated" | "razorpay" | "unavailable">("loading");
   const [razorpayOrder, setRazorpayOrder] = useState<RazorpayOrder | null>(null);
@@ -144,6 +178,17 @@ export function PaymentModal({
       return;
     }
 
+    const prefillOption =
+      prefill && (prefill.name || prefill.email || prefill.contact)
+        ? {
+            prefill: {
+              ...(prefill.name ? { name: prefill.name } : {}),
+              ...(prefill.email ? { email: prefill.email } : {}),
+              ...(prefill.contact ? { contact: prefill.contact } : {}),
+            },
+          }
+        : {};
+
     const rzp = new window.Razorpay({
       key: razorpayOrder.keyId,
       amount: razorpayOrder.amount,
@@ -151,6 +196,8 @@ export function PaymentModal({
       order_id: razorpayOrder.orderId,
       name: "BIKIE",
       description: `${plan.name} membership`,
+      theme: { color: RAZORPAY_THEME_COLOR },
+      ...prefillOption,
       handler: async (response: RazorpaySuccessResponse) => {
         const res = await fetch(purchaseUrl, {
           method: "POST",
@@ -177,6 +224,15 @@ export function PaymentModal({
           // retry, rather than closing behind them.
         },
       },
+    });
+    // Razorpay's own retry UI handles most failures inline; this fires on a terminal failure so
+    // our modal surfaces it instead of sitting silent (Razorpay docs, "Handle Payment Failure").
+    rzp.on("payment.failed", (response: RazorpayFailureResponse) => {
+      const message =
+        response.error?.description ||
+        "The payment could not be completed. No money was charged — please try again.";
+      setRazorpayError(message);
+      toast.error(message);
     });
     rzp.open();
   }
