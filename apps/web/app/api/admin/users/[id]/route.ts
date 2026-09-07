@@ -52,22 +52,17 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const { id } = await params;
   const result = await AdminService.deleteUser(id);
   if (!result.ok) {
-    const status = result.reason === "ADMIN_PROTECTED" ? 400 : 409;
-    return NextResponse.json(
-      {
-        error:
-          result.reason === "ADMIN_PROTECTED"
-            ? "Admin accounts cannot be deleted."
-            : "This user has existing bookings, reviews, organized rides, or moderation history and can't be deleted. Consider suspending the account instead.",
-      },
-      { status },
-    );
+    if (result.reason === "NOT_FOUND") {
+      return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+    return NextResponse.json({ error: "Admin accounts cannot be deleted." }, { status: 400 });
   }
   await logAdminAction({
     userId: session.user.id,
     action: "DELETE_USER",
     entity: "User",
     entityId: id,
+    metadata: { anonymized: result.anonymized },
   });
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, anonymized: result.anonymized });
 }

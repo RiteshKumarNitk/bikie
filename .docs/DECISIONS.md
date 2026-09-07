@@ -3648,3 +3648,38 @@ changes:
   `tsc --noEmit` clean (`web`, `@bikie/services`); backend `vitest` 262/262; `next build` green.
   Live end-to-end (test cards, `success@razorpay` UPI) is now possible once the Key Secret is
   added — until then unverified beyond code review, same as ADR-043.
+
+## ADR-074: Admin "delete user" falls back to anonymise-in-place when the account has history
+
+- **Context.** `DELETE /api/admin/users/[id]` did a hard `prisma.user.delete()`. Any account that
+  had authored something with a restricting FK — bookings, bike/provider reviews, organised
+  rides, ride participations, SOS responses/sessions, moderation actions — threw `P2003`, caught
+  and surfaced as *"This user has existing bookings, reviews, organized rides, or moderation
+  history and can't be deleted. Consider suspending the account instead."* So a real rider could
+  never be deleted, only suspended. Also relevant: the mobile "Delete Account" button (ADR-072)
+  is a stub with no backend.
+- **Decision.** `adminRepository.deleteUser` is now two-tier:
+  1. **Fast path** — try the hard delete. A fresh account with no authored history still deletes
+     completely (Session/Account/Wishlist/memberships/invoices/rider-profile all cascade).
+     Returns `{ ok: true, anonymized: false }`.
+  2. **Slow path** — on `P2003`, run a transaction that *erases in place*: delete all Sessions +
+     Accounts + PushSubscriptions (kills every login method), cancel any ACTIVE
+     `UserMembership`/`PartnerMembership`, then `user.update` to `name: "Deleted User"`,
+     `email: deleted+<id>@bikie.invalid`, `phone`/`phoneNumber` → null, `image` → null,
+     `emailVerified`/`phoneNumberVerified` → false, `accountStatus: BANNED`
+     (`accountStatusExpiresAt: null` — BANNED is permanent). Returns `{ ok: true, anonymized: true }`.
+     The row survives only as an anonymous attribution on the history that references it.
+  - Chosen over (a) cascading the delete through every dependent table — that destroys *other*
+    users' data (a review on a bike, a ride others joined) and wipes safety/audit history; and
+    (b) a schema migration flipping FKs to Cascade — same destruction, plus a migration. Erasure
+    -in-place is the GDPR-style "right to erasure" pattern: remove the PII, keep the anonymised
+    business/audit records. No migration — reuses the existing `BANNED` moderation fast-path
+    (`isAccountRestricted`) so every auth gate already rejects the account.
+  - `deleteUser`'s result type drops `HAS_DEPENDENCIES`; the route maps `NOT_FOUND` → 404,
+    `ADMIN_PROTECTED` → 400, and echoes `anonymized` so the admin UI can say which happened. The
+    confirm dialog and success toast now explain the two outcomes.
+- **Consequences.** No schema change. Admin can now delete any non-admin account. An anonymised
+  account still appears in the users list as a BANNED "Deleted User" (visible on purpose — it's
+  the audit trail; a future `deletedAt` column could hide it). `tsc --noEmit` clean
+  (web/services/database), `vitest` 262/262. This is also the backend the mobile "Delete Account"
+  button should call once it does a real deletion rather than just signing out.

@@ -140,25 +140,50 @@ export async function updateUserAccountType(userId: string, accountType: "RIDER"
 
 export async function deleteUser(
   userId: string,
-): Promise<{ ok: true } | { ok: false; reason: "HAS_DEPENDENCIES" | "ADMIN_PROTECTED" | "NOT_FOUND" }> {
+): Promise<{ ok: true; anonymized: boolean } | { ok: false; reason: "ADMIN_PROTECTED" | "NOT_FOUND" }> {
   const target = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-  // Admin accounts are deletable from the admin API: at minimum they own audit logs seeded
-  // against the platform itself, and a routine-account cleanup must never remove the platform's
-  // own operators (or the audit trail they generated).
   if (!target) return { ok: false, reason: "NOT_FOUND" };
+  // Never remove the platform's own operators (or the audit trail they generated).
   if (target.role === "ADMIN") return { ok: false, reason: "ADMIN_PROTECTED" };
+
+  // Fast path: a fresh account with no history hard-deletes cleanly (Session/Account/Wishlist/
+  // membership/… all cascade). Anything the user *authored* that other records depend on —
+  // bookings, bike/provider reviews, organized rides, SOS responses & sessions, moderation
+  // actions — has a restricting FK and makes this throw P2003.
   try {
     await prisma.user.delete({ where: { id: userId } });
-    return { ok: true };
+    return { ok: true, anonymized: false };
   } catch (err) {
-    // Bookings/reviews/organized trips/moderation actions etc. all restrict deletion of
-    // their owning user (see schema.prisma) �?" surface that as a clean 409 instead of a
-    // raw 500 so the admin UI can explain why the delete didn't go through.
-    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2003") {
-      return { ok: false, reason: "HAS_DEPENDENCIES" };
-    }
-throw err;
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError) || err.code !== "P2003") throw err;
   }
+
+  // Slow path: erasure-in-place. Hard-deleting would corrupt other users' bookings/reviews/rides
+  // and wipe safety & audit history, so instead strip every piece of PII, revoke all login
+  // methods + sessions, cancel any active membership, and BAN the account so it can never
+  // authenticate or act again. The row survives only as an anonymous "Deleted User" attribution
+  // on the history that references it.
+  await prisma.$transaction(async (tx) => {
+    await tx.session.deleteMany({ where: { userId } });
+    await tx.account.deleteMany({ where: { userId } });
+    await tx.pushSubscription.deleteMany({ where: { userId } });
+    await tx.userMembership.updateMany({ where: { userId, status: "ACTIVE" }, data: { status: "CANCELLED" } });
+    await tx.partnerMembership.updateMany({ where: { userId, status: "ACTIVE" }, data: { status: "CANCELLED" } });
+    await tx.user.update({
+      where: { id: userId },
+      data: {
+        name: "Deleted User",
+        email: `deleted+${userId}@bikie.invalid`,
+        emailVerified: false,
+        image: null,
+        phone: null,
+        phoneNumber: null,
+        phoneNumberVerified: false,
+        accountStatus: "BANNED",
+        accountStatusExpiresAt: null,
+      },
+    });
+  });
+  return { ok: true, anonymized: true };
 }
 
 export async function findAllPartners() {

@@ -2,6 +2,16 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Admin "delete user" now works for accounts with history — anonymise-in-place fallback (2026-09-07, ADR-074)
+
+| Task | Status |
+|---|---|
+| `adminRepository.deleteUser`: try hard delete; on `P2003` fall back to a transaction that erases PII (name/email/phone/image), deletes Sessions + Accounts + PushSubscriptions, cancels ACTIVE memberships, sets `accountStatus: BANNED`. Returns `{ ok, anonymized }` | Completed |
+| `DELETE /api/admin/users/[id]`: `NOT_FOUND` → 404, `ADMIN_PROTECTED` → 400; echoes `anonymized`; audit log records it | Completed |
+| Admin users UI: confirm-dialog copy + success toast explain the "removed entirely" vs "anonymised + banned" outcomes | Completed |
+| Verify: `tsc --noEmit` clean (web/services/database); `vitest` 262/262 | Completed |
+| Follow-up: point the mobile "Delete Account" button (ADR-072, currently sign-out only) at this endpoint; optional `deletedAt` column to hide anonymised rows from the default admin list | Backlog |
+
 ## Razorpay test credentials + Standard Checkout client hardening (2026-09-06, ADR-073)
 
 | Task | Status |

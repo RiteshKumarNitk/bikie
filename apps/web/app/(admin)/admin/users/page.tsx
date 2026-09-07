@@ -79,10 +79,15 @@ export default function AdminUsersPage() {
       toast.error(message);
       return;
     }
+    const data = await res.json().catch(() => null);
     setDeleteError(null);
     setDeletingId(null);
     setUsers((prev) => prev.filter((u) => u.id !== id));
-    toast.success("User deleted successfully");
+    toast.success(
+      data?.anonymized
+        ? "Account deleted — its bookings, reviews and ride history were kept but fully anonymised."
+        : "User deleted successfully",
+    );
   }
 
   const filtered = users.filter((u) => {
@@ -277,7 +282,11 @@ export default function AdminUsersPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={() => setDeletingId(null)}>
           <div className="w-full max-w-sm rounded-2xl bg-card p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold">Delete User?</h3>
-            <p className="mt-2 text-sm text-foreground/50">This action cannot be undone. All user data will be permanently removed.</p>
+            <p className="mt-2 text-sm text-foreground/50">
+              This cannot be undone. An account with no history is removed entirely. If it has
+              bookings, reviews, rides or moderation history, those records are kept but the
+              account is fully anonymised (name, email and phone erased) and permanently banned.
+            </p>
             <div className="mt-6 flex gap-3">
               <button
                 type="button"

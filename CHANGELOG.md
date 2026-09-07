@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-07 — Admin can now delete a rider/user account that has history (ADR-074)
+
+Deleting a user in the admin panel failed with "This user has existing bookings, reviews,
+organized rides, or moderation history and can't be deleted" for any account that had actually
+used the app. `DELETE /api/admin/users/[id]` now falls back, when a hard delete is blocked by
+those records, to **erasing the account in place**: it wipes the name, email, phone and photo,
+deletes every login method and session, cancels any active membership, and permanently bans the
+account. The bookings / reviews / rides / audit history stay intact but are now attributed to an
+anonymous "Deleted User" — other users' data and safety records are never touched. A fresh
+account with no history still deletes completely as before. The confirm dialog and toast explain
+which of the two happened. No schema change. See ADR-074.
+
 ## 2026-09-06 — Razorpay test credentials wired in; checkout client brought up to Razorpay's docs (ADR-073)
 
 The membership Razorpay flow (built in ADR-043/069/070 but never run — the keys were blank) is
