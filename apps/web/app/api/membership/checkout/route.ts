@@ -38,7 +38,8 @@ export async function POST(request: Request) {
 
   const order = await RazorpayService.createOrder(
     plan.price,
-    `membership_${session.user.id}_${Date.now()}`,
+    // Razorpay caps `receipt` at 40 chars — keep it short; full ids are in `notes` below.
+    `mem_${Date.now().toString(36)}_${session.user.id.slice(-8)}`,
     { userId: session.user.id, planId: plan.id, planName: plan.name, accountType: "RIDER" },
   );
   if (!order) {

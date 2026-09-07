@@ -1,5 +1,36 @@
 # BIKIE Changelog
 
+## 2026-09-07 — Admin: edit membership plans; clearer delete behaviour
+
+`MembershipPlansManager` (used by `/admin/membership` and `/admin/partner-membership`) gains an
+Edit button per plan (name/description/price/duration/benefits) against the existing
+`PATCH /api/admin/*/plans/[id]`. Delete is unchanged server-side — a plan with any current/past
+subscriber returns 409 (the FK is kept so billing history survives); the UI now confirms first
+and, on that 409, offers to deactivate the plan inline instead. No API/schema change.
+
+## 2026-09-07 — Mobile membership checkout: Razorpay in a WebView; checkout `receipt` 500 fixed (ADR-075)
+
+Flutter membership purchase was broken once real Razorpay keys were set (it only sent
+`DUMMY-<uuid>` → `PAYMENT_VERIFICATION_REQUIRED`). Rider + Service Provider screens now run the
+real flow via `core/payments/razorpay_checkout.dart` — `POST /api/*/checkout` → Razorpay Standard
+Checkout hosted in a `webview_flutter` WebView (same pattern as the MSG91 widget host) → the
+`razorpay_*` triple posted to `/api/*/purchase` for server-side signature verification. Key id
+comes from the server. Free SP plan and the local-dev `DUMMY-` path unchanged. Also fixed a 500 on
+`/api/membership/checkout`: `RazorpayService.createOrder` passed a >40-char `receipt` (Razorpay's
+cap) and didn't catch the throw — now truncates and returns `null` on any Razorpay failure (→
+`503 CHECKOUT_UNAVAILABLE`, logged); both checkout routes pass a short receipt. `vitest` 262/262,
+`flutter test` 119/119. See ADR-075.
+
+## 2026-09-07 — Fix: `/api/notifications` polled in bursts by the navbar bell
+
+`NotificationBell` (rendered twice in the navbar, behind a `!isPending && session` gate that
+flickers on every scroll-triggered re-render) and `NotificationsTab` each ran an independent 45s
+poll + mount-time fetch, so the bell remounting re-hit `GET /api/notifications` repeatedly. Both
+now use one shared `useNotificationPoll` (`apps/web/lib/use-notification-poll.ts`): a single 60s
+module-level interval, a 15s min-refetch gap so remounts are no-ops, one shared in-flight request,
+and no polling while the tab is backgrounded. `NotificationsTab` drops its `userId` prop. No
+API/schema change.
+
 ## 2026-09-07 — Admin can now delete a rider/user account that has history (ADR-074)
 
 Deleting a user in the admin panel failed with "This user has existing bookings, reviews,

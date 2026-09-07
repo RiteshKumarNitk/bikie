@@ -1,5 +1,46 @@
 # Changelog
 
+## 2026-09-07 — Admin: edit membership plans; clearer delete behaviour
+
+`/admin/membership` and `/admin/partner-membership` now have an **Edit** button per plan (name,
+description, price, duration, benefits) — the `PATCH /api/admin/*/plans/[id]` route already
+existed, there was just no UI for anything but the active/inactive toggle. **Delete** is unchanged
+on the backend: a plan with any current or past subscriber can't be removed (the DB keeps the
+reference so billing/subscription history stays intact — same principle as ADR-074), and the API
+returns a 409 explaining that. The admin UI now adds a confirm step and, on that 409, offers to
+**deactivate** the plan inline instead (which stops it being offered to new members without
+touching existing ones). The active/inactive toggle's toast now says "activated"/"deactivated".
+No API or schema change.
+
+## 2026-09-07 — Mobile membership checkout: Razorpay in a WebView; checkout `receipt` 500 fixed (ADR-075)
+
+Membership purchase in the Flutter app was dead once real Razorpay keys went live — the screens
+only sent a `DUMMY-<uuid>` id, which `/api/*/purchase` now rejects with
+`PAYMENT_VERIFICATION_REQUIRED`. The Rider and Service Provider membership screens now run the
+real flow: `POST /api/*/checkout` for a server-priced order → **Razorpay Standard Checkout hosted
+in a `webview_flutter` WebView** (`core/payments/razorpay_checkout.dart`, same approach as the
+MSG91 widget host) → the `razorpay_order_id/payment_id/signature` triple is posted to
+`/api/*/purchase` for server-side signature verification. The key id comes from the server, so the
+app embeds no Razorpay key. Free Service Provider plan path unchanged; the `DUMMY-` path is kept
+only for local dev (`razorpayConfigured: false`). Also fixed a **500** on
+`POST /api/membership/checkout`: `RazorpayService.createOrder` was passing a ~50-char `receipt`
+(Razorpay's max is 40) and didn't catch the resulting throw — it now truncates `receipt` and
+returns `null` on any Razorpay failure (→ clean `503 CHECKOUT_UNAVAILABLE`, real error logged),
+and both checkout routes pass a short receipt. No schema change; `vitest` 262/262, `flutter test`
+119/119. See ADR-075.
+
+## 2026-09-07 — Fix: `/api/notifications` hammered by the navbar bell
+
+The notification bell and the notifications tab each ran their own 45s `setInterval` poll plus a
+fetch on every mount, with no coordination — and the bell is rendered twice in the navbar and
+gated behind `!isPending && session`, whose `isPending` flickers on navbar re-renders (every
+scroll), so the bell was remounting and re-fetching `GET /api/notifications` in bursts. Replaced
+both with a single shared `useNotificationPoll` subscriber (`apps/web/lib/use-notification-poll.ts`):
+one module-level interval (60s), a 15s min-refetch gap that makes a remount a no-op, a single
+in-flight request shared by all consumers, and no polling while the tab is hidden (with one
+immediate refresh on re-focus). Marking read in the tab now updates the bell badge instantly via
+the shared cache. `NotificationsTab` no longer takes a `userId` prop. No API/schema change.
+
 ## 2026-09-07 — Admin can now delete a rider/user account that has history (ADR-074)
 
 Deleting a user in the admin panel failed with "This user has existing bookings, reviews,

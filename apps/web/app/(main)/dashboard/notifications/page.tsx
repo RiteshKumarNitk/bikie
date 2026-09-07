@@ -17,7 +17,7 @@ export default async function DashboardNotificationsPage() {
       </p>
 
       <div className="mt-8 overflow-hidden rounded-3xl border border-foreground/10 bg-card/30">
-        <NotificationsTab userId={session.user.id} />
+        <NotificationsTab />
       </div>
     </div>
   );

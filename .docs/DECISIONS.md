@@ -3683,3 +3683,37 @@ changes:
   the audit trail; a future `deletedAt` column could hide it). `tsc --noEmit` clean
   (web/services/database), `vitest` 262/262. This is also the backend the mobile "Delete Account"
   button should call once it does a real deletion rather than just signing out.
+
+## ADR-075: Mobile membership checkout hosts Razorpay Standard Checkout in a WebView
+
+- **Context.** Once real `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are configured,
+  `/api/{membership,partner-membership}/purchase` requires a signature-verified payment
+  (`razorpayOrderId`/`razorpayPaymentId`/`razorpaySignature`) and rejects a bare `paymentId` with
+  `PAYMENT_VERIFICATION_REQUIRED` (ADR-069). The Flutter membership screens only ever sent
+  `DUMMY-<uuid>`, so **all mobile membership purchase was dead** the moment Razorpay went live —
+  web had the full flow (`PaymentModal.tsx`, ADR-043/073), mobile had nothing.
+- **Decision.** Add the checkout to the app by **hosting Razorpay's browser
+  `checkout.razorpay.com/v1/checkout.js` inside a `webview_flutter` WebView**, not the native
+  `razorpay_flutter` plugin — the same call this codebase already made for MSG91 (ADR-057,
+  `Msg91WidgetHost`): reuse the proven web integration rather than take on a second native SDK,
+  its Android/iOS config, and a divergent code path.
+  - New `core/payments/razorpay_checkout.dart`: `showRazorpayCheckout(context, order, planName,
+    prefill)` pushes a fullscreen page with a WebView that `loadHtmlString`s a tiny page
+    (`baseUrl: https://bikie.app`, like the MSG91 host) building `new Razorpay({key: order.keyId,
+    order_id, amount, currency, name, description, prefill, theme, handler})` and relaying the
+    result over a `RazorpayBridge` JS channel as `{status: success|cancelled|failed}`. Returns a
+    sealed `RazorpayResult`. Non-http nav (`upi:`, `intent:`, bank-app deep links) is handed to
+    `url_launcher` so a UPI app can complete its leg.
+  - `key` comes from the server's checkout response (`order.keyId`) — the app embeds no Razorpay
+    key and needs no `--dart-define`.
+  - Repos gain `checkout({planId}) -> RazorpayOrder?` (`null` = `razorpayConfigured: false`, the
+    dev/simulated path; `503` still throws `ApiException`) and `purchase(...)` now takes the
+    Razorpay triple. The Rider and Service Provider screens run: `checkout()` → if an order comes
+    back, `showRazorpayCheckout` → on success `purchase(triple)`; `null` keeps the legacy
+    `DUMMY-` path for local dev; the Service Provider free-tier (price 0) path is unchanged
+    (`purchase(planId)` with no payment).
+- **Consequences.** No API/schema change — the backend was already mobile-ready. Card payments
+  (test and live) complete in-WebView; some real-UPI-app flows bounce to the UPI app via
+  `url_launcher` and return. `flutter analyze` unchanged (1 pre-existing unrelated `http` info),
+  `flutter test` 119/119, backend `vitest` 262/262. Not done: an `order.paid` webhook (still the
+  ADR-073 deferral) and a plan/amount re-check on `/purchase`.

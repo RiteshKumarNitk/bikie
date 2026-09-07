@@ -46,9 +46,15 @@ export const RazorpayService = {
 
   /** `amountRupees` — converted to paise (Razorpay's base unit) here so every caller works in
    * the same rupee amounts the rest of this codebase already uses (`MembershipPlan.price`).
+   * `receipt` — Razorpay caps this at **40 characters** and rejects the whole order otherwise, so
+   * it's truncated defensively here (callers already keep it short; the full ids live in `notes`).
    * `notes` — Razorpay's per-order key/value bag (max 15 pairs); we stamp the buyer + plan on
    * it so a payment can be reconciled from the Razorpay dashboard or a future `order.paid`
-   * webhook without re-deriving anything from the client callback. */
+   * webhook without re-deriving anything from the client callback.
+   *
+   * Returns `null` on any Razorpay-side failure (auth, validation, network) rather than throwing —
+   * the checkout routes turn `null` into a clean `503 CHECKOUT_UNAVAILABLE` instead of a 500, and
+   * the real error is logged for the operator. */
   async createOrder(
     amountRupees: number,
     receipt: string,
@@ -57,13 +63,18 @@ export const RazorpayService = {
     const creds = credentials();
     if (!creds) return null;
 
-    const order = await getClient(creds.keyId, creds.keySecret).orders.create({
-      amount: Math.round(amountRupees * 100),
-      currency: "INR",
-      receipt,
-      ...(notes ? { notes } : {}),
-    });
-    return { orderId: order.id, amount: Number(order.amount), currency: order.currency, keyId: creds.keyId };
+    try {
+      const order = await getClient(creds.keyId, creds.keySecret).orders.create({
+        amount: Math.round(amountRupees * 100),
+        currency: "INR",
+        receipt: receipt.slice(0, 40),
+        ...(notes ? { notes } : {}),
+      });
+      return { orderId: order.id, amount: Number(order.amount), currency: order.currency, keyId: creds.keyId };
+    } catch (err) {
+      console.error("[Razorpay][createOrder] order creation failed:", err);
+      return null;
+    }
   },
 
   /**

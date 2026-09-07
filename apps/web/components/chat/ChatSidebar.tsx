@@ -74,7 +74,7 @@ export function ChatSidebar({
           )}
         </div>
       ) : (
-        <NotificationsTab userId={userId} />
+        <NotificationsTab />
       )}
     </div>
   );

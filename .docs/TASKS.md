@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Mobile membership checkout — Razorpay hosted in a WebView + checkout `receipt` 500 fix (2026-09-07, ADR-075)
+
+| Task | Status |
+|---|---|
+| `core/payments/razorpay_checkout.dart` — `showRazorpayCheckout()` hosts `checkout.razorpay.com/v1/checkout.js` in a `webview_flutter` WebView (baseUrl `https://bikie.app`, like `Msg91WidgetHost`), relays `{status: success/cancelled/failed}` over a `RazorpayBridge` JS channel, returns a sealed `RazorpayResult`; non-http nav (`upi:`/`intent:`) → `url_launcher` | Completed |
+| `membership_repository.dart` / `partner_membership_repository.dart` — add `checkout({planId}) -> RazorpayOrder?`; `purchase(...)` now takes the `razorpay*` triple | Completed |
+| `membership_screen.dart` / `partner_membership_screen.dart` — `_purchase()` runs `checkout()` → WebView → `purchase(triple)`; `null` keeps the local-dev `DUMMY-` path; SP free-tier (price 0) path unchanged | Completed |
+| Key id comes from the server checkout response — app embeds no Razorpay key, no `--dart-define` | Completed |
+| Fix 500 on `/api/membership/checkout` — `RazorpayService.createOrder` truncates `receipt` to Razorpay's 40-char cap and catches order-create failures (→ `null` → `503 CHECKOUT_UNAVAILABLE`, real error logged); both checkout routes pass a short receipt | Completed |
+| Verify: backend `vitest` 262/262, `tsc --noEmit` clean (web/services), `flutter analyze` unchanged (1 pre-existing `http` info), `flutter test` 119/119 | Completed |
+| Still deferred (ADR-073/069): `order.paid` webhook + async reconciliation, plan/amount mismatch re-check on `/purchase` | Backlog |
+| Deploy: `docker compose build web && docker compose up -d --no-deps web`; ship a new mobile build | Pending (operator) |
+
 ## Admin "delete user" now works for accounts with history — anonymise-in-place fallback (2026-09-07, ADR-074)
 
 | Task | Status |

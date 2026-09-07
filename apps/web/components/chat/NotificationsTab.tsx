@@ -1,10 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { NotificationDTO } from "@bikie/types";
 import { authClient } from "@/lib/auth-client";
-
-const POLL_INTERVAL_MS = 45_000;
+import { useNotificationPoll } from "@/lib/use-notification-poll";
 
 /** Pull the first https Maps / URL out of a notification body for a CTA button. */
 function extractMapsUrl(body: string): string | null {
@@ -32,8 +29,11 @@ function linkifyBody(body: string) {
   );
 }
 
-export function NotificationsTab({ userId }: { userId: string }) {
-  const [notifications, setNotifications] = useState<NotificationDTO[]>([]);
+export function NotificationsTab() {
+  // Shared app-wide poller (throttled, visibility-aware, deduped across the navbar bell + this
+  // tab) — see `use-notification-poll.ts`. `markRead`/`markAllRead` update that shared cache, so
+  // the bell's unread badge reacts immediately.
+  const { notifications, markRead, markAllRead } = useNotificationPoll();
   // A capable Service Provider (ADR-049: active profile, verification status irrelevant here)
   // has their own SOS dashboard (/partner/sos) — route the "Open SOS dashboard" link there
   // instead of the generic Rider one (keyed on capability, not `role` or verification).
@@ -42,43 +42,6 @@ export function NotificationsTab({ userId }: { userId: string }) {
     session?.user.partnerStatus != null && session.user.partnerStatus !== "SUSPENDED"
       ? "/partner/sos"
       : "/dashboard/sos";
-
-  useEffect(() => {
-    let cancelled = false;
-
-    function load() {
-      fetch("/api/notifications")
-        .then((r) => r.json())
-        .then((data) => {
-          if (!cancelled) setNotifications(data.notifications || []);
-        });
-    }
-
-    load();
-    const interval = setInterval(load, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [userId]);
-
-  async function markRead(id: string) {
-    await fetch("/api/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, readAt: new Date().toISOString() } : n)));
-  }
-
-  async function markAllRead() {
-    await fetch("/api/notifications", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "MARK_ALL_READ" }),
-    });
-    setNotifications((prev) => prev.map((n) => ({ ...n, readAt: new Date().toISOString() })));
-  }
 
   const unreadCount = notifications.filter((n) => !n.readAt).length;
 

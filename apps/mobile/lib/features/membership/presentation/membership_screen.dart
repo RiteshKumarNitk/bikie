@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/payments/razorpay_checkout.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../auth/domain/auth_controller.dart';
 import '../data/membership_model.dart';
 import '../data/membership_repository.dart';
 import '../domain/membership_providers.dart';
@@ -154,17 +156,46 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   Future<void> _purchase() async {
     setState(() => _isPurchasing = true);
     try {
-      // Mirrors web's pre-Razorpay simulated checkout (ADR-043) — mobile has no native Razorpay
-      // integration yet (would need the `razorpay_flutter` plugin, a real native-dependency
-      // add, not done in this pass). This path only actually works while the server has no live
-      // Razorpay keys configured; once `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are set,
-      // `POST /api/membership/purchase` starts requiring a verified signature and rejects a
-      // bare `paymentId` with a clear `PAYMENT_VERIFICATION_REQUIRED` error (shown below via the
-      // normal `ApiException` message) — not a crash, but purchase must move to web until mobile
-      // gets its own real checkout.
-      await Future.delayed(const Duration(milliseconds: 1400));
-      final paymentId = 'DUMMY-${const Uuid().v4()}';
-      await ref.read(membershipRepositoryProvider).purchase(planId: widget.plan.id, paymentId: paymentId);
+      final repo = ref.read(membershipRepositoryProvider);
+      final order = await repo.checkout(planId: widget.plan.id);
+
+      if (order == null) {
+        // `razorpayConfigured: false` — Razorpay isn't set up server-side. The backend only
+        // allows this simulated path outside production (in production `/checkout` returns
+        // `503 PAYMENTS_UNAVAILABLE`, caught below as an ApiException). Kept for local dev.
+        await repo.purchase(planId: widget.plan.id, paymentId: 'DUMMY-${const Uuid().v4()}');
+      } else {
+        if (!mounted) return;
+        final user = ref.read(authControllerProvider).user;
+        final result = await showRazorpayCheckout(
+          context,
+          order: order,
+          planName: widget.plan.name,
+          prefill: RazorpayPrefill(
+            name: user?.name,
+            email: sanitizeRazorpayEmail(user?.email),
+            contact: user?.phone,
+          ),
+        );
+        if (!mounted) return;
+        switch (result) {
+          case RazorpayCancelled():
+            setState(() => _isPurchasing = false);
+            return;
+          case RazorpayFailed(:final message):
+            showAppToast(context, message, variant: AppToastVariant.error);
+            setState(() => _isPurchasing = false);
+            return;
+          case RazorpaySuccess(:final orderId, :final paymentId, :final signature):
+            await repo.purchase(
+              planId: widget.plan.id,
+              razorpayOrderId: orderId,
+              razorpayPaymentId: paymentId,
+              razorpaySignature: signature,
+            );
+        }
+      }
+
       ref.invalidate(activeMembershipProvider);
       if (mounted) {
         showAppToast(context, 'Subscription purchased successfully', variant: AppToastVariant.success);

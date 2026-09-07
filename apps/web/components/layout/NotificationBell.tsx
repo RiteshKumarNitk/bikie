@@ -1,41 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import type { NotificationDTO } from "@bikie/types";
+import { useNotificationPoll } from "@/lib/use-notification-poll";
 
-const POLL_INTERVAL_MS = 45_000;
-
-/** Bell icon + unread-count badge, backed by the same `GET /api/notifications`
- * list endpoint `NotificationsTab` uses (there is no dedicated count endpoint —
- * unread count is derived client-side from `readAt`). Simple polling only, no
- * realtime infra. Links to `/dashboard/notifications`. */
+/** Bell icon + unread-count badge, backed by the shared `useNotificationPoll` subscriber (one
+ * app-wide throttled, visibility-aware poll of `GET /api/notifications` — see that file for why
+ * each consumer no longer runs its own interval). Unread count is derived client-side from
+ * `readAt`; there is no dedicated count endpoint. Links to `/dashboard/notifications`. */
 export function NotificationBell() {
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    function load() {
-      fetch("/api/notifications")
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data: { notifications?: NotificationDTO[] } | null) => {
-          if (!cancelled && data?.notifications) {
-            setUnreadCount(data.notifications.filter((n) => !n.readAt).length);
-          }
-        })
-        .catch(() => {
-          // Polling best-effort — a transient failure shouldn't break the navbar.
-        });
-    }
-
-    load();
-    const interval = setInterval(load, POLL_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
+  const { notifications } = useNotificationPoll();
+  const unreadCount = notifications.filter((n) => !n.readAt).length;
 
   return (
     <Link

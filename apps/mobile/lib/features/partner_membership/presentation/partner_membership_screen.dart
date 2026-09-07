@@ -5,9 +5,11 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/payments/razorpay_checkout.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../auth/domain/auth_controller.dart';
 import '../data/partner_membership_model.dart';
 import '../data/partner_membership_repository.dart';
 import '../domain/partner_membership_providers.dart';
@@ -185,15 +187,50 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
     final isFree = widget.plan.price == 0;
     setState(() => _isPurchasing = true);
     try {
-      if (!isFree) {
-        // Mirrors web's pre-Razorpay simulated checkout (ADR-043) — mobile has no native
-        // Razorpay integration yet. Only actually works while the server has no live Razorpay
-        // keys configured; once configured, purchase must move to web until mobile gets its own
-        // real checkout, same caveat the Rider membership screen already carries.
-        await Future.delayed(const Duration(milliseconds: 1400));
+      final repo = ref.read(partnerMembershipRepositoryProvider);
+
+      if (isFree) {
+        // Free plan: no payment step at all — the server activates on the server-side price.
+        await repo.purchase(planId: widget.plan.id);
+      } else {
+        final order = await repo.checkout(planId: widget.plan.id);
+        if (order == null) {
+          // `razorpayConfigured: false` — dev/preview only (production returns
+          // `503 PAYMENTS_UNAVAILABLE` for a paid plan, caught below). Kept for local dev.
+          await repo.purchase(planId: widget.plan.id, paymentId: 'DUMMY-${const Uuid().v4()}');
+        } else {
+          if (!mounted) return;
+          final user = ref.read(authControllerProvider).user;
+          final result = await showRazorpayCheckout(
+            context,
+            order: order,
+            planName: widget.plan.name,
+            prefill: RazorpayPrefill(
+              name: user?.name,
+              email: sanitizeRazorpayEmail(user?.email),
+              contact: user?.phone,
+            ),
+          );
+          if (!mounted) return;
+          switch (result) {
+            case RazorpayCancelled():
+              setState(() => _isPurchasing = false);
+              return;
+            case RazorpayFailed(:final message):
+              showAppToast(context, message, variant: AppToastVariant.error);
+              setState(() => _isPurchasing = false);
+              return;
+            case RazorpaySuccess(:final orderId, :final paymentId, :final signature):
+              await repo.purchase(
+                planId: widget.plan.id,
+                razorpayOrderId: orderId,
+                razorpayPaymentId: paymentId,
+                razorpaySignature: signature,
+              );
+          }
+        }
       }
-      final paymentId = isFree ? null : 'DUMMY-${const Uuid().v4()}';
-      await ref.read(partnerMembershipRepositoryProvider).purchase(planId: widget.plan.id, paymentId: paymentId);
+
       ref.invalidate(activePartnerMembershipProvider);
       if (mounted) {
         showAppToast(context, 'Subscription purchased successfully', variant: AppToastVariant.success);
