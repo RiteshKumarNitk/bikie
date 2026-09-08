@@ -53,10 +53,16 @@ const navGroups = [
     ],
   },
   {
+    label: "Finance",
+    items: [
+      { label: "Transactions", href: "/admin/transactions" },
+      { label: "Revenue Reports", href: "/admin/reports" },
+    ],
+  },
+  {
     label: "System",
     items: [
       { label: "Audit Logs", href: "/admin/audit-logs" },
-      { label: "Revenue Reports", href: "/admin/reports" },
       { label: "Settings", href: "/admin/settings" },
     ],
   },

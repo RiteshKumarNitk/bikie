@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Admin financial reporting — real Revenue Reports + Transactions browser (2026-09-08, ADR-076)
+
+| Task | Status |
+|---|---|
+| Audit: `/admin/reports` was a hard-coded `<EmptyState>` stub — no API, never built. Ledger = `MembershipInvoice` (ADR-070), success-only (`PAID`/`REFUNDED`), snapshot amounts. No order/failed-payment persistence anywhere. | Completed |
+| `billing.repository.ts` — `listTransactionsForAdmin` (server pagination + filters + search + sort), `listAllTransactionsForAdmin` (CSV, capped), `getTransactionForAdmin`, `listTransactionPlanFacets`, `getRevenueReport` (rolling + range revenue, by account type / plan / status, membership summary, daily series) | Completed |
+| `AdminBillingService` flat facade (+ CSV via existing `buildCsv`/`MAX_ADMIN_CSV_ROWS`); `packages/types/admin-reports.ts`; `admin.schema.ts` query schemas | Completed |
+| Routes (all `requireRole("ADMIN")`): `GET /api/admin/reports`, `GET /api/admin/transactions`, `/[id]`, `/export` | Completed |
+| UI: `/admin/reports` rewritten (range presets + custom, summary cards, recharts revenue/txn series + account-type & status pies, tables, empty states); new `/admin/transactions` (filter bar, paginated table, detail drawer, filter-aware CSV); nav "Finance" group | Completed |
+| Verified vs real data: revenue sums frozen snapshot amounts (₹1 stays ₹1, never ₹99), Rider/SP split correct, filters/search/pagination/CSV work, empty states render. `vitest` 262/262, `tsc` clean (types/validation/database/services/web), lint at baseline, OpenAPI regenerated (148→152) | Completed |
+| **Deferred — failed/pending/cancelled payment ledger** (`PaymentTransaction` model + migration; wire `/checkout` → `CREATED`, `purchaseMembership` → `SUCCESS`+invoice link, new client `payment-failed` endpoint, Razorpay `order.paid`/`payment.failed` webhook). Needs a prod schema migration — awaiting go-ahead. | Backlog |
+| Deploy: `docker compose build web && docker compose up -d --no-deps web` (no migration needed) | Pending (operator) |
+
 ## Mobile membership checkout — native `razorpay_flutter` SDK + checkout `receipt` 500 fix (2026-09-07, ADR-075)
 
 | Task | Status |

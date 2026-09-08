@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-08 — Admin: real Revenue Reports + a Transactions browser (ADR-076)
+
+`/admin/reports` was a hard-coded "coming soon" stub — no API, never built — and there was no
+admin Transactions view at all. Both are now real, built server-side from the existing
+`MembershipInvoice` ledger (ADR-070), whose amounts are frozen at purchase time (a ₹1 payment
+always reports as ₹1, never recomputed from a plan's current ₹99). New admin-only routes
+(`requireRole("ADMIN")`): `GET /api/admin/reports` (revenue rolling windows + range-scoped, by
+account type, by plan, by status, membership summary, daily time series) and
+`GET /api/admin/transactions` (+ `/[id]`, + `/export`) with server-side pagination, filters
+(account type / status / plan / date range), search (name / phone / Razorpay payment+order id /
+receipt no) and sort. `/admin/reports` rewritten with range presets + custom dates, summary
+cards, recharts (revenue & transactions over time, account-type & status pies) and real empty
+states; new `/admin/transactions` page with a filter bar, paginated table, detail drawer and a
+CSV export that respects the active filters. Nav gains a "Finance" group. **Deferred:** a
+failed/pending/cancelled-payment ledger (`PaymentTransaction`) — needs a schema migration and
+Razorpay-webhook wiring; until then the payment-status report shows only PAID / REFUNDED and says
+so. No schema change; `vitest` 262/262, `tsc` clean, OpenAPI inventory regenerated. See ADR-076.
+
 ## 2026-09-07 — Admin: edit membership plans; clearer delete behaviour
 
 `/admin/membership` and `/admin/partner-membership` now have an **Edit** button per plan (name,

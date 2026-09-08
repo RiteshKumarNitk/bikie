@@ -1,5 +1,16 @@
 # BIKIE — Roadmap
 
+## Admin Financial Reporting — Revenue Reports + Transactions (2026-09-08, ADR-076)
+`/admin/reports` (previously a "coming soon" stub) is now a real dashboard and there is a new
+`/admin/transactions` browser, both built server-side from the `MembershipInvoice` ledger
+(ADR-070) — snapshot amounts, never recomputed. Admin-only APIs: `GET /api/admin/reports`
+(revenue rolling windows + range-scoped, by account type / plan / status, membership summary,
+daily time series) and `GET /api/admin/transactions` (+ `/[id]`, `/export`) with server-side
+pagination, filters, search, sort and filter-aware CSV. recharts visuals, real empty states.
+Deferred to a follow-up: a `PaymentTransaction` ledger so failed / pending / cancelled Razorpay
+payments (e.g. the `pay_TZ6C4zkf3Iu553` gateway failure) are also visible — needs a schema
+migration and a Razorpay webhook. See ADR-076.
+
 ## Mobile Membership Checkout — Native Razorpay SDK (2026-09-07, ADR-075)
 The Flutter app can now actually take a membership payment. Rider and Service Provider membership
 screens run the real flow — server-priced order from `/api/*/checkout`, then Razorpay checkout via

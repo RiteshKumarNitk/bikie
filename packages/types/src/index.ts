@@ -13,6 +13,7 @@ export * from "./message";
 export * from "./membership";
 export * from "./partner-membership";
 export * from "./billing";
+export * from "./admin-reports";
 export * from "./sos";
 export * from "./referral";
 export * from "./notification";

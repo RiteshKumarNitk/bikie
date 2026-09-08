@@ -93,3 +93,41 @@ export const adminExportQuerySchema = z.object({
 });
 
 export type AdminExportQuery = z.infer<typeof adminExportQuerySchema>;
+
+// --- Transactions + revenue reports (ADR-076) ---
+
+// URL params arrive as empty strings from unfilled fields (`?from=&status=`) — treat as absent.
+const blankToUndefined = (v: unknown) => (v === "" || v === null ? undefined : v);
+
+export const adminTransactionsQuerySchema = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(25),
+  sort: z.preprocess(blankToUndefined, z.enum(["newest", "oldest"]).default("newest")),
+  accountType: z.preprocess(blankToUndefined, z.enum(["RIDER", "SERVICE_PROVIDER"]).optional()),
+  status: z.preprocess(blankToUndefined, z.enum(["PAID", "REFUNDED"]).optional()),
+  planId: z.preprocess(blankToUndefined, z.string().min(1).optional()),
+  from: z.preprocess(blankToUndefined, z.coerce.date().optional()),
+  to: z.preprocess(blankToUndefined, z.coerce.date().optional()),
+  search: z.preprocess(blankToUndefined, z.string().trim().min(1).max(120).optional()),
+});
+
+export type AdminTransactionsQuery = z.infer<typeof adminTransactionsQuerySchema>;
+
+export const REVENUE_RANGE_KEYS = [
+  "today",
+  "yesterday",
+  "last7",
+  "last30",
+  "thisMonth",
+  "lastMonth",
+  "thisYear",
+  "custom",
+] as const;
+
+export const adminRevenueReportQuerySchema = z.object({
+  range: z.preprocess(blankToUndefined, z.enum(REVENUE_RANGE_KEYS).default("last30")),
+  from: z.preprocess(blankToUndefined, z.coerce.date().optional()),
+  to: z.preprocess(blankToUndefined, z.coerce.date().optional()),
+});
+
+export type AdminRevenueReportQuery = z.infer<typeof adminRevenueReportQuerySchema>;

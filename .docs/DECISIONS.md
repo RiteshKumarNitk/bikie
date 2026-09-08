@@ -3724,3 +3724,44 @@ changes:
   pre-existing unrelated `http` info), `flutter test` 119/119, backend `vitest` 262/262. Not
   done: an `order.paid` webhook (still the ADR-073 deferral) and a plan/amount re-check on
   `/purchase`.
+
+## ADR-076: Admin financial reporting — reads the existing `MembershipInvoice` ledger; failed-payment ledger deferred
+
+- **Context.** `/admin/reports` was a hard-coded `<EmptyState>` "coming soon" stub — no API, no
+  data, never built. There was also no admin Transactions view. The DB *does* have a payment
+  ledger: `MembershipInvoice` (ADR-070) — one immutable, snapshot-per-activation receipt for both
+  account types (`amount`/`planName`/`durationDays`/membership window/payer are frozen at purchase
+  time, so historic figures never move when a plan's price changes). What it does **not** record
+  is anything that isn't a completed activation: a Razorpay order is created in `/checkout` and
+  handed to the client but never persisted, and a `payment.failed` on the client only shows a
+  toast. So a failed payment (e.g. `pay_TZ6C4zkf3Iu553`) exists only in the Razorpay dashboard.
+- **Decision.**
+  - **Reporting + Transactions are built directly on `MembershipInvoice`** — no new table, no
+    duplicate ledger, no recomputation from current plan prices. `billing.repository.ts` gains
+    `listTransactionsForAdmin` (server-side pagination, filter by accountType / status / plan /
+    date range, search across receiptNo / name / phone / razorpay payment+order id / paymentId,
+    sort newest|oldest), `getTransactionForAdmin`, `listTransactionPlanFacets`, and
+    `getRevenueReport` (revenue rolling windows + range-scoped; by account type; by plan; by
+    status; membership summary from `UserMembership`/`PartnerMembership`; daily time series).
+  - New flat facade `AdminBillingService` (mirrors `BillingService`), CSV via the existing
+    `buildCsv` + `MAX_ADMIN_CSV_ROWS`.
+  - Routes (all `requireRole("ADMIN")`, server-side): `GET /api/admin/reports`,
+    `GET /api/admin/transactions`, `GET /api/admin/transactions/[id]`,
+    `GET /api/admin/transactions/export`. No financial figure is reachable without an admin
+    session; no Razorpay secret is ever in a response.
+  - UI: `/admin/reports` rewritten (range presets + custom, summary cards, recharts revenue/txn
+    time series + account-type & status pies, by-plan / by-status / by-account-type tables,
+    real empty states); new `/admin/transactions` (filter bar, paginated table, detail drawer,
+    Export CSV that carries the active filters). Nav gains a "Finance" group.
+  - **A failed/pending/cancelled-payment ledger (`PaymentTransaction`) is deferred to a
+    follow-up** — it needs a schema migration and wiring into `/checkout` (record `CREATED`),
+    `purchaseMembership` (mark `SUCCESS` + link the invoice), a client `payment-failed` report
+    endpoint, and ideally a Razorpay `order.paid` / `payment.failed` webhook for authoritative
+    status. Until then the Payment-status report shows only `PAID` / `REFUNDED` and says so.
+- **Consequences.** No schema change in this step; `MembershipInvoice.status` already carries
+  `PAID` / `REFUNDED` (ADR-070). Verified against real data: revenue totals sum the frozen
+  snapshot amounts (a ₹1 payment reports as ₹1, never as the plan's ₹99), Rider vs Service
+  Provider split correctly, date filters / search / pagination / CSV all work, empty states
+  render when a period genuinely has no rows. `vitest` 262/262, `tsc` clean across
+  types/validation/database/services/web, lint adds nothing over baseline, OpenAPI inventory
+  regenerated (148 → 152 routes).

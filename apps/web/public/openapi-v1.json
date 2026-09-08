@@ -2363,6 +2363,57 @@
         }
       }
     },
+    "/api/admin/reports": {
+      "get": {
+        "operationId": "get_api_admin_reports",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/reports",
+        "description": "Source: `apps/web/app/api/admin/reports/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/reports/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
     "/api/admin/sms": {
       "post": {
         "operationId": "post_api_admin_sms",
@@ -2581,6 +2632,159 @@
         ],
         "x-bikie-auth": "admin",
         "x-bikie-source": "apps/web/app/api/admin/testimonials/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/admin/transactions/{id}": {
+      "get": {
+        "operationId": "get_api_admin_transactions_id_",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/transactions/{id}",
+        "description": "Source: `apps/web/app/api/admin/transactions/[id]/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/transactions/[id]/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/admin/transactions/export": {
+      "get": {
+        "operationId": "get_api_admin_transactions_export",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/transactions/export",
+        "description": "Source: `apps/web/app/api/admin/transactions/export/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/transactions/export/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/admin/transactions": {
+      "get": {
+        "operationId": "get_api_admin_transactions",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/transactions",
+        "description": "Source: `apps/web/app/api/admin/transactions/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/transactions/route.ts",
         "responses": {
           "200": {
             "description": "Success (shape documented in .docs/API.md for this route).",

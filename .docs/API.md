@@ -378,6 +378,10 @@ There is no dedicated "members" route — the room's real member list is the sam
 | `/api/admin/referrals` | GET | |
 | `/api/admin/audit-logs` | GET | |
 | `/api/admin/export` | GET | `?type=users\|bookings\|partners` — streams a CSV download |
+| `/api/admin/reports` | GET | ADR-076. `?range=today\|yesterday\|last7\|last30\|thisMonth\|lastMonth\|thisYear\|custom` (`&from=&to=` for `custom`). `{ report: AdminRevenueReportDTO }` — revenue rolling windows + range-scoped, by account type / plan / status, live membership summary, daily time series. Read entirely from the `MembershipInvoice` ledger (ADR-070) — snapshot amounts, never recomputed from a plan's current price. |
+| `/api/admin/transactions` | GET | ADR-076. Server-side paginated (`page`, `pageSize`≤100), `sort=newest\|oldest`, filters `accountType`, `status` (`PAID\|REFUNDED`), `planId`, `from`/`to` (on `paidAt`), `search` (receiptNo / customerName / customerPhone / razorpay payment+order id / paymentId). `{ transactions: AdminTransactionDTO[], total, page, pageSize, totalPages, facets: { plans } }`. |
+| `/api/admin/transactions/[id]` | GET | ADR-076. `{ transaction: AdminTransactionDTO }` or 404. |
+| `/api/admin/transactions/export` | GET | ADR-076. Same query params as the list route (pagination ignored) — streams a CSV of the filtered set, capped at `MAX_ADMIN_CSV_ROWS`. |
 | `/api/admin/email` | POST | `{ to, subject, html }` — send via the email gateway |
 | `/api/admin/sms` | POST | `{ to, message }` — send via the SMS gateway |
 

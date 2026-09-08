@@ -1,5 +1,18 @@
 # BIKIE Changelog
 
+## 2026-09-08 — Admin: real Revenue Reports + Transactions browser (ADR-076)
+
+`/admin/reports` was a static "coming soon" stub; there was no Transactions view. Both are now
+real, read server-side from the `MembershipInvoice` ledger (ADR-070) — snapshot amounts, never
+recomputed from current plan prices. New admin-only routes: `GET /api/admin/reports` and
+`GET /api/admin/transactions` (+ `/[id]`, `/export`) with server-side pagination, filters
+(account type / status / plan / date range), search and sort. `/admin/reports` rewritten with
+range presets, summary cards, recharts and real empty states; new `/admin/transactions` page
+(filter bar, paginated table, detail drawer, filter-aware CSV export). Deferred: a
+`PaymentTransaction` ledger for failed/pending/cancelled payments (needs a migration +
+Razorpay-webhook wiring) — the status report shows only PAID / REFUNDED for now. No schema
+change. See ADR-076.
+
 ## 2026-09-07 — Admin: edit membership plans; clearer delete behaviour
 
 `MembershipPlansManager` (used by `/admin/membership` and `/admin/partner-membership`) gains an

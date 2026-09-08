@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-30T08:32:33.678Z",
-  "count": 148,
+  "generatedAt": "2026-09-08T10:55:47.244Z",
+  "count": 152,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -279,6 +279,14 @@
       "file": "apps/web/app/api/admin/referrals/route.ts"
     },
     {
+      "path": "/api/admin/reports",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/reports/route.ts"
+    },
+    {
       "path": "/api/admin/sms",
       "methods": [
         "POST"
@@ -303,6 +311,30 @@
       ],
       "auth": "admin",
       "file": "apps/web/app/api/admin/testimonials/route.ts"
+    },
+    {
+      "path": "/api/admin/transactions/{id}",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/transactions/[id]/route.ts"
+    },
+    {
+      "path": "/api/admin/transactions/export",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/transactions/export/route.ts"
+    },
+    {
+      "path": "/api/admin/transactions",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/transactions/route.ts"
     },
     {
       "path": "/api/admin/trips/{id}",
