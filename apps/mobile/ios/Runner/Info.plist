@@ -47,5 +47,14 @@
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>BIKIE uses your location to attach accurate coordinates to SOS emergency alerts.</string>
+	<!-- Lets Razorpay Checkout detect installed UPI apps for the UPI-intent payment option. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tez</string>
+		<string>phonepe</string>
+		<string>paytmmp</string>
+		<string>bhim</string>
+		<string>credpay</string>
+	</array>
 </dict>
 </plist>

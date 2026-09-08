@@ -1,14 +1,15 @@
 # BIKIE — Roadmap
 
-## Mobile Membership Checkout — Razorpay Hosted in a WebView (2026-09-07, ADR-075)
+## Mobile Membership Checkout — Native Razorpay SDK (2026-09-07, ADR-075)
 The Flutter app can now actually take a membership payment. Rider and Service Provider membership
-screens run the real flow — server-priced order from `/api/*/checkout`, then Razorpay Standard
-Checkout hosted in a `webview_flutter` WebView (the same approach already used for the MSG91
-widget), then the `razorpay_*` triple posted to `/api/*/purchase` for server-side signature
-verification. The key id comes from the server; the app embeds no Razorpay key. Also fixed a 500
-on `/api/membership/checkout` (the order `receipt` exceeded Razorpay's 40-char limit and the throw
-was unhandled). Still deferred: the `order.paid` webhook and a plan/amount re-check on purchase.
-See ADR-075.
+screens run the real flow — server-priced order from `/api/*/checkout`, then Razorpay checkout via
+the native `razorpay_flutter` SDK, then the `razorpay_*` triple posted to `/api/*/purchase` for
+server-side signature verification. A WebView-hosted first pass was dropped because Razorpay
+Checkout hides the UPI-intent option inside a WebView; the native sheet shows UPI apps + UPI ID +
+QR alongside every other method. The key id comes from the server; the app embeds no Razorpay key.
+Also fixed a 500 on `/api/membership/checkout` (the order `receipt` exceeded Razorpay's 40-char
+limit and the throw was unhandled). Operator still needs UPI enabled on the Razorpay account.
+Still deferred: the `order.paid` webhook and a plan/amount re-check on purchase. See ADR-075.
 
 ## Razorpay Test Credentials + Checkout Client Hardening (2026-09-06, ADR-073)
 Wired a Razorpay test-mode key into the (already-built) membership checkout and brought the

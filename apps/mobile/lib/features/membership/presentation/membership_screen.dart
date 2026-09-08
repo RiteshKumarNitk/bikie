@@ -168,7 +168,6 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
         if (!mounted) return;
         final user = ref.read(authControllerProvider).user;
         final result = await showRazorpayCheckout(
-          context,
           order: order,
           planName: widget.plan.name,
           prefill: RazorpayPrefill(

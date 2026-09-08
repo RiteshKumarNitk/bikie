@@ -3684,7 +3684,7 @@ changes:
   (web/services/database), `vitest` 262/262. This is also the backend the mobile "Delete Account"
   button should call once it does a real deletion rather than just signing out.
 
-## ADR-075: Mobile membership checkout hosts Razorpay Standard Checkout in a WebView
+## ADR-075: Mobile membership checkout — native `razorpay_flutter` SDK
 
 - **Context.** Once real `RAZORPAY_KEY_ID`/`RAZORPAY_KEY_SECRET` are configured,
   `/api/{membership,partner-membership}/purchase` requires a signature-verified payment
@@ -3692,28 +3692,35 @@ changes:
   `PAYMENT_VERIFICATION_REQUIRED` (ADR-069). The Flutter membership screens only ever sent
   `DUMMY-<uuid>`, so **all mobile membership purchase was dead** the moment Razorpay went live —
   web had the full flow (`PaymentModal.tsx`, ADR-043/073), mobile had nothing.
-- **Decision.** Add the checkout to the app by **hosting Razorpay's browser
-  `checkout.razorpay.com/v1/checkout.js` inside a `webview_flutter` WebView**, not the native
-  `razorpay_flutter` plugin — the same call this codebase already made for MSG91 (ADR-057,
-  `Msg91WidgetHost`): reuse the proven web integration rather than take on a second native SDK,
-  its Android/iOS config, and a divergent code path.
-  - New `core/payments/razorpay_checkout.dart`: `showRazorpayCheckout(context, order, planName,
-    prefill)` pushes a fullscreen page with a WebView that `loadHtmlString`s a tiny page
-    (`baseUrl: https://bikie.app`, like the MSG91 host) building `new Razorpay({key: order.keyId,
-    order_id, amount, currency, name, description, prefill, theme, handler})` and relaying the
-    result over a `RazorpayBridge` JS channel as `{status: success|cancelled|failed}`. Returns a
-    sealed `RazorpayResult`. Non-http nav (`upi:`, `intent:`, bank-app deep links) is handed to
-    `url_launcher` so a UPI app can complete its leg.
+- **First attempt (reverted, never released).** Host `checkout.razorpay.com/v1/checkout.js` in a
+  `webview_flutter` WebView, reusing the MSG91 pattern (ADR-057). It worked for cards / netbanking
+  / wallets but **Razorpay Checkout suppresses the UPI-intent option inside an embedded WebView**
+  (the tap-to-open GPay/PhonePe app-switch can't run there), so UPI never appeared — a
+  showstopper for an Indian payments flow.
+- **Decision.** Use the official **`razorpay_flutter` native SDK** (`^1.4.0`). The native sheet
+  lists UPI apps + UPI ID + QR alongside cards / netbanking / wallets, and Razorpay maintains the
+  platform integration.
+  - `core/payments/razorpay_checkout.dart`: `showRazorpayCheckout({order, planName, prefill}) ->
+    Future<RazorpayResult>` wires a `Razorpay()` instance's `EVENT_PAYMENT_SUCCESS` /
+    `EVENT_PAYMENT_ERROR` / `EVENT_EXTERNAL_WALLET` listeners to a `Completer`, then
+    `razorpay.open({key: order.keyId, order_id, amount, currency, name, description, prefill,
+    theme, retry})`. Sealed `RazorpayResult` (`RazorpaySuccess` / `RazorpayCancelled` /
+    `RazorpayFailed`) is unchanged, so the two screens' call sites barely moved (they just drop
+    the old `BuildContext` arg — the native sheet is its own activity).
   - `key` comes from the server's checkout response (`order.keyId`) — the app embeds no Razorpay
     key and needs no `--dart-define`.
-  - Repos gain `checkout({planId}) -> RazorpayOrder?` (`null` = `razorpayConfigured: false`, the
-    dev/simulated path; `503` still throws `ApiException`) and `purchase(...)` now takes the
-    Razorpay triple. The Rider and Service Provider screens run: `checkout()` → if an order comes
-    back, `showRazorpayCheckout` → on success `purchase(triple)`; `null` keeps the legacy
-    `DUMMY-` path for local dev; the Service Provider free-tier (price 0) path is unchanged
-    (`purchase(planId)` with no payment).
-- **Consequences.** No API/schema change — the backend was already mobile-ready. Card payments
-  (test and live) complete in-WebView; some real-UPI-app flows bounce to the UPI app via
-  `url_launcher` and return. `flutter analyze` unchanged (1 pre-existing unrelated `http` info),
-  `flutter test` 119/119, backend `vitest` 262/262. Not done: an `order.paid` webhook (still the
-  ADR-073 deferral) and a plan/amount re-check on `/purchase`.
+  - Platform config: `AndroidManifest.xml` gets a `<queries>` entry for `scheme="upi"` (Android
+    11+ package visibility so Checkout can enumerate UPI apps); `Info.plist` gets
+    `LSApplicationQueriesSchemes` (`tez`, `phonepe`, `paytmmp`, `bhim`, `credpay`) for the same
+    on iOS. No ProGuard rules added — the app doesn't enable R8 minification.
+  - Repos: `checkout({planId}) -> RazorpayOrder?` (`null` = `razorpayConfigured: false`, the
+    dev/simulated path; `503` still throws `ApiException`) and `purchase(...)` takes the Razorpay
+    triple. Rider and Service Provider screens run `checkout()` → `showRazorpayCheckout` → on
+    success `purchase(triple)`; `null` keeps the legacy `DUMMY-` path for local dev; the Service
+    Provider free-tier (price 0) path is unchanged (`purchase(planId)` with no payment).
+- **Consequences.** New native dependency (`razorpay_flutter` + transitive `eventify`); a couple
+  of transitive packages (`webview_flutter`, `vector_math`) pin slightly lower to satisfy it. No
+  API/schema change — the backend was already mobile-ready. `flutter analyze` unchanged (1
+  pre-existing unrelated `http` info), `flutter test` 119/119, backend `vitest` 262/262. Not
+  done: an `order.paid` webhook (still the ADR-073 deferral) and a plan/amount re-check on
+  `/purchase`.

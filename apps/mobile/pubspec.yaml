@@ -52,6 +52,14 @@ dependencies:
   # (`verify.msg91.com/otp-provider.js`) headlessly — see `Msg91WidgetHost`/`Msg91WebviewBridge`.
   webview_flutter: ^4.10.0
 
+  # Razorpay Standard Checkout — native SDK (ADR-075 rev). The earlier WebView-hosted
+  # checkout.js flow could not offer UPI: Razorpay Checkout suppresses the UPI-intent
+  # (tap-to-open GPay/PhonePe) option inside an embedded WebView, so only cards / netbanking /
+  # wallets showed. The native sheet lists UPI apps + UPI ID + QR alongside everything else.
+  # Same server flow: order from /api/*/checkout, then the success callback's
+  # payment_id/order_id/signature is posted to /api/*/purchase for server-side verification.
+  razorpay_flutter: ^1.4.0
+
   # Immutable models / JSON
   freezed_annotation: ^2.4.4
   json_annotation: ^4.9.0

@@ -8,16 +8,19 @@ Edit button per plan (name/description/price/duration/benefits) against the exis
 subscriber returns 409 (the FK is kept so billing history survives); the UI now confirms first
 and, on that 409, offers to deactivate the plan inline instead. No API/schema change.
 
-## 2026-09-07 — Mobile membership checkout: Razorpay in a WebView; checkout `receipt` 500 fixed (ADR-075)
+## 2026-09-07 — Mobile membership checkout: native Razorpay SDK (adds UPI); checkout `receipt` 500 fixed (ADR-075)
 
 Flutter membership purchase was broken once real Razorpay keys were set (it only sent
 `DUMMY-<uuid>` → `PAYMENT_VERIFICATION_REQUIRED`). Rider + Service Provider screens now run the
-real flow via `core/payments/razorpay_checkout.dart` — `POST /api/*/checkout` → Razorpay Standard
-Checkout hosted in a `webview_flutter` WebView (same pattern as the MSG91 widget host) → the
-`razorpay_*` triple posted to `/api/*/purchase` for server-side signature verification. Key id
-comes from the server. Free SP plan and the local-dev `DUMMY-` path unchanged. Also fixed a 500 on
-`/api/membership/checkout`: `RazorpayService.createOrder` passed a >40-char `receipt` (Razorpay's
-cap) and didn't catch the throw — now truncates and returns `null` on any Razorpay failure (→
+real flow via `core/payments/razorpay_checkout.dart` — `POST /api/*/checkout` → Razorpay checkout
+via the native `razorpay_flutter` SDK → the `razorpay_*` triple posted to `/api/*/purchase` for
+server-side signature verification. (A WebView-hosted first pass couldn't show UPI — Razorpay
+Checkout hides the UPI-intent option inside a WebView; the native sheet shows UPI apps + UPI ID +
+QR.) `AndroidManifest` `<queries>` + `Info.plist` `LSApplicationQueriesSchemes` added so Checkout
+sees installed UPI apps. Key id comes from the server. Free SP plan and the local-dev `DUMMY-`
+path unchanged. Also fixed a 500 on `/api/membership/checkout`: `RazorpayService.createOrder`
+passed a >40-char `receipt` (Razorpay's cap) and didn't catch the throw — now truncates and
+returns `null` on any Razorpay failure (→
 `503 CHECKOUT_UNAVAILABLE`, logged); both checkout routes pass a short receipt. `vitest` 262/262,
 `flutter test` 119/119. See ADR-075.
 

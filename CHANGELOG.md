@@ -12,22 +12,25 @@ returns a 409 explaining that. The admin UI now adds a confirm step and, on that
 touching existing ones). The active/inactive toggle's toast now says "activated"/"deactivated".
 No API or schema change.
 
-## 2026-09-07 — Mobile membership checkout: Razorpay in a WebView; checkout `receipt` 500 fixed (ADR-075)
+## 2026-09-07 — Mobile membership checkout: native Razorpay SDK (UPI + all methods); checkout `receipt` 500 fixed (ADR-075)
 
 Membership purchase in the Flutter app was dead once real Razorpay keys went live — the screens
 only sent a `DUMMY-<uuid>` id, which `/api/*/purchase` now rejects with
-`PAYMENT_VERIFICATION_REQUIRED`. The Rider and Service Provider membership screens now run the
-real flow: `POST /api/*/checkout` for a server-priced order → **Razorpay Standard Checkout hosted
-in a `webview_flutter` WebView** (`core/payments/razorpay_checkout.dart`, same approach as the
-MSG91 widget host) → the `razorpay_order_id/payment_id/signature` triple is posted to
-`/api/*/purchase` for server-side signature verification. The key id comes from the server, so the
-app embeds no Razorpay key. Free Service Provider plan path unchanged; the `DUMMY-` path is kept
-only for local dev (`razorpayConfigured: false`). Also fixed a **500** on
-`POST /api/membership/checkout`: `RazorpayService.createOrder` was passing a ~50-char `receipt`
-(Razorpay's max is 40) and didn't catch the resulting throw — it now truncates `receipt` and
-returns `null` on any Razorpay failure (→ clean `503 CHECKOUT_UNAVAILABLE`, real error logged),
-and both checkout routes pass a short receipt. No schema change; `vitest` 262/262, `flutter test`
-119/119. See ADR-075.
+`PAYMENT_VERIFICATION_REQUIRED`. The Rider and Service Provider screens now run the real flow:
+`POST /api/*/checkout` for a server-priced order → **Razorpay checkout via the native
+`razorpay_flutter` SDK** (`core/payments/razorpay_checkout.dart`) → the
+`razorpay_order_id/payment_id/signature` triple is posted to `/api/*/purchase` for server-side
+signature verification. A first pass hosted `checkout.razorpay.com` in a WebView, but Razorpay
+Checkout hides the **UPI-intent** option inside a WebView (only cards / netbanking / wallets
+showed) — the native sheet lists UPI apps + UPI ID + QR alongside everything else. `AndroidManifest`
+gains a `<queries>` entry for `scheme="upi"` and `Info.plist` an `LSApplicationQueriesSchemes`
+list so Checkout can see installed UPI apps. Key id still comes from the server (app embeds no
+key). Free Service Provider plan path unchanged; the `DUMMY-` path is kept only for local dev
+(`razorpayConfigured: false`). Also fixed a **500** on `POST /api/membership/checkout`:
+`RazorpayService.createOrder` passed a ~50-char `receipt` (Razorpay's max is 40) and didn't catch
+the throw — it now truncates `receipt` and returns `null` on any Razorpay failure (→ clean
+`503 CHECKOUT_UNAVAILABLE`, real error logged), and both checkout routes pass a short receipt. No
+schema change; `vitest` 262/262, `flutter test` 119/119. See ADR-075.
 
 ## 2026-09-07 — Fix: `/api/notifications` hammered by the navbar bell
 
