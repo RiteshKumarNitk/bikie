@@ -54,11 +54,13 @@ export interface EmailPort extends ChannelCapability {
 }
 
 export interface SmsPort extends ChannelCapability {
-  /** `templateId` overrides the adapter's default DLT template ID (`MSG91_TEMPLATE_ID`, used for
-   * SOS alerts) — every distinct transactional SMS registered on MSG91's DLT entity needs its own
-   * template ID and exact matching text (ADR-058), so a shared default can't cover more than one
-   * message shape. */
-  send(to: string, message: string, templateId?: string): Promise<ChannelResult>;
+  /** Every distinct transactional SMS registered on MSG91's DLT entity needs its own template id
+   * and exact matching text (ADR-058). The caller passes the template id for *this* SMS type;
+   * the adapter uses it verbatim and NEVER substitutes another type's template. Omitting
+   * `templateId` sends template-less (DLT will usually reject) — callers of a typed SMS resolve
+   * their own `MSG91_*_TEMPLATE_ID` up front and refuse to send when it's unset, rather than
+   * borrow one. `label` is an optional log tag (e.g. `"membership-subscribed"`, `"sos-help"`). */
+  send(to: string, message: string, templateId?: string, label?: string): Promise<ChannelResult>;
 }
 
 export interface WhatsAppPort extends ChannelCapability {

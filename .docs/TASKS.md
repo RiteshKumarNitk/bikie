@@ -2,6 +2,18 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## MSG91 SMS — exactly three DLT templates, one per type, no fourth (2026-09-08, ADR-077)
+
+| Task | Status |
+|---|---|
+| Audit: adapter did `templateId ?? MSG91_TEMPLATE_ID` → typed SMS sent under the wrong template when its own var was unset. `MSG91_TEMPLATE_ID` was leftover from the pre-typed generic-fallback design; the only remaining product use was the SOS free-text SMS to the reporter's contacts/admins, plus the dead `SMSService.sendSOSAlert` and the internal `/admin/sms` tool. NOT needed as a 4th template — the SOS recipient SMS can use `MSG91_SOS_HELP_TEMPLATE_ID` for everyone. OTP path (`msg91-native-otp.adapter.ts`, `MSG91_OTP_TEMPLATE_ID`) is separate and was not touched. | Completed |
+| Adapter (`sms.adapter.ts`) — uses `templateId` verbatim, no `MSG91_TEMPLATE_ID`; template-less send logs `[SMS][CONFIG]`; `label` log tag; credentials server-only; never carries OTPs | Completed |
+| `sms.service.ts` — `MSG91_SMS_TEMPLATE_ENV` = { SOS_HELP, MEMBERSHIP_SUBSCRIBED } only; `resolveSmsTemplateId`; `buildMembershipSubscribedBody`; `sendMembershipSubscribed` → `{ok:false, provider:"unconfigured"}` (no MSG91 call) when its var unset; `sendSOSAlert` removed (0 callers); `SMSService.send` (admin tool) sends untemplated, label `"admin-manual"` | Completed |
+| `fan-out.application.ts` — ALL SOS dispatch SMS (every recipient role) → `MSG91_SOS_HELP_TEMPLATE_ID` + `buildSmsTemplateBody`; skipped per recipient (logged + `summary.errors`) when unset; recipients/channels/eligibility/severity rules unchanged | Completed |
+| Tests — `communications.test.ts` "never borrows MSG91_TEMPLATE_ID"; new `sms.service.test.ts`; `safety-location.test.ts` verifies redaction on the WhatsApp channel + "SOS SMS skipped when unset". `vitest` 262→269, `tsc` clean; OTP adapter byte-identical (no diff) | Completed |
+| `.env.example` — three-templates architecture spelled out; `MSG91_TEMPLATE_ID` marked DEPRECATED (remove) | Completed |
+| Operator: set `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID` + `MSG91_SOS_HELP_TEMPLATE_ID` on the VPS `apps/.env` + restart `web`; ensure each registered template's fixed text matches `buildMembershipSubscribedBody` / `buildSmsTemplateBody`; `MSG91_TEMPLATE_ID` can be removed | Pending (operator) |
+
 ## Admin financial reporting — real Revenue Reports + Transactions browser (2026-09-08, ADR-076)
 
 | Task | Status |

@@ -169,30 +169,38 @@ export async function dispatchToRecipient(
   if (recipient.phone) {
     const phone = toE164Phone(recipient.phone);
 
-    // ADR-059 — capped to the nearest SOS_SMS_RECIPIENT_LIMIT candidate responders
-    // (markSmsEligibility, applied by the caller); `smsEligible === false` skips SMS only —
-    // WhatsApp/email/in-app below are unaffected. Never set (undefined) for emergency
+    // ADR-059 — the SMS channel is capped to the nearest SOS_SMS_RECIPIENT_LIMIT candidate
+    // responders (markSmsEligibility, applied by the caller); `smsEligible === false` skips SMS
+    // only — WhatsApp/email/in-app below are unaffected. Never set (undefined) for emergency
     // contacts/admins/emergency services, which aren't capped.
     if (channels.sms && recipient.smsEligible !== false) {
-      summary.smsAttempted += 1;
-      // The DLT-approved "BIKIE_SR" template applies only to the two roles it's actually
-      // addressed to ("Hello Riders/Service Providers…"); every other recipient keeps the
-      // richer free-text body on the SOS-alert MSG91_TEMPLATE_ID default (a separate,
-      // still-open DLT-compliance gap for those roles — see ADR-059's Consequences).
-      const smsText = isCandidateResponder(recipient.role) ? buildSmsTemplateBody(dispatchAlert) : text;
-      const smsTemplateId = isCandidateResponder(recipient.role)
-        ? process.env.MSG91_SOS_HELP_TEMPLATE_ID?.trim() || undefined
-        : undefined;
-      tasks.push(
-        communications.sms
-          .send(phone, smsText, smsTemplateId)
-          .then((r) => {
-            if (record("sms", phone, r)) summary.smsSent += 1;
-          })
-          .catch((e) => {
-            summary.errors.push(`sms → ${phone}: ${String(e)}`);
-          }),
-      );
+      // ADR-077 — BIKIE has ONE SOS/Amber SMS DLT template ("BIKIE_SR",
+      // `MSG91_SOS_HELP_TEMPLATE_ID`) used for EVERY dispatch recipient — nearby riders /
+      // service providers and the reporter's own contacts / admins / emergency services alike.
+      // There is no separate "generic SOS" template and no SMS type borrows another's. When it
+      // is unset the SMS channel is skipped for that recipient (logged + recorded in the
+      // summary) — WhatsApp / email / in-app, which carry the richer detail and aren't
+      // DLT-gated, are untouched.
+      const smsTemplateId = process.env.MSG91_SOS_HELP_TEMPLATE_ID?.trim() || null;
+      if (!smsTemplateId) {
+        console.error(
+          `[SMS][CONFIG] MSG91_SOS_HELP_TEMPLATE_ID is not set — SOS SMS to ${phone} skipped ` +
+            `(no unrelated DLT template is used). WhatsApp / email / in-app are unaffected.`,
+        );
+        summary.errors.push(`sms → ${phone}: MSG91_SOS_HELP_TEMPLATE_ID not configured (SMS skipped)`);
+      } else {
+        summary.smsAttempted += 1;
+        tasks.push(
+          communications.sms
+            .send(phone, buildSmsTemplateBody(dispatchAlert), smsTemplateId, "sos-help")
+            .then((r) => {
+              if (record("sms", phone, r)) summary.smsSent += 1;
+            })
+            .catch((e) => {
+              summary.errors.push(`sms → ${phone}: ${String(e)}`);
+            }),
+        );
+      }
     }
 
     if (channels.whatsapp) {

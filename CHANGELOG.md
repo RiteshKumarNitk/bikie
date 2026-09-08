@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-08 — MSG91 SMS: exactly three DLT templates, one per type, no fourth (ADR-077)
+
+BIKIE has exactly three SMS types → three DLT templates: **OTP** (`MSG91_OTP_TEMPLATE_ID`, native
+OTP flow — untouched), **membership** (`MSG91_MEMBERSHIP_SUB_TEMPLATE_ID`), **SOS/Amber**
+(`MSG91_SOS_HELP_TEMPLATE_ID`). The adapter used to substitute `MSG91_TEMPLATE_ID` for any send
+without an explicit template id, so a typed SMS whose own var was unset went out under the wrong
+template and was silently rejected by India's DLT firewall. Now the adapter uses the given
+template id verbatim and never borrows another; the membership sender refuses (returns
+`unconfigured`, `confirmationSmsSentAt` stays null to retry) when its var is unset, and **every**
+SOS dispatch recipient's SMS — nearby responders and the reporter's own contacts/admins alike —
+goes under the one `MSG91_SOS_HELP_TEMPLATE_ID` template (skipped per recipient, other channels
+unaffected, when unset). `MSG91_TEMPLATE_ID` is **deprecated** — no product SMS reads it; only the
+internal `/admin/sms` free-text tool did, and it now sends untemplated. `SMSService.sendSOSAlert`
+(0 callers) removed. No SOS severity/eligibility/dispatch-rule change, no schema change, no
+WhatsApp, OTP flow byte-for-byte identical. `vitest` 262→269, `tsc` clean. See ADR-077.
+
 ## 2026-09-08 — Admin: real Revenue Reports + a Transactions browser (ADR-076)
 
 `/admin/reports` was a hard-coded "coming soon" stub — no API, never built — and there was no

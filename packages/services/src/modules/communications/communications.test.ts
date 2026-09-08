@@ -83,7 +83,7 @@ describe("communications adapters (DEV fallback)", () => {
     restoreEnv(prev);
   });
 
-  describe("SMS DLT_TE_ID resolution (ADR-058)", () => {
+  describe("SMS DLT_TE_ID resolution (ADR-058 / one template per SMS type)", () => {
     const keys = ["MSG91_AUTH_KEY", "MSG91_SENDER_ID", "MSG91_ROUTE", "MSG91_TEMPLATE_ID"];
     let prev: Record<string, string | undefined>;
 
@@ -92,7 +92,7 @@ describe("communications adapters (DEV fallback)", () => {
       vi.unstubAllGlobals();
     });
 
-    it("an explicit templateId argument overrides the adapter's configured default", async () => {
+    it("uses the explicit templateId as DLT_TE_ID verbatim", async () => {
       prev = snapshotEnv(keys);
       process.env.MSG91_AUTH_KEY = "test-authkey";
       process.env.MSG91_SENDER_ID = "KSHIDL";
@@ -108,12 +108,13 @@ describe("communications adapters (DEV fallback)", () => {
       expect(body.sms[0].DLT_TE_ID).toBe("membership-sub-template");
     });
 
-    it("falls back to MSG91_TEMPLATE_ID when no explicit templateId is given (SOS alerts, unchanged)", async () => {
+    it("NEVER borrows MSG91_TEMPLATE_ID — a send with no templateId goes out with no DLT_TE_ID and warns", async () => {
       prev = snapshotEnv(keys);
       process.env.MSG91_AUTH_KEY = "test-authkey";
       process.env.MSG91_SENDER_ID = "KSHIDL";
-      process.env.MSG91_TEMPLATE_ID = "sos-default-template";
+      process.env.MSG91_TEMPLATE_ID = "some-other-template";
 
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
       const fetchSpy = vi.fn(async (_input: string | URL, _init?: RequestInit) => new Response('{"type":"success"}', { status: 200 }));
       vi.stubGlobal("fetch", fetchSpy);
 
@@ -121,7 +122,9 @@ describe("communications adapters (DEV fallback)", () => {
 
       const [, init] = fetchSpy.mock.calls[0];
       const body = JSON.parse((init as RequestInit).body as string);
-      expect(body.sms[0].DLT_TE_ID).toBe("sos-default-template");
+      expect(body.sms[0].DLT_TE_ID).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("no DLT template id"));
+      warn.mockRestore();
     });
   });
 

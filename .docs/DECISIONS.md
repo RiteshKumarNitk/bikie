@@ -3765,3 +3765,49 @@ changes:
   render when a period genuinely has no rows. `vitest` 262/262, `tsc` clean across
   types/validation/database/services/web, lint adds nothing over baseline, OpenAPI inventory
   regenerated (148 → 152 routes).
+
+## ADR-077: Exactly three MSG91 DLT templates — one per SMS type, no cross-fallback, no fourth
+
+- **Context.** `SmsPort.send(to, message, templateId?)` did `resolvedTemplateId = templateId ??
+  MSG91_TEMPLATE_ID`. So any typed SMS whose own env var was unset went out under
+  `MSG91_TEMPLATE_ID` with the *wrong* body → India's DLT firewall rejects a mismatched body →
+  silent non-delivery, no "you forgot to set X" signal. BIKIE has **exactly three** SMS types
+  and three DLT templates — OTP, membership, SOS/Amber — and there is **no** fourth "generic
+  SOS" template.
+- **Decision.**
+  - **The adapter uses `templateId` verbatim and never substitutes another.** It no longer reads
+    `MSG91_TEMPLATE_ID`. A send with no `templateId` goes out with no `DLT_TE_ID` and logs
+    `[SMS][CONFIG] … no DLT template id …`. Auth stays server-only; this adapter never carries
+    OTPs.
+  - **OTP is untouched** — `msg91-native-otp.adapter.ts` (`MSG91_OTP_TEMPLATE_ID`,
+    `control.msg91.com/api/v5/otp`, server-rendered from the registered template) is a separate
+    path and was not modified.
+  - **Membership** — `SMSService.sendMembershipSubscribed` resolves
+    `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID`; if unset it returns `{ ok: false, provider:
+    "unconfigured" }` **without calling MSG91** (logged). `MembershipInvoice.confirmationSmsSentAt`
+    stays null so it retries on the next purchase.
+  - **SOS / Amber** — `dispatchToRecipient` sends **every** dispatch recipient's SMS (nearby
+    riders / service providers AND the reporter's contacts / admins / emergency services) under
+    the ONE `MSG91_SOS_HELP_TEMPLATE_ID` ("BIKIE_SR") template, body `buildSmsTemplateBody`. If
+    it is unset the SMS channel is skipped per recipient (logged, recorded in the dispatch
+    summary's `errors`, `smsAttempted` not incremented) — WhatsApp / email / in-app, which carry
+    the richer role-aware detail and aren't DLT-gated, are untouched. The reporter's contacts
+    previously got a free-text SMS on `MSG91_TEMPLATE_ID`; they now get the "BIKIE_SR" body on
+    the SMS channel (full detail still reaches them on the other channels).
+  - **`MSG91_TEMPLATE_ID` is deprecated.** No product SMS reads it. Only the internal
+    `/admin/sms` free-text tool (`SMSService.send`) referenced it; that now sends untemplated
+    (labelled `"admin-manual"`) — it is an operator tool, not a DLT-registered product SMS.
+    `SMSService.sendSOSAlert` (0 callers) was removed.
+- **What is unchanged.** SOS severity / eligibility / dispatch RULES and recipient resolution
+  (only which template id + body the *SMS channel* uses changed); the membership dedup; SMS
+  staying fire-and-forget / `.catch`-wrapped so a MSG91 failure never fails or rolls back the
+  membership or SOS operation. OTP flow byte-for-byte identical. No schema change, no WhatsApp.
+- **Consequences.** Final architecture: OTP→`MSG91_OTP_TEMPLATE_ID`,
+  membership→`MSG91_MEMBERSHIP_SUB_TEMPLATE_ID`, SOS/Amber→`MSG91_SOS_HELP_TEMPLATE_ID`, and
+  nothing else. `communications.test.ts` proves the adapter never borrows `MSG91_TEMPLATE_ID`;
+  new `sms.service.test.ts`; `safety-location.test.ts` verifies the redaction policy on the
+  WhatsApp channel (SMS now always uses the one template body) + a "SOS SMS skipped when
+  `MSG91_SOS_HELP_TEMPLATE_ID` unset" test. `vitest` 262→269, `tsc` clean. Operator must set
+  `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID` and `MSG91_SOS_HELP_TEMPLATE_ID` on the VPS (and ensure
+  each registered template's fixed text matches `buildMembershipSubscribedBody` /
+  `buildSmsTemplateBody`); `MSG91_TEMPLATE_ID` can be removed.

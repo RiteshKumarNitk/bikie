@@ -1,4 +1,14 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// ADR-077 — the one SOS/Amber SMS DLT template. These tests exercise the *configured*
+// deployment, so stub it here (the value's shape doesn't matter — `communications.sms.send` is
+// faked in every case).
+beforeEach(() => {
+  vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "test-bikie-sr-template");
+});
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 vi.mock("@bikie/database", () => ({
   sosRepository: {},
@@ -1523,8 +1533,11 @@ describe("dispatch PII redaction (ADR-047)", () => {
       availability,
     );
 
-    const riderText = (communications.sms.send as any).mock.calls.find((c: any[]) => c[0] === "+918888888888")?.[1];
-    const contactText = (communications.sms.send as any).mock.calls.find((c: any[]) => c[0] === "+916666666666")?.[1];
+    // ADR-077 — every SOS SMS now uses the one "BIKIE_SR" template body regardless of role, so
+    // the redaction policy (candidates redacted, trusted recipients not) is verified on the
+    // WhatsApp channel, which still carries the role-aware free-text body (`buildTextBody`).
+    const riderText = (communications.whatsapp.send as any).mock.calls.find((c: any[]) => c[0] === "+918888888888")?.[1];
+    const contactText = (communications.whatsapp.send as any).mock.calls.find((c: any[]) => c[0] === "+916666666666")?.[1];
 
     expect(riderText).not.toContain("9999999999");
     expect(riderText).not.toContain("12.97160");
@@ -1533,6 +1546,30 @@ describe("dispatch PII redaction (ADR-047)", () => {
 
     expect(contactText).toContain("9999999999");
     expect(contactText).toContain("12.97160");
+  });
+
+  it("skips the SOS-help SMS (does NOT borrow another template) when MSG91_SOS_HELP_TEMPLATE_ID is unset", async () => {
+    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "");
+    const alert = sampleAlert({ latitude: 12.9716, longitude: 77.5946 });
+    const communications = fakeCommunications();
+    const availability = resolveChannelAvailability(communications);
+    const ports = emptyRepos() as unknown as Parameters<typeof dispatchToRecipient>[4];
+    const summary = emptySummary(availability);
+
+    await dispatchToRecipient(
+      alert,
+      { role: "NEARBY_RIDER", name: "Rider", phone: "8888888888", email: "r@example.com", userId: "rider-1" },
+      summary,
+      communications,
+      ports,
+      availability,
+    );
+
+    expect(communications.sms.send).not.toHaveBeenCalled();
+    expect(summary.smsAttempted).toBe(0);
+    expect(summary.errors.some((e) => e.includes("MSG91_SOS_HELP_TEMPLATE_ID not configured"))).toBe(true);
+    // Other channels are unaffected — the in-app notification still went out.
+    expect(summary.inAppNotified).toBe(1);
   });
 });
 
