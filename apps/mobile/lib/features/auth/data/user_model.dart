@@ -13,6 +13,11 @@ class UserModel with _$UserModel {
     required String email,
     required String role,
     String? phone,
+    // Better Auth phone-number plugin field, returned by GET /api/auth/get-session and
+    // /api/auth/phone-number/verify. This — not `phone` (never populated) — is the user's
+    // registered mobile number; used to prefill Razorpay checkout's `contact` so an
+    // authenticated buyer is never asked to re-enter it.
+    String? phoneNumber,
     String? image,
     // ADR-046b — denormalized Partner.verificationStatus. ADR-053: verification/trust status
     // only now, never a capability/routing signal — see accountType below for that. `null`

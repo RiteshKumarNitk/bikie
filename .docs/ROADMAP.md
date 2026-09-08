@@ -1,5 +1,18 @@
 # BIKIE — Roadmap
 
+## Service Provider Flow Fixes — Stale Session Cache + Razorpay Contact Prefill (2026-09-08, ADR-078)
+Three field-reported Service Provider bugs, all stale-state (not an `accountType` architecture
+problem). A Service Provider was shown the Rider experience / stuck on partner onboarding, and a
+Service Provider who had already paid got "This requires an active Service Provider profile." when
+tapping an SOS notification — both because `refreshCachedUserSessions` (ADR-055 — re-publishes the
+live DB row into the Redis session snapshot) was never called after a `User.partnerStatus` write.
+It is now called after `PUT /api/partner/profile`, `POST /api/partner/application/{submit,reapply}`
+and `PATCH /api/admin/partners/[id]`; the mobile app also refreshes the session on a notification
+tap before routing. Separately, Razorpay checkout re-asked for the mobile number because the
+mobile `UserModel` had no `phoneNumber` field (`get-session` returns Better Auth's `phoneNumber`,
+not `phone`); it now does, and both checkout screens prefill `contact` from it. No SOS-severity,
+OTP, membership/payment or schema change. See ADR-078.
+
 ## Admin Financial Reporting — Revenue Reports + Transactions (2026-09-08, ADR-076)
 `/admin/reports` (previously a "coming soon" stub) is now a real dashboard and there is a new
 `/admin/transactions` browser, both built server-side from the `MembershipInvoice` ledger

@@ -173,7 +173,12 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
           prefill: RazorpayPrefill(
             name: user?.name,
             email: sanitizeRazorpayEmail(user?.email),
-            contact: user?.phone,
+            // The authenticated user's registered mobile number (Better Auth phone-plugin
+            // field). When present, Razorpay's contact step is pre-filled and skipped;
+            // when the account somehow has no number, the field is left unset and Razorpay
+            // asks for it rather than us inventing one (the backend still bills against the
+            // server-side User.phoneNumber regardless).
+            contact: user?.phoneNumber,
           ),
         );
         if (!mounted) return;

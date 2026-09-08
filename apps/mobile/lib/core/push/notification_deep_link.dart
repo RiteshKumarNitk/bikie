@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../features/auth/domain/auth_controller.dart';
 import '../network/api_guard.dart';
 import '../network/dio_client.dart';
 import 'push_bootstrap.dart';
@@ -20,6 +21,19 @@ final pendingDeepLinkRouteProvider = StateProvider<String?>((ref) => null);
 final pushTapListenerProvider = Provider<void>((ref) {
   final resolver = ref.watch(notificationDeepLinkResolverProvider);
   final subscription = notificationTapController.stream.listen((data) async {
+    // A tapped notification is often the first thing the user does after their account
+    // changed server-side (approved as a Service Provider, membership activated, …). The
+    // router branches on server-authoritative accountType/partnerStatus held in AuthState,
+    // which is otherwise only refreshed at cold start or after onboarding — so refresh it
+    // now, before routing, so the tap lands on the correct Rider/Service-Provider screen
+    // instead of a stale one (and so an already-approved SP doesn't hit PARTNER_NOT_APPROVED
+    // on the SOS detail route from a cached `partnerStatus: null`). Best-effort: a failed
+    // refresh must not swallow the deep link.
+    try {
+      await ref.read(authControllerProvider.notifier).refreshSession();
+    } catch (_) {
+      /* keep navigating with whatever auth state we have */
+    }
     final path = await resolver.resolve(entity: data['entity'], entityId: data['entityId']);
     ref.read(pendingDeepLinkRouteProvider.notifier).state = path;
   });

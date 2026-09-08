@@ -2,6 +2,17 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Service Provider flow — session-cache staleness + Razorpay contact prefill (2026-09-08, ADR-078)
+
+| Task | Status |
+|---|---|
+| Audit A/B/C — root causes: (A/C) `refreshCachedUserSessions` never called after a `User.partnerStatus` write, so production (Redis session snapshot, ADR-055) serves `partnerStatus: null` → `evaluateSosAccess` → `PARTNER_NOT_APPROVED` ("This requires an active Service Provider profile.") and the mobile router keeps `needsPartnerOnboarding` true; (B) mobile `UserModel.phone` is never populated (`get-session` returns Better Auth's `phoneNumber`), so `contact: user?.phone` in checkout is always null | Completed |
+| `refreshCachedUserSessions` after every `partnerStatus` write: `PUT /api/partner/profile`, `POST /api/partner/application/submit`, `POST /api/partner/application/reapply`, `PATCH /api/admin/partners/[id]` (refreshes `result.userId`, the applicant) | Completed |
+| Mobile: `pushTapListenerProvider` awaits `AuthController.refreshSession()` (best-effort try/catch) before resolving a tapped notification's route, so the tap lands on the correct Rider/SP screen | Completed |
+| Mobile: `UserModel` gains `phoneNumber` (`String?`), parsed from `get-session` / `phone-number/verify`; `user_model.freezed.dart` + `.g.dart` hand-patched (build_runner broken). Both checkout screens pass `contact: user?.phoneNumber`; unset → Razorpay asks, backend still bills the server-side `User.phoneNumber`, checkout contact never written back | Completed |
+| Not changed: `accountType` architecture, `evaluateSosAccess`/`evaluatePartnerCapability` logic, SOS severity/eligibility/dispatch rules, OTP, membership/payment/pricing (no new membership, no re-payment), no dual-mode reintroduced, no schema change | Completed |
+| Verify — `tsc` clean, `next build` clean, `vitest` 269, `flutter analyze` clean (1 pre-existing baseline), `flutter test` 119 | Completed |
+
 ## MSG91 SMS — exactly three DLT templates, one per type, no fourth (2026-09-08, ADR-077)
 
 | Task | Status |
@@ -375,7 +386,8 @@ defects — see ADR-055 for why "fix the middleware" would have addressed none o
 | Fixed `prisma/seed.ts` — the three Service Provider personas set `partnerStatus` but never `accountType`/`role`, so a freshly seeded DB routed them as Riders | Completed |
 | Audited live data read-only: 6 `SERVICE_PROVIDER` users with `role: RENTER`, 0 `RIDER` mismatches, `ADMIN` untouched | Completed |
 | Apply the one-shot corrective `UPDATE` to the 6 existing rows (idempotent; needs explicit go-ahead — not run) | Blocked |
-| Wire `refreshCachedUserSessions` into the `partnerStatus` (`syncPartnerStatus`) and `accountStatus` (moderation ban/suspend) write paths — same staleness, pre-dates ADR-055, deliberately out of scope here | Backlog |
+| Wire `refreshCachedUserSessions` into the `partnerStatus` write paths — same staleness, pre-dates ADR-055 | Completed — ADR-078 (`PUT /api/partner/profile`, `POST /api/partner/application/{submit,reapply}`, `PATCH /api/admin/partners/[id]`) |
+| Wire `refreshCachedUserSessions` into the `accountStatus` (moderation ban/suspend) write path — same staleness | Backlog |
 
 ## Docker production build: DB-backed API routes no longer prerendered at build time (2026-08-15, ADR-054)
 

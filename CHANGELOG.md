@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-09-08 — Service Provider flow: refresh cached session on `partnerStatus` writes; Razorpay contact prefill (ADR-078)
+
+Three field-reported Service Provider bugs, all stale-state, none an `accountType` architecture
+problem. **(A)** an SP was shown the Rider experience / stuck on partner onboarding, and **(C)** a
+paid SP tapping an SOS notification got "This requires an active Service Provider profile." Both
+trace to the same gap: per ADR-055, production serves a `{session, user}` snapshot from Redis, and
+`refreshCachedUserSessions` — which re-publishes the live DB row — was never called after a
+`User.partnerStatus` write, so `partnerStatus` stayed cached as `null` (→ `evaluateSosAccess`
+returns `PARTNER_NOT_APPROVED`; the mobile router keeps `needsPartnerOnboarding` true). It is now
+called after `PUT /api/partner/profile`, `POST /api/partner/application/{submit,reapply}`, and
+`PATCH /api/admin/partners/[id]` (refreshing the applicant's session). The mobile app also
+refreshes the session on a notification tap (best-effort) before routing, so a tap lands on the
+correct Rider/SP screen. **(B)** Razorpay checkout re-asked for the mobile number because the two
+mobile checkout screens passed `contact: user?.phone`, a field `get-session` never populates —
+Better Auth returns `phoneNumber`. `UserModel` gains `phoneNumber`; both screens now prefill
+`contact: user?.phoneNumber` (left unset, so Razorpay asks, when the account has no number — the
+backend still bills against the server-side `User.phoneNumber`, and nothing writes the checkout
+contact back). No `accountType`/SOS-severity/OTP/membership/pricing change, no dual-mode, no
+schema change, no migration. `tsc` clean, `next build` clean, `vitest` 269, `flutter analyze`
+clean (1 pre-existing), `flutter test` 119. See ADR-078.
+
 ## 2026-09-08 — MSG91 SMS: exactly three DLT templates, one per type, no fourth (ADR-077)
 
 BIKIE has exactly three SMS types → three DLT templates: **OTP** (`MSG91_OTP_TEMPLATE_ID`, native

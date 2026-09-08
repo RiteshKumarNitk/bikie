@@ -1,5 +1,20 @@
 # BIKIE Changelog
 
+## 2026-09-08 — Service Provider flow: refresh cached session on `partnerStatus` writes; Razorpay contact prefill (ADR-078)
+
+Three stale-state Service Provider bugs. **A** (SP shown Rider UI / stuck on onboarding) and **C**
+(paid SP gets "This requires an active Service Provider profile." on an SOS notification) share a
+root cause: `refreshCachedUserSessions` (ADR-055 — re-publishes the live DB row into the Redis
+session snapshot) was never called after a `User.partnerStatus` write, so `partnerStatus` stayed
+cached `null`. Now called after `PUT /api/partner/profile`,
+`POST /api/partner/application/{submit,reapply}`, `PATCH /api/admin/partners/[id]` (applicant's
+session). Mobile also refreshes the session on a notification tap before routing. **B** (Razorpay
+re-asks for the number): checkout screens passed `contact: user?.phone`, never populated —
+`UserModel` gains `phoneNumber` (from `get-session`), both screens prefill `contact:
+user?.phoneNumber` (unset → Razorpay asks; backend still bills the server-side number). No
+`accountType`/SOS-rule/OTP/membership/pricing change, no dual-mode, no schema change. `vitest`
+269, `flutter test` 119. See ADR-078.
+
 ## 2026-09-08 — MSG91 SMS: exactly three DLT templates, one per type, no fourth (ADR-077)
 
 Three SMS types → three templates: OTP (`MSG91_OTP_TEMPLATE_ID`, native flow, untouched),

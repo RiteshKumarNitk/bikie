@@ -3811,3 +3811,59 @@ changes:
   `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID` and `MSG91_SOS_HELP_TEMPLATE_ID` on the VPS (and ensure
   each registered template's fixed text matches `buildMembershipSubscribedBody` /
   `buildSmsTemplateBody`); `MSG91_TEMPLATE_ID` can be removed.
+
+## ADR-078: Service Provider flow — refresh the cached session on every `partnerStatus` write; mobile prefills Razorpay `contact` from the registered number
+
+- **Context.** Three field-reported Service Provider bugs, all rooted in stale state, not in the
+  account-type architecture:
+  - **A — SP shown the Rider experience / stuck on onboarding.** `apps/mobile`'s router branches
+    on `accountType` / `partnerStatus` held in the in-memory `AuthState`, refreshed only at
+    cold-start `bootstrap()` and after the onboarding screens. A notification tap
+    (`pushTapListenerProvider` → `pendingDeepLinkRouteProvider` → `main.dart`) navigated without
+    refreshing, so a user whose account changed server-side since their last launch kept routing
+    as a Rider / kept `needsPartnerOnboarding == true` from a cached `partnerStatus: null`.
+  - **B — Razorpay re-asks for the mobile number.** The two mobile checkout screens passed
+    `contact: user?.phone`. `UserModel` had a `phone` field that `GET /api/auth/get-session`
+    never populates — Better Auth returns the phone-plugin field `phoneNumber`. So `contact` was
+    always null and Razorpay's native sheet showed the empty "Enter mobile number" step.
+  - **C — Paid SP fails the SOS profile check.** "This requires an active Service Provider
+    profile." is `require-role.ts`'s mapping of `PARTNER_NOT_APPROVED`, which `evaluateSosAccess`
+    returns for an SP session only when `partnerStatus == null || partnerStatus === "SUSPENDED"`.
+    The provider's real `partnerStatus` is `APPROVED` with an active `PartnerMembership` — the
+    denial comes from a **stale cached session blob** (`partnerStatus: null`); the membership
+    check is never reached.
+  - Root of A(server side) and C: per ADR-055, when `secondaryStorage` (Upstash Redis) is
+    configured — production — `internalAdapter.findSession` serves a `{session, user}` snapshot
+    from Redis; `refreshCachedUserSessions(userId)` is what re-publishes the live DB row. It was
+    wired into `admin/users/[id]`, `admin/account-type-requests/[id]`, `user/complete-phone-signup`
+    only — **never** into any route that writes `User.partnerStatus`. This is the exact ADR-055
+    backlog item. No-op in local dev (no Upstash), which is why the DB audit showed every SP row
+    consistent while production misbehaved.
+- **Decision.**
+  - **Call `refreshCachedUserSessions` after every `User.partnerStatus` write.** Added to
+    `PUT /api/partner/profile` (first upsert creates the `Partner` row + `DRAFT`),
+    `POST /api/partner/application/submit` (`→ PENDING_VERIFICATION`),
+    `POST /api/partner/application/reapply` (`→ DRAFT`), and
+    `PATCH /api/admin/partners/[id]` (approve/reject/request-info/suspend/restore — refreshes the
+    **applicant's** session via `result.userId`). Same pattern as the three existing call sites.
+  - **Mobile: refresh the session on a notification tap.** `pushTapListenerProvider` now
+    `await`s `AuthController.refreshSession()` (best-effort, `try/catch` — a failed refresh must
+    not swallow the deep link) before resolving the route, so a tap lands on the correct
+    Rider/Service-Provider screen and an approved SP doesn't hit `PARTNER_NOT_APPROVED` from a
+    cached `partnerStatus`.
+  - **Mobile: `UserModel` gains `phoneNumber` (`String?`)**, parsed from the `get-session` /
+    `phone-number/verify` payload. Both checkout screens now pass `contact: user?.phoneNumber`.
+    When the account has no number the field is left unset (Razorpay asks) rather than
+    substituting one — the backend still bills against the server-side `User.phoneNumber`
+    regardless, and nothing writes the checkout `contact` back to the user. `user_model.freezed.dart`
+    / `user_model.g.dart` hand-patched (build_runner is broken on this toolchain).
+- **What is unchanged.** `accountType` architecture (`RIDER | SERVICE_PROVIDER`,
+  server-authoritative, mutually exclusive); `evaluateSosAccess` / `evaluatePartnerCapability`
+  logic (only the freshness of their input changed); SOS severity / eligibility / dispatch rules
+  (AMBER → Riders + SPs, RED → Riders only); OTP send/verify; membership/payment/pricing — no new
+  membership, no re-payment, no hardcoded amount; no dual-mode logic reintroduced. No schema
+  change, no migration.
+- **Consequences.** `tsc` clean, `next build` clean, `vitest` 269 pass, `flutter analyze` clean
+  (1 pre-existing baseline), `flutter test` 119 pass. A provider whose blob was cached stale
+  before this ships is reconciled by their next `partnerStatus`-affecting action, the next
+  notification tap, or session expiry.

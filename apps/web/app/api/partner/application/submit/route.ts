@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PartnerService } from "@bikie/services";
+import { refreshCachedUserSessions } from "@bikie/auth";
 import { requireSession } from "@/lib/require-role";
 
 /** ADR-046b — DRAFT | MORE_INFORMATION_REQUIRED -> PENDING_VERIFICATION. The applicant's profile
@@ -22,5 +23,9 @@ export async function POST() {
     }
     return NextResponse.json({ error: "INVALID_TRANSITION", status: result.status }, { status: 409 });
   }
+  // ADR-055 — DRAFT/MORE_INFORMATION_REQUIRED → PENDING_VERIFICATION is a User.partnerStatus
+  // write; re-publish it into any cached session blob so access checks and the mobile router
+  // see the live value. No-op without Redis secondaryStorage.
+  await refreshCachedUserSessions(session.user.id);
   return NextResponse.json({ profile: result.profile });
 }

@@ -26,6 +26,7 @@ mixin _$UserModel {
   String get email => throw _privateConstructorUsedError;
   String get role => throw _privateConstructorUsedError;
   String? get phone => throw _privateConstructorUsedError;
+  String? get phoneNumber => throw _privateConstructorUsedError;
   String? get image =>
       throw _privateConstructorUsedError; // ADR-046b — denormalized Partner.verificationStatus. ADR-053: verification/trust status
   // only now, never a capability/routing signal — see accountType below for that. `null`
@@ -57,6 +58,7 @@ abstract class $UserModelCopyWith<$Res> {
     String email,
     String role,
     String? phone,
+    String? phoneNumber,
     String? image,
     String? partnerStatus,
     String accountType,
@@ -83,6 +85,7 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
     Object? email = null,
     Object? role = null,
     Object? phone = freezed,
+    Object? phoneNumber = freezed,
     Object? image = freezed,
     Object? partnerStatus = freezed,
     Object? accountType = null,
@@ -108,6 +111,10 @@ class _$UserModelCopyWithImpl<$Res, $Val extends UserModel>
             phone: freezed == phone
                 ? _value.phone
                 : phone // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            phoneNumber: freezed == phoneNumber
+                ? _value.phoneNumber
+                : phoneNumber // ignore: cast_nullable_to_non_nullable
                       as String?,
             image: freezed == image
                 ? _value.image
@@ -142,6 +149,7 @@ abstract class _$$UserModelImplCopyWith<$Res>
     String email,
     String role,
     String? phone,
+    String? phoneNumber,
     String? image,
     String? partnerStatus,
     String accountType,
@@ -167,6 +175,7 @@ class __$$UserModelImplCopyWithImpl<$Res>
     Object? email = null,
     Object? role = null,
     Object? phone = freezed,
+    Object? phoneNumber = freezed,
     Object? image = freezed,
     Object? partnerStatus = freezed,
     Object? accountType = null,
@@ -192,6 +201,10 @@ class __$$UserModelImplCopyWithImpl<$Res>
         phone: freezed == phone
             ? _value.phone
             : phone // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        phoneNumber: freezed == phoneNumber
+            ? _value.phoneNumber
+            : phoneNumber // ignore: cast_nullable_to_non_nullable
                   as String?,
         image: freezed == image
             ? _value.image
@@ -219,6 +232,7 @@ class _$UserModelImpl implements _UserModel {
     required this.email,
     required this.role,
     this.phone,
+    this.phoneNumber,
     this.image,
     this.partnerStatus,
     this.accountType = 'RIDER',
@@ -238,6 +252,8 @@ class _$UserModelImpl implements _UserModel {
   @override
   final String? phone;
   @override
+  final String? phoneNumber;
+  @override
   final String? image;
   // ADR-046b — denormalized Partner.verificationStatus. ADR-053: verification/trust status
   // only now, never a capability/routing signal — see accountType below for that. `null`
@@ -253,7 +269,7 @@ class _$UserModelImpl implements _UserModel {
 
   @override
   String toString() {
-    return 'UserModel(id: $id, name: $name, email: $email, role: $role, phone: $phone, image: $image, partnerStatus: $partnerStatus, accountType: $accountType)';
+    return 'UserModel(id: $id, name: $name, email: $email, role: $role, phone: $phone, phoneNumber: $phoneNumber, image: $image, partnerStatus: $partnerStatus, accountType: $accountType)';
   }
 
   @override
@@ -266,6 +282,8 @@ class _$UserModelImpl implements _UserModel {
             (identical(other.email, email) || other.email == email) &&
             (identical(other.role, role) || other.role == role) &&
             (identical(other.phone, phone) || other.phone == phone) &&
+            (identical(other.phoneNumber, phoneNumber) ||
+                other.phoneNumber == phoneNumber) &&
             (identical(other.image, image) || other.image == image) &&
             (identical(other.partnerStatus, partnerStatus) ||
                 other.partnerStatus == partnerStatus) &&
@@ -282,6 +300,7 @@ class _$UserModelImpl implements _UserModel {
     email,
     role,
     phone,
+    phoneNumber,
     image,
     partnerStatus,
     accountType,
@@ -308,6 +327,7 @@ abstract class _UserModel implements UserModel {
     required String email,
     required String role,
     String? phone,
+    String? phoneNumber,
     String? image,
     String? partnerStatus,
     String accountType,
@@ -326,6 +346,8 @@ abstract class _UserModel implements UserModel {
   String get role;
   @override
   String? get phone;
+  @override
+  String? get phoneNumber;
   @override
   String? get image; // ADR-046b — denormalized Partner.verificationStatus. ADR-053: verification/trust status
   // only now, never a capability/routing signal — see accountType below for that. `null`

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { AdminService } from "@bikie/services";
+import { refreshCachedUserSessions } from "@bikie/auth";
 import { partnerVerificationActionSchema } from "@bikie/validation";
 import { requireRole } from "@/lib/require-role";
 import { logAdminAction } from "@/lib/audit";
@@ -37,6 +38,12 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       { status: 409 },
     );
   }
+
+  // ADR-055 — Approve/Reject/Request-info/Suspend/Restore each write the applicant's
+  // User.partnerStatus. Re-publish it into that user's cached session blob so their next
+  // request (SOS access check, mobile router branch) sees the new status instead of the
+  // stale snapshot. No-op without Redis secondaryStorage.
+  await refreshCachedUserSessions(result.userId);
 
   await logAdminAction({
     userId: session.user.id,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PartnerService } from "@bikie/services";
+import { refreshCachedUserSessions } from "@bikie/auth";
 import { partnerProfileSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
 
@@ -63,5 +64,12 @@ export async function PUT(request: Request) {
       { status: 409 },
     );
   }
+  // ADR-055 — the first successful upsert creates the Partner row and moves User.partnerStatus
+  // off `null` ("DRAFT"). BIKIE writes that column via Prisma, bypassing Better Auth's own
+  // updateUser→refreshUserSessions hook, so the cached session blob (Redis secondaryStorage in
+  // production) would otherwise keep serving `partnerStatus: null` — which makes evaluateSosAccess
+  // return PARTNER_NOT_APPROVED and the mobile router force partner-onboarding forever. No-op when
+  // secondaryStorage is unset (local dev).
+  await refreshCachedUserSessions(session.user.id);
   return NextResponse.json({ profile: result.profile });
 }
