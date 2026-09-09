@@ -73,4 +73,12 @@ describe("SMSService — one DLT template per SMS type (ADR-058)", () => {
     expect(body).toContain("Priya");
     expect(body).toMatch(/\d{2}-\w{3}-2027/);
   });
+
+  it("buildMembershipSubscribedBody matches the registered DLT template's fixed text exactly (only the two ##alphanumeric## slots vary)", () => {
+    const body = buildMembershipSubscribedBody("Rahul Kumar", new Date("2027-10-09T00:00:00Z"));
+    expect(body).toBe(
+      "Hello Rider Rahul Kumar; Welcome to BIKIE Community, You are successfully subscribed for " +
+        "BIKIE annual Membership, your membership will be renewed on 09-Oct-2027 as Noted by KSHIDL",
+    );
+  });
 });

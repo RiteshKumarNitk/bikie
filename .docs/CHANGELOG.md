@@ -1,5 +1,19 @@
 # BIKIE Changelog
 
+## 2026-09-09 — MSG91 SMS: final integration audit; adapter delivery diagnosability (ADR-079)
+
+Re-audited the MSG91 SMS chain against the operator's three DLT templates. The three-template
+architecture (ADR-077) is intact; `buildMembershipSubscribedBody` and `buildSmsTemplateBody` match
+the approved DLT text exactly (only `##alphanumeric##` slots vary) — now locked by exact-match
+tests. Membership SMS: once, Rider-only, post payment-verification + invoice, deduped by
+`confirmationSmsSentAt`. SOS SMS: one "BIKIE_SR" body for all recipients, capped 10/batch, skipped
+safely when unset; RED still excludes Service Providers. OTP untouched. Only code change:
+`sms.adapter.ts` logs + returns MSG91's request id on acceptance (gateway acceptance ≠ handset
+delivery; no DLR ingestion) and classifies rejections (auth / sender / template / number /
+balance) in the failure log; `ChannelResult.detail?` added. Service Provider membership
+(₹99/month) still sends no SMS — the annual "BIKIE_Sub" template can't be reused and no monthly
+template exists (not invented). `vitest` 269→272, `tsc` clean. See ADR-079.
+
 ## 2026-09-08 — Service Provider flow: refresh cached session on `partnerStatus` writes; Razorpay contact prefill (ADR-078)
 
 Three stale-state Service Provider bugs. **A** (SP shown Rider UI / stuck on onboarding) and **C**

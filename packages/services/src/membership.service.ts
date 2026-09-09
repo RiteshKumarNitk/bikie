@@ -84,6 +84,12 @@ export const MembershipService = {
             console.error("[MembershipService][purchaseMembership] SMS confirmation not accepted", res.error);
             return;
           }
+          // Gateway acceptance (see the SMS adapter's note) — `detail` is MSG91's request id for
+          // a dashboard/DLR trace. Stamp `confirmationSmsSentAt` so it is never re-sent.
+          console.log(
+            `[MembershipService][purchaseMembership] membership SMS accepted for invoice ${invoice.id}` +
+              `${res?.detail ? ` (MSG91 reqId=${res.detail})` : ""}`,
+          );
           return billingRepository.markConfirmationSmsSent(invoice.id);
         })
         .catch((err) =>

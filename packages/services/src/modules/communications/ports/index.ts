@@ -7,6 +7,11 @@ export type ChannelResult = {
   ok: boolean;
   provider: string;
   error?: string;
+  /** Provider-side reference for a *successful* send — e.g. MSG91's request id from the
+   * `sendsms` response. Gateway acceptance only; NOT proof the message reached the handset
+   * (that comes from the provider's delivery report). Logged and, where useful, persisted so a
+   * send can be traced in the provider dashboard. */
+  detail?: string;
 };
 
 export type EmailMessage = {

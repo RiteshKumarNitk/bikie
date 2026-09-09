@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-09 — MSG91 SMS: final integration audit; adapter delivery diagnosability (ADR-079)
+
+Re-audited the whole MSG91 SMS chain against the operator's three DLT-registered templates.
+Conclusion: the three-template architecture (ADR-077) is intact and the rendered bodies already
+match the approved DLT text **exactly** — `buildMembershipSubscribedBody` and `buildSmsTemplateBody`
+are character-for-character the registered templates, only the `##alphanumeric##` slots vary; both
+are now locked by exact-match tests. Membership SMS still fires once, Rider-only, after payment
+verification + invoice, deduped by `MembershipInvoice.confirmationSmsSentAt`. SOS SMS still uses
+the one "BIKIE_SR" body for every recipient, capped at 10 per batch, skipped safely when the
+template id is unset; RED/EMERGENCY still excludes Service Providers. OTP untouched
+(`msg91-native-otp.adapter.ts` byte-identical). **The only code change:** `sms.adapter.ts` now
+logs and returns MSG91's request id on acceptance (labelled *gateway acceptance, not handset
+delivery* — no DLR ingestion), and classifies a rejection (auth key / sender id / DLT template
+mismatch / recipient number / balance) into the failure log + returned error; `ChannelResult`
+gains optional `detail`. **Service Provider membership (₹99/month) still sends no SMS** — the
+"BIKIE_Sub" template is annual-specific; a separate DLT-approved monthly template would be
+required and does not exist (not invented here). `vitest` 269→272, `tsc` clean. See ADR-079.
+
 ## 2026-09-08 — Service Provider flow: refresh cached session on `partnerStatus` writes; Razorpay contact prefill (ADR-078)
 
 Three field-reported Service Provider bugs, all stale-state, none an `accountType` architecture

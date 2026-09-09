@@ -3867,3 +3867,61 @@ changes:
   (1 pre-existing baseline), `flutter test` 119 pass. A provider whose blob was cached stale
   before this ships is reconciled by their next `partnerStatus`-affecting action, the next
   notification tap, or session expiry.
+
+## ADR-079: MSG91 SMS — final integration audit; adapter diagnosability; SP membership needs its own DLT template
+
+- **Context.** A full re-audit against the operator's three DLT-registered templates (OTP, the
+  annual-membership "BIKIE_Sub", the SOS/Amber "BIKIE_SR"), with the exact approved bodies now in
+  hand. Findings:
+  - **The three-template architecture from ADR-077 is intact and correct.** OTP →
+    `MSG91_OTP_TEMPLATE_ID` (separate `msg91-native-otp.adapter.ts`, **not touched**); membership
+    → `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID`; SOS → `MSG91_SOS_HELP_TEMPLATE_ID`. The `sms.adapter.ts`
+    uses the caller's `templateId` verbatim as `DLT_TE_ID` and never substitutes another; the
+    deprecated `MSG91_TEMPLATE_ID` is read by nothing except the untemplated `/admin/sms` tool.
+  - **The rendered bodies already match the registered DLT text exactly** —
+    `buildMembershipSubscribedBody` (`sms.service.ts`) and `buildSmsTemplateBody`
+    (`safety-location/domain/dispatch-message.ts`) are character-for-character the approved
+    templates, only the `##alphanumeric##` slots vary (membership: rider name + renewal date;
+    SOS: rider name + vehicle reg + location). Renewal date is rendered `DD-Mon-YYYY` (hyphenated,
+    no spaces) as a DLT-variable-safe choice. Exact-match tests now lock both.
+  - **Membership SMS flow is correct.** Fired once from `MembershipService.purchaseMembership`
+    only after the payment is verified and the `UserMembership` + `MembershipInvoice` rows are
+    written; Rider-only; fire-and-forget with its own `.catch`; deduped by
+    `MembershipInvoice.confirmationSmsSentAt` (conditional `UPDATE ... WHERE confirmationSmsSentAt
+    IS NULL`), stamped only on a non-failing send; idempotent replay and `ALREADY_ACTIVE` both
+    return before any SMS. Recipient is the authenticated `User.phoneNumber`.
+  - **SOS SMS flow is correct.** `dispatchToRecipient` sends the one "BIKIE_SR" body to every
+    dispatch recipient that has a phone (nearby riders/providers, emergency contacts, admins,
+    emergency services alike) — no per-role body. SMS capped to the nearest
+    `SOS_SMS_RECIPIENT_LIMIT` (10) candidate responders per batch; skipped per recipient (logged +
+    `summary.errors`) when `MSG91_SOS_HELP_TEMPLATE_ID` is unset; WhatsApp/email/in-app unaffected.
+    Severity rules unchanged — `resolveServiceProviders` still returns `[]` for a RED/EMERGENCY
+    alert.
+  - **Service Provider membership is monthly (₹99/mo); the "BIKIE_Sub" template says "BIKIE
+    annual Membership".** `PartnerMembershipService.purchaseMembership` deliberately sends **no**
+    confirmation SMS. A separate DLT-approved *monthly* Service Provider template would be
+    required to notify providers — **it does not exist and this ADR does not invent one.** Until
+    the operator registers one (e.g. `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID`), SP membership
+    stays SMS-silent (in-app notification + invoice still fire).
+- **Decision (only change made).** `sms.adapter.ts` diagnosability, per task §13:
+  - On **acceptance**, parse MSG91's `sendsms` response, log and return its request id
+    (`ChannelResult.detail`), explicitly labelled *gateway acceptance, not handset delivery* —
+    BIKIE does not ingest MSG91 delivery reports (DLR webhook remains out of scope; it needs a new
+    route + status column).
+  - On **rejection**, `classifyMsg91Failure(status, body)` front-loads the likely cause (auth key
+    / sender id / DLT template mismatch / recipient number / balance) into the `[SMS] Failed …`
+    log line and the returned `error`, alongside MSG91's raw body.
+  - `MembershipService` logs the returned request id against the invoice id on a successful
+    confirmation send.
+  - `ChannelResult` gains an optional `detail?: string`. No caller is required to change.
+- **What is unchanged.** OTP (send + verify, `msg91-native-otp.adapter.ts` byte-identical); the
+  MSG91 endpoint (`/api/v2/sendsms`) and request shape; all three template env-var names; the
+  membership dedup; SOS severity / eligibility / dispatch rules and recipient resolution;
+  credentials staying server-side (`MSG91_AUTH_KEY` / `MSG91_SENDER_ID`, never in mobile/browser
+  code). No schema change, no migration, no WhatsApp, no mobile Admin.
+- **Consequences.** `vitest` 269→272 (+ exact-body membership lock, adapter `detail`-on-success,
+  adapter failure-classification), `tsc` clean (`@bikie/services` + `web`). Operator action:
+  set `MSG91_SENDER_ID=KSHIDL`, `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID=1077368990007493633`,
+  `MSG91_SOS_HELP_TEMPLATE_ID=1077556920001446300`, `MSG91_OTP_TEMPLATE_ID` (unchanged),
+  `MSG91_AUTH_KEY`; leave `MSG91_TEMPLATE_ID` blank. A separate SP-monthly membership DLT
+  template is a product decision, tracked in TASKS.

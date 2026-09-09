@@ -126,6 +126,41 @@ describe("communications adapters (DEV fallback)", () => {
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("no DLT template id"));
       warn.mockRestore();
     });
+
+    it("returns MSG91's request id as `detail` on a successful send (gateway acceptance trace, ADR-079)", async () => {
+      prev = snapshotEnv(keys);
+      process.env.MSG91_AUTH_KEY = "test-authkey";
+      process.env.MSG91_SENDER_ID = "KSHIDL";
+
+      const fetchSpy = vi.fn(
+        async () => new Response('{"type":"success","message":"3b8f1a2c-req-id"}', { status: 200 }),
+      );
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const res = await createSmsAdapter().send("+919876543210", "Hello Rider ...", "bikie-sub-tmpl", "membership-subscribed");
+      expect(res).toMatchObject({ ok: true, provider: "msg91", detail: "3b8f1a2c-req-id" });
+    });
+
+    it("classifies an MSG91 rejection into an operator-actionable reason (ADR-079, §13)", async () => {
+      prev = snapshotEnv(keys);
+      process.env.MSG91_AUTH_KEY = "bad";
+      process.env.MSG91_SENDER_ID = "KSHIDL";
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const cases: Array<[number, string, RegExp]> = [
+        [401, '{"type":"error","message":"authkey not valid"}', /auth key/i],
+        [200, '{"type":"error","message":"DLT_TE_ID content mismatch"}', /template/i],
+        [200, '{"type":"error","message":"invalid mobile number"}', /recipient number/i],
+        [200, '{"type":"error","message":"sender id not approved"}', /sender id/i],
+      ];
+      for (const [status, payload, expected] of cases) {
+        vi.stubGlobal("fetch", vi.fn(async () => new Response(payload, { status })));
+        const res = await createSmsAdapter().send("+919876543210", "x", "tmpl", "sos-help");
+        expect(res.ok).toBe(false);
+        expect(res.error).toMatch(expected);
+      }
+      err.mockRestore();
+    });
   });
 
   it("Email logs DEV when SMTP and Resend are unset", async () => {

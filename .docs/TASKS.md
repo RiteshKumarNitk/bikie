@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## MSG91 SMS — final integration audit + adapter diagnosability (2026-09-09, ADR-079)
+
+| Task | Status |
+|---|---|
+| Full re-audit vs the operator's 3 DLT templates: adapter, membership flow, SOS flow, OTP flow, env vars, MSG91 endpoint/request shape, template handling, recipient phone resolution, dedup, failure handling, exact-body match. Finding: the ADR-077 three-template architecture is intact and both rendered bodies (`buildMembershipSubscribedBody`, `buildSmsTemplateBody`) already match the approved DLT text character-for-character | Completed |
+| Lock the exact DLT bodies with tests — SOS body already had an exact-match test; added the equivalent for the membership body | Completed |
+| `sms.adapter.ts` §13 diagnosability — on acceptance parse + log + return MSG91's request id (`ChannelResult.detail`), labelled gateway-acceptance-not-delivery; on rejection `classifyMsg91Failure` front-loads the cause (auth key / sender id / DLT template mismatch / recipient number / balance) into the log + returned error. `MembershipService` logs the request id against the invoice id | Completed |
+| Confirm OTP is untouched — `msg91-native-otp.adapter.ts` not modified; OTP keeps `MSG91_OTP_TEMPLATE_ID` and the native OTP API flow | Completed |
+| Confirm SOS severity/eligibility/dispatch rules unchanged — `resolveServiceProviders` still returns `[]` for RED/EMERGENCY; SMS is an additional channel only | Completed |
+| Verify — `vitest` 269→272, `tsc` clean (`@bikie/services` + `web`) | Completed |
+| **Service Provider monthly membership needs its own DLT template.** The "BIKIE_Sub" template text is annual-specific ("BIKIE annual Membership"); SP plan is ₹99/month. `PartnerMembershipService.purchaseMembership` sends no SMS by design. A separate DLT-approved *monthly* SP template (e.g. `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID`) must be registered by the operator before providers can get a purchase SMS — not invented here | Backlog (product + operator) |
+| Operator: set `MSG91_SENDER_ID=KSHIDL`, `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID=1077368990007493633`, `MSG91_SOS_HELP_TEMPLATE_ID=1077556920001446300`, `MSG91_OTP_TEMPLATE_ID` (existing), `MSG91_AUTH_KEY`; leave `MSG91_TEMPLATE_ID` blank. Then send one live Rider membership + one test SOS and confirm handset delivery + check the MSG91 dashboard against the logged reqId | Pending (operator) |
+
 ## Service Provider flow — session-cache staleness + Razorpay contact prefill (2026-09-08, ADR-078)
 
 | Task | Status |
