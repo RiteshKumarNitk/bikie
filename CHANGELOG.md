@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-09-12 — Fixed: SOS SMS silently skipped for recipients with an unsynced phone; Service Provider membership SMS wired to its own template; phone numbers masked in logs (ADR-080)
+
+Root cause of "SOS SMS never arrives": SOS recipient resolution (`findNearbyAroundPoint` for
+nearby riders, `findEligiblePartnersNearPoint` for nearby Service Providers) read only
+`User.phone` — a secondary field synced to the authoritative `User.phoneNumber` by a verification
+callback, not always populated. When it wasn't, the recipient silently had "no phone number" as
+far as dispatch could tell — no error, just a skipped SMS channel — even though every other part
+of the alert (in-app notification, WhatsApp/email where those channels exist) went through.
+Both queries now prefer `phoneNumber`, falling back to `phone` only for older/edge-case rows.
+Separately: Service Provider membership purchases now send their own confirmation SMS via a new
+`sendPartnerMembershipSubscribed`, gated on two env vars — a DLT template id AND its exact
+approved wording (with `{name}`/`{renewalDate}` placeholders) — so it never reuses the Rider
+annual template (still wrong for a monthly plan) and never sends fabricated text; it stays
+`unconfigured`-and-retryable until an operator registers a real SP template. Every SMS log line
+(adapter accept/reject, SOS dispatch errors) now masks the recipient's phone number. Also audited
+and reported (not changed): Razorpay is one-time Orders + internally-managed expiry, not a
+recurring subscription — no auto-renewal, no cancellation flow exists yet; that's a separate,
+larger feature pending go-ahead. SOS severity/eligibility/dispatch rules, the dispatch idempotency
+guard, and the escalation "already notified" dedup (no duplicate SMS storms) are all unchanged.
+`vitest` 272→280, `tsc`/`next build` clean. See ADR-080.
+
 ## 2026-09-09 — MSG91 SMS: final integration audit; adapter delivery diagnosability (ADR-079)
 
 Re-audited the whole MSG91 SMS chain against the operator's three DLT-registered templates.

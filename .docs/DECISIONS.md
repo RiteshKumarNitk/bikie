@@ -3925,3 +3925,87 @@ changes:
   `MSG91_SOS_HELP_TEMPLATE_ID=1077556920001446300`, `MSG91_OTP_TEMPLATE_ID` (unchanged),
   `MSG91_AUTH_KEY`; leave `MSG91_TEMPLATE_ID` blank. A separate SP-monthly membership DLT
   template is a product decision, tracked in TASKS.
+
+## ADR-080: Production SMS bugs — a `phone`-vs-`phoneNumber` recipient-resolution gap silencing SOS SMS; SP membership SMS wired to its own (not-yet-registered) DLT template; phone numbers masked in server logs; Razorpay confirmed one-time-payment, not recurring
+
+- **Context.** Production testing after ADR-079 found: (1) Rider membership SMS works; (2) Service
+  Provider membership SMS never arrives; (3) SOS/Amber SMS to eligible nearby recipients never
+  arrives. Also asked to audit whether the membership model is a true recurring subscription.
+- **Root cause — SOS SMS (the production-breaking bug).** `User` carries two phone columns:
+  `phoneNumber` (Better Auth's phone-plugin field — `@unique`, set at every OTP verification, the
+  number a user actually signs in with) and `phone` (a secondary mirror, synced to `phoneNumber`
+  only by a `callbackOnVerification` hook in `packages/auth/src/server.ts`, and only for accounts
+  that have gone through that specific callback since it was added). SOS recipient resolution read
+  **only `phone`**:
+  - `rider-location.repository.ts`'s `findNearbyAroundPoint` (nearby-rider pool) selected bare
+    `u."phone"`, no fallback.
+  - `partner.repository.ts`'s `findEligiblePartnersNearPoint` (nearby-Service-Provider pool)
+    selected `user.phone`, falling back only to the partner's own `contactPerson1Mobile`, never to
+    `phoneNumber`.
+  For any recipient whose `phone` mirror is null or stale, `channelsForRecipient` computes
+  `hasPhone: false` and the SMS (and WhatsApp) channel is silently skipped — no error anywhere,
+  because from the dispatch code's point of view there was simply no phone number to send to. This
+  reproduces exactly the reported symptom (eligible recipients notified in-app, never by SMS) with
+  zero involvement from MSG91, DLT, or the adapter — which is also why Rider membership SMS (reads
+  `User.phoneNumber` directly, per ADR-058) was unaffected. This is the same class of bug as
+  ADR-078's Razorpay-`contact` fix, in a different call site.
+- **Root cause — Service Provider membership SMS.** By design, per ADR-058/079:
+  `PartnerMembershipService.purchaseMembership` sent **no** SMS at all — the only registered
+  membership template ("BIKIE_Sub") is fixed text for an **annual** plan ("BIKIE annual
+  Membership") and the Service Provider plan is **monthly**; sending that template to a provider
+  would be both factually wrong and a likely DLT content-mismatch rejection. This is confirmed
+  intended behavior, not a bug, but it needed to become configurable rather than a dead end.
+- **Decision.**
+  1. **SOS recipient phone resolution now prefers `phoneNumber`.** `findNearbyAroundPoint`'s raw
+     SQL selects `COALESCE(u."phoneNumber", u."phone")`; `findEligiblePartnersNearPoint` (and the
+     sibling `findPartnersNearPointForDispatch`) now also select `phoneNumber`, and
+     `resolveServiceProviders` builds each `SOSRecipient.phone` from
+     `p.user.phoneNumber ?? p.user.phone ?? p.contactPerson1Mobile`. No behavior change for any
+     account whose `phone` was already correctly synced — this only fixes the accounts where it
+     wasn't.
+  2. **A dedicated, config-driven Service Provider membership SMS.** New
+     `SMSService.sendPartnerMembershipSubscribed`, gated on **two** env vars:
+     `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID` (the DLT template id) and
+     `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT` (the exact MSG91-approved wording, with literal
+     `{name}`/`{renewalDate}` placeholders the code substitutes). Neither is hardcoded — BIKIE has
+     no approved SP template, and this ADR does not invent one; both must be set together or the
+     send is refused (`unconfigured`, logged once, never a second time per purchase) and never
+     falls back to the Rider template. Wired into `PartnerMembershipService.purchaseMembership`
+     exactly like the Rider flow: fire-and-forget after the invoice is written, deduped by the same
+     `MembershipInvoice.confirmationSmsSentAt`, never fails/rolls back the purchase. The moment the
+     operator registers a real SP template and sets both vars, this starts sending — no further
+     code change or deploy.
+  3. **Phone numbers masked in every SMS-related log line.** New `maskPhone()` (keeps a leading
+     `+` and the last 4 digits, masks the rest) in `communications/domain/phone.ts`, applied in
+     `sms.adapter.ts`'s accept/reject/no-template/DEV logs and in `fan-out.application.ts`'s
+     `summary.errors` strings (which do reach the console via `[SOS][DISPATCH][ERROR]`). The
+     number actually sent to MSG91 is unchanged — only what appears in server logs.
+  4. **Razorpay architecture confirmed and reported, not changed.** `RazorpayService` only ever
+     calls `razorpay.orders.create` (`packages/services/src/razorpay.service.ts`) — one-time
+     Orders. There is no `razorpay.subscriptions.*` call anywhere in the codebase, no webhook
+     ingestion, and no `/cancel` route for either membership type. `createMembership` /
+     `partnerMembershipRepository.createMembership` set `endDate = startDate + plan.durationDays`
+     and nothing more ever runs against that row — membership is **one-time payment + internally
+     managed expiry**, not a Razorpay-recurring subscription, and there is currently no
+     auto-renewal and no cancellation flow at all (a user cannot cancel today because the feature
+     doesn't exist yet, not because of a bug). Implementing "subscribe until cancelled" against
+     Razorpay (UPI Autopay / e-mandate `subscriptions.create`, a `subscription.charged` /
+     `subscription.cancelled` webhook, a `RazorpaySubscriptionId`/renewal-state column, a cancel
+     UI) is a substantial, separately-scoped feature — explicitly NOT built here per "do not
+     blindly replace the existing Razorpay flow"; tracked in TASKS/ROADMAP as its own item pending
+     the user's go-ahead.
+- **What is unchanged.** `accountType` architecture; SOS severity/eligibility/dispatch rules
+  (radius, tiering, RED excludes Service Providers); the SOS dispatch idempotency claim (one
+  fan-out per alert) and the escalation `alreadyNotified` dedup (no duplicate SMS storms on radius
+  widening or cron retries) — confirmed intact, not modified; OTP; Rider membership SMS body/flow;
+  pricing (no hardcoded ₹99); `MSG91_TEMPLATE_ID` still unused by any product SMS; no WhatsApp, no
+  mobile Admin. **Known, unchanged gap** (reported, not fixed here): a candidate marked
+  `HELPER_OFFERED` in the SOS timeline is never retried even if their SMS specifically failed
+  (only whether they were *notified at all* is tracked, not per-channel delivery) — building
+  per-channel retry is a separate, larger change than this bug-fix pass warranted.
+- **Consequences.** `vitest` 272→280 (SP-SMS config/dedup tests, `maskPhone`), `tsc` clean across
+  `@bikie/database`, `@bikie/services`, `web`; `next build` clean. No schema change, no migration.
+  Operator: after deploying, verify `MSG91_SOS_HELP_TEMPLATE_ID` is actually set on the VPS (§ the
+  final report's exact command) and re-test one SOS alert — the masked `[SMS][MSG91] Accepted …
+  reqId=…` / `[SMS][CONFIG] … not set` / classified-failure log lines now pinpoint which stage
+  failed without needing to read a raw phone number out of the log.

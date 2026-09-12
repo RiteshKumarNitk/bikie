@@ -1,4 +1,5 @@
 import type { ChannelResult, SmsPort } from "../ports";
+import { maskPhone } from "../domain/phone";
 import { fetchWithTimeout } from "./http";
 
 /** Turn an MSG91 rejection (HTTP status + response body) into a short, operator-actionable
@@ -54,8 +55,9 @@ export function createSmsAdapter(): SmsPort {
       const credentials = msg91Credentials();
       if (!credentials) {
         // DEV log carries the body deliberately (local visibility); it never runs when
-        // MSG91_AUTH_KEY/MSG91_SENDER_ID are set, i.e. never in a configured deployment.
-        console.log(`[SMS][DEV] ${tag}To: ${to} | Message: ${message}`);
+        // MSG91_AUTH_KEY/MSG91_SENDER_ID are set, i.e. never in a configured deployment. The
+        // phone number itself is still masked — this can end up in shared dev/CI console output.
+        console.log(`[SMS][DEV] ${tag}To: ${maskPhone(to)} | Message: ${message}`);
         return { ok: false, provider: "dev", error: "MSG91 credentials not configured" };
       }
 
@@ -69,8 +71,8 @@ export function createSmsAdapter(): SmsPort {
         // the send goes out template-less and India's DLT content firewall will very likely
         // reject it. The caller is expected to have logged which MSG91_*_TEMPLATE_ID to set.
         console.warn(
-          `[SMS][CONFIG] ${tag}sending to ${to} with no DLT template id — MSG91/DLT will likely reject this. ` +
-            `Set the matching MSG91_*_TEMPLATE_ID for this SMS type.`,
+          `[SMS][CONFIG] ${tag}sending to ${maskPhone(to)} with no DLT template id — MSG91/DLT will likely ` +
+            `reject this. Set the matching MSG91_*_TEMPLATE_ID for this SMS type.`,
         );
       }
 
@@ -97,7 +99,7 @@ export function createSmsAdapter(): SmsPort {
         // actionable from the log line alone (task §13).
         const reason = classifyMsg91Failure(res.status, body);
         console.error(
-          `[SMS] ${tag}Failed to ${to} (template ${templateId ?? "none"}): ${reason} :: ${body.slice(0, 400)}`,
+          `[SMS] ${tag}Failed to ${maskPhone(to)} (template ${templateId ?? "none"}): ${reason} :: ${body.slice(0, 400)}`,
         );
         return { ok: false, provider: "msg91", error: `${reason} :: ${body.slice(0, 400)}` };
       }
@@ -107,7 +109,7 @@ export function createSmsAdapter(): SmsPort {
       // request id is logged and returned so a send can be traced in the MSG91 dashboard.
       const requestId = extractMsg91RequestId(body);
       console.log(
-        `[SMS][MSG91] ${tag}Accepted for ${to} (template ${templateId ?? "none"})` +
+        `[SMS][MSG91] ${tag}Accepted for ${maskPhone(to)} (template ${templateId ?? "none"})` +
           `${requestId ? ` reqId=${requestId}` : ""} — gateway acceptance, not proof of handset delivery`,
       );
       return { ok: true, provider: "msg91", detail: requestId ?? undefined };

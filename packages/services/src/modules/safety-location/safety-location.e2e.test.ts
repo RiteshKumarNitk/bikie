@@ -302,7 +302,13 @@ describe("SOS end-to-end (ADR-045)", () => {
       latitude: 10.01,
       longitude: 10.01,
       distanceMeters: 500,
-      user: { id: "partner-general", name: "General Responders Co", email: "gr@example.com", phone: "9000000001" },
+      user: {
+        id: "partner-general",
+        name: "General Responders Co",
+        email: "gr@example.com",
+        phone: "9000000001",
+        phoneNumber: "9000000001",
+      },
     };
     const mechanicOnlyPartner = { ...generalPartner, userId: "partner-mechanic", isGeneralResponder: false };
 

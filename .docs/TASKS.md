@@ -2,6 +2,23 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Production SMS bugs — SOS recipient-phone gap, SP membership SMS wiring, log masking (2026-09-12, ADR-080)
+
+| Task | Status |
+|---|---|
+| Root-cause SOS SMS not reaching eligible recipients: `findNearbyAroundPoint`/`findEligiblePartnersNearPoint` read only `User.phone` (a secondary, not-always-synced mirror of `User.phoneNumber`); an unsynced recipient silently resolved to no phone at all — no error, channel just skipped | Completed |
+| Fix — both queries now select/prefer `phoneNumber`, falling back to `phone`: `rider-location.repository.ts` (`COALESCE`), `partner.repository.ts` (`findEligiblePartnersNearPoint` + `findPartnersNearPointForDispatch`), `escalation.application.ts`'s `resolveServiceProviders` | Completed |
+| Root-cause SP membership SMS: by design (ADR-058/079) `PartnerMembershipService` sent no SMS — the only registered template is annual-specific, wrong for the monthly SP plan | Completed (confirmed intended, made configurable) |
+| New `SMSService.sendPartnerMembershipSubscribed` gated on `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID` + `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT` (operator-supplied exact wording, `{name}`/`{renewalDate}` placeholders); wired into `PartnerMembershipService.purchaseMembership` mirroring the Rider flow (fire-and-forget, `confirmationSmsSentAt` dedup, never fails the purchase); never falls back to the Rider template | Completed |
+| Masked recipient phone numbers (`maskPhone`, keeps `+` + last 4 digits) in every SMS log line: `sms.adapter.ts` accept/reject/no-template/DEV logs, `fan-out.application.ts`'s `summary.errors` (reaches console via `[SOS][DISPATCH][ERROR]`) | Completed |
+| Audited Razorpay architecture: confirmed one-time `orders.create` only, no `subscriptions.*` API usage, no webhook, no `/cancel` route for either membership type — membership is internal-expiry, not a Razorpay recurring subscription; no auto-renewal exists | Completed (reported, not changed) |
+| Confirmed unchanged: SOS severity/eligibility/dispatch rules, dispatch idempotency claim (one fan-out per alert), escalation `alreadyNotified` dedup (no duplicate SMS storms on radius widening/cron retry), OTP, Rider membership SMS | Completed |
+| Verify — `vitest` 272→280, `tsc` clean (`@bikie/database`+`@bikie/services`+`web`), `next build` clean | Completed |
+| **Known gap (reported, not fixed):** a candidate marked `HELPER_OFFERED` is never retried even if their specific SMS failed — only "notified at all" is tracked, not per-channel delivery. Building per-recipient-per-channel retry is a separate, larger change | Backlog |
+| **Razorpay recurring subscriptions ("subscribe until cancelled").** Current model is one-time payment + internal `durationDays` expiry; no `razorpay.subscriptions.*`, no webhook, no cancel endpoint. Implementing true auto-renew-until-cancelled needs: Razorpay UPI Autopay/e-mandate `subscriptions.create`, a `subscription.charged`/`.cancelled` webhook, a `RazorpaySubscriptionId`/renewal-state column on `UserMembership`/`PartnerMembership`, a cancel UI (web+mobile), and a decision on grace-period behavior after cancellation. Explicitly NOT built in ADR-080 per "do not blindly replace the existing Razorpay flow" — needs its own scoped task and the user's go-ahead | Backlog (needs go-ahead) |
+| Operator: register a Service Provider-specific monthly membership DLT template with MSG91, then set `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID` + `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT` on the VPS | Pending (operator) |
+| Operator: verify `MSG91_SOS_HELP_TEMPLATE_ID` (and the rest of the MSG91 vars) are actually present on the production `web` container, not just `.env.example` — exact command in the final report | Pending (operator) |
+
 ## MSG91 SMS — final integration audit + adapter diagnosability (2026-09-09, ADR-079)
 
 | Task | Status |

@@ -1,6 +1,7 @@
 import { billingRepository, partnerMembershipRepository, userRepository } from "@bikie/database";
 import type { PartnerMembershipPlanDTO, PartnerMembershipDTO } from "@bikie/types";
 import { isRealRazorpayPaymentId } from "./billing.internal";
+import { SMSService } from "./sms.service";
 
 /** ADR-069 — mirrors `MembershipService`'s `PurchaseMembershipResult`. */
 export type PurchasePartnerMembershipResult =
@@ -44,10 +45,7 @@ export const PartnerMembershipService = {
     // ADR-070 — persist the immutable receipt (snapshot from the row/plan just created;
     // idempotent per membership id + payment id). A free-tier activation (`amount` 0, no payment
     // reference) still gets an invoice so billing history is uniform across both account types.
-    // No confirmation SMS: the "BIKIE_Sub" DLT template's fixed text is annual-specific and the
-    // Service Provider plan is monthly (ADR-058) — a separate registered template would be
-    // required to notify providers, and none exists yet.
-    await billingRepository.createInvoice({
+    const invoice = await billingRepository.createInvoice({
       userId,
       accountType: "SERVICE_PROVIDER",
       partnerMembershipId: membership.id,
@@ -64,6 +62,33 @@ export const PartnerMembershipService = {
       razorpayOrderId: razorpayOrderId ?? null,
       paidAt: new Date(),
     });
+
+    // ADR-080 — Service Provider membership confirmation SMS: separate from the Rider "BIKIE_Sub"
+    // template (annual-specific text, wrong for this monthly plan — see
+    // `SMSService.sendPartnerMembershipSubscribed`'s doc comment). Mirrors the Rider flow exactly
+    // otherwise: fire-and-forget, never fails/rolls back the purchase, deduped by the same
+    // `confirmationSmsSentAt` guard. Refuses cleanly (logged, retryable) until the operator
+    // registers a real SP DLT template and sets both its env vars — never sends the Rider
+    // template just because a payment succeeded.
+    if (user?.phoneNumber && !invoice.confirmationSmsSentAt) {
+      SMSService.sendPartnerMembershipSubscribed(user.phoneNumber, user.name, new Date(membership.endDate))
+        .then((res) => {
+          if (res && res.ok === false) {
+            if (res.provider !== "unconfigured") {
+              console.error("[PartnerMembershipService][purchaseMembership] SMS confirmation not accepted", res.error);
+            }
+            return;
+          }
+          console.log(
+            `[PartnerMembershipService][purchaseMembership] partner membership SMS accepted for invoice ${invoice.id}` +
+              `${res?.detail ? ` (MSG91 reqId=${res.detail})` : ""}`,
+          );
+          return billingRepository.markConfirmationSmsSent(invoice.id);
+        })
+        .catch((err) =>
+          console.error("[PartnerMembershipService][purchaseMembership] SMS confirmation failed", err),
+        );
+    }
 
     return { ok: true, membership };
   },

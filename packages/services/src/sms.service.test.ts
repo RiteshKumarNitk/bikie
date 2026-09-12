@@ -10,7 +10,12 @@ vi.mock("./modules/communications/public", () => ({
   getCommunicationsPorts: () => ({ sms: { send: smsSend } }),
 }));
 
-import { SMSService, resolveSmsTemplateId, buildMembershipSubscribedBody } from "./sms.service";
+import {
+  SMSService,
+  resolveSmsTemplateId,
+  buildMembershipSubscribedBody,
+  buildPartnerMembershipSubscribedBody,
+} from "./sms.service";
 
 describe("SMSService — one DLT template per SMS type (ADR-058)", () => {
   beforeEach(() => {
@@ -59,6 +64,76 @@ describe("SMSService — one DLT template per SMS type (ADR-058)", () => {
       expect(label).toBe("membership-subscribed");
       expect(message).toContain("Priya");
     });
+  });
+
+  describe("sendPartnerMembershipSubscribed (ADR-080)", () => {
+    it("REFUSES to send when MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID is unset, even if the text is configured", async () => {
+      vi.stubEnv("MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID", "");
+      vi.stubEnv("MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT", "Hello SP {name}, renews {renewalDate}");
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const res = await SMSService.sendPartnerMembershipSubscribed("+919000000002", "Auto Care", new Date("2027-01-01"));
+
+      expect(res).toEqual({
+        ok: false,
+        provider: "unconfigured",
+        error: "MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID / MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT not configured",
+      });
+      expect(smsSend).not.toHaveBeenCalled();
+      err.mockRestore();
+    });
+
+    it("REFUSES to send when the template id is set but the approved text is not (never invents wording)", async () => {
+      vi.stubEnv("MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID", "sp-tmpl-id");
+      vi.stubEnv("MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT", "");
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      const res = await SMSService.sendPartnerMembershipSubscribed("+919000000002", "Auto Care", new Date("2027-01-01"));
+
+      expect(res.ok).toBe(false);
+      expect(res.provider).toBe("unconfigured");
+      expect(smsSend).not.toHaveBeenCalled();
+      expect(err).toHaveBeenCalledWith(expect.stringContaining("MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT is not set"));
+      err.mockRestore();
+    });
+
+    it("never falls back to the Rider MSG91_MEMBERSHIP_SUB_TEMPLATE_ID", async () => {
+      vi.stubEnv("MSG91_MEMBERSHIP_SUB_TEMPLATE_ID", "rider-annual-tmpl");
+      vi.stubEnv("MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID", "");
+      vi.stubEnv("MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT", "Hello SP {name}, renews {renewalDate}");
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      await SMSService.sendPartnerMembershipSubscribed("+919000000002", "Auto Care", new Date("2027-01-01"));
+
+      expect(smsSend).not.toHaveBeenCalled();
+      err.mockRestore();
+    });
+
+    it("sends with the operator-configured template id + text once both are set", async () => {
+      vi.stubEnv("MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID", "sp-tmpl-id");
+      vi.stubEnv(
+        "MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT",
+        "Hello Service Provider {name}, your BIKIE monthly membership renews on {renewalDate}.",
+      );
+
+      await SMSService.sendPartnerMembershipSubscribed("+919000000002", "Auto Care", new Date("2027-03-15T00:00:00Z"));
+
+      expect(smsSend).toHaveBeenCalledTimes(1);
+      const [phone, message, templateId, label] = smsSend.mock.calls[0]!;
+      expect(phone).toBe("+919000000002");
+      expect(templateId).toBe("sp-tmpl-id");
+      expect(label).toBe("partner-membership-subscribed");
+      expect(message).toBe("Hello Service Provider Auto Care, your BIKIE monthly membership renews on 15-Mar-2027.");
+    });
+  });
+
+  it("buildPartnerMembershipSubscribedBody substitutes {name}/{renewalDate} into the operator-supplied text, verbatim otherwise", () => {
+    const body = buildPartnerMembershipSubscribedBody(
+      "Auto Care",
+      new Date("2027-03-15T00:00:00Z"),
+      "Hi {name}, your SP plan renews {renewalDate}. Thanks!",
+    );
+    expect(body).toBe("Hi Auto Care, your SP plan renews 15-Mar-2027. Thanks!");
   });
 
   it("admin manual send() is not a DLT product template — sends with NO template id, never borrows MSG91_TEMPLATE_ID", async () => {

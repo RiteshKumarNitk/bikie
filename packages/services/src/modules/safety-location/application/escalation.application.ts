@@ -101,15 +101,20 @@ async function resolveServiceProviders(
 
   const recipients: SOSRecipient[] = [];
   for (const p of eligible) {
+    // ADR-080 — `phoneNumber` (Better Auth's phone-plugin field, set at every OTP verification)
+    // is the authoritative number; `phone` is a secondary mirror kept only for accounts
+    // predating its sync callback. Falls through to the business's own contact-person mobile
+    // only if the account itself somehow has neither.
+    const userPhone = p.user.phoneNumber ?? p.user.phone;
     recipients.push({
       role: "SERVICE_PROVIDER",
       name: p.businessName || p.user.name,
-      phone: p.user.phone ?? p.contactPerson1Mobile,
+      phone: userPhone ?? p.contactPerson1Mobile,
       email: p.user.email,
       userId: p.userId,
       distanceMeters: Math.round(p.distanceMeters),
     });
-    if (p.contactPerson1Mobile && p.contactPerson1Mobile !== p.user.phone) {
+    if (p.contactPerson1Mobile && p.contactPerson1Mobile !== userPhone) {
       recipients.push({
         role: "SERVICE_PROVIDER",
         name: p.contactPerson1Name ?? `${p.businessName} contact`,

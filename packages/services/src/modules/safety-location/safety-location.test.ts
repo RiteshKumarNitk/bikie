@@ -708,6 +708,7 @@ describe("fan-out dispatch", () => {
                 name: "Partner User",
                 email: "partner@example.com",
                 phone: "9000000001",
+                phoneNumber: "9000000001",
               },
             },
           ]),

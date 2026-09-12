@@ -1,4 +1,4 @@
-import { toE164Phone } from "../../communications/domain/phone";
+import { maskPhone, toE164Phone } from "../../communications/domain/phone";
 import { whatsappShareUrl, type CommunicationsPorts } from "../../communications/public";
 import type { IdempotencyPort } from "../../platform/public";
 import { alertKind } from "../domain/alert-kind";
@@ -168,6 +168,10 @@ export async function dispatchToRecipient(
 
   if (recipient.phone) {
     const phone = toE164Phone(recipient.phone);
+    // Real `phone` is still what's actually sent to the provider — this is only for log lines
+    // and `summary.errors` entries (which do reach the console via the [SOS][DISPATCH][ERROR]
+    // line below), so a production log never carries a full recipient mobile number.
+    const maskedPhone = maskPhone(phone);
 
     // ADR-059 — the SMS channel is capped to the nearest SOS_SMS_RECIPIENT_LIMIT candidate
     // responders (markSmsEligibility, applied by the caller); `smsEligible === false` skips SMS
@@ -184,20 +188,20 @@ export async function dispatchToRecipient(
       const smsTemplateId = process.env.MSG91_SOS_HELP_TEMPLATE_ID?.trim() || null;
       if (!smsTemplateId) {
         console.error(
-          `[SMS][CONFIG] MSG91_SOS_HELP_TEMPLATE_ID is not set — SOS SMS to ${phone} skipped ` +
+          `[SMS][CONFIG] MSG91_SOS_HELP_TEMPLATE_ID is not set — SOS SMS to ${maskedPhone} skipped ` +
             `(no unrelated DLT template is used). WhatsApp / email / in-app are unaffected.`,
         );
-        summary.errors.push(`sms → ${phone}: MSG91_SOS_HELP_TEMPLATE_ID not configured (SMS skipped)`);
+        summary.errors.push(`sms → ${maskedPhone}: MSG91_SOS_HELP_TEMPLATE_ID not configured (SMS skipped)`);
       } else {
         summary.smsAttempted += 1;
         tasks.push(
           communications.sms
             .send(phone, buildSmsTemplateBody(dispatchAlert), smsTemplateId, "sos-help")
             .then((r) => {
-              if (record("sms", phone, r)) summary.smsSent += 1;
+              if (record("sms", maskedPhone, r)) summary.smsSent += 1;
             })
             .catch((e) => {
-              summary.errors.push(`sms → ${phone}: ${String(e)}`);
+              summary.errors.push(`sms → ${maskedPhone}: ${String(e)}`);
             }),
         );
       }
@@ -209,7 +213,7 @@ export async function dispatchToRecipient(
         communications.whatsapp
           .send(phone, text)
           .then(async (r) => {
-            if (record("whatsapp", phone, r)) {
+            if (record("whatsapp", maskedPhone, r)) {
               summary.whatsappSent += 1;
               // The native location card always carries exact GPS — there's no "approximate"
               // version of it worth sending, so it's skipped entirely for a pre-assignment
@@ -233,7 +237,7 @@ export async function dispatchToRecipient(
             }
           })
           .catch((e) => {
-            summary.errors.push(`whatsapp → ${phone}: ${String(e)}`);
+            summary.errors.push(`whatsapp → ${maskedPhone}: ${String(e)}`);
           }),
       );
     } else {

@@ -294,7 +294,7 @@ export async function findPartnersNearPointForDispatch(
       ...(options.verifiedOnly ? { isVerified: true } : {}),
     },
     include: {
-      user: { select: { id: true, name: true, email: true, phone: true } },
+      user: { select: { id: true, name: true, email: true, phone: true, phoneNumber: true } },
     },
   });
 
@@ -476,7 +476,11 @@ export async function findEligiblePartnersNearPoint(latitude: number, longitude:
       isAvailable: true,
       user: { partnerMembership: { some: { status: "ACTIVE", endDate: { gte: new Date() } } } },
     },
-    include: { user: { select: { id: true, name: true, email: true, phone: true } } },
+    // `phoneNumber` (Better Auth's phone-plugin field, set at every OTP verification) is the
+    // authoritative number; `phone` is a secondary mirror synced on verification (see the
+    // `User.phone` doc comment in schema.prisma) and included only as a fallback for an account
+    // predating that sync. SOS dispatch prefers `phoneNumber` — see `resolveServiceProviders`.
+    include: { user: { select: { id: true, name: true, email: true, phone: true, phoneNumber: true } } },
   });
 
   return partners

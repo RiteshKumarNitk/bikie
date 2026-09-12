@@ -100,6 +100,13 @@ export async function findNearby(
  * lat/lng from the panic button's one-shot geolocation. `receiveSosAlerts = true` (ADR-045) is a
  * second, independent gate from `sharingEnabled` — a rider can stay findable/browsable
  * (`sharingEnabled`) while opting out of being paged as an SOS candidate, or the reverse.
+ *
+ * `COALESCE("phoneNumber", "phone")` (ADR-080): `phoneNumber` is Better Auth's phone-plugin
+ * field, set at every OTP verification and `@unique` — the number that's actually authoritative.
+ * `phone` is a secondary mirror synced by a verification callback (`packages/auth/src/server.ts`)
+ * and only kept for accounts predating that sync. Selecting bare `phone` risked resolving a
+ * `null` contact number for an otherwise-eligible nearby rider — a silent SMS no-op with no
+ * error anywhere (`channelsForRecipient` just sees `hasPhone: false` and skips the channel).
  */
 export async function findNearbyAroundPoint(
   latitude: number,
@@ -109,7 +116,9 @@ export async function findNearbyAroundPoint(
   staleMinutes = 30,
 ): Promise<NearbyRiderContactRow[]> {
   return prisma.$queryRaw<NearbyRiderContactRow[]>`
-    SELECT u."id" AS "id", u."name" AS "name", u."phone" AS "phone", u."email" AS "email",
+    SELECT u."id" AS "id", u."name" AS "name",
+           COALESCE(u."phoneNumber", u."phone") AS "phone",
+           u."email" AS "email",
            ST_Distance(
              rl."location",
              ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography

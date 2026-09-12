@@ -16,8 +16,12 @@ vi.mock("@bikie/database", () => ({
 }));
 
 // Guard: the Rider "BIKIE_Sub" SMS must never be sent for a Service Provider purchase (ADR-058).
+// `sendPartnerMembershipSubscribed` (ADR-080) is the SP-specific sender under test below.
 vi.mock("./sms.service", () => ({
-  SMSService: { sendMembershipSubscribed: vi.fn() },
+  SMSService: {
+    sendMembershipSubscribed: vi.fn(),
+    sendPartnerMembershipSubscribed: vi.fn(async () => ({ ok: false, provider: "unconfigured" })),
+  },
 }));
 
 import { partnerMembershipRepository, billingRepository } from "@bikie/database";
@@ -78,6 +82,27 @@ describe("PartnerMembershipService.purchaseMembership (ADR-069/070)", () => {
       }),
     );
     expect(SMSService.sendMembershipSubscribed).not.toHaveBeenCalled();
+    expect(SMSService.sendPartnerMembershipSubscribed).toHaveBeenCalledWith(
+      "+919000000000",
+      "Ravi Kumar",
+      new Date(membershipOn(paidPlan).endDate),
+    );
+  });
+
+  it("logs (not throws) and never sends the Rider template when the SP confirmation comes back unconfigured", async () => {
+    repo.createMembership.mockResolvedValueOnce(membershipOn(paidPlan));
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await PartnerMembershipService.purchaseMembership("user-1", "sp-plan", "pay_x", "order_x");
+    await flush();
+
+    expect(result.ok).toBe(true);
+    expect(billing.markConfirmationSmsSent).not.toHaveBeenCalled();
+    expect(SMSService.sendMembershipSubscribed).not.toHaveBeenCalled();
+    // "unconfigured" is already logged by SMSService itself — purchaseMembership must not add a
+    // second, noisier error on every single purchase until the operator configures a template.
+    expect(err).not.toHaveBeenCalled();
+    err.mockRestore();
   });
 
   it("free-tier activation still records a ₹0 invoice (uniform history), no payment refs", async () => {
@@ -90,6 +115,30 @@ describe("PartnerMembershipService.purchaseMembership (ADR-069/070)", () => {
     expect(billing.createInvoice).toHaveBeenCalledWith(
       expect.objectContaining({ amount: 0, paymentId: null, razorpayPaymentId: null, razorpayOrderId: null }),
     );
+  });
+
+  it("stamps confirmationSmsSentAt once the SP confirmation SMS is accepted", async () => {
+    repo.createMembership.mockResolvedValueOnce(membershipOn(paidPlan));
+    (SMSService.sendPartnerMembershipSubscribed as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      provider: "msg91",
+      detail: "req-123",
+    });
+
+    await PartnerMembershipService.purchaseMembership("user-1", "sp-plan", "pay_x", "order_x");
+    await flush();
+
+    expect(billing.markConfirmationSmsSent).toHaveBeenCalledWith("inv-1");
+  });
+
+  it("does not re-send the SP confirmation SMS if the invoice already has confirmationSmsSentAt", async () => {
+    repo.createMembership.mockResolvedValueOnce(membershipOn(paidPlan));
+    billing.createInvoice.mockResolvedValueOnce({ id: "inv-1", confirmationSmsSentAt: "2026-08-30T10:00:00.000Z" });
+
+    await PartnerMembershipService.purchaseMembership("user-1", "sp-plan", "pay_x", "order_x");
+    await flush();
+
+    expect(SMSService.sendPartnerMembershipSubscribed).not.toHaveBeenCalled();
   });
 
   it("replay returns the existing membership with no second invoice", async () => {

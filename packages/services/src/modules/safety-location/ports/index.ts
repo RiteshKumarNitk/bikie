@@ -282,6 +282,9 @@ export interface PartnerDispatchRow {
     name: string;
     email: string;
     phone: string | null;
+    /** Better Auth phone-plugin field — the authoritative number (ADR-080); `phone` above is a
+     * secondary mirror kept only for accounts predating its verification-sync callback. */
+    phoneNumber: string | null;
   };
 }
 

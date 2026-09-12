@@ -19,3 +19,19 @@ export function isValidIndianMobile(phone: string): boolean {
   const local = digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
   return /^[6-9]\d{9}$/.test(local);
 }
+
+/**
+ * Redacts a phone number for server logs — keeps the leading `+` (if present) and the last 4
+ * digits, masks everything in between. Every SMS/WhatsApp log line that used to interpolate a
+ * recipient's raw number (adapter accept/reject logs, SOS dispatch error strings) goes through
+ * this first, so a production log never carries a full mobile number even though the number
+ * itself is still what's actually sent to the provider.
+ */
+export function maskPhone(phone: string | null | undefined): string {
+  if (!phone) return "(none)";
+  const digits = phone.replace(/\D/g, "");
+  if (digits.length < 4) return "***";
+  const last4 = digits.slice(-4);
+  const maskedCount = Math.max(digits.length - 4, 3);
+  return `${phone.trim().startsWith("+") ? "+" : ""}${"*".repeat(maskedCount)}${last4}`;
+}

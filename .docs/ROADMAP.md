@@ -1,5 +1,21 @@
 # BIKIE — Roadmap
 
+## Production SMS Bugs Fixed: SOS Recipient-Phone Gap, SP Membership SMS, Log Masking (2026-09-12, ADR-080)
+Two production SMS failures traced end-to-end. SOS/Amber SMS wasn't reaching eligible recipients
+because both nearby-rider and nearby-Service-Provider recipient queries read only the secondary
+`User.phone` mirror instead of the authoritative `User.phoneNumber` — an account whose mirror
+wasn't synced silently had "no phone number" as far as dispatch could tell, no error anywhere.
+Fixed by preferring `phoneNumber` in both queries. Service Provider membership purchases now send
+their own confirmation SMS through a new, separately-gated sender (its own DLT template id AND
+exact approved wording, both operator-configured) rather than staying permanently silent — it
+never reuses the Rider annual template and never invents text. Every SMS log line now masks the
+recipient's phone number. Also audited and clearly reported: Razorpay is currently one-time
+Orders with an internally-managed expiry date, not a Razorpay recurring subscription — there is no
+auto-renewal and no cancellation flow; building "subscribe until cancelled" against Razorpay's
+UPI-Autopay/e-mandate subscriptions API is scoped as a separate future task pending go-ahead, not
+built here. SOS severity/eligibility/dispatch rules and the existing no-duplicate-notification
+dedup are confirmed unchanged. See ADR-080.
+
 ## MSG91 SMS — Final Integration Audit + Adapter Diagnosability (2026-09-09, ADR-079)
 Re-audited the whole MSG91 SMS chain against the operator's three DLT-registered templates (OTP,
 annual-membership "BIKIE_Sub", SOS "BIKIE_SR"). The three-template architecture from ADR-077 is

@@ -173,7 +173,7 @@ export function createPartnerDispatchAdapter(): PartnerDispatchPort {
         contactPerson2Mobile: string | null;
         latitude: number | null;
         longitude: number | null;
-        user: { id: string; name: string; email: string; phone: string | null };
+        user: { id: string; name: string; email: string; phone: string | null; phoneNumber: string | null };
       }) => ({
         userId: p.userId,
         businessName: p.businessName,
@@ -189,6 +189,7 @@ export function createPartnerDispatchAdapter(): PartnerDispatchPort {
           name: p.user.name,
           email: p.user.email,
           phone: p.user.phone,
+          phoneNumber: p.user.phoneNumber,
         },
       }));
     },
