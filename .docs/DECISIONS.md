@@ -4043,3 +4043,92 @@ changes:
   health (dashboard error/latency metrics, plan limits, region, credential validity) is still
   worth doing — this change bounds the damage from an unhealthy instance, it doesn't fix an
   unhealthy instance.
+
+## ADR-082: Service Provider membership plan never seeded in production; mobile UserModel stops silently defaulting accountType to RIDER
+
+- Context. Two reports, investigated together since both concern the Rider/Service-Provider
+  boundary. (1) A brand-new mobile Service Provider signup, after logout/login, was seen showing
+  the Rider UI. (2) The Service Provider Membership screen showed the wrong/free price instead of
+  the configured Rs 99/month.
+- Investigation — account-type routing. Traced the complete chain end to end: Better Auth's
+  phoneNumber plugin (packages/auth/src/server.ts) declares accountType as a required
+  additionalFields entry with defaultValue "RIDER", so every user-shaped API response
+  (get-session, phone-number/verify, sign-in/email) always serializes it — parseUserOutput's
+  filterOutputFields (confirmed directly in better-auth's installed source) only ever removes a
+  field marked returned:false, never adds one. setAccountType
+  (packages/database/src/repositories/user.repository.ts) writes accountType+role in one
+  statement. PATCH /api/user/complete-phone-signup (mobile signup's accountType-apply step)
+  already calls refreshCachedUserSessions before returning, and signup_screen.dart already calls
+  AuthController.refreshSession() right after, before navigating — confirmed present and correct
+  (this is the ADR-055/078 fix, still intact). Confirmed in better-auth's own source that a login
+  (not signup) always creates a session by re-querying the user row fresh from Postgres
+  (internal-adapter.mjs's createSession, the fn callback does adapter.findOne({model:"user",
+  where:[{field:"id", value:userId}]}) at session-creation time) — never a stale cached copy — so
+  a second login after signup is not, by itself, a path that can return a wrong accountType.
+  app_router.dart's isPartner branch already reads authControllerProvider's user.accountType
+  directly (role_provider.dart's isServiceProviderAccountType), never role/partnerStatus/profile
+  existence/local cache — already exactly the rule requested. login_screen.dart's pre-OTP
+  mismatch check (_sendCode) and post-verify defensive check (_verify) already refuse to silently
+  continue as the wrong type — a mismatch surfaces its own "Already registered as X — Continue as
+  X / Contact Support" screen, never a silent Rider fallback. AppPreferences was confirmed to hold
+  no cached accountType/mode at all (removed outright by ADR-053, comment documents this). One
+  real gap found: UserModel.fromJson (apps/mobile/lib/features/auth/data/user_model.g.dart,
+  hand-patched — build_runner is broken on this toolchain, same recurring issue as ADR-059/063)
+  parsed accountType: json['accountType'] as String? ?? 'RIDER' — a silent fallback that violates
+  the explicit product rule ("if accountType is missing, that's an auth/contract error, never a
+  reason to guess RIDER"). Not proven to be the cause of the one reported incident (no
+  field-missing response was ever observed live in this pass — the account couldn't be
+  reproduced against the live DB from this environment), but it is a real, latent landmine: if a
+  future response ever did omit or null the field (a partial API response, a proxy/cache
+  stripping it, a future refactor), the app would silently show the wrong entire experience with
+  no error at all instead of failing loudly — exactly the failure mode the product spec calls out
+  by name.
+- Decision (routing). user_model.g.dart's generated fromJson now requires accountType to be
+  exactly "RIDER" or "SERVICE_PROVIDER" and throws a StateError otherwise (a missing, null, or
+  unrecognized value) — caught by the same broad try/catch every caller already has (apiGuard,
+  AuthController.bootstrap), surfacing as a normal sign-in failure instead of a silent misroute.
+  The @Default('RIDER') on the source freezed annotation (user_model.dart) is left in place — it
+  only affects direct Dart construction (test fixtures), not fromJson, and its doc comment is
+  corrected to say so. packages/services/packages/database/packages/auth were re-verified, not
+  changed — every write path, cache-refresh call site, and session-creation code path already
+  matched the intended architecture (User.accountType server-authoritative, no dual-mode, no
+  self-service mutation, admin-approved change requests only) and needed no fix.
+- Investigation — Service Provider membership price. GET /api/partner-membership/plans
+  (apps/web/app/api/partner-membership/plans/route.ts), the checkout/purchase routes, and both
+  the web and Flutter UIs (_PlanCard in partner_membership_screen.dart) were all confirmed to
+  render whatever PartnerMembershipPlan.price/durationDays the database actually returns — no
+  hardcoded 99 anywhere in either client's pricing render path (the "Rs 99/month" strings found
+  elsewhere are static marketing/upsell copy on locked-feature banners, not the purchasable plan
+  card). RazorpayService.createOrder converts rupees to paise (amountRupees * 100) only for the
+  Razorpay API call itself; the plan's DB price column and every DTO/model field carry plain
+  rupees throughout — confirmed no unit-mismatch bug. Queried the dev Neon DB directly:
+  partner_membership_plan held exactly one row — legacy-free-partner-plan (price: 0,
+  durationDays: 36500, isActive: true) — and no "Service Provider Membership" row at all.
+  patch-store-review-phones.ts's own plan lookup already anticipated exactly this (fall back to
+  the legacy id, then to any plan, if the named plan isn't found) — corroborating evidence this
+  has been the production state since ADR-056 shipped: that ADR's Rs 99/durationDays:30 seed
+  logic was written into prisma/seed.ts, explicitly flagged there as "not yet applied to
+  production" (seeding is disabled in prod, SEED_DB=false), and no later ADR/CHANGELOG entry ever
+  confirms it was run. Root cause: a data-seeding gap, not a code bug — the UI was correctly,
+  dynamically rendering the one plan that actually existed (the free legacy one, in a ~100-year
+  duration), which is indistinguishable from "wrong/missing price" to the reporter.
+- Decision (pricing). New packages/database/prisma/patch-partner-membership-plan.ts
+  (db:patch:partner-membership-plan script), mirroring patch-store-review-phones.ts's established
+  pattern exactly: idempotently creates "Service Provider Membership" (Rs 99/durationDays:30, same
+  benefits list as seed.ts) if a plan by that name doesn't already exist, then deactivates
+  legacy-free-partner-plan if still active — touches no other row, re-running changes nothing.
+  Verified end to end against the dev Neon DB: before the patch, the plan list returned only the
+  free legacy plan; after, it returns exactly the Rs 99/30-day plan; a second run reported
+  "already exists" / "already isActive=false" and made no further writes. No code change was made
+  to either client or to the checkout/purchase routes — they were already correct.
+- Consequences. flutter analyze clean (1 pre-existing unrelated http-import info), flutter test
+  119 to 124 (5 new UserModel.fromJson cases: SERVICE_PROVIDER parses, RIDER parses, throws on
+  missing/null/unrecognized). tsc --noEmit clean on @bikie/database. No schema change, no new API
+  route, no Razorpay behavior change. Operator action required: run
+  db:patch:partner-membership-plan against production the same way db:patch:store-review was run
+  (docker compose cp + docker compose exec -w /app/packages/database web pnpm exec tsx
+  prisma/patch-partner-membership-plan.ts) — until then, production's Service Provider Membership
+  screen keeps showing the free legacy plan on both platforms. The account-type routing incident
+  itself remains unreproduced in this environment; if it recurs after this patch, the new
+  StateError will surface as a visible, diagnosable sign-in failure instead of a silent Rider
+  misroute, which is the concrete next debugging signal to collect.

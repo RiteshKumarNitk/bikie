@@ -10,6 +10,7 @@
     "db:migrate": "dotenv -e ../../apps/web/.env.local -- prisma migrate dev",
     "db:seed": "dotenv -e ../../apps/web/.env.local -- tsx prisma/seed.ts",
     "db:patch:store-review": "dotenv -e ../../apps/web/.env.local -- tsx prisma/patch-store-review-phones.ts",
+    "db:patch:partner-membership-plan": "dotenv -e ../../apps/web/.env.local -- tsx prisma/patch-partner-membership-plan.ts",
     "typecheck": "tsc --noEmit"
   },
   "prisma": {

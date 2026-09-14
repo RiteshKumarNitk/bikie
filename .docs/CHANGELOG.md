@@ -1,5 +1,18 @@
 # BIKIE Changelog
 
+## 2026-09-14 — Mobile account-type routing audit; Service Provider membership plan never seeded in production; UserModel hardened (ADR-082)
+
+Audited a report of a mobile Service Provider account showing Rider UI after logout/login — every
+layer (session creation, accountType/role writes, cache refresh, router, login mismatch handling)
+was already correct per the current architecture; not reproducible in this environment. Found and
+fixed one real gap: `UserModel.fromJson` silently defaulted a missing `accountType` to `'RIDER'`
+— now throws instead of guessing. Separately root-caused a real, concurrent bug: the Service
+Provider Membership screen showed the free legacy plan instead of ₹99/month because that plan row
+was never inserted in production (ADR-056's seed logic, flagged "not yet applied," apparently
+never run) — both clients' pricing UI was already correctly dynamic, no hardcoded price found. New
+idempotent `db:patch:partner-membership-plan` script, verified against the dev DB. `flutter test`
+119→124, `tsc` clean. See ADR-082.
+
 ## 2026-09-14 — Fixed: sign-out taking 20-30 seconds (ADR-081)
 
 Both platforms' sign-out is just one `POST /api/auth/sign-out`; the hang was inside Better Auth's

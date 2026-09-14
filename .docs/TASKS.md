@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Mobile account-type routing audit; Service Provider membership plan never seeded; UserModel hardened (2026-09-14, ADR-082)
+
+| Task | Status |
+|---|---|
+| Traced the complete signup->logout->login chain for a reported "Service Provider signup shows Rider UI after re-login" bug: Better Auth session creation always re-reads the user fresh from Postgres (confirmed in installed `better-auth` source), `accountType`/`role` writes and `refreshCachedUserSessions` calls are already correctly wired (ADR-055/078), `app_router.dart`/`role_provider.dart` already read `accountType` only (never role/partnerStatus/profile existence/local cache), `login_screen.dart` already refuses to silently continue as the wrong type (shows a mismatch/"Continue as X" screen instead). Could not reproduce the incident in this environment. | Completed |
+| Found and fixed a real, related hardening gap: `user_model.g.dart`'s `fromJson` silently defaulted a missing/null `accountType` to `'RIDER'` — violates the explicit "never guess RIDER, fail loudly" rule. Now throws `StateError` for missing/null/unrecognized values, caught by the same broad try/catch every caller already has (`apiGuard`, `AuthController.bootstrap`) and surfaced as a normal sign-in failure. | Completed |
+| Added 5 regression tests (`auth_repository_test.dart`) for `UserModel.fromJson`'s accountType parsing: SERVICE_PROVIDER parses, RIDER parses, throws on missing/null/unrecognized. Updated the shared `buildUserJson()` test fixture to include `accountType` (a real API response always does). | Completed |
+| Investigated the concurrently-reported "Service Provider Membership screen shows the wrong/free price" bug. Confirmed both web and mobile pricing UI (`_PlanCard`, `partner_membership_screen.dart`; web's checkout/purchase routes) are already fully dynamic — no hardcoded ₹99 in either client's plan-render path, no rupee/paise unit-mismatch (`RazorpayService.createOrder` converts only for the Razorpay API call). Queried the dev Neon DB directly: `partner_membership_plan` held only the `legacy-free-partner-plan` row (₹0, ~100-year duration) — the real ₹99/30-day "Service Provider Membership" plan was never inserted. Root cause: ADR-056's seed logic was explicitly flagged "not yet applied to production" and no later ADR/CHANGELOG confirms it was ever run — a data gap, not a code bug. | Completed |
+| New `packages/database/prisma/patch-partner-membership-plan.ts` (+ `db:patch:partner-membership-plan` script) — idempotently creates the ₹99/30-day plan and deactivates the legacy free plan, mirroring `patch-store-review-phones.ts`'s established pattern. Verified against the dev DB: before → only the free legacy plan returned; after → exactly the ₹99/30-day plan; re-run → no-op, confirmed idempotent. | Completed |
+| Verify — `flutter analyze` clean (1 pre-existing unrelated `http`-import info), `flutter test` 119→124, `tsc --noEmit` clean on `@bikie/database` | Completed |
+| Operator: run `db:patch:partner-membership-plan` against production (`docker compose cp` + `docker compose exec -w /app/packages/database web pnpm exec tsx prisma/patch-partner-membership-plan.ts`) — until then, production's Service Provider Membership screen shows the free legacy plan on both platforms | Pending (operator) |
+| The original account-type routing incident remains unreproduced — if it recurs post-patch, the new `StateError` will surface as a visible sign-in failure (check server logs / a crash report for "Auth contract violation") rather than a silent misroute; that is the next concrete debugging signal to collect | Backlog (needs live repro) |
+
 ## Fix: sign-out taking 20-30 seconds (2026-09-14, ADR-081)
 
 | Task | Status |

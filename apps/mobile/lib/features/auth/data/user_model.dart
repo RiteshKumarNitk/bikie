@@ -25,7 +25,11 @@ class UserModel with _$UserModel {
     String? partnerStatus,
     // ADR-053 — server-authoritative, mutually-exclusive Rider/Service-Provider selector. Set
     // only at registration or by an admin-approved Account Type Change Request, never
-    // self-service. Defaults to RIDER to match the server's schema default.
+    // self-service. `@Default('RIDER')` only applies when a UserModel is constructed directly
+    // in Dart (e.g. a test fixture) — `fromJson` (hand-patched in user_model.g.dart, since
+    // build_runner is broken on this toolchain) does NOT use this default: a real server
+    // response missing accountType throws instead of silently becoming RIDER, since this field
+    // alone decides which entire app experience (Rider vs Service Provider) renders.
     @Default('RIDER') String accountType,
   }) = _UserModel;
 

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-09-14 — Investigated mobile account-type routing report; fixed the real gap found (Service Provider membership plan never seeded in production); hardened mobile UserModel against a silent Rider fallback (ADR-082)
+
+Investigated a report that a mobile Service Provider account showed the Rider UI after
+logout/login. Traced the complete chain — Better Auth's session creation, `accountType`/`role`
+writes, `refreshCachedUserSessions`, the mobile router's `isPartner` check, the login screen's
+mismatch handling — and found every piece already correctly implemented per the current
+architecture (`User.accountType` server-authoritative, no dual-mode, login always re-reads the
+user fresh from Postgres when creating a session). Could not reproduce the incident directly in
+this environment. Found and closed one real, related gap while auditing: `UserModel.fromJson`
+silently defaulted a missing `accountType` to `'RIDER'` — now throws instead, so a broken/partial
+server response fails loudly (a diagnosable sign-in error) rather than silently rendering the
+wrong entire app experience. Separately, root-caused a genuine bug reported at the same time —
+the Service Provider Membership screen showing the wrong/free price instead of ₹99/month: the
+`partner_membership_plan` table in the (dev) database held only the ₹0/100-year legacy plan; the
+real ₹99/30-day plan was never inserted, because ADR-056's seed logic — flagged there as "not yet
+applied to production" — was apparently never run. Both clients' pricing UI was already correctly
+dynamic (no hardcoded ₹99 anywhere); this was a data gap, not a code bug. New idempotent
+`db:patch:partner-membership-plan` script (mirrors the existing `db:patch:store-review` pattern)
+creates the real plan and deactivates the legacy one — verified against the dev DB, needs running
+against production. `flutter test` 119→124, `flutter analyze` unchanged, `tsc` clean. See
+ADR-082.
+
 ## 2026-09-14 — Fixed: sign-out taking 20-30 seconds (ADR-081)
 
 Sign-out on both web and mobile was hanging 20-30+ seconds even though neither client does

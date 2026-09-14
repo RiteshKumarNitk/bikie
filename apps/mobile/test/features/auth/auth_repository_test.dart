@@ -38,6 +38,10 @@ void main() {
         'name': 'Rider One',
         'email': 'rider@bikie.app',
         'role': 'RENTER',
+        // Always present on a real Better Auth response (a required additionalField with a
+        // server-side default) — included here so these fixtures don't silently rely on
+        // UserModel.fromJson's now-removed accountType fallback (see user_model.g.dart).
+        'accountType': 'RIDER',
       };
 
   group('AuthRepository.signIn', () {
@@ -362,6 +366,33 @@ void main() {
       final code = await repository.fetchDevOtp('+919876543210');
 
       expect(code, isNull);
+    });
+  });
+
+  group('UserModel.fromJson accountType (mobile account-type routing bug)', () {
+    test('parses SERVICE_PROVIDER correctly — no silent Rider fallback', () {
+      final user = UserModel.fromJson({...buildUserJson(), 'accountType': 'SERVICE_PROVIDER'});
+      expect(user.accountType, 'SERVICE_PROVIDER');
+    });
+
+    test('parses RIDER correctly', () {
+      final user = UserModel.fromJson(buildUserJson());
+      expect(user.accountType, 'RIDER');
+    });
+
+    test('throws (never silently defaults to RIDER) when accountType is missing from the response', () {
+      final json = buildUserJson()..remove('accountType');
+      expect(() => UserModel.fromJson(json), throwsA(isA<StateError>()));
+    });
+
+    test('throws when accountType is null', () {
+      final json = {...buildUserJson(), 'accountType': null};
+      expect(() => UserModel.fromJson(json), throwsA(isA<StateError>()));
+    });
+
+    test('throws on an unrecognized accountType value rather than guessing', () {
+      final json = {...buildUserJson(), 'accountType': 'PARTNER'};
+      expect(() => UserModel.fromJson(json), throwsA(isA<StateError>()));
     });
   });
 }

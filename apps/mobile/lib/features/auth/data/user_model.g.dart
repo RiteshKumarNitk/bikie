@@ -16,8 +16,23 @@ _$UserModelImpl _$$UserModelImplFromJson(Map<String, dynamic> json) =>
       phoneNumber: json['phoneNumber'] as String?,
       image: json['image'] as String?,
       partnerStatus: json['partnerStatus'] as String?,
-      accountType: json['accountType'] as String? ?? 'RIDER',
+      // Server-authoritative and mutually exclusive (ADR-053) — the mobile UI routes an entire
+      // Rider-vs-Service-Provider experience off this one field, so a response that omits it is
+      // a broken auth contract, never a reason to guess. A missing/blank value here used to
+      // silently fall back to 'RIDER', which could show a Service Provider account the Rider UI
+      // with no error at all if the field were ever dropped upstream. Fail loudly instead: this
+      // getter throws, caught by `apiGuard`/`AuthController.bootstrap`'s broad catch and surfaced
+      // as a normal sign-in failure rather than a silent misroute.
+      accountType: _requireAccountType(json['accountType']),
     );
+
+String _requireAccountType(Object? value) {
+  if (value == 'RIDER' || value == 'SERVICE_PROVIDER') return value as String;
+  throw StateError(
+    'Auth contract violation: server response is missing a valid accountType '
+    '(got: ${value == null ? 'null' : '"$value"'}). Refusing to default to RIDER.',
+  );
+}
 
 Map<String, dynamic> _$$UserModelImplToJson(_$UserModelImpl instance) =>
     <String, dynamic>{
