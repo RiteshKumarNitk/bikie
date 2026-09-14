@@ -1,5 +1,31 @@
 # BIKIE Changelog
 
+## 2026-09-14 — SOS SMS: strictly sequential sends; 10-recipient cap is per-alert not per-batch (ADR-085)
+
+Corrected two ADR-084 semantics against explicit requirements. SMS sends now run one recipient
+at a time (`sendSosSmsSequentially`, replacing the old parallel per-recipient sends) — each
+send fully completes before the next starts, one failure never blocking the rest. The
+10-recipient cap is now enforced per alert lifetime, not per dispatch batch — a new
+`countSmsSelectedForAlert` (reusing existing `SOSTimelineEvent` rows, no schema change) tracks
+the running total across seed + every widening tick; once 10 is reached, later ticks' fresh
+candidates still get in-app/WhatsApp/email, never SMS. Fixed a real regression caught by 2
+pre-existing tests: the admin-escalation fallback called the SMS function directly and needed
+the same fix. Nearest-first, phone verification/dedup, RED exclusion, requester exclusion, and
+`MSG91_SOS_HELP_TEMPLATE_ID` unchanged. `vitest` 284→291, `tsc` clean, no schema/queue change.
+See ADR-085.
+
+## 2026-09-14 — Amber SOS SMS: verified/deduped nearest-10, structured observability (ADR-084)
+
+Audited the dispatch-time SOS SMS flow against a request to verify/dedupe/cap-at-10/log it —
+found nearly all of it already existed (nearest-10 cap, independent per-recipient send/failure
+handling, correct `MSG91_SOS_HELP_TEMPLATE_ID`, dispatch-time not accept-time firing, retry-safe
+idempotency). Closed two real gaps in `markSmsEligibility`: a phone-less/malformed candidate
+could waste one of the 10 slots (now filtered via existing `isValidIndianMobile`); a Service
+Provider's own number and their contact-person's number could double-count (now deduped).
+Added `SOS_SMS_DISPATCH_START`/`SOS_SMS_SENT`/`SOS_SMS_FAILED` structured logs. RED alerts'
+existing rider SMS behavior left unchanged (reported, not silently regressed). No queue, no new
+template, no schema change. `vitest` 280→284, `tsc` clean. See ADR-084.
+
 ## 2026-09-14 — Fixed: mobile Service Provider Requests tab never showed eligible Amber SOS requests (ADR-083)
 
 Root cause: the Requests tab (Service Provider only) already queried the real, persistent

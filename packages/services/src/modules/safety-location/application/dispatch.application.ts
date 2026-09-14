@@ -9,6 +9,7 @@ import {
   emptySummary,
   mergeSummaries,
   resolveEscalationRecipients,
+  sendSosSmsSequentially,
   type FanOutDeps,
   type SOSDispatchSummary,
 } from "./fan-out.application";
@@ -56,9 +57,15 @@ export function createDispatchOrchestrator(ports: SafetyLocationPorts) {
         const availability = resolveChannelAvailability(communications);
         const admins = await resolveEscalationRecipients(ports);
         const adminSummary = emptySummary(availability);
-        await Promise.all(
-          admins.map((r: SOSRecipient) => dispatchToRecipient(alert, r, adminSummary, communications, ports, availability)),
-        );
+        // ADR-085 — SMS runs its own sequential loop alongside the parallel WhatsApp/email/
+        // in-app dispatch, same pattern as fanOut/notifyRecipients (admins aren't capped by
+        // markSmsEligibility, so every admin with a phone gets one, just one at a time).
+        await Promise.all([
+          sendSosSmsSequentially(alert, admins, communications, availability, adminSummary),
+          Promise.all(
+            admins.map((r: SOSRecipient) => dispatchToRecipient(alert, r, adminSummary, communications, ports, availability)),
+          ),
+        ]);
         adminSummary.escalatedToAdmins = admins.length;
         summary = mergeSummaries(summary, adminSummary);
 

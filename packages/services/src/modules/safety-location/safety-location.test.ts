@@ -43,8 +43,8 @@ vi.mock("../../../push.service", () => ({
 }));
 
 import { alertKind } from "./domain/alert-kind";
-import { buildEmailHtml, buildSmsTemplateBody, buildTextBody, describeLocation } from "./domain/dispatch-message";
-import { dispatchToRecipient, emptySummary, markSmsEligibility } from "./application/fan-out.application";
+import { buildEmailHtml, buildSmsTemplateBody, buildTextBody, describeLocation, type SOSRecipient } from "./domain/dispatch-message";
+import { dispatchToRecipient, emptySummary, markSmsEligibility, sendSosSmsSequentially } from "./application/fan-out.application";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "./domain/maps";
 import {
   channelsForRecipient,
@@ -147,12 +147,12 @@ describe("safety-location domain", () => {
     });
   });
 
-  describe("markSmsEligibility (ADR-059 — SOS_SMS_RECIPIENT_LIMIT)", () => {
+  describe("markSmsEligibility (ADR-059 — SOS_SMS_RECIPIENT_LIMIT; ADR-084 — phone validation + dedup)", () => {
     it("marks only the nearest `limit` recipients smsEligible, by distanceMeters ascending", () => {
       const recipients = [
-        { role: "NEARBY_RIDER" as const, name: "Far", distanceMeters: 5000 },
-        { role: "SERVICE_PROVIDER" as const, name: "Near", distanceMeters: 100 },
-        { role: "NEARBY_RIDER" as const, name: "Mid", distanceMeters: 1000 },
+        { role: "NEARBY_RIDER" as const, name: "Far", phone: "9111111111", distanceMeters: 5000 },
+        { role: "SERVICE_PROVIDER" as const, name: "Near", phone: "9222222222", distanceMeters: 100 },
+        { role: "NEARBY_RIDER" as const, name: "Mid", phone: "9333333333", distanceMeters: 1000 },
       ];
       const result = markSmsEligibility(recipients, 2);
       expect(result.find((r) => r.name === "Near")?.smsEligible).toBe(true);
@@ -161,27 +161,81 @@ describe("safety-location domain", () => {
     });
 
     it("does not mutate the input array's objects", () => {
-      const recipients = [{ role: "NEARBY_RIDER" as const, name: "A", distanceMeters: 100 }];
+      const recipients = [{ role: "NEARBY_RIDER" as const, name: "A", phone: "9111111111", distanceMeters: 100 }];
       markSmsEligibility(recipients, 1);
       expect(recipients[0]).not.toHaveProperty("smsEligible");
     });
 
     it("treats a recipient with no distanceMeters as farthest (sorts last)", () => {
       const recipients = [
-        { role: "NEARBY_RIDER" as const, name: "Unknown distance" },
-        { role: "NEARBY_RIDER" as const, name: "Known", distanceMeters: 9000 },
+        { role: "NEARBY_RIDER" as const, name: "Unknown distance", phone: "9111111111" },
+        { role: "NEARBY_RIDER" as const, name: "Known", phone: "9222222222", distanceMeters: 9000 },
       ];
       const result = markSmsEligibility(recipients, 1);
       expect(result.find((r) => r.name === "Known")?.smsEligible).toBe(true);
       expect(result.find((r) => r.name === "Unknown distance")?.smsEligible).toBe(false);
     });
 
-    it("defaults to SOS_SMS_RECIPIENT_LIMIT (10) when no explicit limit is given", () => {
+    it("defaults to SOS_SMS_RECIPIENT_LIMIT (10) when no explicit limit is given, across 15 valid candidates", () => {
       const recipients = Array.from({ length: 15 }, (_, i) => ({
         role: "NEARBY_RIDER" as const,
         name: `r${i}`,
+        phone: `9${String(100000000 + i).padStart(9, "0")}`,
         distanceMeters: i * 100,
       }));
+      const result = markSmsEligibility(recipients);
+      expect(result.filter((r) => r.smsEligible).length).toBe(10);
+      // The nearest 10 (i = 0..9), never an arbitrary/unordered subset.
+      for (let i = 0; i < 10; i++) expect(result.find((r) => r.name === `r${i}`)?.smsEligible).toBe(true);
+      for (let i = 10; i < 15; i++) expect(result.find((r) => r.name === `r${i}`)?.smsEligible).toBe(false);
+    });
+
+    it("never marks a phone-less recipient eligible — they never occupy one of the limited slots", () => {
+      const recipients = [
+        { role: "NEARBY_RIDER" as const, name: "No phone, closest", distanceMeters: 50 },
+        { role: "NEARBY_RIDER" as const, name: "Has phone, farther", phone: "9111111111", distanceMeters: 500 },
+      ];
+      const result = markSmsEligibility(recipients, 1);
+      expect(result.find((r) => r.name === "No phone, closest")?.smsEligible).toBe(false);
+      // The slot isn't wasted on the phone-less candidate — the next-nearest reachable one gets it.
+      expect(result.find((r) => r.name === "Has phone, farther")?.smsEligible).toBe(true);
+    });
+
+    it("never marks an invalid/malformed phone number eligible, and doesn't waste a slot on it", () => {
+      const recipients = [
+        { role: "NEARBY_RIDER" as const, name: "Landline, closest", phone: "1234567890", distanceMeters: 50 },
+        { role: "NEARBY_RIDER" as const, name: "Too short, closer", phone: "98765", distanceMeters: 60 },
+        { role: "NEARBY_RIDER" as const, name: "Valid, farther", phone: "9876543210", distanceMeters: 500 },
+      ];
+      const result = markSmsEligibility(recipients, 1);
+      expect(result.find((r) => r.name === "Landline, closest")?.smsEligible).toBe(false);
+      expect(result.find((r) => r.name === "Too short, closer")?.smsEligible).toBe(false);
+      expect(result.find((r) => r.name === "Valid, farther")?.smsEligible).toBe(true);
+    });
+
+    it("deduplicates by normalized phone number — the closer of two matching numbers wins the slot, never both", () => {
+      const recipients = [
+        { role: "SERVICE_PROVIDER" as const, name: "Partner account", phone: "+919876543210", distanceMeters: 100 },
+        { role: "SERVICE_PROVIDER" as const, name: "Same partner's contact person", phone: "9876543210", distanceMeters: 100 },
+        { role: "NEARBY_RIDER" as const, name: "Different rider", phone: "9111111111", distanceMeters: 200 },
+      ];
+      const result = markSmsEligibility(recipients, 2);
+      const eligible = result.filter((r) => r.smsEligible).map((r) => r.name);
+      expect(eligible).toContain("Partner account");
+      expect(eligible).not.toContain("Same partner's contact person");
+      expect(eligible).toContain("Different rider");
+      expect(eligible.length).toBe(2);
+    });
+
+    it("caps at exactly 10 SMS attempts even with far more than 10 eligible candidates (never client-controlled)", () => {
+      const recipients = Array.from({ length: 40 }, (_, i) => ({
+        role: "NEARBY_RIDER" as const,
+        name: `bulk-${i}`,
+        phone: `9${String(200000000 + i).padStart(9, "0")}`,
+        distanceMeters: i,
+      }));
+      // markSmsEligibility's own default has no client-facing parameter at all — calling it with
+      // no limit argument is the only way any caller in this codebase invokes it in production.
       const result = markSmsEligibility(recipients);
       expect(result.filter((r) => r.smsEligible).length).toBe(10);
     });
@@ -1455,6 +1509,197 @@ describe("escalation application — tier advancement", () => {
   });
 });
 
+describe("sendSosSmsSequentially (ADR-085 — one recipient at a time, failure isolation)", () => {
+  const validRecipients = (count: number, offset = 0): SOSRecipient[] =>
+    Array.from({ length: count }, (_, i) => ({
+      role: "NEARBY_RIDER" as const,
+      name: `R${i}`,
+      phone: `9${String(300000000 + offset + i).padStart(9, "0")}`,
+      email: null,
+      userId: `r${offset + i}`,
+      distanceMeters: i * 10,
+      smsEligible: true,
+    }));
+
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("never sends more than one SMS concurrently — the next send does not start until the previous one settles", async () => {
+    let inFlight = 0;
+    let maxConcurrent = 0;
+    const smsSend = vi.fn(async () => {
+      inFlight += 1;
+      maxConcurrent = Math.max(maxConcurrent, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return { ok: true, provider: "msg91" as const };
+    });
+    const communications = fakeCommunications({ sms: { send: smsSend } });
+    const availability = resolveChannelAvailability(communications);
+    const summary = emptySummary(availability);
+    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+
+    await sendSosSmsSequentially(sampleAlert(), validRecipients(5), communications, availability, summary);
+
+    expect(maxConcurrent).toBe(1);
+    expect(smsSend).toHaveBeenCalledTimes(5);
+    expect(summary.smsSent).toBe(5);
+  });
+
+  it("one recipient's SMS failure does not stop the remaining recipients from being attempted", async () => {
+    const smsSend = vi.fn(async (to: string) =>
+      to.endsWith("3") ? { ok: false, provider: "msg91" as const, error: "rejected" } : { ok: true, provider: "msg91" as const },
+    );
+    const communications = fakeCommunications({ sms: { send: smsSend } });
+    const availability = resolveChannelAvailability(communications);
+    const summary = emptySummary(availability);
+    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+
+    // Recipient #3 (distance-sorted, 0-indexed "R3") has a phone ending in "3" and fails.
+    await sendSosSmsSequentially(sampleAlert(), validRecipients(10), communications, availability, summary);
+
+    expect(summary.smsAttempted).toBe(10);
+    expect(summary.smsSent).toBe(9);
+  });
+
+  it("a thrown/rejected send (not just an { ok: false } result) is also isolated — the loop still continues", async () => {
+    const smsSend = vi.fn(async (to: string) => {
+      if (to.endsWith("4")) throw new Error("network error");
+      return { ok: true, provider: "msg91" as const };
+    });
+    const communications = fakeCommunications({ sms: { send: smsSend } });
+    const availability = resolveChannelAvailability(communications);
+    const summary = emptySummary(availability);
+    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+
+    await sendSosSmsSequentially(sampleAlert(), validRecipients(10), communications, availability, summary);
+
+    expect(summary.smsAttempted).toBe(10);
+    expect(summary.smsSent).toBe(9);
+    expect(summary.errors.some((e) => e.includes("network error"))).toBe(true);
+  });
+});
+
+describe("escalation application — ADR-085: per-SOS (not per-batch) SMS budget", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("caps SMS at exactly 10 out of 15 eligible candidates on the very first (seed) dispatch — everyone still gets in-app", async () => {
+    const notify = notifyMock();
+    const findNearbyAroundPoint = vi.fn(async () =>
+      Array.from({ length: 15 }, (_, i) => ({
+        id: `rider-${i}`,
+        name: `Rider ${i}`,
+        phone: `9${String(400000000 + i).padStart(9, "0")}`,
+        email: null,
+        distanceMeters: i * 100,
+      })),
+    );
+    const smsSend = vi.fn(async () => ({ ok: true, provider: "msg91" as const }));
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any,
+        notifications: { notify },
+      }),
+      communications: fakeCommunications({ sms: { send: smsSend } }),
+    });
+    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+
+    const result = await module.escalation.seedEscalation(sampleAlert());
+
+    expect(smsSend).toHaveBeenCalledTimes(10);
+    expect(result.summary.smsAttempted).toBe(10);
+    // All 15 riders still get the in-app notification — only the SMS channel is capped.
+    expect(notify.mock.calls.length).toBe(15);
+  });
+
+  it("sends exactly 5 SMS for 5 eligible candidates — no shortfall, no padding", async () => {
+    const findNearbyAroundPoint = vi.fn(async () =>
+      Array.from({ length: 5 }, (_, i) => ({
+        id: `rider-${i}`,
+        name: `Rider ${i}`,
+        phone: `9${String(500000000 + i).padStart(9, "0")}`,
+        email: null,
+        distanceMeters: i * 100,
+      })),
+    );
+    const smsSend = vi.fn(async () => ({ ok: true, provider: "msg91" as const }));
+    const module = createSafetyLocationModule({
+      ...emptyRepos({ riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any }),
+      communications: fakeCommunications({ sms: { send: smsSend } }),
+    });
+    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+
+    const result = await module.escalation.seedEscalation(sampleAlert());
+
+    expect(smsSend).toHaveBeenCalledTimes(5);
+    expect(result.summary.smsAttempted).toBe(5);
+  });
+
+  it("a later widening tick sends ZERO more SMS once the alert's 10-recipient budget is already spent", async () => {
+    const smsSend = vi.fn(async () => ({ ok: true, provider: "msg91" as const }));
+    // Simulates seedEscalation (or an earlier tick) having already selected the full 10.
+    const countSmsSelectedForAlert = vi.fn(async () => 10);
+    const findNearbyAroundPoint = vi.fn(async () =>
+      Array.from({ length: 10 }, (_, i) => ({
+        id: `fresh-rider-${i}`,
+        name: `Fresh ${i}`,
+        phone: `9${String(600000000 + i).padStart(9, "0")}`,
+        email: null,
+        distanceMeters: i * 100,
+      })),
+    );
+    const notify = notifyMock();
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any,
+        sosAlerts: { ...emptyRepos().sosAlerts, findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()) } as any,
+        sosTimeline: { ...emptyRepos().sosTimeline, countSmsSelectedForAlert } as any,
+        notifications: { notify },
+      }),
+      communications: fakeCommunications({ sms: { send: smsSend } }),
+    });
+    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+
+    await module.escalation.tickEscalation(
+      sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
+    );
+
+    // The 10 fresh candidates still all get the in-app notification (the cap is SMS-only) —
+    // just none of them get an SMS, since the alert's lifetime budget is already exhausted.
+    expect(notify.mock.calls.length).toBe(10);
+    expect(smsSend).not.toHaveBeenCalled();
+  });
+
+  it("a widening tick gets only the REMAINING budget, not a fresh 10, when an earlier batch already spent some", async () => {
+    const smsSend = vi.fn(async () => ({ ok: true, provider: "msg91" as const }));
+    const countSmsSelectedForAlert = vi.fn(async () => 8); // 8 already selected earlier
+    const findNearbyAroundPoint = vi.fn(async () =>
+      Array.from({ length: 10 }, (_, i) => ({
+        id: `fresh-rider-${i}`,
+        name: `Fresh ${i}`,
+        phone: `9${String(700000000 + i).padStart(9, "0")}`,
+        email: null,
+        distanceMeters: i * 100,
+      })),
+    );
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any,
+        sosAlerts: { ...emptyRepos().sosAlerts, findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()) } as any,
+        sosTimeline: { ...emptyRepos().sosTimeline, countSmsSelectedForAlert } as any,
+      }),
+      communications: fakeCommunications({ sms: { send: smsSend } }),
+    });
+    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+
+    await module.escalation.tickEscalation(
+      sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
+    );
+
+    // Only 10 - 8 = 2 of the 10 fresh, otherwise-eligible candidates get an SMS this tick.
+    expect(smsSend).toHaveBeenCalledTimes(2);
+  });
+});
+
 // ADR-064 (documentation-only pass, confirming the existing rule) — the same RED/EMERGENCY
 // severity gate `escalation.tickEscalation`/`seedEscalation` enforce for automatic dispatch above
 // also applies to a partner *browsing* "Nearby Requests" (`GET /api/partner/sos/nearby`) — a RED
@@ -1556,15 +1801,15 @@ describe("dispatch PII redaction (ADR-047)", () => {
     const availability = resolveChannelAvailability(communications);
     const ports = emptyRepos() as unknown as Parameters<typeof dispatchToRecipient>[4];
     const summary = emptySummary(availability);
+    const recipient: SOSRecipient = { role: "NEARBY_RIDER", name: "Rider", phone: "8888888888", email: "r@example.com", userId: "rider-1" };
 
-    await dispatchToRecipient(
-      alert,
-      { role: "NEARBY_RIDER", name: "Rider", phone: "8888888888", email: "r@example.com", userId: "rider-1" },
-      summary,
-      communications,
-      ports,
-      availability,
-    );
+    // ADR-085 — SMS is sent by `sendSosSmsSequentially`, not `dispatchToRecipient`, which now
+    // only handles WhatsApp/email/in-app; real callers (fanOut/notifyRecipients) run both
+    // against the same recipient array.
+    await Promise.all([
+      sendSosSmsSequentially(alert, [recipient], communications, availability, summary),
+      dispatchToRecipient(alert, recipient, summary, communications, ports, availability),
+    ]);
 
     expect(communications.sms.send).not.toHaveBeenCalled();
     expect(summary.smsAttempted).toBe(0);

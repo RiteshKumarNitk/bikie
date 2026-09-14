@@ -1,4 +1,4 @@
-import { maskPhone, toE164Phone } from "../../communications/domain/phone";
+import { isValidIndianMobile, maskPhone, toE164Phone } from "../../communications/domain/phone";
 import { whatsappShareUrl, type CommunicationsPorts } from "../../communications/public";
 import type { IdempotencyPort } from "../../platform/public";
 import { alertKind } from "../domain/alert-kind";
@@ -33,17 +33,48 @@ function isCandidateResponder(role: SOSRecipient["role"]): boolean {
 export const SOS_SMS_RECIPIENT_LIMIT = 10;
 
 /**
- * Marks the nearest `limit` candidate responders (by `distanceMeters`, ascending; a recipient
- * with no distance sorts last) as SMS-eligible, the rest ineligible — only the SMS channel is
- * capped: in-app push/WhatsApp/email still reach every recipient in the input array unchanged,
- * since under-notifying there has real safety cost and neither is per-message billed the same
- * way SMS is. Callers pass only the combined nearby-rider + service-provider pool for one
- * dispatch batch — never emergency contacts/admins/emergency-services, which aren't capped.
+ * Marks the nearest `limit` *verified* candidate responders (by `distanceMeters`, ascending; a
+ * recipient with no distance sorts last) as SMS-eligible, the rest ineligible — only the SMS
+ * channel is capped: in-app push/WhatsApp/email still reach every recipient in the input array
+ * unchanged, since under-notifying there has real safety cost and neither is per-message billed
+ * the same way SMS is. Callers pass only the combined nearby-rider + service-provider pool for
+ * one dispatch batch — never emergency contacts/admins/emergency-services, which aren't capped.
+ *
+ * "Verified" — before a candidate can occupy one of the `limit` slots, it must have a phone
+ * number at all, that number must pass `isValidIndianMobile` (MSG91 would reject anything else —
+ * a malformed number must never waste a slot a genuinely reachable candidate #11 could have
+ * used), and it must not be a duplicate of a closer candidate's number already counted (e.g. a
+ * partner's own number coinciding with their listed contact-person's number). A candidate that
+ * fails any of these is simply never `smsEligible: true` — the cap itself always stays at
+ * exactly `limit`, never fewer just because some invalid/duplicate numbers happened to sort
+ * first. `limit` is a compile-time default (`SOS_SMS_RECIPIENT_LIMIT`, server-side only) — no
+ * caller passes it from client input.
  */
 export function markSmsEligibility(recipients: SOSRecipient[], limit = SOS_SMS_RECIPIENT_LIMIT): SOSRecipient[] {
   const sorted = [...recipients].sort((a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity));
-  const eligible = new Set(sorted.slice(0, limit));
+
+  const eligible = new Set<SOSRecipient>();
+  const seenPhones = new Set<string>();
+  for (const r of sorted) {
+    if (eligible.size >= limit) break;
+    if (!r.phone) continue;
+    const normalized = toE164Phone(r.phone);
+    if (!isValidIndianMobile(normalized)) continue;
+    if (seenPhones.has(normalized)) continue;
+    seenPhones.add(normalized);
+    eligible.add(r);
+  }
+
   return recipients.map((r) => ({ ...r, smsEligible: eligible.has(r) }));
+}
+
+/** One structured observability line per dispatch batch, right after `markSmsEligibility` — pairs
+ * with the per-recipient `SOS_SMS_SENT`/`SOS_SMS_FAILED` lines below to answer "how many
+ * candidates were found, how many actually got an SMS attempt (always <= 10), for this alert" at
+ * a glance, without a raw phone number or any secret in the line. */
+export function logSmsDispatchStart(alertId: string, candidates: SOSRecipient[], selected: SOSRecipient[]): void {
+  const selectedCount = selected.filter((r) => r.smsEligible).length;
+  console.log(`SOS_SMS_DISPATCH_START sosId=${alertId} candidateCount=${candidates.length} selectedCount=${selectedCount}`);
 }
 
 export interface SOSDispatchSummary {
@@ -91,6 +122,85 @@ export type FanOutDeps = {
   communications?: CommunicationsPorts;
   idempotency?: IdempotencyPort;
 };
+
+/**
+ * ADR-085 — sends the SMS channel ONE RECIPIENT AT A TIME, nearest-first, for a batch of
+ * candidates already verified/deduped/capped by `markSmsEligibility` — never `Promise.all`. A
+ * failed send is caught and recorded, then the loop moves on to the next recipient; it never
+ * aborts the batch. Split out of `dispatchToRecipient` (which still handles WhatsApp/email/
+ * in-app for every recipient, unchanged and still fully parallel — neither channel has a
+ * "one at a time" requirement, so slowing them down to match SMS would only add latency for no
+ * safety benefit) so the two can run concurrently with each other while SMS alone stays
+ * serialized within itself. Callers (`fanOut`/`notifyRecipients`) run this alongside the
+ * `Promise.all` of `dispatchToRecipient` calls over the same recipient array.
+ *
+ * `recipient.smsEligible !== false` (true, or unset for a non-capped recipient like an emergency
+ * contact) is the same eligibility gate `dispatchToRecipient`'s old inline SMS branch used —
+ * preserved exactly so emergency contacts/emergency services (never passed through
+ * `markSmsEligibility`, always eligible) keep getting SMS'd here too.
+ */
+export async function sendSosSmsSequentially(
+  alert: RawSOSAlertDTO,
+  recipients: SOSRecipient[],
+  communications: CommunicationsPorts,
+  availability: ChannelAvailability,
+  summary: SOSDispatchSummary,
+): Promise<void> {
+  const smsTemplateId = process.env.MSG91_SOS_HELP_TEMPLATE_ID?.trim() || null;
+
+  const toSend = recipients
+    .filter((r) => r.smsEligible !== false && channelsForRecipient(r, availability).sms)
+    .sort((a, b) => (a.distanceMeters ?? Infinity) - (b.distanceMeters ?? Infinity));
+
+  for (const recipient of toSend) {
+    const phone = toE164Phone(recipient.phone!);
+    // Real `phone` is still what's actually sent to the provider — masked only for log lines /
+    // `summary.errors` entries, so a production log never carries a full recipient mobile number.
+    const maskedPhone = maskPhone(phone);
+    const recipientTag = recipient.userId ?? "none";
+
+    if (!smsTemplateId) {
+      // ADR-077 — BIKIE has ONE SOS/Amber SMS DLT template ("BIKIE_SR",
+      // `MSG91_SOS_HELP_TEMPLATE_ID`), used for every dispatch recipient. No unrelated template
+      // is ever substituted — when it's unset the SMS channel is skipped entirely (logged +
+      // recorded); WhatsApp/email/in-app are untouched.
+      console.error(
+        `[SMS][CONFIG] MSG91_SOS_HELP_TEMPLATE_ID is not set — SOS SMS to ${maskedPhone} skipped ` +
+          `(no unrelated DLT template is used). WhatsApp / email / in-app are unaffected.`,
+      );
+      summary.errors.push(`sms → ${maskedPhone}: MSG91_SOS_HELP_TEMPLATE_ID not configured (SMS skipped)`);
+      continue;
+    }
+
+    const isRedacted = isCandidateResponder(recipient.role);
+    const dispatchAlert = redactAlertForViewer(alert, !isRedacted);
+
+    summary.smsAttempted += 1;
+    // Structured, per-recipient observability (never the raw phone number, never a secret).
+    try {
+      // Awaited — the next recipient's send does not start until this one has fully settled,
+      // success or failure.
+      const result = await communications.sms.send(phone, buildSmsTemplateBody(dispatchAlert), smsTemplateId, "sos-help");
+      if (result.ok) {
+        summary.smsSent += 1;
+        console.log(`SOS_SMS_SENT sosId=${alert.id} recipientUserId=${recipientTag} status=SUCCESS`);
+      } else {
+        if (result.provider !== "dev") {
+          summary.errors.push(`sms → ${maskedPhone}: ${(result.error ?? "unknown error").slice(0, 200)}`);
+        }
+        console.error(
+          `SOS_SMS_FAILED sosId=${alert.id} recipientUserId=${recipientTag} status=FAILED ` +
+            `reason=${(result.error ?? "unknown error").slice(0, 200)}`,
+        );
+      }
+    } catch (e) {
+      // A thrown/rejected send is caught here, per recipient — it never stops the loop from
+      // continuing on to the next recipient.
+      summary.errors.push(`sms → ${maskedPhone}: ${String(e)}`);
+      console.error(`SOS_SMS_FAILED sosId=${alert.id} recipientUserId=${recipientTag} status=FAILED reason=${String(e).slice(0, 200)}`);
+    }
+  }
+}
 
 async function resolveEmergencyContacts(
   reporterUserId: string,
@@ -173,39 +283,12 @@ export async function dispatchToRecipient(
     // line below), so a production log never carries a full recipient mobile number.
     const maskedPhone = maskPhone(phone);
 
-    // ADR-059 — the SMS channel is capped to the nearest SOS_SMS_RECIPIENT_LIMIT candidate
-    // responders (markSmsEligibility, applied by the caller); `smsEligible === false` skips SMS
-    // only — WhatsApp/email/in-app below are unaffected. Never set (undefined) for emergency
-    // contacts/admins/emergency services, which aren't capped.
-    if (channels.sms && recipient.smsEligible !== false) {
-      // ADR-077 — BIKIE has ONE SOS/Amber SMS DLT template ("BIKIE_SR",
-      // `MSG91_SOS_HELP_TEMPLATE_ID`) used for EVERY dispatch recipient — nearby riders /
-      // service providers and the reporter's own contacts / admins / emergency services alike.
-      // There is no separate "generic SOS" template and no SMS type borrows another's. When it
-      // is unset the SMS channel is skipped for that recipient (logged + recorded in the
-      // summary) — WhatsApp / email / in-app, which carry the richer detail and aren't
-      // DLT-gated, are untouched.
-      const smsTemplateId = process.env.MSG91_SOS_HELP_TEMPLATE_ID?.trim() || null;
-      if (!smsTemplateId) {
-        console.error(
-          `[SMS][CONFIG] MSG91_SOS_HELP_TEMPLATE_ID is not set — SOS SMS to ${maskedPhone} skipped ` +
-            `(no unrelated DLT template is used). WhatsApp / email / in-app are unaffected.`,
-        );
-        summary.errors.push(`sms → ${maskedPhone}: MSG91_SOS_HELP_TEMPLATE_ID not configured (SMS skipped)`);
-      } else {
-        summary.smsAttempted += 1;
-        tasks.push(
-          communications.sms
-            .send(phone, buildSmsTemplateBody(dispatchAlert), smsTemplateId, "sos-help")
-            .then((r) => {
-              if (record("sms", maskedPhone, r)) summary.smsSent += 1;
-            })
-            .catch((e) => {
-              summary.errors.push(`sms → ${maskedPhone}: ${String(e)}`);
-            }),
-        );
-      }
-    }
+    // ADR-085 — SMS is no longer sent from inside this parallel per-recipient dispatch at all.
+    // It's handled by `sendSosSmsSequentially`, called by the same batch orchestrators
+    // (`fanOut`/`notifyRecipients`) alongside this function — one recipient's SMS attempt fully
+    // completes before the next one starts, which `Promise.all`-style dispatch here cannot
+    // guarantee. WhatsApp/email/in-app below are unaffected — they have no such requirement and
+    // stay parallel across recipients exactly as before.
 
     if (channels.whatsapp) {
       summary.whatsappAttempted += 1;
@@ -368,9 +451,14 @@ export function createFanOutApplication(ports: SafetyLocationPorts) {
         else if (receipt.provider !== "dev") summary.errors.push(`email → ${alert.userEmail}: ${receipt.error}`);
       }
 
-      await Promise.all(
-        recipients.map((r) => dispatchToRecipient(alert, r, summary, communications, ports, availability)),
-      );
+      // ADR-085 — SMS runs sequentially (one recipient at a time, its own loop) alongside, not
+      // inside, the parallel WhatsApp/email/in-app dispatch below — the two channels sets don't
+      // overlap (SMS moved out of `dispatchToRecipient` entirely) so running them concurrently
+      // with each other is safe and doesn't slow either one down waiting on the other.
+      await Promise.all([
+        sendSosSmsSequentially(alert, recipients, communications, availability, summary),
+        Promise.all(recipients.map((r) => dispatchToRecipient(alert, r, summary, communications, ports, availability))),
+      ]);
 
       console.log(
         `[SOS][DISPATCH][CONTACTS] alert=${alert.id} contacts=${summary.emergencyContacts} ` +

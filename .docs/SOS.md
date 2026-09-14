@@ -181,26 +181,33 @@ platform admins immediately, logs `[SOS][DISPATCH][NO-RECIPIENTS]`, and reports
 `escalatedToAdmins` in the summary. The reporter always receives an in-app notice regardless of
 provider configuration.
 
-**SMS content is DLT-template-bound, and differs by recipient role (ADR-059).** India's TRAI DLT
-content firewall requires SMS text to exactly match a registered template — the free-text,
-multi-line `buildTextBody` (with maps links etc.) used for every other channel does **not**
-qualify, and was likely being silently rejected by MSG91 for every SMS send before ADR-059 (caught
-into `summary.errors`, never surfaced elsewhere). `NEARBY_RIDER`/`SERVICE_PROVIDER` recipients now
-get the DLT-approved **"BIKIE_SR"** template instead (`buildSmsTemplateBody`,
-`MSG91_SOS_HELP_TEMPLATE_ID`): rider name, vehicle registration number (`"N/A"` if the rider never
-filled it in — `RiderProfile.vehicleRegistrationNumber`), and approximate location
-(`describeLocation`, respecting the same pre-assignment redaction as every other channel).
-Emergency contacts/admins/emergency services still get the older free-text body on the original
-`MSG91_TEMPLATE_ID` default — a still-open DLT-compliance gap for those roles, not yet resolved
-(no approved template exists for that copy).
+**SMS content is DLT-template-bound (ADR-059/077).** India's TRAI DLT content firewall requires
+SMS text to exactly match a registered template — the free-text, multi-line `buildTextBody` (with
+maps links etc.) used for every other channel does **not** qualify. Every SOS SMS recipient —
+`NEARBY_RIDER`/`SERVICE_PROVIDER` candidates **and** the reporter's own emergency contacts/admins/
+emergency services alike — gets the one DLT-approved **"BIKIE_SR"** template
+(`buildSmsTemplateBody`, `MSG91_SOS_HELP_TEMPLATE_ID`): rider name, vehicle registration number
+(`"N/A"` if the rider never filled it in — `RiderProfile.vehicleRegistrationNumber`), and
+approximate location (`describeLocation`, respecting the same pre-assignment redaction as every
+other channel). There is no second "generic SOS" template — `MSG91_TEMPLATE_ID` is deprecated and
+read by no SOS code path (ADR-077).
 
-**SMS is capped to the nearest 10 per dispatch batch (ADR-059).** `markSmsEligibility`
-(`fan-out.application.ts`) sorts the combined nearby-rider + service-provider candidate pool by
-`distanceMeters` and marks only the closest `SOS_SMS_RECIPIENT_LIMIT` (10) recipients
-`smsEligible`; the rest still get in-app push, WhatsApp, and email — only the SMS leg is skipped
-for them. Applied independently at each dispatch call (`seedEscalation`'s tier-1 batch, and both
-of `tickEscalation`'s radius-widening/community-timeout batches) — a per-batch cap, not a
-lifetime-per-alert one.
+**SMS is verified, deduplicated, and capped at 10 per alert's WHOLE lifecycle — not per batch
+(ADR-059/085).** `markSmsEligibility` (`fan-out.application.ts`) sorts the combined nearby-rider +
+service-provider candidate pool by `distanceMeters`, and only counts a candidate toward the cap if
+it has a phone number that passes `isValidIndianMobile` and isn't a duplicate (by normalized
+number) of a closer candidate already counted — a malformed or repeated number never wastes a
+slot. `SOS_SMS_RECIPIENT_LIMIT` (10) is a **per-SOS** budget: `seedEscalation`'s tier-1 batch and
+both of `tickEscalation`'s radius-widening/community-timeout batches each ask
+`countSmsSelectedForAlert` (a count reconstructed from the existing `SOSTimelineEvent`
+`HELPER_OFFERED` rows, no new table) how many candidates have *already* been selected for SMS
+across this alert's whole history, and only mark up to the *remaining* budget eligible — once 10
+have ever been selected, no later widening tick can select any more, even though fresh candidates
+keep entering the (uncapped) in-app/WhatsApp/email fan-out as the radius grows. The SMS channel is
+also the only one sent **sequentially** — `sendSosSmsSequentially` awaits each recipient's send
+fully before starting the next, nearest-first, so one recipient's failure never blocks or delays
+the rest; WhatsApp/email/in-app have no such requirement and stay fully parallel across recipients
+as before.
 
 ### 4b. Cron idempotency (ADR-052)
 

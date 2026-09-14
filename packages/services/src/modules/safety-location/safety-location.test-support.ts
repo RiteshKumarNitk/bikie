@@ -146,6 +146,7 @@ export function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partia
     sosTimeline: {
       record: vi.fn(async () => undefined),
       listForAlert: vi.fn(async () => []),
+      countSmsSelectedForAlert: vi.fn(async () => 0),
     },
     community: {
       findSharedGroupMemberIds: vi.fn(async () => new Set<string>()),

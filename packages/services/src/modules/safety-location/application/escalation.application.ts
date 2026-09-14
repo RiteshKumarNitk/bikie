@@ -1,10 +1,19 @@
 import { resolveChannelAvailability, type ChannelAvailability } from "../domain/channel-selection";
+import { maskPhone, toE164Phone } from "../../communications/domain/phone";
 import type { CommunicationsPorts } from "../../communications/public";
 import { partnerMatchesAlertType } from "../domain/partner-mapping";
 import { deriveSeverity } from "../domain/severity";
 import type { SOSRecipient } from "../domain/dispatch-message";
 import type { RawSOSAlertDTO, SafetyLocationPorts } from "../ports";
-import { dispatchToRecipient, emptySummary, markSmsEligibility, type SOSDispatchSummary } from "./fan-out.application";
+import {
+  dispatchToRecipient,
+  emptySummary,
+  logSmsDispatchStart,
+  markSmsEligibility,
+  sendSosSmsSequentially,
+  SOS_SMS_RECIPIENT_LIMIT,
+  type SOSDispatchSummary,
+} from "./fan-out.application";
 
 const INITIAL_RADIUS_METERS = 5000;
 const radiusStepMeters = () => Number(process.env.SOS_RADIUS_STEP_KM ?? "5") * 1000;
@@ -135,8 +144,59 @@ async function notifyRecipients(
   availability: ChannelAvailability,
 ): Promise<SOSDispatchSummary> {
   const summary = emptySummary(availability);
-  await Promise.all(recipients.map((r) => dispatchToRecipient(alert, r, summary, communications, ports, availability)));
+  // ADR-085 — SMS runs its own sequential (one-at-a-time) loop alongside, not inside, the
+  // parallel WhatsApp/email/in-app dispatch — see sendSosSmsSequentially's doc comment.
+  await Promise.all([
+    sendSosSmsSequentially(alert, recipients, communications, availability, summary),
+    Promise.all(recipients.map((r) => dispatchToRecipient(alert, r, summary, communications, ports, availability))),
+  ]);
   return summary;
+}
+
+/** ADR-085 — `SOS_SMS_RECIPIENT_LIMIT` is a budget for the alert's WHOLE lifecycle, not a
+ * per-batch allowance: once 10 candidates have been selected for SMS across seed + every later
+ * radius-widening tick, no further tick may select any more, even though brand-new candidates
+ * keep entering the in-app/WhatsApp/email fan-out as the radius widens. Returns how many MORE
+ * candidates this batch may mark `smsEligible`, floored at 0. */
+async function remainingSmsBudget(ports: SafetyLocationPorts, alertId: string): Promise<number> {
+  const alreadySelected = await ports.sosTimeline.countSmsSelectedForAlert(alertId);
+  return Math.max(0, SOS_SMS_RECIPIENT_LIMIT - alreadySelected);
+}
+
+/** A stable-enough key to count a candidate exactly once toward the per-SOS SMS budget: the
+ * recipient's own `userId` when they have an account, or their masked phone number for a
+ * phone-only recipient with none (e.g. a partner's secondary contact person) — never the raw
+ * number, matching this codebase's existing log-masking convention. `null` only when the
+ * recipient has neither (shouldn't happen for anyone `markSmsEligibility` ever marks eligible,
+ * which already requires a phone). */
+function candidateKey(r: SOSRecipient): string | null {
+  if (r.userId) return r.userId;
+  if (r.phone) return maskPhone(toE164Phone(r.phone));
+  return null;
+}
+
+/** Records one `HELPER_OFFERED` timeline event per dispatch candidate — every candidate the
+ * in-app/WhatsApp/email fan-out reached this batch, not only the SMS-eligible subset, matching
+ * the pre-ADR-085 behavior exactly. `metadata.sms` additionally marks which of them were
+ * selected for the SMS channel, which is what `countSmsSelectedForAlert` reads back to compute
+ * the next batch's remaining budget. */
+async function recordDispatchTimeline(
+  ports: SafetyLocationPorts,
+  alertId: string,
+  recipients: SOSRecipient[],
+  extraMetadata: Record<string, unknown>,
+): Promise<void> {
+  for (const r of recipients) {
+    const id = candidateKey(r);
+    if (!id) continue;
+    await ports.sosTimeline
+      .record({
+        alertId,
+        type: "HELPER_OFFERED",
+        metadata: { candidateId: id, role: r.role, sms: r.smsEligible === true, ...extraMetadata },
+      })
+      .catch(() => undefined);
+  }
 }
 
 export type EscalationDeps = { communications?: CommunicationsPorts };
@@ -181,17 +241,20 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
       communityIds.size > 0 ? "NEARBY_RIDERS_COMMUNITY" : "NEARBY_RIDERS_GENERAL";
     const ridersToNotify = tier === "NEARBY_RIDERS_COMMUNITY" ? nearby.filter((r) => r.userId && communityIds.has(r.userId)) : nearby;
     const timeoutMs = tier === "NEARBY_RIDERS_COMMUNITY" ? communityTierTimeoutMs() : tierTimeoutMs();
-    // ADR-059 — caps the DLT "BIKIE_SR" SMS to the nearest 10 combined riders+providers in this
-    // batch; in-app/WhatsApp/email still reach everyone in ridersToNotify/providers unchanged.
-    const toNotify = markSmsEligibility([...ridersToNotify, ...providers]);
+    // ADR-059/085 — caps the DLT "BIKIE_SR" SMS to the nearest candidates in this batch, bounded
+    // by whatever's left of the 10-per-SOS-lifetime budget (always 10 here, since this is the
+    // very first batch for a brand-new alert) — in-app/WhatsApp/email still reach everyone in
+    // ridersToNotify/providers unchanged, uncapped.
+    const smsCandidates = [...ridersToNotify, ...providers];
+    const budget = await remainingSmsBudget(ports, alert.id);
+    const toNotify = markSmsEligibility(smsCandidates, budget);
+    logSmsDispatchStart(alert.id, smsCandidates, toNotify);
 
     const summary = await notifyRecipients(alert, toNotify, ports, communications, availability);
     summary.nearbyRiders = ridersToNotify.length;
     summary.serviceProviders = providers.length;
 
-    for (const r of toNotify) {
-      if (r.userId) await ports.sosTimeline.record({ alertId: alert.id, type: "HELPER_OFFERED", metadata: { candidateId: r.userId, role: r.role, tier } }).catch(() => undefined);
-    }
+    await recordDispatchTimeline(ports, alert.id, toNotify, { tier });
 
     await ports.sosAlerts.updateEscalationState(alert.id, {
       escalationTier: tier,
@@ -233,8 +296,14 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
         resolveServiceProviders(alert, ports, INITIAL_RADIUS_METERS, alreadyNotified),
       ]);
       const freshRiders = nearby.filter((r) => !r.userId || !alreadyNotified.has(r.userId));
-      const fresh = markSmsEligibility([...freshRiders, ...providers]); // ADR-059
+      const freshCandidates = [...freshRiders, ...providers];
+      // ADR-085 — the SMS budget is per-SOS, not per-tick: only whatever's left of the 10 after
+      // seedEscalation (and any earlier tick) already spent some is available here.
+      const budget = await remainingSmsBudget(ports, alert.id);
+      const fresh = markSmsEligibility(freshCandidates, budget); // ADR-059
+      logSmsDispatchStart(alert.id, freshCandidates, fresh);
       const summary = await notifyRecipients(alert, fresh, ports, communications, availability);
+      await recordDispatchTimeline(ports, alert.id, fresh, { tier: "NEARBY_RIDERS_GENERAL" });
       await ports.sosTimeline.record({
         alertId: alert.id,
         type: "RADIUS_EXPANDED", // community-only pool -> full nearby pool; closest existing event type
@@ -264,9 +333,14 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
         resolveServiceProviders(alert, ports, widened, alreadyNotified),
       ]);
       const freshRiders = nearby.filter((r) => r.userId && !alreadyNotified.has(r.userId));
-      const fresh = markSmsEligibility([...freshRiders, ...providers]); // ADR-059
+      const freshCandidates = [...freshRiders, ...providers];
+      // ADR-085 — same per-SOS (not per-tick) SMS budget as the branch above.
+      const budget = await remainingSmsBudget(ports, alert.id);
+      const fresh = markSmsEligibility(freshCandidates, budget); // ADR-059
+      logSmsDispatchStart(alert.id, freshCandidates, fresh);
 
       const summary = await notifyRecipients(alert, fresh, ports, communications, availability);
+      await recordDispatchTimeline(ports, alert.id, fresh, { tier: "NEARBY_RIDERS_GENERAL" });
       await ports.sosTimeline.record({
         alertId: alert.id,
         type: "RADIUS_EXPANDED",

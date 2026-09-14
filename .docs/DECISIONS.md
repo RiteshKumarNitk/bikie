@@ -4204,3 +4204,148 @@ changes:
   unit test. The reported missing SMS needs the operator to check the production/dev deployment's
   `MSG91_SOS_HELP_TEMPLATE_ID` and server logs for the exact `[SMS][CONFIG]`/`[SMS][MSG91]`/
   `[SOS][DISPATCH][ERROR]` line for that alert.
+
+## ADR-084: Amber SOS SMS — verified/deduped nearest-10, structured per-recipient observability (no new architecture)
+
+- Context. Requested: when an Amber SOS is created, SMS the nearest eligible recipients
+  (Riders and/or Service Providers per existing rules), max 10, verified/deduplicated, one at a
+  time, a single failure never blocking the rest, reusing `MSG91_SOS_HELP_TEMPLATE_ID` (never the
+  deprecated `MSG91_TEMPLATE_ID`), immediately at creation (not waiting for acceptance), with
+  observability logging and duplicate-SMS protection on retry.
+- Finding — this already exists. Auditing `fan-out.application.ts`/`escalation.application.ts`
+  against every numbered requirement in the task found the dispatch-time SOS SMS architecture
+  (built across ADR-059/077/079/080, unmodified until this ADR) already implements almost all of
+  it: `markSmsEligibility` (`SOS_SMS_RECIPIENT_LIMIT = 10`, a server-only constant no client can
+  override) sorts the combined nearby-rider + eligible-Service-Provider pool by distance and caps
+  SMS eligibility to the nearest 10; `dispatchToRecipient` sends each recipient's SMS as an
+  independent `Promise` with its own `.then/.catch`, so one recipient's failure cannot abort or
+  block any other recipient's send (`Promise.all` over independently-caught tasks); the template
+  is exclusively `MSG91_SOS_HELP_TEMPLATE_ID` (`MSG91_TEMPLATE_ID` was already fully removed from
+  this path in ADR-077); the SMS fires inside `seedEscalation`/`tickEscalation`, i.e. at
+  dispatch/creation time, never gated on acceptance; the whole alert-creation dispatch (this SMS
+  batch included) is wrapped in an existing idempotency claim keyed `sos-dispatch:{alertId}`
+  (`dispatch.application.ts`), so an API/client retry of the same create-alert request replays the
+  cached summary rather than re-sending; and later radius-widening cron ticks already exclude
+  anyone already notified for that alert (`findNotifiedUserIdsForAlert`, backed by the
+  `SOSTimelineEvent` `HELPER_OFFERED` rows written for every dispatch candidate) before they ever
+  reach `markSmsEligibility` again, so a rider/provider is never re-SMS'd across ticks either.
+  Requester exclusion is already structural: `findNearbyAroundPoint`'s SQL takes the reporter's
+  own `userId` and excludes it (`rl."userId" != $excludeUserId`), and a Service Provider candidate
+  can never *be* the Rider reporter — `accountType` is mutually exclusive (ADR-053), so the two
+  pools can't overlap. No queue/job system exists for this flow (confirmed: SOS dispatch is
+  synchronous inside the HTTP request, `packages/services/src/modules/platform`'s job-queue port
+  defaults to in-process-sync, full async workers explicitly deferred per ADR-027/076 until
+  measured need) — none was introduced here, matching the task's own "don't add an unneeded queue
+  framework" instruction; the existing `Promise.all`-of-independently-caught-tasks pattern already
+  satisfies "one failure doesn't stop the rest" without one.
+- Decision — the two real gaps found and closed, both inside `markSmsEligibility`
+  (`fan-out.application.ts`), nothing else touched:
+  1. **Phone verification before capping.** Previously any candidate could occupy one of the 10
+     slots regardless of whether it had a usable phone number at all — a phone-less or malformed
+     (non-Indian-mobile-shaped) candidate that happened to sort closest wasted a slot a genuinely
+     reachable candidate #11 could have used, and MSG91 would reject it anyway. `markSmsEligibility`
+     now walks the distance-sorted list and only counts a candidate toward the limit if it has a
+     phone and that phone passes the existing `isValidIndianMobile` check (already used to gate
+     OTP send) — never a new validation rule.
+  2. **Phone-number deduplication.** A Service Provider's own registered number and their listed
+     contact-person's number can coincide; nothing previously prevented both rows from separately
+     counting toward the cap (and, worse, both texting the same phone). Now deduplicated by
+     `toE164Phone`-normalized number — the closer-sorted occurrence wins the slot, the later
+     duplicate is never `smsEligible`.
+  Both changes only affect the SMS channel's eligibility flag (`smsEligible`) — in-app/WhatsApp/
+  email dispatch, the Requests-tab/notification data path, and every severity/eligibility rule
+  (RED excludes Service Providers, Amber includes them) are completely unchanged.
+- Observability (additive). New `logSmsDispatchStart(alertId, candidates, selected)` — one
+  `SOS_SMS_DISPATCH_START sosId=… candidateCount=… selectedCount=…` line per dispatch batch
+  (`seedEscalation`'s tier-1 batch and both of `tickEscalation`'s radius-widening/community-timeout
+  batches), plus per-recipient `SOS_SMS_SENT sosId=… recipientUserId=… status=SUCCESS` /
+  `SOS_SMS_FAILED sosId=… recipientUserId=… status=FAILED reason=…` lines inside
+  `dispatchToRecipient`'s SMS branch — alongside, not replacing, the existing `[SOS][DISPATCH][*]`/
+  `[SMS][*]` log lines. Never logs a raw phone number (only the recipient's internal `userId`,
+  already logged elsewhere in this codebase) or any credential.
+- What was explicitly NOT changed, on request. RED/Emergency alerts already receive this same
+  SMS treatment for their Rider candidate pool (SMS to nearby riders isn't Amber-specific — it's
+  the existing, documented behavior for every `NEARBY_RIDER`/`SERVICE_PROVIDER` candidate
+  regardless of severity; only Service-Provider *dispatch itself* is excluded for RED, unchanged,
+  per ADR-064) — removing rider SMS for RED would be an unrequested regression to working,
+  documented behavior, so it was left alone and is called out here rather than silently altered.
+  The accept/connection lifecycle, the offer/accept atomic claim, and the fact that no
+  "on-accept" SMS exists (ADR-083) are all untouched. No new DLT template, no hardcoded sender
+  id/auth key/template id — `MSG91_SOS_HELP_TEMPLATE_ID` remains the sole source, read from
+  `process.env` exactly as before.
+- Consequences. `tsc --noEmit` clean on `@bikie/services`. `vitest` 280→284 (existing
+  `markSmsEligibility` fixtures updated to carry phone numbers, since a phone is now required to
+  be `smsEligible`; 4 new tests: phone-less never eligible, invalid-phone never eligible + slot
+  not wasted, phone-number dedup, and a 40-candidate stress case confirming the cap holds at
+  exactly 10 with no client-facing override). No schema change, no new table, no queue
+  introduced, no behavior change to who gets dispatched or notified in-app — only which SMS
+  candidates are verified before counting toward the existing 10-recipient cap.
+
+## ADR-085: SOS SMS sent one recipient at a time; the 10-recipient cap is per-alert, not per-batch
+
+- Context. Two semantics from ADR-084 needed correcting against an explicit product requirement:
+  (1) SMS sends across recipients ran in parallel (`Promise.all` over independently-caught
+  per-recipient tasks) — the product rule is a literal sequential loop, recipient N's send fully
+  completing before recipient N+1's begins; (2) `SOS_SMS_RECIPIENT_LIMIT` (10) was enforced **per
+  dispatch batch** — `seedEscalation`'s tier-1 round could select up to 10, and each later
+  `tickEscalation` radius-widening tick could select up to 10 *more*, newly-in-range candidates,
+  for a possible 20-30 SMS across one alert's lifetime. The product rule is a hard 10 **per SOS**,
+  for its whole lifecycle.
+- Decision — sequential sending. New `sendSosSmsSequentially(alert, recipients, communications,
+  availability, summary)` (`fan-out.application.ts`) replaces the SMS branch that used to live
+  inside `dispatchToRecipient`'s per-recipient `Promise.all` fan-out. It filters to
+  `smsEligible !== false` (the same gate the old inline branch used — `true`, or unset for a
+  non-capped recipient like an emergency contact, both still eligible), sorts nearest-first, and
+  runs a plain `for...of` loop with `await` inside — the next recipient's send provably cannot
+  start before the previous one's `communications.sms.send(...)` call has resolved or rejected.
+  Each iteration is wrapped in its own try/catch so one recipient's failure — thrown or returned
+  as `{ok:false}` — is recorded and the loop moves on, never aborting the batch.
+  `dispatchToRecipient` no longer touches the SMS channel at all; it keeps WhatsApp/email/in-app,
+  which have no "one at a time" requirement and stay fully parallel. All three call sites that
+  used to invoke `dispatchToRecipient` alone (`fanOut`'s emergency-contacts leg, `notifyRecipients`
+  in `escalation.application.ts`, and `dispatch.application.ts`'s zero-recipient admin-escalation
+  leg) now run `sendSosSmsSequentially` and the `Promise.all` of `dispatchToRecipient` calls
+  concurrently *with each other* — the SMS loop and the parallel non-SMS fan-out don't share a
+  channel, so there's no reason to make one wait for the other, only for SMS to serialize within
+  itself.
+- Decision — per-alert (not per-batch) budget. New `countSmsSelectedForAlert(alertId)`
+  (`sos-timeline.repository.ts`, exposed via the existing `SosTimelineRepositoryPort`) counts how
+  many *distinct* candidates have ever been marked `smsEligible` for this alert, by reading back
+  the `SOSTimelineEvent` `HELPER_OFFERED` rows every dispatch batch already writes per candidate —
+  no new table, no schema change. Each `HELPER_OFFERED` write now carries `metadata.sms:
+  boolean` (was `markSmsEligibility`'s result, previously discarded after the batch) and
+  `metadata.candidateId` (the candidate's `userId`, or a **masked** phone number — never raw —
+  for a phone-only recipient with no account, e.g. a partner's secondary contact person, so the
+  count still covers every SMS-eligible candidate even though not all of them have a `userId`).
+  `escalation.application.ts`'s new `remainingSmsBudget(ports, alertId)` computes
+  `max(0, SOS_SMS_RECIPIENT_LIMIT - countSmsSelectedForAlert(alertId))` and that value — not the
+  bare constant — is what's passed as `markSmsEligibility`'s `limit` at all three call sites
+  (`seedEscalation`, and both `tickEscalation` branches). Once the running total reaches 10,
+  `remainingSmsBudget` returns 0, `markSmsEligibility(candidates, 0)` marks nobody eligible (its
+  own loop's `eligible.size >= limit` check is true on the very first iteration), and a later
+  widening tick's brand-new, otherwise-eligible candidates still get in-app/WhatsApp/email —
+  simply never an SMS. `recordDispatchTimeline` (new, `escalation.application.ts`) replaced the
+  old `seedEscalation`-only per-candidate `HELPER_OFFERED` loop (guarded on `r.userId`, silently
+  skipping phone-only candidates) and was additionally wired into both `tickEscalation` branches,
+  which previously wrote only a single per-tick summary event (`RADIUS_EXPANDED`) with no
+  per-candidate record at all — needed for the running count to see every batch, not just the
+  first.
+- What is unchanged. Nearest-first ordering, `isValidIndianMobile` verification, normalized-phone
+  deduplication, and the never-a-fourth-template rule (ADR-084) are all still enforced inside
+  `markSmsEligibility` itself, untouched by this ADR. Requester exclusion, the RED/Emergency
+  severity gate (Service Providers still never dispatched at all for RED — `resolveServiceProviders`
+  is unmodified), the existing whole-alert-creation idempotency claim, and every non-SMS channel's
+  behavior are all unchanged. `MSG91_SOS_HELP_TEMPLATE_ID` remains the sole source of the DLT
+  template id, read exactly as before.
+- Consequences. `tsc --noEmit` clean on `@bikie/services`/`@bikie/database`. `vitest` 284→291 (7
+  new: strict-sequential-ordering via a concurrency counter, one-recipient-failure-doesn't-stop
+  the-rest for both a returned failure and a thrown error, 15-candidates→exactly-10-SMS and
+  5-candidates→exactly-5-SMS through `seedEscalation`, a later widening tick sending **zero**
+  more once the budget is already spent, and a later tick getting only the *remaining* budget
+  — 2, not a fresh 10 — when an earlier batch already spent 8). A real regression was caught and
+  fixed mid-change: `dispatch.application.ts`'s admin-escalation leg (the ADR-030 zero-recipient
+  fallback) called `dispatchToRecipient` directly, so removing SMS from that function without
+  also adding `sendSosSmsSequentially` there would have silently stopped admin escalation from
+  ever sending SMS — caught by two now-updated pre-existing tests failing, not missed silently.
+  No schema migration (the new `metadata` fields ride on the existing `Json` column), no queue,
+  no new DLT template.

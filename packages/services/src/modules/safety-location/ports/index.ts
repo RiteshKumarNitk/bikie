@@ -227,6 +227,12 @@ export interface SosTimelineRepositoryPort {
   listForAlert(alertId: string): Promise<
     Array<{ id: string; alertId: string; sessionId: string | null; type: string; actorId: string | null; actorName: string | null; createdAt: Date }>
   >;
+  /** ADR-085 — how many distinct candidates have EVER been selected for the SMS channel across
+   * this alert's whole lifecycle (seed + every later radius-widening tick), regardless of
+   * whether the send itself succeeded. `SOS_SMS_RECIPIENT_LIMIT` is a per-SOS budget, not a
+   * per-batch one — this is what lets the escalation loop compute the remaining budget before
+   * calling `markSmsEligibility` again, so one alert never sends more than the limit in total. */
+  countSmsSelectedForAlert(alertId: string): Promise<number>;
 }
 
 /** Community/club prioritization (ADR-033 Phase D hook — port fully implemented in Phase A). */

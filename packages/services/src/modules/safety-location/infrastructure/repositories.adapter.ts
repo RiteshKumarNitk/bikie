@@ -128,6 +128,7 @@ export function createSosTimelineRepositoryAdapter(): SosTimelineRepositoryPort 
           createdAt: r.createdAt,
         })),
       ),
+    countSmsSelectedForAlert: (alertId) => sosTimelineRepository.countSmsSelectedForAlert(alertId),
   };
 }
 

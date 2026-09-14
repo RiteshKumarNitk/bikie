@@ -1,5 +1,45 @@
 # Changelog
 
+## 2026-09-14 — SOS SMS now sends strictly one recipient at a time; the 10-recipient cap is per-alert, not per-batch (ADR-085)
+
+Corrected two semantics from the same-day ADR-084 work against explicit product requirements.
+SMS sends across recipients previously ran in parallel — now a plain sequential loop
+(`sendSosSmsSequentially`) awaits each recipient's send fully before starting the next,
+nearest-first, with each recipient's failure independently caught so it never blocks or delays
+the rest. Separately, the 10-recipient SMS cap was being enforced per dispatch batch — an
+alert's first round could select 10, and each later radius-widening tick could select 10 *more*
+newly-in-range candidates, for up to 20-30 SMS across one alert's life. It's now a hard 10 for
+the alert's entire lifecycle: a new `countSmsSelectedForAlert` (reusing the existing
+`SOSTimelineEvent` rows, no schema change) tracks how many candidates have ever been selected,
+and each batch is only allowed to select whatever's left of the budget — once 10 is reached, a
+later tick's fresh candidates still get in-app/WhatsApp/email, just never an SMS. Caught and
+fixed a real regression along the way: the admin-escalation zero-recipient fallback called the
+SMS-sending function directly and would have silently lost its own SMS behavior — two
+pre-existing tests failing surfaced it immediately. Nearest-first ordering, phone verification/
+dedup, RED severity exclusion, requester exclusion, and the single `MSG91_SOS_HELP_TEMPLATE_ID`
+template are all unchanged. `vitest` 284→291, `tsc` clean, no schema migration, no queue. See
+ADR-085.
+
+## 2026-09-14 — Amber SOS SMS: verified/deduped nearest-10 recipients, structured observability (ADR-084)
+
+Audited the request for "SMS the nearest eligible Amber SOS recipients, max 10, verified,
+deduplicated, one at a time, one failure doesn't block the rest, at creation not on acceptance"
+against the existing dispatch code — nearly all of it already exists (built across
+ADR-059/077/079/080): the nearest-10 cap, per-recipient independent send/failure handling, the
+correct `MSG91_SOS_HELP_TEMPLATE_ID` template, dispatch-time (not accept-time) firing, and
+retry-safe idempotency (a whole-alert-creation retry replays the cached dispatch summary; a
+cron radius-widening tick already excludes anyone previously notified for that alert). Two real
+gaps closed, both inside `markSmsEligibility`: a phone-less or malformed-number candidate could
+previously occupy one of the 10 slots and waste it (now filtered via the existing
+`isValidIndianMobile` check before capping); and a Service Provider's own number coinciding with
+their listed contact-person's number could count twice toward the cap (now deduplicated by
+normalized phone, closer occurrence wins). Added structured, secret-free observability logs
+(`SOS_SMS_DISPATCH_START`/`SOS_SMS_SENT`/`SOS_SMS_FAILED`) alongside the existing log lines.
+Explicitly not changed: RED alerts already get this same rider SMS treatment (unrelated to
+Service-Provider exclusion, which is untouched) — reported, not silently "fixed" into a
+regression. No queue introduced (none exists or is warranted for this flow); no new DLT
+template; no schema change. `vitest` 280→284, `tsc` clean. See ADR-084.
+
 ## 2026-09-14 — Fixed: mobile Service Provider "Requests" tab never showed eligible Amber SOS requests (ADR-083)
 
 Root-caused a report that an Amber/Assistance SOS reached the recipient's notifications but never
