@@ -4009,3 +4009,37 @@ changes:
   final report's exact command) and re-test one SOS alert — the masked `[SMS][MSG91] Accepted …
   reqId=…` / `[SMS][CONFIG] … not set` / classified-failure log lines now pinpoint which stage
   failed without needing to read a raw phone number out of the log.
+
+## ADR-081: Cap Upstash Redis retries/timeout — sign-out (and rate-limiting) was hanging 20-30s
+
+- **Context.** Sign-out was taking 20-30+ seconds on both web and mobile, despite both platforms'
+  client-side sign-out code doing nothing more than one `await authClient.signOut()` /
+  `POST /api/auth/sign-out` with no other awaited work in the critical path (mobile's push-token
+  unregister is already `unawaited`, per ADR from the mobile Delete-Account work). The delay was
+  inside Better Auth's own library internals, invisible to a grep of app code: its stock
+  `/api/auth/sign-out` handler calls `internalAdapter.deleteSession(token)`, which — because
+  `packages/auth/src/server.ts` wires an Upstash Redis `secondaryStorage` for cross-instance rate
+  limiting (ADR-032/055) — issues **four sequential, un-parallelized** Redis calls (get session,
+  get the user's active-session list, update/delete that list, delete the token). `@upstash/redis`
+  (`^1.38.0`)'s default client retries any failing/slow call up to 5× with exponential backoff
+  (`Math.exp(retryCount) * 50`ms — roughly 11s of sleep alone before giving up on one call), and
+  the client was constructed with no request timeout at all, so a single slow/unreachable/
+  rate-limited Redis instance could stack across those 4 sequential calls into exactly the
+  reported 20-30s.
+- **Decision.** Construct the shared `Redis` client (`packages/auth/src/server.ts`'s `getRedis()`)
+  with `retry: { retries: 1, backoff: () => 150 }` and `signal: () => AbortSignal.timeout(2000)`.
+  Bounds every Redis call to ~2.15s worst case regardless of Redis's health, so a full outage now
+  costs ~4 × 2.15s ≈ 8.6s worst case for sign-out instead of 20-30s+, and costs nothing when Redis
+  is healthy (a normal Upstash REST round trip is tens of milliseconds). This client backs BOTH
+  session deletion and Better Auth's built-in rate limiter, so sign-in/sign-up throttling checks
+  get the same bound. Failing fast is strictly better here: Better Auth clears the session cookie
+  unconditionally regardless of whether the Redis-side delete succeeds, so a timed-out delete
+  doesn't leave the user still "signed in" — it's already best-effort bookkeeping.
+- **What is unchanged.** No change to sign-out's actual behavior/response shape, no schema
+  change, no change to rate-limit thresholds, no change to `RealtimeService`'s separate Redis
+  client (chat/notifications — not on the sign-out path, out of scope here).
+- **Consequences.** `tsc --noEmit` clean on `@bikie/auth` and `web`; `vitest` unaffected (280/280,
+  no test exercised this Redis config). Confirming the actual production Upstash instance's
+  health (dashboard error/latency metrics, plan limits, region, credential validity) is still
+  worth doing — this change bounds the damage from an unhealthy instance, it doesn't fix an
+  unhealthy instance.

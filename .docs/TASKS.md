@@ -2,6 +2,16 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Fix: sign-out taking 20-30 seconds (2026-09-14, ADR-081)
+
+| Task | Status |
+|---|---|
+| Traced both platforms' sign-out to a single shared root cause: neither client does anything beyond `POST /api/auth/sign-out`; the delay is inside Better Auth's stock handler, which deletes the session via 4 sequential Upstash Redis calls (`secondaryStorage`, wired for cross-instance rate limiting). No custom hooks/overrides in `packages/auth/src/server.ts`; `refreshCachedUserSessions`/`RealtimeService` not on this path; mobile push-unregister already `unawaited`; ruled out `fetchWithTimeout`, `PROVIDER_HTTP_TIMEOUT_MS`, and any artificial delay. | Completed |
+| Confirmed against installed `@upstash/redis@1.38.0` source: default 5 retries, `Math.exp(retryCount)*50`ms backoff (~11s of sleep alone before one call gives up), no request timeout — 4 sequential calls against one unhealthy/rate-limited/unreachable Redis instance is sufficient to produce the reported 20-30s. | Completed |
+| Fix — `getRedis()` in `packages/auth/src/server.ts` now constructs the shared `Redis` client with `retry: { retries: 1, backoff: () => 150 }` and `signal: () => AbortSignal.timeout(2000)`. Bounds a full Redis outage to ~4 × ~2.15s ≈ 8.6s instead of 20-30s+; zero added latency when Redis is healthy. Also bounds Better Auth's built-in rate-limiter, which shares this client. | Completed |
+| Verify: `tsc --noEmit` clean on `@bikie/auth` and `web`; `vitest` 280/280 (no test exercised this config, none broken) | Completed |
+| Follow-up (operator): check the Upstash dashboard for the actual production instance's error/latency/rate-limit metrics around a slow sign-out — this change bounds the damage, it doesn't diagnose *why* that Redis instance was unhealthy (plan limits, region, stale credentials, network) | Backlog |
+
 ## Production SMS bugs — SOS recipient-phone gap, SP membership SMS wiring, log masking (2026-09-12, ADR-080)
 
 | Task | Status |

@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-14 — Fixed: sign-out taking 20-30 seconds (ADR-081)
+
+Sign-out on both web and mobile was hanging 20-30+ seconds even though neither client does
+anything but one `POST /api/auth/sign-out`. The delay was inside Better Auth's own sign-out
+handler: it deletes the session via 4 sequential, un-parallelized Upstash Redis calls (Redis is
+wired in as `secondaryStorage` for cross-instance rate limiting), and the `@upstash/redis` client
+was retrying any slow/failing call up to 5× with exponential backoff (~11s of sleep alone per
+call) with no request timeout at all — so one unhealthy Redis round could stack across those 4
+calls into exactly the reported 20-30s. Fixed by capping the shared Redis client to 1 retry and a
+hard 2s per-request timeout (`packages/auth/src/server.ts`), bounding a full Redis outage to
+~8-9s worst case instead of 20-30s+, at zero cost when Redis is healthy — session deletion is
+already best-effort (the cookie clears either way). Also bounds Better Auth's rate-limiter calls,
+which share the same client. No behavior/schema change. `tsc` clean, `vitest` 280/280. See
+ADR-081.
+
 ## 2026-09-12 — Fixed: SOS SMS silently skipped for recipients with an unsynced phone; Service Provider membership SMS wired to its own template; phone numbers masked in logs (ADR-080)
 
 Root cause of "SOS SMS never arrives": SOS recipient resolution (`findNearbyAroundPoint` for

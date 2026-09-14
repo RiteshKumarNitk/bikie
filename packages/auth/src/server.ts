@@ -12,6 +12,17 @@ import { getIdentityAccessModule, isValidIndianMobile } from "@bikie/services";
 // gives Better Auth's built-in rate limiter (see getDefaultSpecialRules: sign-in/sign-up
 // already capped at 3 requests / 10s by the library itself) a durable, cross-instance store
 // via the `secondaryStorage` hook instead of hand-rolling auth throttling.
+// ADR-081 — sign-out (and every other secondaryStorage call: rate-limit increments, session
+// deletion) was observed taking 20-30s. Root cause: `@upstash/redis`'s default client retries a
+// failing/slow call up to 5x with exponential backoff (~50ms * e^n, ~11s of sleep alone before
+// giving up), and Better Auth's `deleteSession` makes 4 of these calls SEQUENTIALLY per sign-out
+// — a single unhealthy/rate-limited/unreachable Redis instance is enough to stack that into
+// 20-30s+. Capping retries to 1 and bounding each request with a hard 2s abort timeout turns a
+// Redis outage into a ~4s worst case instead of ~30s, at zero cost when Redis is healthy (a
+// normal Upstash REST round trip is tens of milliseconds). Session deletion and rate-limiting
+// are both best-effort against this store already — Better Auth clears the session cookie
+// regardless of whether the Redis delete succeeds — so failing fast here is strictly better than
+// hanging the request.
 let redisClient: Redis | null | undefined;
 function getRedis(): Redis | null {
   if (redisClient !== undefined) return redisClient;
@@ -21,7 +32,12 @@ function getRedis(): Redis | null {
     redisClient = null;
     return redisClient;
   }
-  redisClient = new Redis({ url, token });
+  redisClient = new Redis({
+    url,
+    token,
+    retry: { retries: 1, backoff: () => 150 },
+    signal: () => AbortSignal.timeout(2000),
+  });
   return redisClient;
 }
 

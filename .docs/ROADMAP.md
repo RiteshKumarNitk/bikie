@@ -1,5 +1,16 @@
 # BIKIE — Roadmap
 
+## Fixed: Sign-Out Taking 20-30 Seconds (2026-09-14, ADR-081)
+Traced both web's and mobile's sign-out — each just one `POST /api/auth/sign-out` — to Better
+Auth's own stock handler, which deletes the session via 4 sequential Upstash Redis calls
+(secondaryStorage, used for cross-instance rate limiting). The `@upstash/redis` client retried
+any slow/failing call up to 5x with exponential backoff and no request timeout, so one unhealthy
+Redis round could stack across those calls into exactly the reported 20-30s. Capped the shared
+client to 1 retry + a 2s hard timeout per request, bounding a full Redis outage to ~8-9s instead
+of 20-30s+, with zero cost when Redis is healthy — session deletion is already best-effort, since
+Better Auth clears the cookie regardless of whether the Redis-side delete succeeds. Also bounds
+the rate-limiter, which shares this client. No behavior or schema change. See ADR-081.
+
 ## Production SMS Bugs Fixed: SOS Recipient-Phone Gap, SP Membership SMS, Log Masking (2026-09-12, ADR-080)
 Two production SMS failures traced end-to-end. SOS/Amber SMS wasn't reaching eligible recipients
 because both nearby-rider and nearby-Service-Provider recipient queries read only the secondary

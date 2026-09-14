@@ -1,5 +1,16 @@
 # BIKIE Changelog
 
+## 2026-09-14 — Fixed: sign-out taking 20-30 seconds (ADR-081)
+
+Both platforms' sign-out is just one `POST /api/auth/sign-out`; the hang was inside Better Auth's
+own handler, which deletes the session via 4 sequential Upstash Redis calls (Redis backs
+`secondaryStorage` for cross-instance rate limiting). The `@upstash/redis` client retried any
+slow/failing call up to 5× with exponential backoff and no request timeout, so one unhealthy
+Redis round could stack across those calls into 20-30s. Capped the shared client
+(`packages/auth/src/server.ts`) to 1 retry + a 2s hard timeout per request — bounds a full outage
+to ~8-9s instead of 20-30s+, zero cost when Redis is healthy. Also bounds the rate-limiter, which
+shares the client. No behavior/schema change. `tsc` clean, `vitest` 280/280. See ADR-081.
+
 ## 2026-09-12 — Fixed: SOS SMS recipient-phone gap; SP membership SMS wired; logs masked (ADR-080)
 
 Root cause of SOS SMS never reaching eligible recipients: `findNearbyAroundPoint` (nearby riders)
