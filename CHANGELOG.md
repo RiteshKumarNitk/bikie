@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-09-14 — Membership confirmation SMS audit: code confirmed correct, structured observability added (ADR-086)
+
+Audited a production report that a membership payment succeeds and activates but no confirmation
+SMS arrives — traced both the Rider and Service Provider flows end to end against the actual code
+(purchase route → signature verification → `purchaseMembership` → membership + invoice creation →
+`SMSService` → `sms.adapter.ts` → MSG91 → `confirmationSmsSentAt`) and found every layer already
+correct and already test-covered: SMS fires only after verified payment + activation + invoice,
+fire-and-forget so a delivery failure never rolls back the purchase, the recipient number is
+always the authoritative `user.phoneNumber` (never the stale `phone` mirror), the Rider and
+Service Provider paths use their own separate templates with no cross-fallback, and
+`confirmationSmsSentAt` is stamped only on a non-failing send with replay protection against
+duplicate SMS. No code defect found, so none was invented — added the requested structured,
+secret-free observability instead: `MEMBERSHIP_SMS_DISPATCH_START` /
+`MEMBERSHIP_SMS_GATEWAY_ACCEPTED` / `MEMBERSHIP_SMS_FAILED` / `MEMBERSHIP_SMS_UNCONFIGURED` /
+`MEMBERSHIP_SMS_ALREADY_SENT` / `MEMBERSHIP_SMS_SKIPPED`, each with userId/invoiceId/accountType/
+a masked phone/the template env var name/MSG91's request id — the concrete tool to pinpoint the
+real production cause on the next purchase, which is necessarily a configuration/deployment gap
+(most likely: `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID` / `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID`+
+`_TEXT` unset in production — the exact gap already flagged as pending operator action after
+ADR-079/080; or stale deployed code; or an unapplied migration). `vitest` 291→295, `tsc` clean.
+See ADR-086.
+
 ## 2026-09-14 — SOS SMS now sends strictly one recipient at a time; the 10-recipient cap is per-alert, not per-batch (ADR-085)
 
 Corrected two semantics from the same-day ADR-084 work against explicit product requirements.

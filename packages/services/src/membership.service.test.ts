@@ -17,6 +17,7 @@ vi.mock("@bikie/database", () => ({
 
 vi.mock("./sms.service", () => ({
   SMSService: { sendMembershipSubscribed: vi.fn(async () => ({ ok: true, provider: "msg91" })) },
+  MSG91_SMS_TEMPLATE_ENV: { MEMBERSHIP_SUBSCRIBED: "MSG91_MEMBERSHIP_SUB_TEMPLATE_ID" },
 }));
 
 import { membershipRepository, billingRepository, userRepository } from "@bikie/database";
@@ -97,6 +98,49 @@ describe("MembershipService.purchaseMembership — activation + invoice + SMS (A
     expect(sms).toHaveBeenCalledTimes(1);
     expect(sms).toHaveBeenCalledWith("+919876543210", "Priya Verma", new Date(sampleMembership.endDate));
     expect(billing.markConfirmationSmsSent).toHaveBeenCalledWith("inv-1");
+  });
+
+  it("logs structured MEMBERSHIP_SMS_* lines with a masked phone — never the raw number (ADR-086)", async () => {
+    repo.createMembership.mockResolvedValueOnce(sampleMembership);
+    users.findById.mockResolvedValueOnce({ id: "user-1", name: "Priya Verma", phoneNumber: "+919876543210" });
+    sms.mockResolvedValueOnce({ ok: true, provider: "msg91", detail: "req-abc-123" });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await MembershipService.purchaseMembership("user-1", "plan-1", "pay_abc", "order_abc");
+    await flush();
+
+    const lines = log.mock.calls.map((c) => String(c[0]));
+    expect(lines.some((l) => l.startsWith("MEMBERSHIP_SMS_DISPATCH_START") && l.includes("accountType=RIDER"))).toBe(true);
+    expect(lines.some((l) => l.startsWith("MEMBERSHIP_SMS_GATEWAY_ACCEPTED") && l.includes("msg91ReqId=req-abc-123"))).toBe(true);
+    // Every logged line carries the masked form (asterisks + last 4 digits), never the raw
+    // 10-digit number unmasked anywhere.
+    expect(lines.some((l) => l.includes("9876543210"))).toBe(false);
+    expect(lines.some((l) => /phone=\+\*+3210/.test(l))).toBe(true);
+    log.mockRestore();
+  });
+
+  it("logs MEMBERSHIP_SMS_UNCONFIGURED (not an error) when the template id is unset, and MEMBERSHIP_SMS_FAILED (an error) for a genuine send failure", async () => {
+    repo.createMembership.mockResolvedValueOnce(sampleMembership);
+    users.findById.mockResolvedValue({ id: "user-1", name: "Priya", phoneNumber: "+919876543210" });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    sms.mockResolvedValueOnce({ ok: false, provider: "unconfigured", error: "MSG91_MEMBERSHIP_SUB_TEMPLATE_ID not configured" });
+    await MembershipService.purchaseMembership("user-1", "plan-1", "pay_a");
+    await flush();
+    expect(log.mock.calls.some((c) => String(c[0]).startsWith("MEMBERSHIP_SMS_UNCONFIGURED"))).toBe(true);
+    expect(err).not.toHaveBeenCalled();
+
+    log.mockClear();
+    repo.createMembership.mockResolvedValueOnce(sampleMembership);
+    billing.createInvoice.mockResolvedValueOnce({ id: "inv-2", confirmationSmsSentAt: null });
+    sms.mockResolvedValueOnce({ ok: false, provider: "msg91", error: "DLT rejected" });
+    await MembershipService.purchaseMembership("user-1", "plan-1", "pay_b");
+    await flush();
+    expect(err.mock.calls.some((c) => String(c[0]).startsWith("MEMBERSHIP_SMS_FAILED"))).toBe(true);
+
+    log.mockRestore();
+    err.mockRestore();
   });
 
   it("stores a DUMMY dev-mode paymentId as paymentId only, never as razorpayPaymentId", async () => {

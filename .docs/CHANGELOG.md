@@ -1,5 +1,19 @@
 # BIKIE Changelog
 
+## 2026-09-14 — Membership confirmation SMS audit: code confirmed correct, structured observability added (ADR-086)
+
+Audited a "payment succeeds, no confirmation SMS" production report end to end for both Rider and
+Service Provider flows. Found every layer already correct and already test-covered — verified
+payment before activation, fire-and-forget SMS that never rolls back the purchase, authoritative
+`phoneNumber` (never the stale `phone` mirror), no cross-template fallback between account types,
+`confirmationSmsSentAt` stamped only on success with replay protection. No code bug found or
+invented — added the requested structured logs instead (`MEMBERSHIP_SMS_DISPATCH_START`/
+`GATEWAY_ACCEPTED`/`FAILED`/`UNCONFIGURED`/`ALREADY_SENT`/`SKIPPED`, masked phone, no secrets) so
+the operator can pinpoint the real cause next purchase — most likely a missing
+`MSG91_MEMBERSHIP_SUB_TEMPLATE_ID`/`MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID`+`_TEXT` in
+production, stale deployed code, or an unapplied migration. `vitest` 291→295, `tsc` clean. See
+ADR-086.
+
 ## 2026-09-14 — SOS SMS: strictly sequential sends; 10-recipient cap is per-alert not per-batch (ADR-085)
 
 Corrected two ADR-084 semantics against explicit requirements. SMS sends now run one recipient

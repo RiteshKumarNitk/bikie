@@ -4349,3 +4349,100 @@ changes:
   ever sending SMS — caught by two now-updated pre-existing tests failing, not missed silently.
   No schema migration (the new `metadata` fields ride on the existing `Json` column), no queue,
   no new DLT template.
+
+## ADR-086: Membership confirmation SMS audit — code confirmed correct end to end; added structured MEMBERSHIP_SMS_* observability
+
+- Context. A production report: a membership payment succeeds and the membership activates, but
+  the confirmation SMS never arrives. Audited the complete Rider and Service Provider flows
+  against the actual code (not documentation) end to end: purchase route → signature verification
+  → `purchaseMembership` → `UserMembership`/`PartnerMembership` creation → `MembershipInvoice`
+  creation → `SMSService.sendMembershipSubscribed`/`sendPartnerMembershipSubscribed` →
+  `sms.adapter.ts` → MSG91 → `confirmationSmsSentAt`.
+- Finding — every layer traced is already correct, confirmed by both code inspection and the
+  pre-existing test suite (which already covers nearly every case this audit's own task list
+  asked for):
+  - `POST /api/membership/purchase` / `POST /api/partner-membership/purchase`
+    (`apps/web/app/api/**`) verify the Razorpay HMAC signature server-side *before* calling
+    `purchaseMembership` at all — a client's claimed "payment succeeded" is never trusted alone.
+  - `MembershipService.purchaseMembership`/`PartnerMembershipService.purchaseMembership` fire the
+    confirmation SMS only after the membership row **and** the `MembershipInvoice` are both
+    successfully created, fire-and-forget (`.then/.catch`, never `await`ed into the response) so a
+    delivery failure can never fail or roll back an already-successful purchase.
+  - The recipient number is `user.phoneNumber` (Better Auth's authoritative phone-plugin field,
+    set at every OTP verification) — never the secondary, not-always-synced `user.phone` mirror
+    (the exact bug class ADR-080 already fixed for SOS dispatch; this path was never affected by
+    it, since it always read `phoneNumber`).
+  - `SMSService.sendMembershipSubscribed` resolves `MSG91_MEMBERSHIP_SUB_TEMPLATE_ID`;
+    `sendPartnerMembershipSubscribed` resolves `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID` **and**
+    `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT` — neither ever falls back to the other's template
+    (confirmed: the SP path has its own dedicated test asserting the Rider sender is never
+    called). A missing template id/text returns `{ok:false, provider:"unconfigured"}` without
+    calling MSG91 at all — logged once, not on every purchase attempt at error severity.
+  - `confirmationSmsSentAt` is stamped (`billingRepository.markConfirmationSmsSent`, an
+    `updateMany` guarded on `confirmationSmsSentAt: null` — idempotent) only on a non-failing
+    send; a failed or unconfigured send leaves it `null`. A replayed payment reference
+    (`findByPaymentReference`) returns the existing membership *before* the SMS block is ever
+    reached, so a genuine retry cannot double-send. **Known, already-documented limitation,
+    unchanged by this audit**: because the replay path returns early, there is currently no active
+    job that re-attempts a *previously failed* send on a later retry — the `confirmationSmsSentAt
+    IS NULL` marker exists for exactly that purpose (per ADR-070) but nothing currently consumes
+    it; a confirmation-SMS retry job remains a Milestone-4 backlog item, not a new bug.
+  - `sms.adapter.ts` masks the phone number in every log line, distinguishes MSG91 gateway
+    acceptance from actual handset delivery (there is no DLR ingestion, by design, unchanged), and
+    never logs `MSG91_AUTH_KEY` or any other credential.
+  - Given every one of these was already correct and already test-covered, **no code bug was
+    found** — per the task's own instruction not to make changes when the code is already
+    correct, none of the above was altered.
+- Decision — the one legitimate gap: observability. There was no way to trace *this specific
+  purchase's* SMS outcome from server logs using one grep-able identifier — the existing log
+  lines were prefixed `[MembershipService][purchaseMembership]`/
+  `[PartnerMembershipService][purchaseMembership]` with no structured fields. Added the requested
+  structured lines to both `membership.service.ts` and `partner-membership.service.ts`:
+  `MEMBERSHIP_SMS_DISPATCH_START`, `MEMBERSHIP_SMS_GATEWAY_ACCEPTED`, `MEMBERSHIP_SMS_FAILED`,
+  `MEMBERSHIP_SMS_UNCONFIGURED`, `MEMBERSHIP_SMS_ALREADY_SENT`, `MEMBERSHIP_SMS_SKIPPED` (no phone
+  on file) — each carrying `userId`, `invoiceId`, `membershipId` (on dispatch-start),
+  `accountType`, a **masked** phone (`maskPhone`, never the raw number), the template **env var
+  name** (never MSG91's numeric template id, kept as an extra margin of caution even though a DLT
+  template id isn't itself a credential), and MSG91's request id (`msg91ReqId`) when accepted.
+  `UNCONFIGURED` logs at `console.log`, not `console.error` — matching the SP path's pre-existing,
+  intentional behavior (the underlying `resolveSmsTemplateId`/`sendPartnerMembershipSubscribed`
+  already log the missing-var error once; re-logging it at error severity on every single purchase
+  attempt until the operator configures it would be noise, not a real, actionable, new failure).
+- Root cause of the reported production symptom — cannot be a code defect given the above, so it
+  is necessarily one of the categories the task itself listed, verifiable only against the actual
+  production server (not reproducible or checkable from this environment):
+  1. **`MSG91_MEMBERSHIP_SUB_TEMPLATE_ID` (Rider) and/or `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID`
+     + `MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_TEXT` (Service Provider) unset in the production
+     `apps/.env`** — the single most likely cause, and the exact gap ADR-079/080 already flagged
+     as "Pending (operator)" in `.docs/TASKS.md` before this audit. The code's own behavior in
+     this state (refuse cleanly, log `MEMBERSHIP_SMS_UNCONFIGURED`, leave
+     `confirmationSmsSentAt` null) is indistinguishable from "SMS silently didn't arrive" to an
+     end user, which matches the report exactly.
+  2. **The production `web` container is running code older than ADR-058/070/077/080** (i.e., a
+     `git pull` + `docker compose build web && docker compose up -d --no-deps web` was never run
+     after those commits landed) — would also produce "membership activates, no SMS," with no
+     error at all if the deployed code predates the SMS wiring entirely.
+  3. **The `MembershipInvoice`/idempotency migrations were never applied to the production
+     database** — `20260830100000_membership_payment_idempotency` and
+     `20260830120000_membership_invoice` both exist in this repo (confirmed on disk) and
+     `docker/entrypoint.sh` already runs `prisma migrate deploy` on every container boot, so this
+     self-heals on the *next* deploy — but if the container has been running continuously since
+     before that migration was added and hasn't been redeployed, `MembershipInvoice` creation
+     itself would throw (`P2021` — table doesn't exist), which would abort `purchaseMembership`
+     **before** the SMS block ever runs (a 500, not a silent SMS gap — a different, louder
+     symptom, but still a real config-drift possibility to rule out).
+  None of these can be confirmed or ruled out from this environment — they require reading the
+  actual production server's env/deployed git SHA/`prisma migrate status`, none of which this
+  environment has access to.
+- Tests. 4 new: masked-phone structured-log assertions for both the Rider and Service Provider
+  paths (dispatch-start + gateway-accepted lines present, the raw 10-digit number never appears
+  in any logged line, the masked form does), and `UNCONFIGURED` logging at `console.log` (not
+  `console.error`) for both paths, confirming no new error-level noise for an already-known
+  configuration gap. `vitest` 291→295, `tsc --noEmit` clean on `@bikie/services`.
+- Consequences. No schema change, no route change, no change to when/how SMS is triggered, no
+  change to the fire-and-forget/idempotency/phone-source logic — everything there was already
+  correct. The new structured logs are the concrete tool for the operator to actually pinpoint
+  which of the three categories above is the real cause on their next purchase attempt: a
+  `MEMBERSHIP_SMS_UNCONFIGURED` line names the exact missing env var; a `MEMBERSHIP_SMS_FAILED`
+  line names MSG91's rejection reason; the complete absence of any `MEMBERSHIP_SMS_*` line at all
+  for a purchase that definitely completed points at stale deployed code instead.

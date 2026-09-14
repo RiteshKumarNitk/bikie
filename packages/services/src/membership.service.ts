@@ -1,6 +1,7 @@
 import { billingRepository, membershipRepository, userRepository } from "@bikie/database";
 import type { MembershipPlanDTO, UserMembershipDTO } from "@bikie/types";
-import { SMSService } from "./sms.service";
+import { maskPhone } from "./modules/communications/domain/phone";
+import { MSG91_SMS_TEMPLATE_ENV, SMSService } from "./sms.service";
 import { isRealRazorpayPaymentId } from "./billing.internal";
 
 /** ADR-069 — discriminated result (mirrors `BookingService.create`'s shape): `ALREADY_ACTIVE`
@@ -73,27 +74,59 @@ export const MembershipService = {
       paidAt: new Date(),
     });
 
-    // ADR-058/070 — the "BIKIE_Sub" DLT confirmation SMS: fired only here (after activation AND
-    // the invoice), Rider-only, exactly once per activated membership. Fire-and-forget — a
+    // ADR-058/070/086 — the "BIKIE_Sub" DLT confirmation SMS: fired only here (after activation
+    // AND the invoice), Rider-only, exactly once per activated membership. Fire-and-forget — a
     // delivery failure must never fail or roll back the purchase; `confirmationSmsSentAt` is
     // only stamped on a non-failing send, leaving a failed one visible for a later retry.
-    if (user?.phoneNumber && !invoice.confirmationSmsSentAt) {
+    const maskedPhone = maskPhone(user?.phoneNumber);
+    if (!user?.phoneNumber) {
+      console.log(
+        `MEMBERSHIP_SMS_SKIPPED userId=${userId} invoiceId=${invoice.id} accountType=RIDER reason=NO_PHONE_ON_FILE`,
+      );
+    } else if (invoice.confirmationSmsSentAt) {
+      console.log(
+        `MEMBERSHIP_SMS_ALREADY_SENT userId=${userId} invoiceId=${invoice.id} accountType=RIDER phone=${maskedPhone}`,
+      );
+    } else {
+      console.log(
+        `MEMBERSHIP_SMS_DISPATCH_START userId=${userId} invoiceId=${invoice.id} membershipId=${membership.id} ` +
+          `accountType=RIDER phone=${maskedPhone} template=${MSG91_SMS_TEMPLATE_ENV.MEMBERSHIP_SUBSCRIBED}`,
+      );
       SMSService.sendMembershipSubscribed(user.phoneNumber, user.name, new Date(membership.endDate))
         .then((res) => {
           if (res && res.ok === false) {
-            console.error("[MembershipService][purchaseMembership] SMS confirmation not accepted", res.error);
+            // "unconfigured" is already logged (at error level, naming the exact env var) by
+            // `resolveSmsTemplateId` inside SMSService itself — logging it again here at error
+            // level would double the noise on every single purchase until the operator sets the
+            // template id. A genuine send failure (MSG91 rejected it, network error, etc.) is a
+            // real error worth its own line.
+            if (res.provider === "unconfigured") {
+              console.log(
+                `MEMBERSHIP_SMS_UNCONFIGURED userId=${userId} invoiceId=${invoice.id} accountType=RIDER ` +
+                  `phone=${maskedPhone} template=${MSG91_SMS_TEMPLATE_ENV.MEMBERSHIP_SUBSCRIBED}`,
+              );
+            } else {
+              console.error(
+                `MEMBERSHIP_SMS_FAILED userId=${userId} invoiceId=${invoice.id} accountType=RIDER phone=${maskedPhone} ` +
+                  `template=${MSG91_SMS_TEMPLATE_ENV.MEMBERSHIP_SUBSCRIBED} reason=${(res.error ?? "unknown").slice(0, 200)}`,
+              );
+            }
             return;
           }
           // Gateway acceptance (see the SMS adapter's note) — `detail` is MSG91's request id for
           // a dashboard/DLR trace. Stamp `confirmationSmsSentAt` so it is never re-sent.
           console.log(
-            `[MembershipService][purchaseMembership] membership SMS accepted for invoice ${invoice.id}` +
-              `${res?.detail ? ` (MSG91 reqId=${res.detail})` : ""}`,
+            `MEMBERSHIP_SMS_GATEWAY_ACCEPTED userId=${userId} invoiceId=${invoice.id} accountType=RIDER ` +
+              `phone=${maskedPhone} template=${MSG91_SMS_TEMPLATE_ENV.MEMBERSHIP_SUBSCRIBED}` +
+              `${res?.detail ? ` msg91ReqId=${res.detail}` : ""}`,
           );
           return billingRepository.markConfirmationSmsSent(invoice.id);
         })
         .catch((err) =>
-          console.error("[MembershipService][purchaseMembership] SMS confirmation failed", err),
+          console.error(
+            `MEMBERSHIP_SMS_FAILED userId=${userId} invoiceId=${invoice.id} accountType=RIDER phone=${maskedPhone} ` +
+              `template=${MSG91_SMS_TEMPLATE_ENV.MEMBERSHIP_SUBSCRIBED} reason=${String(err).slice(0, 200)}`,
+          ),
         );
     }
 

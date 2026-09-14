@@ -22,6 +22,7 @@ vi.mock("./sms.service", () => ({
     sendMembershipSubscribed: vi.fn(),
     sendPartnerMembershipSubscribed: vi.fn(async () => ({ ok: false, provider: "unconfigured" })),
   },
+  MSG91_SMS_TEMPLATE_ENV: { PARTNER_MEMBERSHIP_SUBSCRIBED: "MSG91_PARTNER_MEMBERSHIP_SUB_TEMPLATE_ID" },
 }));
 
 import { partnerMembershipRepository, billingRepository } from "@bikie/database";
@@ -129,6 +130,41 @@ describe("PartnerMembershipService.purchaseMembership (ADR-069/070)", () => {
     await flush();
 
     expect(billing.markConfirmationSmsSent).toHaveBeenCalledWith("inv-1");
+  });
+
+  it("logs structured MEMBERSHIP_SMS_* lines for the SP path with a masked phone — never the raw number (ADR-086)", async () => {
+    repo.createMembership.mockResolvedValueOnce(membershipOn(paidPlan));
+    (SMSService.sendPartnerMembershipSubscribed as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+      ok: true,
+      provider: "msg91",
+      detail: "req-sp-1",
+    });
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+
+    await PartnerMembershipService.purchaseMembership("user-1", "sp-plan", "pay_x", "order_x");
+    await flush();
+
+    const lines = log.mock.calls.map((c) => String(c[0]));
+    expect(lines.some((l) => l.startsWith("MEMBERSHIP_SMS_DISPATCH_START") && l.includes("accountType=SERVICE_PROVIDER"))).toBe(true);
+    expect(lines.some((l) => l.startsWith("MEMBERSHIP_SMS_GATEWAY_ACCEPTED") && l.includes("msg91ReqId=req-sp-1"))).toBe(true);
+    expect(lines.some((l) => l.includes("9000000000"))).toBe(false);
+    expect(lines.some((l) => /phone=\+\*+0000/.test(l))).toBe(true);
+    log.mockRestore();
+  });
+
+  it("logs MEMBERSHIP_SMS_UNCONFIGURED (not an error) for the SP path when unconfigured", async () => {
+    repo.createMembership.mockResolvedValueOnce(membershipOn(paidPlan));
+    const log = vi.spyOn(console, "log").mockImplementation(() => {});
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Default mock already resolves { ok: false, provider: "unconfigured" }.
+    await PartnerMembershipService.purchaseMembership("user-1", "sp-plan", "pay_x", "order_x");
+    await flush();
+
+    expect(log.mock.calls.some((c) => String(c[0]).startsWith("MEMBERSHIP_SMS_UNCONFIGURED") && String(c[0]).includes("accountType=SERVICE_PROVIDER"))).toBe(true);
+    expect(err).not.toHaveBeenCalled();
+    log.mockRestore();
+    err.mockRestore();
   });
 
   it("does not re-send the SP confirmation SMS if the invoice already has confirmationSmsSentAt", async () => {
