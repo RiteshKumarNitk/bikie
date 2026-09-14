@@ -382,7 +382,11 @@ flowchart LR
   screens from the generic rider flow on both platforms, not a modification of it. Availability
   toggle, live stats, a distance-sorted eligible-requests list, and the same
   Accept/Decline/Waiting/Confirmed flow, built on the identical offer/accept/session backend the
-  rider flow uses. `PUT /api/partner/profile` additionally accepts `isGeneralResponder`.
+  rider flow uses. `PUT /api/partner/profile` additionally accepts `isGeneralResponder`. The
+  distance-sorted list on both platforms needs a GPS fix first — web auto-requests the browser's
+  geolocation on page load; mobile does the same on entering Home or Requests
+  (`partnerLocationBootstrapProvider`, ADR-083) rather than requiring a manual "share location"
+  tap, since the Partner tab set has no equivalent of the Rider SOS screen's location button.
 - **Nearby help** (`GET /api/places/nearby`, Google Places) is a separate, unrelated feature —
   petrol/mechanic/hospital lookup, not panic fan-out.
 - Profile **phone** + **emergency contacts** improve dispatch quality

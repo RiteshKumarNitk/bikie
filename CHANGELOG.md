@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-09-14 — Fixed: mobile Service Provider "Requests" tab never showed eligible Amber SOS requests (ADR-083)
+
+Root-caused a report that an Amber/Assistance SOS reached the recipient's notifications but never
+appeared in their Requests tab. The Requests tab (`PartnerRequestsScreen`, Service Provider
+accounts only) already correctly queried the real, persistent, database-backed
+`GET /api/partner/sos/nearby` — there was no fake/local list. The actual bug:
+`partnerNearbyRequestsProvider` returns an empty list whenever the app has no location on file,
+and the **only** place in the entire app that ever captured one was the Rider-only SOS screen's
+"Share my location" button — a screen a Service Provider account's tab set has no route to at
+all. Every Service Provider's Requests tab (and Home's "Nearby Requests" preview) was therefore
+permanently, silently empty, indistinguishable from a genuinely idle queue, regardless of how many
+real eligible alerts existed — confirmed mobile-only, since the web Partner SOS dashboard already
+auto-captures the browser's geolocation on page load. Fixed by porting that same auto-capture
+behavior to Flutter: a new `partnerLocationBootstrapProvider`, watched from Home and the Requests
+tab, that fetches GPS once automatically and writes it into the same shared location state the
+Rider button uses — plus a distinct "couldn't get your location" empty state so a genuine
+permission failure no longer looks identical to "no requests." Also investigated, and confirmed
+NOT a bug: the missing SMS. The SOS SMS architecture has exactly one SMS, sent at dispatch time
+(via `MSG91_SOS_HELP_TEMPLATE_ID`) — there is no separate "on accept" SMS anywhere in the
+codebase; that's a gap to scope as its own feature if wanted, not something to invent here. Accept
+atomicity, the Amber/Red severity split, and `accountType`-only routing were all confirmed already
+correct and untouched. `flutter test` 124→126, `flutter analyze` clean, no backend/schema change.
+See ADR-083.
+
 ## 2026-09-14 — Investigated mobile account-type routing report; fixed the real gap found (Service Provider membership plan never seeded in production); hardened mobile UserModel against a silent Rider fallback (ADR-082)
 
 Investigated a report that a mobile Service Provider account showed the Rider UI after

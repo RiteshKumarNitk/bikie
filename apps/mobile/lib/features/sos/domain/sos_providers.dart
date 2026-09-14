@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 
 import '../data/sos_model.dart';
 import '../data/sos_repository.dart';
@@ -9,7 +10,33 @@ import '../data/sos_repository.dart';
 /// client's location gate (`.docs/API.md`: non-admin callers get `400 LOCATION_REQUIRED`
 /// without `lat`/`lng`). Replaced a free-text city field: sender and viewer typing their city
 /// differently ("Jaipur" vs "jaipur") used to silently hide otherwise-nearby alerts.
+///
+/// Shared with the Partner dashboard (`partnerLocationProvider` in
+/// `partner_dashboard_providers.dart` is a direct alias of this one) — "nearby requests,
+/// distance-sorted" is the same concept for a Rider browsing alerts and a Service Provider
+/// browsing eligible ones.
 final sosActiveAlertsLocationProvider = StateProvider<({double latitude, double longitude})?>((ref) => null);
+
+/// One-shot GPS fix, same permission flow `SosScreen._shareLocation`/`SendSosSheet._captureLocation`
+/// already use — factored out so it can also run automatically (no button tap) for a Service
+/// Provider, who has no equivalent of the Rider SOS screen's "Share my location" button anywhere
+/// in their tab set. Returns `null` (never throws) on a denied/failed permission or a location
+/// fetch error — callers decide how to surface that.
+Future<({double latitude, double longitude})?> captureOneShotLocation() async {
+  try {
+    var permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+    }
+    if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
+      return null;
+    }
+    final position = await Geolocator.getCurrentPosition();
+    return (latitude: position.latitude, longitude: position.longitude);
+  } catch (_) {
+    return null;
+  }
+}
 
 final activeSosAlertsProvider = FutureProvider.autoDispose<List<SOSAlert>>((ref) {
   final location = ref.watch(sosActiveAlertsLocationProvider);

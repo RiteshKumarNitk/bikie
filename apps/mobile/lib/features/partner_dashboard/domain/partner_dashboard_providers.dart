@@ -10,6 +10,35 @@ import '../data/partner_dashboard_repository.dart';
 /// for a second copy.
 final partnerLocationProvider = sosActiveAlertsLocationProvider;
 
+/// True once an automatic location capture has genuinely failed (permission denied, or the GPS
+/// fetch errored) — lets the UI show "enable location access" instead of the ambiguous "no
+/// requests nearby" a `null` location alone can't distinguish from "not captured yet".
+final partnerLocationDeniedProvider = StateProvider<bool>((ref) => false);
+
+/// Auto-captures the device's GPS once for a Service Provider, mirroring the web Partner SOS
+/// dashboard's `useEffect(() => navigator.geolocation.getCurrentPosition(...), [])` on mount.
+///
+/// Root cause this exists to fix: the ONLY place in the whole app that ever wrote a value into
+/// `sosActiveAlertsLocationProvider` was the Rider-only SOS screen's "Share my location" button
+/// (`SosScreen`) — but a Service Provider account's bottom nav has no SOS tab at all (ADR-044:
+/// Home/Requests/Active/Messages/Profile, no `/sos`), so that button was structurally
+/// unreachable for them. `partnerNearbyRequestsProvider` below short-circuits to an empty list
+/// whenever the location is `null`, so every Service Provider's "Requests" tab silently showed
+/// "No open requests nearby" regardless of real, eligible, database-backed SOS alerts — there was
+/// no code path left that could ever populate their location. Watched (not read) from
+/// `PartnerHomeScreen` and `PartnerRequestsScreen` so it fires whether the provider opens the app
+/// fresh, taps the Home tab, or deep-links straight into Requests from a push notification.
+final partnerLocationBootstrapProvider = FutureProvider.autoDispose<void>((ref) async {
+  if (ref.read(partnerLocationProvider) != null) return;
+  final location = await captureOneShotLocation();
+  if (location != null) {
+    ref.read(partnerLocationProvider.notifier).state = location;
+    ref.read(partnerLocationDeniedProvider.notifier).state = false;
+  } else {
+    ref.read(partnerLocationDeniedProvider.notifier).state = true;
+  }
+});
+
 /// Seeded from `GET /api/partner/profile` (ADR-044's first mobile read of that route) and then
 /// updated locally on every successful toggle — avoids a round-trip refetch just to reflect what
 /// the user themselves just set.

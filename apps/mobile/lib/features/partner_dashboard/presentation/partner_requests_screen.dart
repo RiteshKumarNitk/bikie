@@ -15,23 +15,46 @@ class PartnerRequestsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Auto-captures GPS once — the Requests tab is reachable directly (bottom nav, or a
+    // notification deep link) without ever passing through Home first, so it needs its own
+    // watch of the same bootstrap rather than relying on Home having already run it.
+    ref.watch(partnerLocationBootstrapProvider);
     final nearbyAsync = ref.watch(partnerNearbyRequestsProvider);
     final pendingCount = ref.watch(partnerPendingOffersProvider).valueOrNull?.length ?? 0;
+    final locationDenied = ref.watch(partnerLocationDeniedProvider);
 
     return Scaffold(
       appBar: AppBar(title: const Text('Nearby Requests')),
       body: RefreshIndicator(
-        onRefresh: () async => ref.invalidate(partnerNearbyRequestsProvider),
+        onRefresh: () async {
+          ref.invalidate(partnerLocationBootstrapProvider);
+          ref.invalidate(partnerNearbyRequestsProvider);
+        },
         child: nearbyAsync.when(
           data: (requests) {
             if (requests.isEmpty && pendingCount == 0) {
+              // Distinguishes "genuinely nothing nearby" from "we couldn't get your location" —
+              // the two used to be indistinguishable, which silently hid real, database-backed
+              // requests behind a message that read like everything was working fine.
               return ListView(
-                children: const [
-                  EmptyState(
-                    icon: Icons.check_circle_outline,
-                    title: 'No open requests nearby',
-                    message: "You'll see assistance requests here as soon as one matches your service area.",
-                  ),
+                children: [
+                  if (locationDenied)
+                    EmptyState(
+                      icon: Icons.location_off_outlined,
+                      title: "Couldn't get your location",
+                      message: 'Nearby requests need your location. Enable location access for BIKIE and pull down to retry.',
+                      actionLabel: 'Retry',
+                      onAction: () {
+                        ref.read(partnerLocationDeniedProvider.notifier).state = false;
+                        ref.invalidate(partnerLocationBootstrapProvider);
+                      },
+                    )
+                  else
+                    const EmptyState(
+                      icon: Icons.check_circle_outline,
+                      title: 'No open requests nearby',
+                      message: "You'll see assistance requests here as soon as one matches your service area.",
+                    ),
                 ],
               );
             }

@@ -2,6 +2,20 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Mobile Service Provider Requests tab never showed eligible Amber SOS requests (2026-09-14, ADR-083)
+
+| Task | Status |
+|---|---|
+| Traced creation -> dispatch -> eligibility -> Requests query -> Flutter Requests tab -> accept -> SMS. Confirmed the Requests tab (Service Provider only — a plain Rider has no equivalent tab) already reads the real, persistent, database-backed `GET /api/partner/sos/nearby` (`listNearbyOpenRequests`) — no fake/local item existed. | Completed |
+| Root cause: `partnerNearbyRequestsProvider` returns `[]` whenever `partnerLocationProvider` (alias of `sosActiveAlertsLocationProvider`) is `null` — and the ONLY setter anywhere in the app was `SosScreen`'s "Share my location" button, on a Rider-only screen (`/sos`) that a Service Provider's tab set has no route to at all. Every Service Provider's Requests tab (and Home's preview) was permanently, silently empty regardless of real eligible alerts. Confirmed mobile-only: web's `/partner/sos` already auto-captures GPS via `useEffect` on mount. | Completed |
+| Fix: `captureOneShotLocation()` (`sos_providers.dart`) factors out the existing Rider-button permission/fetch logic into a reusable function (Rider screen itself untouched). New `partnerLocationBootstrapProvider` (`partner_dashboard_providers.dart`), watched from `PartnerHomeScreen` and `PartnerRequestsScreen`, auto-captures GPS once into the SAME shared location state. New `partnerLocationDeniedProvider` flag + distinct "couldn't get your location" empty state with a Retry action, mirroring web's `locationError` UX. | Completed |
+| Investigated missing SMS — confirmed NOT a bug: exactly one SOS SMS exists (dispatch-time, `MSG91_SOS_HELP_TEMPLATE_ID`, "BIKIE_SR"); there is no "on accept"/"connection" SMS anywhere in the codebase. Not invented here per instruction — flagged as a separate feature needing its own scope if wanted. The existing dispatch SMS is skipped (not failed) and logged (`[SMS][CONFIG] MSG91_SOS_HELP_TEMPLATE_ID is not set`) when the template env var is unset — first thing to check server-side, not verifiable from this environment. | Completed (reported) |
+| Confirmed already correct, untouched: `acceptOffer`'s atomic claim + auto-expiry of other offers + "already assigned" notification (ADR-033/048); the Amber/Red severity split (`resolveServiceProviders` returns `[]` for RED, ADR-064); `User.accountType` as the sole routing signal, no dual-mode reintroduced. | Verified, no change |
+| New regression tests (`partner_location_bootstrap_test.dart`): bootstrap no-ops once a location is already known; `partnerLocationProvider` and `sosActiveAlertsLocationProvider` share one state. Geolocator itself has no method-channel mock anywhere in this suite (matches the pre-existing, long-standing lack of coverage on `SosScreen._shareLocation`) — the actual GPS call is verified by code review + parity with the working web implementation, not a unit test. | Completed |
+| Verify — `flutter analyze` clean (1 pre-existing unrelated `http`-import info), `flutter test` 124→126 | Completed |
+| Operator: check production/dev server logs for the specific missed SOS alert's `[SMS][CONFIG]`/`[SMS][MSG91]`/`[SOS][DISPATCH][ERROR]` line, and confirm `MSG91_SOS_HELP_TEMPLATE_ID` is actually set on that deployment | Pending (operator) |
+| Product decision needed: is an "on accept"/"connection established" SMS actually wanted? If yes, scope as its own task — must reuse `MSG91_SOS_HELP_TEMPLATE_ID` or a newly operator-registered DLT template, never invented/hardcoded text | Backlog (needs product decision) |
+
 ## Mobile account-type routing audit; Service Provider membership plan never seeded; UserModel hardened (2026-09-14, ADR-082)
 
 | Task | Status |

@@ -1,5 +1,20 @@
 # BIKIE Changelog
 
+## 2026-09-14 — Fixed: mobile Service Provider Requests tab never showed eligible Amber SOS requests (ADR-083)
+
+Root cause: the Requests tab (Service Provider only) already queried the real, persistent
+`GET /api/partner/sos/nearby` — but it short-circuits to `[]` with no location on file, and the
+only setter anywhere in the app for that location was a button on the Rider-only SOS screen,
+unreachable from the Service Provider tab set. Every Service Provider's Requests tab was
+permanently empty regardless of real eligible alerts. Fixed by auto-capturing GPS once (mirroring
+the web Partner SOS dashboard's existing mount-time auto-capture), plus a distinct
+"couldn't get your location" state so a permission failure isn't indistinguishable from "no
+requests." Missing SMS investigated and confirmed not a bug: there is exactly one SOS SMS
+(dispatch-time, `MSG91_SOS_HELP_TEMPLATE_ID`) and no "on accept" SMS exists in the codebase at
+all — a separate feature to scope if wanted, not invented here. Accept atomicity, Amber/Red
+severity split, and `accountType`-only routing confirmed already correct. `flutter test` 124→126,
+`flutter analyze` clean, no backend/schema change. See ADR-083.
+
 ## 2026-09-14 — Mobile account-type routing audit; Service Provider membership plan never seeded in production; UserModel hardened (ADR-082)
 
 Audited a report of a mobile Service Provider account showing Rider UI after logout/login — every

@@ -21,6 +21,10 @@ class PartnerHomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Auto-captures GPS once, mirroring the web Partner SOS dashboard — there is no Rider-style
+    // "Share my location" button anywhere in the Service Provider tab set to do this manually
+    // (see partnerLocationBootstrapProvider's doc comment for the full root-cause story).
+    ref.watch(partnerLocationBootstrapProvider);
     final me = ref.watch(authControllerProvider).user;
     final statsAsync = ref.watch(partnerSosDashboardProvider);
     final nearbyAsync = ref.watch(partnerNearbyRequestsProvider);
@@ -31,6 +35,7 @@ class PartnerHomeScreen extends ConsumerWidget {
       appBar: AppBar(title: const Text('BIKIE Partner', style: TextStyle(fontWeight: FontWeight.bold))),
       body: RefreshIndicator(
         onRefresh: () async {
+          ref.invalidate(partnerLocationBootstrapProvider);
           ref.invalidate(partnerSosDashboardProvider);
           ref.invalidate(partnerNearbyRequestsProvider);
           ref.invalidate(partnerPendingOffersProvider);

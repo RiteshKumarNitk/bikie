@@ -4132,3 +4132,75 @@ changes:
   itself remains unreproduced in this environment; if it recurs after this patch, the new
   StateError will surface as a visible, diagnosable sign-in failure instead of a silent Rider
   misroute, which is the concrete next debugging signal to collect.
+
+## ADR-083: Mobile Service Provider Requests tab never captured GPS — the only setter was a button on a screen Service Providers never see
+
+- Context. Reported: an Amber/Assistance SOS request reached the recipient's notifications but
+  never appeared in their Requests tab, and the expected SMS never arrived. Traced the complete
+  path (creation -> dispatch -> eligibility -> Requests query -> Flutter Requests tab -> accept ->
+  SMS) against both the mobile client and the already-documented backend SOS architecture
+  (SOS.md, ADR-033/044/045/047/048/052/059/064/077/079/080).
+- Root cause (Requests tab). Only Service Provider accounts have a "Requests" tab at all
+  (`AppShell.partnerTabs`, `/partner/requests` -> `PartnerRequestsScreen`) — a plain Rider's
+  bottom nav has no equivalent (Home/Rides/Bikes/Bookings/Profile). `PartnerRequestsScreen`
+  already reads the real, persistent, database-backed list
+  (`partnerNearbyRequestsProvider` -> `GET /api/partner/sos/nearby` ->
+  `listNearbyOpenRequests`/`findEligiblePartnersNearPoint`) — there was never a fake/local
+  Requests item, and eligibility/severity filtering (RED excluded from Service Providers, type
+  match or `isGeneralResponder`, availability, active membership) was already correctly enforced
+  server-side and untouched by this fix. The bug: `partnerNearbyRequestsProvider` short-circuits
+  to `[]` whenever `partnerLocationProvider` (an alias of `sosActiveAlertsLocationProvider`, a
+  plain `StateProvider` defaulting to `null`) has no value — and the ONLY place in the entire app
+  that ever wrote a value into that provider was `SosScreen`'s "Share my location" `IconButton`
+  (ADR-042) — a screen that exists only in the Rider tab set (`/sos`, no equivalent route in
+  `AppShell.partnerTabs`). A Service Provider account therefore had **no code path anywhere**
+  that could ever populate their location, so their Requests tab (and Home's "Nearby Requests"
+  preview, which reads the same provider) permanently rendered "No open requests nearby" —
+  indistinguishable from a genuinely empty queue — regardless of how many real, eligible,
+  database-backed SOS alerts existed. Confirmed this is mobile-only: the web Partner SOS
+  dashboard (`apps/web/app/(main)/partner/sos/page.tsx`) already auto-captures the browser's
+  geolocation via `useEffect(() => navigator.geolocation.getCurrentPosition(...), [])` on mount —
+  no button, no user action — which is the reference behavior this fix ports to Flutter.
+- Decision. New `captureOneShotLocation()` (`sos_providers.dart`) factors out the exact
+  permission-check-then-fetch sequence `SosScreen._shareLocation` already used (left unmodified —
+  it works correctly for Riders) into a pure, reusable async function. New
+  `partnerLocationBootstrapProvider` (`partner_dashboard_providers.dart`) — watched from
+  `PartnerHomeScreen` and `PartnerRequestsScreen` — calls it automatically once, mirroring web's
+  mount-time auto-capture, and writes the result into the same shared
+  `sosActiveAlertsLocationProvider` the Rider screen would have written to manually (one location
+  state, not a second copy). Short-circuits immediately if a location is already known (never
+  re-fetches or overwrites). New `partnerLocationDeniedProvider` flag distinguishes "location
+  capture genuinely failed" from "no requests exist" in the empty state, mirroring web's
+  `locationError` UX, with a Retry action.
+- SMS investigation (no code change — confirmed, not fixed, because nothing is broken). The SOS
+  SMS architecture (ADR-077/079/080) has exactly ONE SOS SMS: sent at dispatch/creation time to
+  eligible `NEARBY_RIDER`/`SERVICE_PROVIDER` candidates (`fan-out.application.ts`'s
+  `dispatchToRecipient`, `MSG91_SOS_HELP_TEMPLATE_ID`, the "BIKIE_SR" template) — this is the SMS
+  the report says never arrived. **There is no separate "on accept" / "connection established"
+  SMS anywhere in the codebase** — the product's own SOS.md and every prior ADR describe the
+  dispatch-time notification as the sole SMS touchpoint; acceptance only produces an in-app
+  notification to the losing responders ("already assigned to another responder", ADR-048), never
+  an SMS to either party. This gap is reported, not invented around: if an accept/connection SMS
+  is wanted, it needs its own scoped ADR and (per the task's own instruction) MUST reuse
+  `MSG91_SOS_HELP_TEMPLATE_ID` or a newly-registered template, never a hardcoded/invented one. The
+  existing dispatch-time SMS is skipped, not failed, whenever `MSG91_SOS_HELP_TEMPLATE_ID` is
+  unset — logged as `[SMS][CONFIG] MSG91_SOS_HELP_TEMPLATE_ID is not set … SMS skipped` and
+  recorded in the dispatch summary's `errors` (`fan-out.application.ts`) — this is the first thing
+  to check server-side for the reporter's specific missed SMS; it cannot be verified from this
+  environment (no access to the live/dev deployment's env vars or MSG91 dashboard).
+- What was confirmed already correct, untouched. `acceptOffer`'s atomic claim (`WHERE
+  assignedHelperId IS NULL`), auto-expiry of every other pending offer on the same alert, and the
+  "already assigned" notification to losing responders (ADR-033/048) — server-authoritative,
+  race-safe, no client-side status mutation. The Amber/Red severity split
+  (`resolveServiceProviders` returns `[]` outright for RED — ADR-064) — unmodified. `User.
+  accountType` remains the sole account-type signal; no dual-mode/Partner-role reintroduction.
+- Consequences. `flutter analyze` clean (1 pre-existing unrelated `http`-import info), `flutter
+  test` 124 to 126 (2 new — `partnerLocationBootstrapProvider`'s already-known-location no-op,
+  and `partnerLocationProvider`/`sosActiveAlertsLocationProvider` sharing one state). No backend
+  change, no schema change, no new API route — this was a pure Flutter client-side gap. Not
+  testable in this environment: Geolocator itself has no method-channel mock anywhere in this
+  test suite (matching `SosScreen._shareLocation`'s own long-standing lack of coverage), so the
+  actual GPS-capture call is verified by code review + the reference web implementation, not a
+  unit test. The reported missing SMS needs the operator to check the production/dev deployment's
+  `MSG91_SOS_HELP_TEMPLATE_ID` and server logs for the exact `[SMS][CONFIG]`/`[SMS][MSG91]`/
+  `[SOS][DISPATCH][ERROR]` line for that alert.
