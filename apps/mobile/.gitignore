@@ -50,3 +50,10 @@ app.*.map.json
 **/google-services.json
 **/GoogleService-Info.plist
 lib/firebase_options.dart
+
+# Release signing — the upload keystore and its passwords. Losing this file is recoverable
+# (Google support can reset an upload key) but slow; never committed regardless.
+android/key.properties
+android/app/upload-keystore.jks
+*.jks
+*.keystore

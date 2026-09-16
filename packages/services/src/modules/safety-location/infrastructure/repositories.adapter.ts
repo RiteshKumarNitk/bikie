@@ -50,7 +50,7 @@ export function createSosOfferRepositoryAdapter(): SosOfferRepositoryPort {
   return {
     createOffer: async (params) => {
       try {
-        return (await sosSessionRepository.createOffer(params)) as any;
+        return await sosSessionRepository.createOffer(params);
       } catch (err) {
         if (err instanceof sosSessionRepository.AlreadyOfferedError) throw new AlreadyOfferedError(err.message);
         throw err;
@@ -72,10 +72,10 @@ export function createSosOfferRepositoryAdapter(): SosOfferRepositoryPort {
         throw err;
       }
     },
-    listOffersForAlert: (alertId) => sosSessionRepository.listOffersForAlert(alertId) as any,
+    listOffersForAlert: (alertId) => sosSessionRepository.listOffersForAlert(alertId),
     declineAlert: async (params) => {
       try {
-        return (await sosSessionRepository.declineAlert(params)) as any;
+        return await sosSessionRepository.declineAlert(params);
       } catch (err) {
         if (err instanceof sosSessionRepository.AlreadyOfferedError) throw new AlreadyOfferedError(err.message);
         throw err;

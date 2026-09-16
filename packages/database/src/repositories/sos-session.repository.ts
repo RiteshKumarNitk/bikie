@@ -28,6 +28,11 @@ export async function createOffer(params: {
         message: params.message,
         status: "OFFERED",
       },
+      // The `SosOfferRow` port type (and session.application.ts's offerHelp, which reads
+      // `offer.responder.name` to notify the reporter) requires this relation — same shape as
+      // listOffersForAlert below. Omitting it left `responder` undefined at runtime despite the
+      // port type promising it, since the adapter wires this through an `as any` cast.
+      include: { responder: { select: { id: true, name: true, phone: true, email: true } } },
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
@@ -76,6 +81,9 @@ export async function declineAlert(params: { alertId: string; responderId: strin
         respondedAt: new Date(),
         respondedBy: params.responderId,
       },
+      // Same `SosOfferRow` contract as createOffer above — kept consistent even though no
+      // current caller reads `.responder` off this one, so the type and the data stay truthful.
+      include: { responder: { select: { id: true, name: true, phone: true, email: true } } },
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
