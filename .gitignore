@@ -31,3 +31,6 @@ yarn-error.log*
 !.vscode/extensions.json
 *.tsbuildinfo
 next-env.d.ts
+
+# Claude Code scratchpad — session-local working files, never part of the project.
+.scratch/
