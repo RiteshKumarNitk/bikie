@@ -85,11 +85,18 @@ function cleanForDltVariable(value: string): string {
   return value.replace(/[,;]/g, " ").replace(/\s+/g, " ").trim();
 }
 
-/** The first comma-delimited segment of a compound address fragment — the most specific part of
- * e.g. "Mansarovar Sector 7, Near Metro Station, Jaipur", not the whole 47-character string. A
- * comma-free value (the common case — "Jagatpura", "Vaishali Nagar") passes through unchanged. */
+/** The first NON-EMPTY comma-delimited segment of a compound address fragment — the most
+ * specific part of e.g. "Mansarovar Sector 7, Near Metro Station, Jaipur", not the whole
+ * 47-character string. A comma-free value (the common case — "Jagatpura", "Vaishali Nagar")
+ * passes through unchanged. Skips past a blank leading segment (e.g. ", Jagatpura, Jaipur" from
+ * a geocoding quirk) to the next real one, rather than giving up and returning the whole
+ * unsplit string. Falls back to the trimmed whole value only if every segment was blank. */
 function firstAddressSegment(value: string): string {
-  return value.split(",")[0]?.trim() || value.trim();
+  for (const part of value.split(",")) {
+    const trimmed = part.trim();
+    if (trimmed.length > 0) return trimmed;
+  }
+  return value.trim();
 }
 
 export function describeShortLocation(alert: DispatchableAlert): string {
