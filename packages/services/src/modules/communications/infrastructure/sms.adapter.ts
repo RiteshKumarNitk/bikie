@@ -76,6 +76,26 @@ export function createSmsAdapter(): SmsPort {
         );
       }
 
+      const requestPayload = {
+        sender: senderId,
+        route,
+        country: "91",
+        sms: [smsEntry],
+      };
+
+      // Diagnostic (task: "verify DLT_TE_ID is actually present in the serialized JSON
+      // immediately before fetch()") — logs the EXACT bytes about to be sent to MSG91, so a field
+      // name/casing/value question is answered by the literal wire payload, not by re-reading
+      // this code. Phone masked; the auth key lives only in the request header, never in this
+      // body, so there's nothing secret in it. Safe to leave in permanently — one line per send,
+      // no PII (the same message text is what the recipient's own phone receives).
+      console.log(
+        `[SMS][MSG91][REQUEST] ${tag}${JSON.stringify({
+          ...requestPayload,
+          sms: [{ ...smsEntry, to: [maskPhone(to)] }],
+        })}`,
+      );
+
       const res = await fetchWithTimeout("https://api.msg91.com/api/v2/sendsms", {
         method: "POST",
         headers: {
@@ -83,12 +103,7 @@ export function createSmsAdapter(): SmsPort {
           "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          sender: senderId,
-          route,
-          country: "91",
-          sms: [smsEntry],
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
       const body = await res.text();
