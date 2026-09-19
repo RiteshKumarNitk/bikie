@@ -18,6 +18,14 @@ WhatsApp/email/in-app keep the full address unchanged; `MSG91_SOS_HELP_TEMPLATE_
 untouched; SOS severity/eligibility/dispatch rules untouched. `vitest` 297→305, `tsc` clean. No SMS
 sent during investigation or verification. See ADR-087.
 
+**Same-day follow-up:** the first cut assumed `area`/`placeName` were always short, which isn't
+true in general (reverse-geocoded fields can themselves be long, comma-heavy compounds).
+`describeShortLocation` now takes each candidate's own first comma-delimited segment before
+falling back to the next field, so a short `area` always wins over a long `placeName`, and a long
+`area` still yields its meaningful first fragment instead of a mid-word slice; truncation is now
+a last resort, not the first move. Added a real-coordinate fallback for when every human-readable
+field is empty. `vitest` 305→315 (10 new, a full A–H edge-case matrix). No SMS sent.
+
 ## 2026-09-14 — Membership confirmation SMS audit: code confirmed correct, structured observability added (ADR-086)
 
 Audited a production report that a membership payment succeeds and activates but no confirmation

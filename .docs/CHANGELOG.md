@@ -13,6 +13,12 @@ and a MSG91 Reports failure could coexist. Fixed: removed the space; new `descri
 full address for the SMS variable — WhatsApp/email/in-app unaffected. Template id/sender id/SOS
 rules untouched. `vitest` 297→305. No SMS sent during investigation. See ADR-087.
 
+**Same-day follow-up:** hardened `describeShortLocation` — the first cut assumed area/placeName
+were always short, which isn't guaranteed. Now takes each field's first comma-segment before
+falling to the next field (short area beats long placeName; a long area still yields its useful
+first fragment), truncates only as a last resort, and falls back to real coordinates when every
+field is empty. `vitest` 305→315 (full A–H edge-case matrix). No SMS sent.
+
 ## 2026-09-14 — Membership confirmation SMS audit: code confirmed correct, structured observability added (ADR-086)
 
 Audited a "payment succeeds, no confirmation SMS" production report end to end for both Rider and

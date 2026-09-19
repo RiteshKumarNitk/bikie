@@ -153,21 +153,125 @@ describe("safety-location domain", () => {
       expect(describeShortLocation(alert).length).toBeLessThanOrEqual(40);
     });
 
-    it("strips commas and semicolons (DLT variables are alphanumeric)", () => {
-      expect(describeShortLocation(sampleAlert({ area: "Sector 5, Phase-2;", placeName: null, city: "" }))).toBe(
-        "Sector 5 Phase-2",
-      );
+    it("takes only the first comma-delimited segment of a compound field, rather than joining every fragment", () => {
+      expect(describeShortLocation(sampleAlert({ area: "Sector 5, Phase-2;", placeName: null, city: "" }))).toBe("Sector 5");
     });
 
-    it("hard-truncates to 40 characters even for an unusually long area/placeName/city", () => {
+    it("hard-truncates to 40 characters only as a last resort, when every field's first segment is still too long", () => {
       const longName = "A".repeat(60);
       const result = describeShortLocation(sampleAlert({ area: longName, placeName: null, city: "" }));
       expect(result.length).toBe(40);
       expect(result).toBe("A".repeat(40));
     });
 
-    it("falls back to a generic label when area/placeName/city are all empty", () => {
-      expect(describeShortLocation(sampleAlert({ area: null, placeName: null, city: "" }))).toBe("your area");
+    it("falls back to coordinates when area/placeName/city are all empty but a GPS fix exists", () => {
+      expect(describeShortLocation(sampleAlert({ area: null, placeName: null, city: "", latitude: 26.8186, longitude: 75.8286 }))).toBe(
+        "26.8186, 75.8286",
+      );
+    });
+
+    it("falls back to the literal 'your area' when nothing at all is available (unreachable for a real created alert)", () => {
+      // Only the redacted public SOSAlertDTO view (not RawSOSAlertDTO, which always has real
+      // coordinates) can have null lat/lng — build that shape directly for this case.
+      const redacted = { ...sampleAlert({ area: null, placeName: null, city: "" }), latitude: null, longitude: null };
+      expect(describeShortLocation(redacted)).toBe("your area");
+    });
+
+    // ===== Edge-case matrix (A-H) from the follow-up hardening request =====
+
+    it("A. placeName + area + city all set — area wins, short and useful", () => {
+      const result = describeShortLocation(
+        sampleAlert({ placeName: "Vedang Height Road", area: "Jagatpura", city: "Jaipur" }),
+      );
+      expect(result).toBe("Jagatpura");
+      expect(result.length).toBeLessThanOrEqual(40);
+    });
+
+    it("B. a long, compound area (with commas) yields its meaningful first segment, not a blind slice", () => {
+      const result = describeShortLocation(
+        sampleAlert({ area: "Mansarovar Sector 7, Near Metro Station, Jaipur", placeName: null, city: "Jaipur" }),
+      );
+      expect(result).toBe("Mansarovar Sector 7");
+      expect(result.length).toBeLessThanOrEqual(40);
+    });
+
+    it("C. a very long placeName never wins over a short, usable area — no blind truncation of the long field", () => {
+      const result = describeShortLocation(
+        sampleAlert({
+          placeName: "A very long building or shopping complex name exceeding forty characters",
+          area: "Vaishali Nagar",
+          city: "Jaipur",
+        }),
+      );
+      expect(result).toBe("Vaishali Nagar");
+      expect(result).not.toContain("shopping complex");
+      expect(result.length).toBeLessThanOrEqual(40);
+    });
+
+    it("D. placeName missing, area present -> area", () => {
+      expect(describeShortLocation(sampleAlert({ placeName: null, area: "Jagatpura", city: "Jaipur" }))).toBe("Jagatpura");
+    });
+
+    it("E. placeName and area missing, city present -> city", () => {
+      expect(describeShortLocation(sampleAlert({ placeName: null, area: null, city: "Jaipur" }))).toBe("Jaipur");
+    });
+
+    it("F. no human-readable field at all, but coordinates exist -> uses the real GPS fix, not invented text", () => {
+      const result = describeShortLocation(
+        sampleAlert({ placeName: null, area: null, city: "", latitude: 26.8186129, longitude: 75.8285784 }),
+      );
+      expect(result).toBe("26.8186, 75.8286");
+      expect(result.length).toBeLessThanOrEqual(40);
+    });
+
+    it("G. every human-readable field is long -> final result is still guaranteed <=40", () => {
+      const area = "Extremely Long Locality Name That Also Goes On And On";
+      const result = describeShortLocation(
+        sampleAlert({
+          placeName: "Extremely Long Building Complex Name That Goes On And On",
+          area,
+          city: "Extremely Long City District Name That Also Never Stops",
+        }),
+      );
+      expect(result.length).toBeLessThanOrEqual(40);
+      // area is highest priority, so the truncation-fallback pass truncates area, not placeName/city.
+      expect(result).toBe(area.slice(0, 40).trim());
+      expect(area).not.toBe(result); // confirms it really was truncated, not coincidentally short
+    });
+
+    it("H. commas, numbers, and special characters in the field are handled safely", () => {
+      const result = describeShortLocation(
+        sampleAlert({ area: "Sector-5, Near Big Bazaar #12, Jaipur-302015", placeName: null, city: "Jaipur" }),
+      );
+      expect(result).toBe("Sector-5");
+      expect(result.length).toBeLessThanOrEqual(40);
+    });
+
+    it("every case in the matrix above also produces a DLT-template-safe full SMS body", () => {
+      const cases = [
+        sampleAlert({ placeName: "Vedang Height Road", area: "Jagatpura", city: "Jaipur" }),
+        sampleAlert({ area: "Mansarovar Sector 7, Near Metro Station, Jaipur", placeName: null, city: "Jaipur" }),
+        sampleAlert({
+          placeName: "A very long building or shopping complex name exceeding forty characters",
+          area: "Vaishali Nagar",
+          city: "Jaipur",
+        }),
+        sampleAlert({ placeName: null, area: "Jagatpura", city: "Jaipur" }),
+        sampleAlert({ placeName: null, area: null, city: "Jaipur" }),
+        sampleAlert({
+          placeName: "Extremely Long Building Complex Name That Goes On And On",
+          area: "Extremely Long Locality Name That Also Goes On And On",
+          city: "Extremely Long City District Name That Also Never Stops",
+        }),
+        sampleAlert({ area: "Sector-5, Near Big Bazaar #12, Jaipur-302015", placeName: null, city: "Jaipur" }),
+      ];
+      for (const alert of cases) {
+        const body = buildSmsTemplateBody(alert);
+        expect(body).toMatch(/^Hello Riders\/Service Providers, Rider .+, with Vehicle registration number is .+ having some emergency situation at .+;Please reach out to Rider to Provide Moral support and Adequate help, as noted by Kiesh India$/);
+        const match = body.match(/emergency situation at (.+);Please/);
+        expect(match).not.toBeNull();
+        expect(match![1].length).toBeLessThanOrEqual(40);
+      }
     });
   });
 

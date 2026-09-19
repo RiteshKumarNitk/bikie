@@ -4498,4 +4498,23 @@ changes:
   of the builder logic) so it keeps reporting accurately post-fix. No schema change, no migration,
   no MSG91/DLT change, no SMS sent during this investigation or verification (`tsc`/`vitest`/the
   read-only diagnostic script only — confirmed no `communications.sms.send`/MSG91 call was made).
+- **Follow-up hardening (same ADR, same day).** The first cut assumed `area`/`placeName` were
+  always short — untrue in general (reverse-geocoded fields can themselves be long, comma-heavy
+  compounds). `describeShortLocation` now runs two passes instead of pick-then-truncate: pass 1
+  takes each candidate's own first comma-delimited segment (e.g. "Mansarovar Sector 7" out of
+  "Mansarovar Sector 7, Near Metro Station, Jaipur") in `area → placeName → city` order and uses
+  the first one that's non-empty and already ≤40 chars — so a short `area` always wins over a
+  60-character `placeName`, and a long, compound `area` still yields its meaningful first
+  fragment rather than nothing or a mid-word slice. Truncation is now reached only in pass 2, if
+  every field's first segment is still too long. Added a coordinate fallback (real
+  `latitude`/`longitude` off the alert, formatted to 4 decimals — well under 40 chars) for the
+  case every human-readable field is empty; the literal `"your area"` is the final,
+  unreachable-in-practice fallback (`city` is required non-empty at alert creation). Still SMS-only,
+  still never invents data, still never touches `describeLocation`/WhatsApp/email/in-app,
+  `MSG91_SENDER_ID`, or `MSG91_SOS_HELP_TEMPLATE_ID`. `vitest` 305→315 (10 new: the full A–H
+  edge-case matrix — long compound `area`, a long `placeName` losing to a short `area`, each field
+  missing individually, all-fields-long guaranteeing ≤40, commas/numbers/special characters, the
+  coordinate fallback, the final literal fallback — plus one test asserting every matrix case still
+  produces a template-exact, ≤40-char SMS body), `tsc --noEmit` clean. No SMS sent.
+
 

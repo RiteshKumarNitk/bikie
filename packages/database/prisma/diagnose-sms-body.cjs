@@ -68,10 +68,28 @@ function describeLocation(alert) {
   return parts.length > 0 ? parts.join(", ") : alert.city;
 }
 const SMS_LOCATION_MAX_LENGTH = 40;
+function cleanForDltVariable(value) {
+  return value.replace(/[,;]/g, " ").replace(/\s+/g, " ").trim();
+}
+function firstAddressSegment(value) {
+  const seg = value.split(",")[0];
+  return (seg && seg.trim()) || value.trim();
+}
 function describeShortLocation(alert) {
-  const candidate = alert.area || alert.placeName || alert.city || "your area";
-  const cleaned = candidate.replace(/[,;]/g, " ").replace(/\s+/g, " ").trim();
-  return cleaned.length > SMS_LOCATION_MAX_LENGTH ? cleaned.slice(0, SMS_LOCATION_MAX_LENGTH).trim() : cleaned;
+  const rawCandidates = [alert.area, alert.placeName, alert.city].filter((v) => Boolean(v && v.trim()));
+
+  for (const raw of rawCandidates) {
+    const segment = cleanForDltVariable(firstAddressSegment(raw));
+    if (segment.length > 0 && segment.length <= SMS_LOCATION_MAX_LENGTH) return segment;
+  }
+  for (const raw of rawCandidates) {
+    const cleaned = cleanForDltVariable(raw);
+    if (cleaned.length > 0) return cleaned.slice(0, SMS_LOCATION_MAX_LENGTH).trim();
+  }
+  if (alert.latitude != null && alert.longitude != null) {
+    return `${alert.latitude.toFixed(4)}, ${alert.longitude.toFixed(4)}`;
+  }
+  return "your area";
 }
 function buildSmsTemplateBody(alert) {
   const vehicleReg = (alert.riderVehicleRegistrationNumber && alert.riderVehicleRegistrationNumber.trim()) || "N/A";
@@ -126,6 +144,8 @@ function main() {
         area: alert.area,
         formattedAddress: alert.formattedAddress,
         city: alert.city,
+        latitude: alert.latitude,
+        longitude: alert.longitude,
       };
 
       console.log("================ RAW INPUTS (from DB, read-only) ================");

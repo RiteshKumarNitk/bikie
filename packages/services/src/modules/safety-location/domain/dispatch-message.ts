@@ -58,18 +58,60 @@ export function describeLocation(alert: DispatchableAlert): string {
  * confirmed against a real production alert, where `describeLocation`'s full reverse-geocoded
  * address ran 110 characters with 6 commas. This is a SEPARATE, SMS-only value — `describeLocation`
  * above is unchanged and keeps serving WhatsApp/email/in-app, none of which have a DLT constraint
- * and benefit from the fuller address. Reuses the exact same geocoded fields `describeLocation`
- * already reads — never invents new location data — preferring the shortest genuinely-identifying
- * one: `area` (a locality/neighbourhood name from reverse geocoding, typically short and
- * consistent) before `placeName` (a specific building/road name, length varies more) before bare
- * `city`. Commas/semicolons are stripped (the variable is alphanumeric) and the result is
- * hard-truncated to `SMS_LOCATION_MAX_LENGTH` as a last-resort guarantee, not just a preference. */
+ * and benefit from the fuller address.
+ *
+ * Never invents location data — every candidate below is an existing field `describeLocation`
+ * already reads, or the alert's own coordinates. Two passes, in `area -> placeName -> city`
+ * priority order:
+ *   1. **Segment-first**: take each field's own first comma-delimited segment (a compound
+ *      geocoded value like "Mansarovar Sector 7, Near Metro Station, Jaipur" isn't reliably
+ *      short just because it's `area` — its first segment usually is, and is the most specific,
+ *      human-meaningful part). The first field whose cleaned segment is non-empty and fits
+ *      `SMS_LOCATION_MAX_LENGTH` wins outright — a short, non-comma `area` always beats a long
+ *      `placeName`, even one exceeding the limit, because `area` is checked first and already
+ *      fits without needing to look further.
+ *   2. **Truncation fallback**, reached only if every field's first segment was still too long:
+ *      hard-truncates the highest-priority non-empty cleaned candidate — a real, if imperfect,
+ *      value, never blank. This is the *only* place truncation happens, and only as a last
+ *      resort, never the first move.
+ * If `area`/`placeName`/`city` are all empty, falls back to the alert's own coordinates (real
+ * data — redacted to `null` on the pre-assignment nearby-rider/Service-Provider view specifically,
+ * but present for emergency-contact/admin recipients, who get this same SMS body too). The
+ * literal `"your area"` is the final, unreachable-in-practice fallback — `city` is required
+ * non-empty at alert creation (`sosAlertCreateSchema`). */
 const SMS_LOCATION_MAX_LENGTH = 40;
 
+function cleanForDltVariable(value: string): string {
+  return value.replace(/[,;]/g, " ").replace(/\s+/g, " ").trim();
+}
+
+/** The first comma-delimited segment of a compound address fragment — the most specific part of
+ * e.g. "Mansarovar Sector 7, Near Metro Station, Jaipur", not the whole 47-character string. A
+ * comma-free value (the common case — "Jagatpura", "Vaishali Nagar") passes through unchanged. */
+function firstAddressSegment(value: string): string {
+  return value.split(",")[0]?.trim() || value.trim();
+}
+
 export function describeShortLocation(alert: DispatchableAlert): string {
-  const candidate = alert.area || alert.placeName || alert.city || "your area";
-  const cleaned = candidate.replace(/[,;]/g, " ").replace(/\s+/g, " ").trim();
-  return cleaned.length > SMS_LOCATION_MAX_LENGTH ? cleaned.slice(0, SMS_LOCATION_MAX_LENGTH).trim() : cleaned;
+  const rawCandidates = [alert.area, alert.placeName, alert.city].filter(
+    (v): v is string => Boolean(v && v.trim()),
+  );
+
+  for (const raw of rawCandidates) {
+    const segment = cleanForDltVariable(firstAddressSegment(raw));
+    if (segment.length > 0 && segment.length <= SMS_LOCATION_MAX_LENGTH) return segment;
+  }
+
+  for (const raw of rawCandidates) {
+    const cleaned = cleanForDltVariable(raw);
+    if (cleaned.length > 0) return cleaned.slice(0, SMS_LOCATION_MAX_LENGTH).trim();
+  }
+
+  if (alert.latitude != null && alert.longitude != null) {
+    return `${alert.latitude.toFixed(4)}, ${alert.longitude.toFixed(4)}`;
+  }
+
+  return "your area";
 }
 
 export function buildTextBody(alert: DispatchableAlert, recipient: SOSRecipient): string {
