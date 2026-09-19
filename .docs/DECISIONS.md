@@ -4446,3 +4446,56 @@ changes:
   `MEMBERSHIP_SMS_UNCONFIGURED` line names the exact missing env var; a `MEMBERSHIP_SMS_FAILED`
   line names MSG91's rejection reason; the complete absence of any `MEMBERSHIP_SMS_*` line at all
   for a purchase that definitely completed points at stale deployed code instead.
+
+## ADR-087: SOS SMS content mismatch — a stray space before `;Please` and an unbounded, comma-filled location variable were causing MSG91/DLT Pause Code 211 rejections after gateway acceptance
+
+- **Context.** Live production evidence (not a hunch): the app's own logs showed `SOS_SMS_SENT
+  status=SUCCESS` with a real MSG91 `reqId`, yet MSG91's Reports dashboard later marked the same
+  request FAILED, Pause Code 211 — "DLT Template Id missing OR API SMS content do not match the
+  content added on Template." A read-only reproduction script
+  (`packages/database/prisma/diagnose-sms-body.cjs`, added this investigation) rebuilt the exact
+  SMS body for a real production alert from its actual DB row and diffed it, segment by segment,
+  against the operator-pasted MSG91 dashboard template text. Two real, provable defects, both in
+  `buildSmsTemplateBody` (`packages/services/src/modules/safety-location/domain/dispatch-
+  message.ts`):
+  1. **A literal extra space** between the third `##alphanumeric##` variable and the following
+     `;` — code produced `...emergency situation at <location> ;Please...`, the registered
+     template reads `...##alphanumeric##;Please...` (no space). A one-character static-text
+     mismatch is exactly the class of thing DLT content matching rejects.
+  2. **The location variable was unbounded and comma-filled.** It reused `describeLocation()`,
+     which prefers the full reverse-geocoded `formattedAddress` — for the real alert inspected,
+     110 characters with 6 commas (`"Vedang Height Road, Jagatpura, Jaipur Municipal Corporation,
+     Sanganer Tehsil, Jaipur, Rajasthan, 303902, India"`), nothing like a short `##alphanumeric##`
+     value.
+  Both explain the split symptom exactly: MSG91's synchronous `/api/v2/sendsms` gateway only
+  checks that a `DLT_TE_ID`/sender/auth are present and valid, accepting immediately (hence our
+  own `SOS_SMS_SENT status=SUCCESS` log and a real `reqId`) — the actual TRAI/DLT content-match
+  scrub happens asynchronously afterward, at the telecom/scrubber level, which is where Pause Code
+  211 surfaces, invisible to the app's own synchronous response.
+- **Decision.** Two changes, both confined to `dispatch-message.ts`, nothing else:
+  1. Removed the stray space — `${describeShortLocation(alert)};Please reach out` (no space)
+     replaces `${describeLocation(alert)} ;Please reach out`.
+  2. New `describeShortLocation(alert)` — used **only** by `buildSmsTemplateBody`, never invented
+     data: prefers `alert.area` (a locality/neighbourhood name from reverse geocoding, typically
+     short and consistent) → `alert.placeName` (a specific road/building name, length varies more)
+     → `alert.city` → the literal fallback `"your area"` if all three are empty. Commas/semicolons
+     stripped (the DLT variable is alphanumeric) and hard-truncated to 40 characters as a
+     guarantee, not just a preference — so the length requirement holds even for a pathologically
+     long area/placeName/city, not merely in the common case.
+  `describeLocation()` itself is **unchanged** — `buildTextBody` (WhatsApp), `buildEmailHtml`, and
+  the in-app notification body (`fan-out.application.ts`) all keep reading the full address; none
+  of them face a DLT constraint and all benefit from the richer detail. Only the SMS channel's
+  variable changed.
+- **What is unchanged.** `MSG91_SOS_HELP_TEMPLATE_ID` and `MSG91_SENDER_ID` (`KSHIDL`) — read
+  exactly as before, never touched; no new/altered DLT template; rider name and vehicle
+  registration remain the first two variables, unchanged; SOS severity/eligibility/dispatch rules;
+  the sequential-SMS/per-alert-budget behavior from ADR-084/085; every non-SMS channel's content.
+- **Consequences.** `vitest` 297→305 (8 new: `describeShortLocation`'s area/placeName/city
+  preference order, comma/semicolon stripping, 40-char hard truncation, the "your area" ultimate
+  fallback, plus `buildSmsTemplateBody` asserting the exact no-space template match, confirming it
+  never emits the full address, and a dedicated ≤40-char guarantee test), `tsc --noEmit` clean on
+  `@bikie/services`/`@bikie/database`. `diagnose-sms-body.cjs` updated to match (its verbatim copy
+  of the builder logic) so it keeps reporting accurately post-fix. No schema change, no migration,
+  no MSG91/DLT change, no SMS sent during this investigation or verification (`tsc`/`vitest`/the
+  read-only diagnostic script only — confirmed no `communications.sms.send`/MSG91 call was made).
+

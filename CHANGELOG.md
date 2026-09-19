@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-19 — Fixed: SOS SMS content mismatch causing MSG91/DLT Pause Code 211 rejections (ADR-087)
+
+Live production evidence showed the app's own logs reporting a successful SOS SMS send (real MSG91
+`reqId`, gateway-accepted) while MSG91's Reports dashboard later marked the same request FAILED —
+Pause Code 211, "content do not match the content added on Template." A read-only reproduction
+script rebuilt the exact SMS body from a real alert's DB row and diffed it against the MSG91
+dashboard's registered template text, proving two defects: a stray space before `;Please` in the
+static text, and the location variable using the full reverse-geocoded address (110+ characters,
+multiple commas) instead of a short value — MSG91's synchronous API only checks template
+id/sender/auth and accepts immediately, so the actual TRAI content-match rejection only ever
+surfaced asynchronously on the dashboard, never in our own logs. Fixed both in
+`buildSmsTemplateBody` (`dispatch-message.ts`): removed the extra space, and added
+`describeShortLocation` — used only by the SMS builder — preferring `area` → `placeName` → `city`
+(never inventing new location data), comma/semicolon-stripped, hard-capped at 40 characters.
+WhatsApp/email/in-app keep the full address unchanged; `MSG91_SOS_HELP_TEMPLATE_ID`/`MSG91_SENDER_ID`
+untouched; SOS severity/eligibility/dispatch rules untouched. `vitest` 297→305, `tsc` clean. No SMS
+sent during investigation or verification. See ADR-087.
+
 ## 2026-09-14 — Membership confirmation SMS audit: code confirmed correct, structured observability added (ADR-086)
 
 Audited a production report that a membership payment succeeds and activates but no confirmation

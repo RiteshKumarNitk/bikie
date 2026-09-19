@@ -52,6 +52,26 @@ export function describeLocation(alert: DispatchableAlert): string {
   return parts.length > 0 ? parts.join(", ") : alert.city;
 }
 
+/** ADR-087 — the SOS SMS DLT template's third (`##alphanumeric##`) variable must stay short and
+ * punctuation-free or MSG91/TRAI's DLT content scrubber silently rejects the whole message after
+ * gateway acceptance (Pause Code 211: "content do not match the content added on Template") —
+ * confirmed against a real production alert, where `describeLocation`'s full reverse-geocoded
+ * address ran 110 characters with 6 commas. This is a SEPARATE, SMS-only value — `describeLocation`
+ * above is unchanged and keeps serving WhatsApp/email/in-app, none of which have a DLT constraint
+ * and benefit from the fuller address. Reuses the exact same geocoded fields `describeLocation`
+ * already reads — never invents new location data — preferring the shortest genuinely-identifying
+ * one: `area` (a locality/neighbourhood name from reverse geocoding, typically short and
+ * consistent) before `placeName` (a specific building/road name, length varies more) before bare
+ * `city`. Commas/semicolons are stripped (the variable is alphanumeric) and the result is
+ * hard-truncated to `SMS_LOCATION_MAX_LENGTH` as a last-resort guarantee, not just a preference. */
+const SMS_LOCATION_MAX_LENGTH = 40;
+
+export function describeShortLocation(alert: DispatchableAlert): string {
+  const candidate = alert.area || alert.placeName || alert.city || "your area";
+  const cleaned = candidate.replace(/[,;]/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned.length > SMS_LOCATION_MAX_LENGTH ? cleaned.slice(0, SMS_LOCATION_MAX_LENGTH).trim() : cleaned;
+}
+
 export function buildTextBody(alert: DispatchableAlert, recipient: SOSRecipient): string {
   const kind = alertKind(alert.description);
   const label =
@@ -92,7 +112,7 @@ export function buildTextBody(alert: DispatchableAlert, recipient: SOSRecipient)
 }
 
 /**
- * ADR-059 — the DLT-approved "BIKIE_SR" template's exact fixed text (Sender ID `KSHIDL`,
+ * ADR-059/087 — the DLT-approved "BIKIE_SR" template's exact fixed text (Sender ID `KSHIDL`,
  * `MSG91_SOS_HELP_TEMPLATE_ID`), for the **SMS channel only**, sent only to `NEARBY_RIDER`/
  * `SERVICE_PROVIDER` candidate-responder recipients — matches this template's own "Hello
  * Riders/Service Providers" framing exactly. WhatsApp/email/in-app keep the richer
@@ -103,12 +123,17 @@ export function buildTextBody(alert: DispatchableAlert, recipient: SOSRecipient)
  * fallback (never an empty string, which the DLT filter may reject as not matching
  * `##alphanumeric##` at all), same posture ADR-044 already established for the sibling
  * vehicleType/Brand/Model fields being empty for most riders.
+ *
+ * ADR-087 — two content-mismatch defects confirmed against a real production alert (Pause Code
+ * 211): (1) `describeShortLocation` (not `describeLocation`) supplies the third variable — see its
+ * own doc comment; (2) there is NO space between the third variable and the following `;` — the
+ * registered template reads `...##alphanumeric##;Please...`, not `...##alphanumeric## ;Please...`.
  */
 export function buildSmsTemplateBody(alert: DispatchableAlert): string {
   const vehicleReg = alert.riderVehicleRegistrationNumber?.trim() || "N/A";
   return (
     `Hello Riders/Service Providers, Rider ${alert.userName}, with Vehicle registration number is ` +
-    `${vehicleReg} having some emergency situation at ${describeLocation(alert)} ;Please reach out ` +
+    `${vehicleReg} having some emergency situation at ${describeShortLocation(alert)};Please reach out ` +
     `to Rider to Provide Moral support and Adequate help, as noted by Kiesh India`
   );
 }

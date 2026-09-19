@@ -2,6 +2,18 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SOS SMS content mismatch causing MSG91 Pause Code 211 (2026-09-19, ADR-087)
+
+| Task | Status |
+|---|---|
+| Reproduce, read-only, the exact SMS body BIKIE generates for a real production alert and diff it segment-by-segment against the MSG91-dashboard-pasted approved template (`diagnose-sms-body.cjs`) | Completed |
+| Root-cause: (1) stray space before `;Please` in `buildSmsTemplateBody`'s static text, (2) location variable used the full reverse-geocoded address (100+ chars, multiple commas) instead of a short value | Completed |
+| Fix: removed the space; new `describeShortLocation` (SMS-only) prefers `area` → `placeName` → `city`, strips commas/semicolons, hard-capped at 40 chars | Completed |
+| Confirm `describeLocation` (WhatsApp/email/in-app) and `MSG91_SOS_HELP_TEMPLATE_ID`/`MSG91_SENDER_ID` unchanged | Completed |
+| Update `diagnose-sms-body.cjs`'s verbatim reproduction to match the fix | Completed |
+| Tests + typecheck | Completed — `vitest` 297→305, `tsc` clean on `@bikie/services`/`@bikie/database` |
+| Operator: redeploy, then re-run a real SOS test and check MSG91 Reports for the resulting request — confirm Pause Code 211 no longer recurs | Pending (operator) |
+
 ## Membership confirmation SMS audit — code confirmed correct, structured observability added (2026-09-14, ADR-086)
 
 | Task | Status |

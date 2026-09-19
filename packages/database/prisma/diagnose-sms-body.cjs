@@ -67,11 +67,17 @@ function describeLocation(alert) {
   const parts = [alert.placeName, alert.area, alert.city].filter((p) => Boolean(p));
   return parts.length > 0 ? parts.join(", ") : alert.city;
 }
+const SMS_LOCATION_MAX_LENGTH = 40;
+function describeShortLocation(alert) {
+  const candidate = alert.area || alert.placeName || alert.city || "your area";
+  const cleaned = candidate.replace(/[,;]/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned.length > SMS_LOCATION_MAX_LENGTH ? cleaned.slice(0, SMS_LOCATION_MAX_LENGTH).trim() : cleaned;
+}
 function buildSmsTemplateBody(alert) {
   const vehicleReg = (alert.riderVehicleRegistrationNumber && alert.riderVehicleRegistrationNumber.trim()) || "N/A";
   return (
     `Hello Riders/Service Providers, Rider ${alert.userName}, with Vehicle registration number is ` +
-    `${vehicleReg} having some emergency situation at ${describeLocation(alert)} ;Please reach out ` +
+    `${vehicleReg} having some emergency situation at ${describeShortLocation(alert)};Please reach out ` +
     `to Rider to Provide Moral support and Adequate help, as noted by Kiesh India`
   );
 }
@@ -133,12 +139,14 @@ function main() {
       console.log(`rider vehicleRegistrationNumber (RiderProfile): ${vehicleReg === null ? "(not set on RiderProfile — falls back to 'N/A')" : vehicleReg}`);
 
       const location = describeLocation(dispatchAlert);
+      const shortLocation = describeShortLocation(dispatchAlert);
       const smsBody = buildSmsTemplateBody(dispatchAlert);
 
       console.log("\n================ COMPUTED VALUES ================");
-      console.log(`describeLocation(alert) result:  "${location}"`);
-      console.log(`  -> length: ${location.length} characters`);
-      console.log(`  -> contains comma: ${location.includes(",")}`);
+      console.log(`describeLocation(alert) result (WhatsApp/email/in-app only):  "${location}"`);
+      console.log(`  -> length: ${location.length} characters, contains comma: ${location.includes(",")}`);
+      console.log(`describeShortLocation(alert) result (SMS variable, ADR-087):  "${shortLocation}"`);
+      console.log(`  -> length: ${shortLocation.length} characters, contains comma: ${shortLocation.includes(",")}`);
       const finalVehicleReg = (vehicleReg && vehicleReg.trim()) || "N/A";
       console.log(`vehicleReg used in SMS:           "${finalVehicleReg}" (length ${finalVehicleReg.length})`);
       console.log(`rider name used in SMS:           "${dispatchAlert.userName}" (length ${dispatchAlert.userName.length})`);
@@ -161,8 +169,8 @@ function main() {
         userName: sentinel1,
         riderVehicleRegistrationNumber: sentinel2,
         placeName: null,
-        area: null,
-        formattedAddress: sentinel3,
+        area: sentinel3,
+        formattedAddress: null,
         city: null,
       });
       const codeSegments = codeTemplateBody.split(new RegExp(`${sentinel1}|${sentinel2}|${sentinel3}`));
@@ -182,8 +190,9 @@ function main() {
       console.log("\n================ D. VARIABLE LENGTH CHECK ================");
       console.log(`VAR1 (rider name) length:        ${dispatchAlert.userName.length}  ${dispatchAlert.userName.length > 40 ? "*** EXCEEDS 40 ***" : "ok"}`);
       console.log(`VAR2 (vehicle reg) length:        ${finalVehicleReg.length}  ${finalVehicleReg.length > 40 ? "*** EXCEEDS 40 ***" : "ok"}`);
-      console.log(`VAR3 (location) length:           ${location.length}  ${location.length > 40 ? "*** EXCEEDS 40 ***" : "ok"}`);
-      console.log(`VAR3 contains commas (likely non-alphanumeric per DLT variable rules): ${location.includes(",")}`);
+      console.log(`VAR3 (location, actual SMS value) length: ${shortLocation.length}  ${shortLocation.length > 40 ? "*** EXCEEDS 40 ***" : "ok"}`);
+      console.log(`VAR3 contains commas: ${shortLocation.includes(",")}`);
+      console.log(`(for reference — the full describeLocation() address WhatsApp/email use is ${location.length} chars, not sent via SMS)`);
     } finally {
       await client.end();
     }

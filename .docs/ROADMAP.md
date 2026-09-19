@@ -1,5 +1,15 @@
 # BIKIE — Roadmap
 
+## Fixed: SOS SMS Content Mismatch Causing MSG91 Pause Code 211 (2026-09-19, ADR-087)
+Live production evidence — the app's own logs showed a successful SOS SMS send with a real MSG91
+request id, while MSG91's own Reports dashboard later marked the same request FAILED (Pause Code
+211, content mismatch). A read-only reproduction of the exact SMS body for a real alert, diffed
+against the MSG91-registered template text, proved two defects: a stray space before `;Please` in
+the fixed template text, and the location variable using the full 100+ character, comma-filled
+reverse-geocoded address instead of a short value the DLT template's `##alphanumeric##` slot
+expects. Fixed both, SMS-only — WhatsApp/email/in-app keep the fuller address unchanged, and
+neither the DLT template id nor the sender id were touched. See ADR-087.
+
 ## Fixed: Sign-Out Taking 20-30 Seconds (2026-09-14, ADR-081)
 Traced both web's and mobile's sign-out — each just one `POST /api/auth/sign-out` — to Better
 Auth's own stock handler, which deletes the session via 4 sequential Upstash Redis calls

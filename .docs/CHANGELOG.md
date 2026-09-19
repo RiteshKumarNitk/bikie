@@ -1,5 +1,18 @@
 # BIKIE Changelog
 
+## 2026-09-19 — Fixed: SOS SMS content mismatch causing MSG91 Pause Code 211 (ADR-087)
+
+Proved (via a read-only DB reproduction, not a guess) that `buildSmsTemplateBody` produced two
+content mismatches against the registered "BIKIE_SR" DLT template: a stray space before `;Please`,
+and a location variable using the full 100+ character, comma-filled reverse-geocoded address
+instead of a short value. MSG91's synchronous API only validates template id/sender/auth and
+accepts immediately — the real TRAI content-match rejection (Pause Code 211) only ever showed up
+asynchronously on the MSG91 dashboard, never in app logs, which is why `SOS_SMS_SENT status=SUCCESS`
+and a MSG91 Reports failure could coexist. Fixed: removed the space; new `describeShortLocation`
+(SMS-only, prefers area → placeName → city, comma-stripped, hard-capped at 40 chars) replaces the
+full address for the SMS variable — WhatsApp/email/in-app unaffected. Template id/sender id/SOS
+rules untouched. `vitest` 297→305. No SMS sent during investigation. See ADR-087.
+
 ## 2026-09-14 — Membership confirmation SMS audit: code confirmed correct, structured observability added (ADR-086)
 
 Audited a "payment succeeds, no confirmation SMS" production report end to end for both Rider and

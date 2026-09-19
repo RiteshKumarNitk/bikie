@@ -43,7 +43,14 @@ vi.mock("../../../push.service", () => ({
 }));
 
 import { alertKind } from "./domain/alert-kind";
-import { buildEmailHtml, buildSmsTemplateBody, buildTextBody, describeLocation, type SOSRecipient } from "./domain/dispatch-message";
+import {
+  buildEmailHtml,
+  buildSmsTemplateBody,
+  buildTextBody,
+  describeLocation,
+  describeShortLocation,
+  type SOSRecipient,
+} from "./domain/dispatch-message";
 import { dispatchToRecipient, emptySummary, markSmsEligibility, sendSosSmsSequentially } from "./application/fan-out.application";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "./domain/maps";
 import {
@@ -122,8 +129,50 @@ describe("safety-location domain", () => {
     );
   });
 
-  describe("buildSmsTemplateBody (ADR-059, DLT 'BIKIE_SR')", () => {
-    it("matches the registered template text exactly, with rider name/vehicle reg/location filled in", () => {
+  describe("describeShortLocation (ADR-087 — SMS-only, DLT-safe location variable)", () => {
+    it("prefers area over placeName and city", () => {
+      expect(describeShortLocation(sampleAlert({ placeName: "City Park", area: "Malviya Nagar", city: "Jaipur" }))).toBe(
+        "Malviya Nagar",
+      );
+    });
+
+    it("falls back to placeName when area is missing", () => {
+      expect(describeShortLocation(sampleAlert({ placeName: "City Park", area: null, city: "Jaipur" }))).toBe("City Park");
+    });
+
+    it("falls back to bare city when neither area nor placeName is set", () => {
+      expect(describeShortLocation(sampleAlert({ area: null, placeName: null, city: "Jaipur" }))).toBe("Jaipur");
+    });
+
+    it("never uses the full formattedAddress, unlike describeLocation", () => {
+      const alert = sampleAlert({
+        formattedAddress: "Vedang Height Road, Jagatpura, Jaipur Municipal Corporation, Sanganer Tehsil, Jaipur, Rajasthan, 303902, India",
+        area: "Jagatpura",
+      });
+      expect(describeShortLocation(alert)).toBe("Jagatpura");
+      expect(describeShortLocation(alert).length).toBeLessThanOrEqual(40);
+    });
+
+    it("strips commas and semicolons (DLT variables are alphanumeric)", () => {
+      expect(describeShortLocation(sampleAlert({ area: "Sector 5, Phase-2;", placeName: null, city: "" }))).toBe(
+        "Sector 5 Phase-2",
+      );
+    });
+
+    it("hard-truncates to 40 characters even for an unusually long area/placeName/city", () => {
+      const longName = "A".repeat(60);
+      const result = describeShortLocation(sampleAlert({ area: longName, placeName: null, city: "" }));
+      expect(result.length).toBe(40);
+      expect(result).toBe("A".repeat(40));
+    });
+
+    it("falls back to a generic label when area/placeName/city are all empty", () => {
+      expect(describeShortLocation(sampleAlert({ area: null, placeName: null, city: "" }))).toBe("your area");
+    });
+  });
+
+  describe("buildSmsTemplateBody (ADR-059/087, DLT 'BIKIE_SR')", () => {
+    it("matches the registered template text exactly, with rider name/vehicle reg/location filled in — NO space before the semicolon", () => {
       const alert = sampleAlert({
         userName: "Priya Verma",
         city: "Jaipur",
@@ -131,7 +180,7 @@ describe("safety-location domain", () => {
       });
       expect(buildSmsTemplateBody(alert)).toBe(
         "Hello Riders/Service Providers, Rider Priya Verma, with Vehicle registration number is " +
-          "RJ14AB1234 having some emergency situation at Jaipur ;Please reach out to Rider to " +
+          "RJ14AB1234 having some emergency situation at Jaipur;Please reach out to Rider to " +
           "Provide Moral support and Adequate help, as noted by Kiesh India",
       );
     });
@@ -141,9 +190,28 @@ describe("safety-location domain", () => {
       expect(buildSmsTemplateBody(alert)).toContain("Vehicle registration number is N/A having");
     });
 
-    it("uses the same redacted-aware location as describeLocation (approximate pre-assignment)", () => {
-      const alert = sampleAlert({ formattedAddress: "Exact Street, Jaipur", city: "Jaipur" });
-      expect(buildSmsTemplateBody(alert)).toContain("emergency situation at Exact Street, Jaipur ;");
+    it("uses the short (area/placeName/city) location, never the full formattedAddress WhatsApp/email use", () => {
+      const alert = sampleAlert({
+        formattedAddress: "Vedang Height Road, Jagatpura, Jaipur Municipal Corporation, Sanganer Tehsil, Jaipur, Rajasthan, 303902, India",
+        area: "Jagatpura",
+        city: "Jaipur",
+      });
+      expect(buildSmsTemplateBody(alert)).toContain("emergency situation at Jagatpura;Please reach out");
+      expect(buildSmsTemplateBody(alert)).not.toContain("Sanganer Tehsil");
+      // WhatsApp/email are unaffected — still get the full address.
+      expect(buildTextBody(alert, { role: "NEARBY_RIDER", name: "Helper" })).toContain("Sanganer Tehsil");
+    });
+
+    it("the location variable never exceeds 40 characters, guaranteeing the DLT template's variable-length allowance", () => {
+      const alert = sampleAlert({
+        area: null,
+        placeName: "A Very Long Road Name That Somehow Exceeds Forty Characters Entirely",
+        city: "Jaipur",
+      });
+      const body = buildSmsTemplateBody(alert);
+      const match = body.match(/emergency situation at (.+);Please/);
+      expect(match).not.toBeNull();
+      expect(match![1].length).toBeLessThanOrEqual(40);
     });
   });
 
