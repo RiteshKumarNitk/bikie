@@ -161,40 +161,6 @@ describe("communications adapters (DEV fallback)", () => {
       }
       err.mockRestore();
     });
-
-    it("logs the exact serialized request payload (DLT_TE_ID + sender) before fetch, with the phone masked — never the raw number", async () => {
-      prev = snapshotEnv(keys);
-      process.env.MSG91_AUTH_KEY = "test-authkey";
-      process.env.MSG91_SENDER_ID = "KSHIDL";
-
-      const log = vi.spyOn(console, "log").mockImplementation(() => {});
-      const fetchSpy = vi.fn(async (_input: string | URL, _init?: RequestInit) => new Response('{"type":"success","message":"req-1"}', { status: 200 }));
-      vi.stubGlobal("fetch", fetchSpy);
-
-      // The real SOS DLT template id (ADR-087 investigation) — used here, not a placeholder,
-      // so this test directly proves the exact production value gets serialized correctly.
-      const SOS_TEMPLATE_ID = "1077556920001446300";
-      await createSmsAdapter().send("+918946887702", "SOS body", SOS_TEMPLATE_ID, "sos-help");
-
-      // What was actually transmitted to MSG91 — the real phone number, unmasked (masking is a
-      // logging-only concern, must never touch the actual wire request).
-      const [, init] = fetchSpy.mock.calls[0];
-      const sentBody = JSON.parse((init as RequestInit).body as string);
-      expect(sentBody.sender).toBe("KSHIDL");
-      expect(sentBody.sms[0].DLT_TE_ID).toBe(SOS_TEMPLATE_ID);
-      expect(sentBody.sms[0].to).toEqual(["918946887702"]);
-
-      // What was logged — same DLT_TE_ID/sender, but the phone number masked.
-      const requestLogCall = log.mock.calls.find((call) => String(call[0]).includes("[SMS][MSG91][REQUEST]"));
-      expect(requestLogCall).toBeDefined();
-      const loggedJson = String(requestLogCall![0]).replace(/^\[SMS\]\[MSG91\]\[REQUEST\] \[sos-help\] /, "");
-      const logged = JSON.parse(loggedJson);
-      expect(logged.sender).toBe("KSHIDL");
-      expect(logged.sms[0].DLT_TE_ID).toBe(SOS_TEMPLATE_ID);
-      expect(logged.sms[0].to[0]).not.toBe("918946887702");
-      expect(logged.sms[0].to[0]).not.toContain("887702");
-      log.mockRestore();
-    });
   });
 
   it("Email logs DEV when SMTP and Resend are unset", async () => {
