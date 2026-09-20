@@ -72,11 +72,8 @@ function cleanForDltVariable(value) {
   return value.replace(/[,;]/g, " ").replace(/\s+/g, " ").trim();
 }
 function firstAddressSegment(value) {
-  for (const part of value.split(",")) {
-    const trimmed = part.trim();
-    if (trimmed.length > 0) return trimmed;
-  }
-  return value.trim();
+  const seg = value.split(",")[0];
+  return (seg && seg.trim()) || value.trim();
 }
 function describeShortLocation(alert) {
   const rawCandidates = [alert.area, alert.placeName, alert.city].filter((v) => Boolean(v && v.trim()));

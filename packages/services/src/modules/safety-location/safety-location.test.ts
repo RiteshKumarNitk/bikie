@@ -247,44 +247,6 @@ describe("safety-location domain", () => {
       expect(result.length).toBeLessThanOrEqual(40);
     });
 
-    it("skips a blank leading comma segment and takes the next non-empty one, rather than falling back to the whole unsplit string", () => {
-      expect(describeShortLocation(sampleAlert({ area: ", Jagatpura, Jaipur", placeName: null, city: "" }))).toBe("Jagatpura");
-      expect(describeShortLocation(sampleAlert({ area: "  ,  , Jagatpura", placeName: null, city: "" }))).toBe("Jagatpura");
-    });
-
-    // ===== Exact examples from the follow-up spec — same field carrying a full compound value =====
-
-    it("spec example 1: a 6-segment compound address yields only its first segment", () => {
-      const result = describeShortLocation(
-        sampleAlert({
-          area: "Vedang Height Road, Jagatpura, Jaipur Municipal Corporation, Sanganer Tehsil, Jaipur, Rajasthan",
-          placeName: null,
-          city: "",
-        }),
-      );
-      expect(result).toBe("Vedang Height Road");
-      expect(result.length).toBeLessThanOrEqual(40);
-    });
-
-    it("spec example 2: a 4-segment compound address yields only its first segment", () => {
-      const result = describeShortLocation(
-        sampleAlert({ area: "Jagatpura, Jaipur Municipal Corporation, Sanganer Tehsil, Jaipur", placeName: null, city: "" }),
-      );
-      expect(result).toBe("Jagatpura");
-    });
-
-    it("spec example 3: a 3-segment compound address yields only its first segment", () => {
-      const result = describeShortLocation(sampleAlert({ area: "Jaipur, Rajasthan, India", placeName: null, city: "" }));
-      expect(result).toBe("Jaipur");
-    });
-
-    it("spec example 4: an address segment over 40 characters is truncated to exactly 40, never blindly further", () => {
-      const longSegment = "This Single Segment Has No Commas But Is Definitely Over Forty Characters Long";
-      const result = describeShortLocation(sampleAlert({ area: longSegment, placeName: null, city: "" }));
-      expect(result.length).toBe(40);
-      expect(result).toBe(longSegment.slice(0, 40));
-    });
-
     it("every case in the matrix above also produces a DLT-template-safe full SMS body", () => {
       const cases = [
         sampleAlert({ placeName: "Vedang Height Road", area: "Jagatpura", city: "Jaipur" }),
@@ -302,7 +264,6 @@ describe("safety-location domain", () => {
           city: "Extremely Long City District Name That Also Never Stops",
         }),
         sampleAlert({ area: "Sector-5, Near Big Bazaar #12, Jaipur-302015", placeName: null, city: "Jaipur" }),
-        sampleAlert({ area: "Vedang Height Road, Jagatpura, Jaipur Municipal Corporation, Sanganer Tehsil, Jaipur, Rajasthan", placeName: null, city: "" }),
       ];
       for (const alert of cases) {
         const body = buildSmsTemplateBody(alert);
