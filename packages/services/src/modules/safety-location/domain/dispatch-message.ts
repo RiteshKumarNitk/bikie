@@ -170,6 +170,12 @@ export function buildTextBody(alert: DispatchableAlert, recipient: SOSRecipient)
  * 211): (1) `describeShortLocation` (not `describeLocation`) supplies the third variable — see its
  * own doc comment; (2) there is NO space between the third variable and the following `;` — the
  * registered template reads `...##alphanumeric##;Please...`, not `...##alphanumeric## ;Please...`.
+ *
+ * NOT the live SOS SMS transport as of the MSG91 Flow API migration — `sendSosSmsSequentially`
+ * (`fan-out.application.ts`) now calls `communications.sms.sendFlow` with `buildSosFlowVariables`
+ * below instead of this pre-rendered body + `communications.sms.send`. Kept, exported, and fully
+ * tested: `diagnose-sms-body.cjs` still exercises it, and it remains the fallback shape if SOS SMS
+ * is ever rolled back to the v2 `sendsms` + `DLT_TE_ID` transport.
  */
 export function buildSmsTemplateBody(alert: DispatchableAlert): string {
   const vehicleReg = alert.riderVehicleRegistrationNumber?.trim() || "N/A";
@@ -178,6 +184,28 @@ export function buildSmsTemplateBody(alert: DispatchableAlert): string {
     `${vehicleReg} having some emergency situation at ${describeShortLocation(alert)};Please reach out ` +
     `to Rider to Provide Moral support and Adequate help, as noted by Kiesh India`
   );
+}
+
+/**
+ * MSG91 Flow API (`v5/flow`, `MSG91_SOS_FLOW_TEMPLATE_ID`) variables for the SOS-help Flow
+ * template — the live SOS SMS transport. Flow templates have no pre-rendered text body: MSG91
+ * fills in its own registered template using named placeholders, so this returns the same three
+ * values `buildSmsTemplateBody` used to compose into a string (rider name, vehicle registration,
+ * short location — same `describeShortLocation`, so the 40-char/no-comma/no-full-address
+ * protections from ADR-087 still apply) as a variables map instead.
+ *
+ * Placeholder mapping — MUST match the actual MSG91 Flow template's configured placeholder
+ * order, not assumed: `alphanumeric1` = rider name, `alphanumeric2` = vehicle registration
+ * number, `alphanumeric3` = short location. Verify this against the live Flow template
+ * (`6a7b54abd6f241632f0bc273`) in MSG91's dashboard before relying on it in production.
+ */
+export function buildSosFlowVariables(alert: DispatchableAlert): Record<string, string> {
+  const vehicleReg = alert.riderVehicleRegistrationNumber?.trim() || "N/A";
+  return {
+    alphanumeric1: alert.userName,
+    alphanumeric2: vehicleReg,
+    alphanumeric3: describeShortLocation(alert),
+  };
 }
 
 export function buildEmailHtml(alert: DispatchableAlert, recipient: SOSRecipient): string {

@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// ADR-077 — the one SOS/Amber SMS DLT template. These tests exercise the *configured*
-// deployment, so stub it here (the value's shape doesn't matter — `communications.sms.send` is
-// faked in every case).
+// The one SOS/Amber SMS MSG91 Flow template. These tests exercise the *configured* deployment,
+// so stub it here (the value's shape doesn't matter — `communications.sms.sendFlow` is faked in
+// every case).
 beforeEach(() => {
-  vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "test-bikie-sr-template");
+  vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "test-bikie-sr-flow-template");
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -1160,7 +1160,7 @@ describe("fan-out dispatch", () => {
     const module = createSafetyLocationModule({
       ...emptyRepos(),
       communications: fakeCommunications({
-        sms: { send: smsSend },
+        sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsSend },
       }),
     });
 
@@ -1223,7 +1223,7 @@ describe("fan-out dispatch", () => {
         },
       }),
       communications: fakeCommunications({
-        sms: { isConfigured: () => true, send: smsSend },
+        sms: { isConfigured: () => true, send: vi.fn(async () => ok("twilio")), sendFlow: smsSend },
         whatsapp: {
           isConfigured: () => false,
           send: whatsappSend,
@@ -1869,10 +1869,10 @@ describe("sendSosSmsSequentially (ADR-085 — one recipient at a time, failure i
       inFlight -= 1;
       return { ok: true, provider: "msg91" as const };
     });
-    const communications = fakeCommunications({ sms: { send: smsSend } });
+    const communications = fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsSend } });
     const availability = resolveChannelAvailability(communications);
     const summary = emptySummary(availability);
-    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+    vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "bikie-sr-flow-template");
 
     await sendSosSmsSequentially(sampleAlert(), validRecipients(5), communications, availability, summary);
 
@@ -1885,10 +1885,10 @@ describe("sendSosSmsSequentially (ADR-085 — one recipient at a time, failure i
     const smsSend = vi.fn(async (to: string) =>
       to.endsWith("3") ? { ok: false, provider: "msg91" as const, error: "rejected" } : { ok: true, provider: "msg91" as const },
     );
-    const communications = fakeCommunications({ sms: { send: smsSend } });
+    const communications = fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsSend } });
     const availability = resolveChannelAvailability(communications);
     const summary = emptySummary(availability);
-    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+    vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "bikie-sr-flow-template");
 
     // Recipient #3 (distance-sorted, 0-indexed "R3") has a phone ending in "3" and fails.
     await sendSosSmsSequentially(sampleAlert(), validRecipients(10), communications, availability, summary);
@@ -1902,16 +1902,113 @@ describe("sendSosSmsSequentially (ADR-085 — one recipient at a time, failure i
       if (to.endsWith("4")) throw new Error("network error");
       return { ok: true, provider: "msg91" as const };
     });
-    const communications = fakeCommunications({ sms: { send: smsSend } });
+    const communications = fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsSend } });
     const availability = resolveChannelAvailability(communications);
     const summary = emptySummary(availability);
-    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+    vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "bikie-sr-flow-template");
 
     await sendSosSmsSequentially(sampleAlert(), validRecipients(10), communications, availability, summary);
 
     expect(summary.smsAttempted).toBe(10);
     expect(summary.smsSent).toBe(9);
     expect(summary.errors.some((e) => e.includes("network error"))).toBe(true);
+  });
+
+  describe("MSG91 Flow API migration — variables, template id, redaction, city (ADR-0XX)", () => {
+    it("calls sendFlow with the SOS Flow template id and the rider name / vehicle reg / SHORT location as variables (not the full address)", async () => {
+      const smsFlow = vi.fn(async (_to: string, _templateId: string, _variables: Record<string, string>, _label?: string) => ({ ok: true, provider: "msg91" as const }));
+      const communications = fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsFlow } });
+      const availability = resolveChannelAvailability(communications);
+      const summary = emptySummary(availability);
+      vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "6a7b54abd6f241632f0bc273");
+
+      // The recipient below is a NEARBY_RIDER (a candidate responder), so `redactAlertForViewer`
+      // nulls area/placeName/formattedAddress before `describeShortLocation` ever runs — leaving
+      // `city` as the only surviving, short candidate. This is the same ADR-045 redaction every
+      // SOS SMS to a candidate responder goes through; only `city` reaches the SMS.
+      const alert = sampleAlert({
+        userName: "Mohit kumar sharma",
+        riderVehicleRegistrationNumber: null, // N/A fallback
+        area: "Kartarpura",
+        placeName: null,
+        city: "Jaipur",
+        formattedAddress: "Kartarpura, Jaipur Municipal Corporation, Sanganer Tehsil, Jaipur, Rajasthan, 303902, India",
+      });
+
+      await sendSosSmsSequentially(alert, validRecipients(1), communications, availability, summary);
+
+      expect(smsFlow).toHaveBeenCalledTimes(1);
+      const [to, templateId, variables, label] = smsFlow.mock.calls[0];
+      expect(templateId).toBe("6a7b54abd6f241632f0bc273"); // exact configured Flow template id, no DLT_TE_ID involved
+      expect(label).toBe("sos-help");
+      expect(to).toMatch(/^\+91/);
+
+      // G: short location used (post-redaction: city), not the full formatted address.
+      expect(variables.alphanumeric3).toBe("Jaipur");
+      // H: the huge full address must never appear in any variable.
+      expect(Object.values(variables).join(" ")).not.toContain("Sanganer Tehsil");
+      expect(Object.values(variables).join(" ")).not.toContain("Kartarpura"); // area was redacted, not just shortened
+      expect((variables.alphanumeric3 as string).length).toBeLessThanOrEqual(40);
+      expect(variables.alphanumeric1).toBe("Mohit kumar sharma");
+      expect(variables.alphanumeric2).toBe("N/A");
+    });
+
+    it("I/J: candidate-responder redaction and the server-geocoded city fix are unchanged under the Flow transport", async () => {
+      const smsFlow = vi.fn(async (_to: string, _templateId: string, _variables: Record<string, string>, _label?: string) => ({ ok: true, provider: "msg91" as const }));
+      const communications = fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsFlow } });
+      const availability = resolveChannelAvailability(communications);
+      const summary = emptySummary(availability);
+      vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "6a7b54abd6f241632f0bc273");
+
+      // Simulates the alert as persisted after the city root-cause fix: `city` holds the
+      // geocoded value ("Jaipur"), not the client's "Unknown" — and `area`/`placeName` are real
+      // geocoded values that a NEARBY_RIDER (candidate responder) must never see verbatim.
+      const alert = sampleAlert({ area: null, placeName: null, city: "Jaipur", formattedAddress: null });
+      const recipient: SOSRecipient = {
+        role: "NEARBY_RIDER",
+        name: "Nearby Rider",
+        phone: "9888888888",
+        email: "rider@example.com",
+        userId: "rider-1",
+        smsEligible: true,
+      };
+
+      await sendSosSmsSequentially(alert, [recipient], communications, availability, summary);
+
+      const [, , variables] = smsFlow.mock.calls[0];
+      // With area/placeName absent (as they would be after redaction nulls them for a candidate
+      // responder), describeShortLocation falls through to the geocoded city — "Jaipur", not
+      // the client-fallback "Unknown".
+      expect(variables.alphanumeric3).toBe("Jaipur");
+      expect(variables.alphanumeric3).not.toBe("Unknown");
+    });
+
+    it("K: WhatsApp/email/in-app SOS notifications are unaffected by the SMS transport change", async () => {
+      const whatsappSend = vi.fn(async () => ok("meta"));
+      const emailSend = vi.fn(async () => ok("smtp"));
+      const notify = notifyMock();
+      const communications = fakeCommunications({
+        whatsapp: { send: whatsappSend, sendLocation: vi.fn(async () => ok("meta")) },
+        email: { send: emailSend },
+      });
+      const availability = resolveChannelAvailability(communications);
+      const summary = emptySummary(availability);
+      const ports = { ...emptyRepos(), notifications: { notify } } as unknown as Parameters<typeof dispatchToRecipient>[4];
+      const recipient: SOSRecipient = {
+        role: "NEARBY_RIDER",
+        name: "Nearby Rider",
+        phone: "9888888888",
+        email: "rider@example.com",
+        userId: "rider-1",
+        smsEligible: true,
+      };
+
+      await dispatchToRecipient(sampleAlert(), recipient, summary, communications, ports, availability);
+
+      expect(whatsappSend).toHaveBeenCalledTimes(1);
+      expect(emailSend).toHaveBeenCalledTimes(1);
+      expect(notify).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
@@ -1935,9 +2032,9 @@ describe("escalation application — ADR-085: per-SOS (not per-batch) SMS budget
         riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any,
         notifications: { notify },
       }),
-      communications: fakeCommunications({ sms: { send: smsSend } }),
+      communications: fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsSend } }),
     });
-    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+    vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "bikie-sr-flow-template");
 
     const result = await module.escalation.seedEscalation(sampleAlert());
 
@@ -1960,9 +2057,9 @@ describe("escalation application — ADR-085: per-SOS (not per-batch) SMS budget
     const smsSend = vi.fn(async () => ({ ok: true, provider: "msg91" as const }));
     const module = createSafetyLocationModule({
       ...emptyRepos({ riderLocation: { ...emptyRepos().riderLocation, findNearbyAroundPoint } as any }),
-      communications: fakeCommunications({ sms: { send: smsSend } }),
+      communications: fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsSend } }),
     });
-    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+    vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "bikie-sr-flow-template");
 
     const result = await module.escalation.seedEscalation(sampleAlert());
 
@@ -1991,9 +2088,9 @@ describe("escalation application — ADR-085: per-SOS (not per-batch) SMS budget
         sosTimeline: { ...emptyRepos().sosTimeline, countSmsSelectedForAlert } as any,
         notifications: { notify },
       }),
-      communications: fakeCommunications({ sms: { send: smsSend } }),
+      communications: fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsSend } }),
     });
-    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+    vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "bikie-sr-flow-template");
 
     await module.escalation.tickEscalation(
       sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
@@ -2023,9 +2120,9 @@ describe("escalation application — ADR-085: per-SOS (not per-batch) SMS budget
         sosAlerts: { ...emptyRepos().sosAlerts, findNotifiedUserIdsForAlert: vi.fn(async () => new Set<string>()) } as any,
         sosTimeline: { ...emptyRepos().sosTimeline, countSmsSelectedForAlert } as any,
       }),
-      communications: fakeCommunications({ sms: { send: smsSend } }),
+      communications: fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow: smsSend } }),
     });
-    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "bikie-sr-template");
+    vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "bikie-sr-flow-template");
 
     await module.escalation.tickEscalation(
       sampleAlert({ escalationTier: "NEARBY_RIDERS_GENERAL", currentRadiusMeters: 5000 }),
@@ -2130,8 +2227,8 @@ describe("dispatch PII redaction (ADR-047)", () => {
     expect(contactText).toContain("12.97160");
   });
 
-  it("skips the SOS-help SMS (does NOT borrow another template) when MSG91_SOS_HELP_TEMPLATE_ID is unset", async () => {
-    vi.stubEnv("MSG91_SOS_HELP_TEMPLATE_ID", "");
+  it("skips the SOS-help SMS (does NOT borrow another template) when MSG91_SOS_FLOW_TEMPLATE_ID is unset", async () => {
+    vi.stubEnv("MSG91_SOS_FLOW_TEMPLATE_ID", "");
     const alert = sampleAlert({ latitude: 12.9716, longitude: 77.5946 });
     const communications = fakeCommunications();
     const availability = resolveChannelAvailability(communications);
@@ -2147,9 +2244,9 @@ describe("dispatch PII redaction (ADR-047)", () => {
       dispatchToRecipient(alert, recipient, summary, communications, ports, availability),
     ]);
 
-    expect(communications.sms.send).not.toHaveBeenCalled();
+    expect(communications.sms.sendFlow).not.toHaveBeenCalled();
     expect(summary.smsAttempted).toBe(0);
-    expect(summary.errors.some((e) => e.includes("MSG91_SOS_HELP_TEMPLATE_ID not configured"))).toBe(true);
+    expect(summary.errors.some((e) => e.includes("MSG91_SOS_FLOW_TEMPLATE_ID not configured"))).toBe(true);
     // Other channels are unaffected — the in-app notification still went out.
     expect(summary.inAppNotified).toBe(1);
   });

@@ -4517,4 +4517,69 @@ changes:
   coordinate fallback, the final literal fallback — plus one test asserting every matrix case still
   produces a template-exact, ≤40-char SMS body), `tsc --noEmit` clean. No SMS sent.
 
+## ADR-088: SOS SMS moves from MSG91 v2 `sendsms` + `DLT_TE_ID` to the MSG91 Flow API (`v5/flow`)
+
+- **Context.** A manually-tested MSG91 Flow API request (`POST
+  https://control.msg91.com/api/v5/flow`, Flow template `6a7b54abd6f241632f0bc273`) was confirmed
+  to successfully deliver SMS, as an alternative transport to the `v2/sendsms` + `DLT_TE_ID` path
+  ADR-059/077/087 diagnosed repeated Pause Code 211 rejections on. Requested: switch SOS/Amber
+  dispatch SMS specifically to the Flow API, leaving OTP and membership SMS (both still v2
+  `sendsms` + their own `DLT_TE_ID`s) untouched.
+- **Decision.**
+  1. **`SmsPort` gets a second method, `sendFlow(to, templateId, variables, label?)`**
+     (`communications/ports/index.ts`), alongside the existing `send(to, message, templateId?,
+     label?)` — not a replacement. `templateId` here is a Flow template id, never a `DLT_TE_ID`;
+     the two are not interchangeable and the adapter never mixes them.
+  2. **`sms.adapter.ts` implements `sendFlow`** against `https://control.msg91.com/api/v5/flow`:
+     body `{ template_id, short_url: "1", realTimeResponse: "1", recipients: [{ mobiles, ...variables }] }`
+     — no `DLT_TE_ID` field anywhere. Reuses the existing `msg91Credentials()` (same
+     `MSG91_AUTH_KEY`/`MSG91_SENDER_ID`/`MSG91_ROUTE` config check as `send`, though Flow doesn't
+     put a sender in the body — MSG91 resolves that from the Flow template itself), the same
+     `+91XXXXXXXXXX` → `91XXXXXXXXXX` phone normalization (strip leading `+`) as `send`'s `mobile`
+     variable, the same `classifyMsg91Failure`/`extractMsg91RequestId` helpers (no duplicated
+     auth/parsing logic), and the same DEV-fallback-when-unconfigured convention. New log lines:
+     `[SMS][DEV][FLOW]`, `[SMS][MSG91][FLOW][REQUEST]` (masked phone, full variables — variable
+     values are not secret, same posture as ADR-079's `[SMS][MSG91][REQUEST]`), `[SMS][MSG91][FLOW]`
+     accept/reject lines. The auth key is never logged — header only.
+  3. **`dispatch-message.ts` gets `buildSosFlowVariables(alert)`**, alongside (not replacing)
+     `buildSmsTemplateBody`: returns `{ alphanumeric1: riderName, alphanumeric2: vehicleReg,
+     alphanumeric3: describeShortLocation(alert) }` — same three values, same `"N/A"` vehicle
+     fallback, same `describeShortLocation` (ADR-087's 40-char/no-comma/short-location guarantees
+     carry over unchanged) — just returned as a variables map instead of composed into one string,
+     since a Flow template has no pre-rendered body. Placeholder mapping
+     (`alphanumeric1`/`2`/`3` = rider name/vehicle/location) matches the order requested for Flow
+     template `6a7b54abd6f241632f0bc273`; **this must still be verified against that template's
+     actual configured placeholder order in MSG91's dashboard** before relying on it in production
+     — nothing in this codebase can confirm that mapping.
+  4. **`fan-out.application.ts`'s `sendSosSmsSequentially`** now reads `MSG91_SOS_FLOW_TEMPLATE_ID`
+     (not `MSG91_SOS_HELP_TEMPLATE_ID`) and calls `communications.sms.sendFlow(phone,
+     smsFlowTemplateId, buildSosFlowVariables(dispatchAlert), "sos-help")` instead of
+     `communications.sms.send(...)`. Same per-recipient sequential/failure-isolated behavior
+     (ADR-085), same ADR-045 redaction (`redactAlertForViewer` runs before variable-building,
+     unchanged), same ADR-045-city-fix behavior (`city` still prefers the server-geocoded value —
+     see the `sos.application.ts` `createAlert` change earlier this engagement). If the env var is
+     unset, the SMS is skipped per recipient (logged, recorded in the dispatch summary) exactly as
+     before — WhatsApp/email/in-app are unaffected either way.
+  5. **`buildSmsTemplateBody`/`MSG91_SOS_HELP_TEMPLATE_ID` are NOT deleted** — kept, still fully
+     tested, still used by `diagnose-sms-body.cjs`, as the v2-`sendsms` fallback shape if Flow ever
+     needs to be rolled back. Not read by any live SOS send path any more.
+  6. **OTP and membership SMS are untouched** — both still call `communications.sms.send(...)`
+     with their own DLT template ids; `SmsPort.send` and `sms.service.ts` are unmodified.
+- **New env var: `MSG91_SOS_FLOW_TEMPLATE_ID`** (`.env.example`). **Confirmed NOT YET SET** in the
+  local dev env (`apps/web/.env` only has the old `MSG91_SOS_HELP_TEMPLATE_ID`) — SOS SMS will log
+  `[SMS][CONFIG] MSG91_SOS_FLOW_TEMPLATE_ID is not set` and skip per recipient until this is added,
+  both locally and on the production server, before deploying.
+- **Tests.** `communications.test.ts`: new `sendFlow` suite — exact endpoint
+  (`https://control.msg91.com/api/v5/flow`), exact `template_id`, phone normalization
+  (`+918946887702` → `918946887702`, no `+`/`0091`/double-`91`), variables passed through
+  verbatim, no `DLT_TE_ID` anywhere in the request, auth key never appears in any log line, masked
+  phone in the request log, DEV fallback, MSG91 rejection classification reused.
+  `safety-location.test.ts`: `sendSosSmsSequentially` now asserts against `sendFlow` (not `send`)
+  everywhere it's exercised (9 existing test sites updated, env var stub renamed); new tests
+  confirm `alphanumeric3` is the short, redacted location (never the full address, never over 40
+  chars), that ADR-045 redaction and the geocoded-city fix behave identically under the new
+  transport, and that WhatsApp/email/in-app are unaffected. `vitest` 322→332 (10 new: 6 adapter +
+  3 fan-out + 1 whitespace-lock from the same session's earlier work), `tsc --noEmit` clean. No SMS
+  sent during implementation — not committed, not pushed, not deployed.
+
 

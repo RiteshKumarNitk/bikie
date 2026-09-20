@@ -70,7 +70,7 @@ export function notifyMock() {
 export function fakeCommunications(overrides: Partial<CommunicationsPorts> = {}): CommunicationsPorts {
   return {
     email: { send: vi.fn(async () => ok("smtp")) },
-    sms: { send: vi.fn(async () => ok("twilio")) },
+    sms: { send: vi.fn(async () => ok("twilio")), sendFlow: vi.fn(async () => ok("msg91")) },
     whatsapp: {
       send: vi.fn(async () => ok("meta")),
       sendLocation: vi.fn(async () => ok("meta")),

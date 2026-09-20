@@ -9,7 +9,7 @@ import {
 } from "../domain/channel-selection";
 import {
   buildEmailHtml,
-  buildSmsTemplateBody,
+  buildSosFlowVariables,
   buildTextBody,
   describeLocation,
   humanizeSosType,
@@ -146,7 +146,11 @@ export async function sendSosSmsSequentially(
   availability: ChannelAvailability,
   summary: SOSDispatchSummary,
 ): Promise<void> {
-  const smsTemplateId = process.env.MSG91_SOS_HELP_TEMPLATE_ID?.trim() || null;
+  // MSG91 Flow API migration — the SOS-help SMS no longer goes through v2 `sendsms` +
+  // `DLT_TE_ID` (`MSG91_SOS_HELP_TEMPLATE_ID`); it's a Flow template, filled in by named
+  // placeholder variables via `communications.sms.sendFlow`. No unrelated template is ever
+  // substituted — same posture as before, just a different transport/id.
+  const smsFlowTemplateId = process.env.MSG91_SOS_FLOW_TEMPLATE_ID?.trim() || null;
 
   const toSend = recipients
     .filter((r) => r.smsEligible !== false && channelsForRecipient(r, availability).sms)
@@ -159,16 +163,12 @@ export async function sendSosSmsSequentially(
     const maskedPhone = maskPhone(phone);
     const recipientTag = recipient.userId ?? "none";
 
-    if (!smsTemplateId) {
-      // ADR-077 — BIKIE has ONE SOS/Amber SMS DLT template ("BIKIE_SR",
-      // `MSG91_SOS_HELP_TEMPLATE_ID`), used for every dispatch recipient. No unrelated template
-      // is ever substituted — when it's unset the SMS channel is skipped entirely (logged +
-      // recorded); WhatsApp/email/in-app are untouched.
+    if (!smsFlowTemplateId) {
       console.error(
-        `[SMS][CONFIG] MSG91_SOS_HELP_TEMPLATE_ID is not set — SOS SMS to ${maskedPhone} skipped ` +
-          `(no unrelated DLT template is used). WhatsApp / email / in-app are unaffected.`,
+        `[SMS][CONFIG] MSG91_SOS_FLOW_TEMPLATE_ID is not set — SOS SMS to ${maskedPhone} skipped ` +
+          `(no unrelated template is used). WhatsApp / email / in-app are unaffected.`,
       );
-      summary.errors.push(`sms → ${maskedPhone}: MSG91_SOS_HELP_TEMPLATE_ID not configured (SMS skipped)`);
+      summary.errors.push(`sms → ${maskedPhone}: MSG91_SOS_FLOW_TEMPLATE_ID not configured (SMS skipped)`);
       continue;
     }
 
@@ -180,7 +180,12 @@ export async function sendSosSmsSequentially(
     try {
       // Awaited — the next recipient's send does not start until this one has fully settled,
       // success or failure.
-      const result = await communications.sms.send(phone, buildSmsTemplateBody(dispatchAlert), smsTemplateId, "sos-help");
+      const result = await communications.sms.sendFlow(
+        phone,
+        smsFlowTemplateId,
+        buildSosFlowVariables(dispatchAlert),
+        "sos-help",
+      );
       if (result.ok) {
         summary.smsSent += 1;
         console.log(`SOS_SMS_SENT sosId=${alert.id} recipientUserId=${recipientTag} status=SUCCESS`);

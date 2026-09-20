@@ -66,6 +66,13 @@ export interface SmsPort extends ChannelCapability {
    * their own `MSG91_*_TEMPLATE_ID` up front and refuse to send when it's unset, rather than
    * borrow one. `label` is an optional log tag (e.g. `"membership-subscribed"`, `"sos-help"`). */
   send(to: string, message: string, templateId?: string, label?: string): Promise<ChannelResult>;
+  /** MSG91 Flow API (`v5/flow`) — a different transport than `send`'s `v2/sendsms` +
+   * `DLT_TE_ID`: there is no pre-rendered text body, the fixed message lives entirely in the
+   * MSG91 Flow template itself, and the caller fills it in by named placeholder variables
+   * (`alphanumeric1`, `alphanumeric2`, ...) matching that template's actual configured order.
+   * `templateId` here is a Flow template id, NOT a `DLT_TE_ID` — the two are never
+   * interchangeable. `label` is the same optional log tag convention as `send`. */
+  sendFlow(to: string, templateId: string, variables: Record<string, string>, label?: string): Promise<ChannelResult>;
 }
 
 export interface WhatsAppPort extends ChannelCapability {

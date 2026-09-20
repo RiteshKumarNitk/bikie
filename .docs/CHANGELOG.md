@@ -1,5 +1,23 @@
 # BIKIE Changelog
 
+## 2026-09-20 — SOS SMS moved from MSG91 v2 sendsms + DLT_TE_ID to the MSG91 Flow API (ADR-088)
+
+A manually-tested MSG91 Flow API request (Flow template `6a7b54abd6f241632f0bc273`) confirmed
+working, as an alternative to the v2 `sendsms` + `DLT_TE_ID` path this session's ADR-087 diagnosed
+Pause Code 211 rejections on. `SmsPort` gets a new `sendFlow(to, templateId, variables, label?)`
+alongside (not replacing) `send` — OTP and membership SMS are untouched, both still `send` with
+their own DLT template ids. `sms.adapter.ts` implements `sendFlow` against
+`https://control.msg91.com/api/v5/flow` (no `DLT_TE_ID` field, reuses the existing auth/phone-
+normalization/error-classification helpers). `dispatch-message.ts` gets `buildSosFlowVariables`
+— same rider name / vehicle reg / `describeShortLocation` short location as `buildSmsTemplateBody`
+(kept, unused by the live path, still tested), now returned as a variables map
+(`alphanumeric1`/`2`/`3`) instead of a composed string. `fan-out.application.ts`'s
+`sendSosSmsSequentially` now calls `sendFlow` with a new `MSG91_SOS_FLOW_TEMPLATE_ID` env var,
+same per-recipient sequential/failure-isolated dispatch (ADR-085), same ADR-045 redaction, same
+geocoded-city fix — unchanged. **`MSG91_SOS_FLOW_TEMPLATE_ID` is not yet set in the local dev env**
+— must be added (dev and production) before this can send. `vitest` 322→332, `tsc --noEmit`
+clean. No SMS sent; not committed, not pushed, not deployed. See ADR-088.
+
 ## 2026-09-19 — Fixed: SOS SMS content mismatch causing MSG91 Pause Code 211 (ADR-087)
 
 Proved (via a read-only DB reproduction, not a guess) that `buildSmsTemplateBody` produced two

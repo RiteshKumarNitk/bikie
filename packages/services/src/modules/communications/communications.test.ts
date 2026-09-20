@@ -197,6 +197,140 @@ describe("communications adapters (DEV fallback)", () => {
     });
   });
 
+  describe("SMS Flow API (MSG91 v5/flow — SOS dispatch transport)", () => {
+    const keys = ["MSG91_AUTH_KEY", "MSG91_SENDER_ID", "MSG91_ROUTE"];
+    let prev: Record<string, string | undefined>;
+
+    afterEach(() => {
+      restoreEnv(prev);
+      vi.unstubAllGlobals();
+    });
+
+    it("posts to the Flow endpoint with the template id, normalized phone, and variables — no DLT_TE_ID anywhere", async () => {
+      prev = snapshotEnv(keys);
+      process.env.MSG91_AUTH_KEY = "test-authkey";
+      process.env.MSG91_SENDER_ID = "KSHIDL";
+
+      const fetchSpy = vi.fn(async (_input: string | URL, _init?: RequestInit) => new Response('{"type":"success","message":"flow-req-1"}', { status: 200 }));
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const SOS_FLOW_TEMPLATE_ID = "6a7b54abd6f241632f0bc273";
+      await createSmsAdapter().sendFlow(
+        "+918946887702",
+        SOS_FLOW_TEMPLATE_ID,
+        { alphanumeric1: "Mohit kumar sharma", alphanumeric2: "N/A", alphanumeric3: "Kartarpura" },
+        "sos-help",
+      );
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(url).toBe("https://control.msg91.com/api/v5/flow"); // A
+
+      const sentBody = JSON.parse((init as RequestInit).body as string);
+      expect(sentBody.template_id).toBe(SOS_FLOW_TEMPLATE_ID); // B
+      expect(sentBody.recipients).toHaveLength(1);
+      expect(sentBody.recipients[0].mobiles).toBe("918946887702"); // C — leading + stripped, no 0091/9191
+      expect(sentBody.recipients[0].alphanumeric1).toBe("Mohit kumar sharma"); // D
+      expect(sentBody.recipients[0].alphanumeric2).toBe("N/A");
+      expect(sentBody.recipients[0].alphanumeric3).toBe("Kartarpura");
+      expect(JSON.stringify(sentBody)).not.toContain("DLT_TE_ID"); // E
+
+      const headers = (init as RequestInit).headers as Record<string, string>;
+      expect(headers.authkey).toBe("test-authkey"); // sent in the header...
+      expect(JSON.stringify(sentBody)).not.toContain("test-authkey"); // ...never in the body
+    });
+
+    it("never logs the auth key — request/success/error log lines are all free of it (F)", async () => {
+      prev = snapshotEnv(keys);
+      process.env.MSG91_AUTH_KEY = "super-secret-authkey";
+      process.env.MSG91_SENDER_ID = "KSHIDL";
+
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+      const fetchSpy = vi.fn(async () => new Response('{"type":"success","message":"flow-req-2"}', { status: 200 }));
+      vi.stubGlobal("fetch", fetchSpy);
+
+      await createSmsAdapter().sendFlow("+918946887702", "6a7b54abd6f241632f0bc273", { alphanumeric1: "x" }, "sos-help");
+
+      const allLoggedText = [...log.mock.calls, ...err.mock.calls].map((c) => c.join(" ")).join("\n");
+      expect(allLoggedText).not.toContain("super-secret-authkey");
+
+      log.mockRestore();
+      err.mockRestore();
+    });
+
+    it("masks the phone number in the [SMS][MSG91][FLOW][REQUEST] diagnostic log line", async () => {
+      prev = snapshotEnv(keys);
+      process.env.MSG91_AUTH_KEY = "test-authkey";
+      process.env.MSG91_SENDER_ID = "KSHIDL";
+
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.stubGlobal("fetch", vi.fn(async () => new Response('{"type":"success","message":"req-3"}', { status: 200 })));
+
+      await createSmsAdapter().sendFlow("+918946887702", "6a7b54abd6f241632f0bc273", { alphanumeric1: "x" }, "sos-help");
+
+      const requestLogCall = log.mock.calls.find((call) => String(call[0]).includes("[SMS][MSG91][FLOW][REQUEST]"));
+      expect(requestLogCall).toBeDefined();
+      const loggedJson = String(requestLogCall![0]).replace(/^\[SMS\]\[MSG91\]\[FLOW\]\[REQUEST\] \[sos-help\] /, "");
+      const logged = JSON.parse(loggedJson);
+      expect(logged.recipients[0].mobiles).not.toBe("918946887702");
+      expect(logged.recipients[0].mobiles).not.toContain("887702".slice(0, -4)); // masked, not the raw digits
+
+      log.mockRestore();
+    });
+
+    it("distinguishes API acceptance from handset delivery, and returns MSG91's request id as `detail`", async () => {
+      prev = snapshotEnv(keys);
+      process.env.MSG91_AUTH_KEY = "test-authkey";
+      process.env.MSG91_SENDER_ID = "KSHIDL";
+
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      vi.stubGlobal("fetch", vi.fn(async () => new Response('{"type":"success","message":"flow-req-4"}', { status: 200 })));
+
+      const res = await createSmsAdapter().sendFlow("+918946887702", "6a7b54abd6f241632f0bc273", { alphanumeric1: "x" }, "sos-help");
+
+      expect(res).toMatchObject({ ok: true, provider: "msg91", detail: "flow-req-4" });
+      const acceptedLog = log.mock.calls.find((call) => String(call[0]).includes("[SMS][MSG91][FLOW] "));
+      expect(acceptedLog).toBeDefined();
+      expect(String(acceptedLog![0])).toContain("API accepted, not proof of handset delivery");
+
+      log.mockRestore();
+    });
+
+    it("falls back to DEV (does not call fetch) when MSG91 credentials are unset, phone still masked", async () => {
+      prev = snapshotEnv(keys);
+      clearEnv(keys);
+
+      const log = vi.spyOn(console, "log").mockImplementation(() => {});
+      const fetchSpy = vi.fn();
+      vi.stubGlobal("fetch", fetchSpy);
+
+      const res = await createSmsAdapter().sendFlow("+918946887702", "6a7b54abd6f241632f0bc273", { alphanumeric1: "x" });
+
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(res).toEqual({ ok: false, provider: "dev", error: "MSG91 credentials not configured" });
+      const devLog = log.mock.calls.find((call) => String(call[0]).includes("[SMS][DEV][FLOW]"));
+      expect(devLog).toBeDefined();
+      expect(String(devLog![0])).not.toContain("918946887702");
+
+      log.mockRestore();
+    });
+
+    it("classifies an MSG91 Flow rejection the same way as v2 (auth/sender/number/balance)", async () => {
+      prev = snapshotEnv(keys);
+      process.env.MSG91_AUTH_KEY = "bad";
+      process.env.MSG91_SENDER_ID = "KSHIDL";
+      const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+      vi.stubGlobal("fetch", vi.fn(async () => new Response('{"type":"error","message":"authkey not valid"}', { status: 401 })));
+      const res = await createSmsAdapter().sendFlow("+918946887702", "6a7b54abd6f241632f0bc273", { alphanumeric1: "x" }, "sos-help");
+
+      expect(res.ok).toBe(false);
+      expect(res.error).toMatch(/auth key/i);
+      err.mockRestore();
+    });
+  });
+
   it("Email logs DEV when SMTP and Resend are unset", async () => {
     const keys = ["SMTP_USER", "SMTP_PASS", "RESEND_API_KEY"];
     const prev = snapshotEnv(keys);

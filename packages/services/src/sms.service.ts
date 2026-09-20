@@ -3,11 +3,14 @@ import { getCommunicationsPorts, type ChannelResult } from "./modules/communicat
 export type SMSResult = ChannelResult & { provider: "msg91" | "dev" | "unconfigured" | string };
 
 /**
- * BIKIE has exactly THREE MSG91 DLT templates, one per SMS type, never shared (ADR-077):
+ * BIKIE has THREE distinct MSG91 SMS types, one template each, never shared (ADR-077):
  *
- *   - OTP           → MSG91_OTP_TEMPLATE_ID  (native OTP adapter, `msg91-native-otp.adapter.ts`)
- *   - Membership    → MSG91_MEMBERSHIP_SUB_TEMPLATE_ID
- *   - SOS / Amber   → MSG91_SOS_HELP_TEMPLATE_ID
+ *   - OTP           → MSG91_OTP_TEMPLATE_ID  (native OTP adapter, `msg91-native-otp.adapter.ts`) — DLT, v2 sendsms
+ *   - Membership    → MSG91_MEMBERSHIP_SUB_TEMPLATE_ID — DLT, v2 sendsms
+ *   - SOS / Amber   → MSG91_SOS_FLOW_TEMPLATE_ID — MSG91 Flow API (v5/flow), NOT a DLT_TE_ID
+ *     (`safety-location/application/fan-out.application.ts`'s `sendSosSmsSequentially`, not this
+ *     file — SOS SMS never went through `SMSService`). `SOS_HELP` below is kept for reference
+ *     only; it is not read by any live send path.
  *
  * Each typed sender resolves its own id here; if the var is unset it logs a clear configuration
  * error and the send is refused rather than falling back to another type's template (India's DLT
@@ -19,7 +22,9 @@ export type SMSResult = ChannelResult & { provider: "msg91" | "dev" | "unconfigu
  * now sends untemplated.
  */
 export const MSG91_SMS_TEMPLATE_ENV = {
-  /** "BIKIE_SR" DLT template — the SOS / Amber assistance SMS to every dispatch recipient. */
+  /** Not read by any live send path — SOS/Amber SMS now uses the MSG91 Flow API
+   * (`MSG91_SOS_FLOW_TEMPLATE_ID`, `fan-out.application.ts`), not this DLT template id. Kept for
+   * `buildSmsTemplateBody`/`diagnose-sms-body.cjs` reference only. */
   SOS_HELP: "MSG91_SOS_HELP_TEMPLATE_ID",
   /** "BIKIE_Sub" DLT template — Rider membership-purchased confirmation (ADR-058). Its
    * registered text is annual-specific ("BIKIE annual Membership") — never used for a Service

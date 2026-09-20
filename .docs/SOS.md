@@ -181,16 +181,22 @@ platform admins immediately, logs `[SOS][DISPATCH][NO-RECIPIENTS]`, and reports
 `escalatedToAdmins` in the summary. The reporter always receives an in-app notice regardless of
 provider configuration.
 
-**SMS content is DLT-template-bound (ADR-059/077).** India's TRAI DLT content firewall requires
-SMS text to exactly match a registered template — the free-text, multi-line `buildTextBody` (with
-maps links etc.) used for every other channel does **not** qualify. Every SOS SMS recipient —
-`NEARBY_RIDER`/`SERVICE_PROVIDER` candidates **and** the reporter's own emergency contacts/admins/
-emergency services alike — gets the one DLT-approved **"BIKIE_SR"** template
-(`buildSmsTemplateBody`, `MSG91_SOS_HELP_TEMPLATE_ID`): rider name, vehicle registration number
-(`"N/A"` if the rider never filled it in — `RiderProfile.vehicleRegistrationNumber`), and
-approximate location (`describeLocation`, respecting the same pre-assignment redaction as every
-other channel). There is no second "generic SOS" template — `MSG91_TEMPLATE_ID` is deprecated and
-read by no SOS code path (ADR-077).
+**SMS content is template-bound (ADR-059/077/087), sent via MSG91's Flow API.** India's TRAI DLT
+content firewall requires SMS text to exactly match a registered template — the free-text,
+multi-line `buildTextBody` (with maps links etc.) used for every other channel does **not**
+qualify. Every SOS SMS recipient — `NEARBY_RIDER`/`SERVICE_PROVIDER` candidates **and** the
+reporter's own emergency contacts/admins/emergency services alike — gets the one approved
+**"BIKIE_SR"** Flow template (`buildSosFlowVariables`, `communications.sms.sendFlow`,
+`MSG91_SOS_FLOW_TEMPLATE_ID`): rider name, vehicle registration number (`"N/A"` if the rider never
+filled it in — `RiderProfile.vehicleRegistrationNumber`), and a short, DLT-length-safe location
+(`describeShortLocation` — area/placeName/city, never the full formatted address; respects the
+same pre-assignment redaction as every other channel). Sent as named placeholder variables
+(`alphanumeric1`/`2`/`3`), not a pre-rendered text body — MSG91's Flow endpoint (`v5/flow`) fills
+in its own registered template, so there is no `DLT_TE_ID` in this request at all. The older v2
+`sendsms` + `DLT_TE_ID` path (`buildSmsTemplateBody`, `MSG91_SOS_HELP_TEMPLATE_ID`) is no longer
+used by live SOS dispatch — kept only for `diagnose-sms-body.cjs` and as a rollback fallback.
+There is no second "generic SOS" template — `MSG91_TEMPLATE_ID` is deprecated and read by no SOS
+code path (ADR-077).
 
 **SMS is verified, deduplicated, and capped at 10 per alert's WHOLE lifecycle — not per batch
 (ADR-059/085).** `markSmsEligibility` (`fan-out.application.ts`) sorts the combined nearby-rider +

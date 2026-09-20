@@ -129,5 +129,70 @@ export function createSmsAdapter(): SmsPort {
       );
       return { ok: true, provider: "msg91", detail: requestId ?? undefined };
     },
+
+    async sendFlow(to: string, templateId: string, variables: Record<string, string>, label?: string): Promise<ChannelResult> {
+      const tag = label ? `[${label}] ` : "";
+      const credentials = msg91Credentials();
+      if (!credentials) {
+        // Same DEV fallback convention as `send` — never runs once MSG91_AUTH_KEY/MSG91_SENDER_ID
+        // are configured. Variable VALUES can end up in shared dev/CI console output (matches
+        // `send`'s DEV log carrying the message body); the phone is still masked.
+        console.log(
+          `[SMS][DEV][FLOW] ${tag}To: ${maskPhone(to)} | template: ${templateId} | variables: ${JSON.stringify(variables)}`,
+        );
+        return { ok: false, provider: "dev", error: "MSG91 credentials not configured" };
+      }
+
+      const { authKey } = credentials;
+      const mobile = to.replace(/^\+/, "");
+      // Flow API recipients are a flat object: the mobile number plus the template's own
+      // placeholder keys (e.g. `alphanumeric1`) — there is no `DLT_TE_ID` field, unlike `send`'s
+      // v2 sendsms body; Flow templates carry their own DLT mapping on MSG91's side.
+      const recipient: Record<string, unknown> = { mobiles: mobile, ...variables };
+      const requestPayload = {
+        template_id: templateId,
+        short_url: "1",
+        realTimeResponse: "1",
+        recipients: [recipient],
+      };
+
+      // Same diagnostic convention as `send`'s `[SMS][MSG91][REQUEST]` log — phone masked,
+      // variable values logged (not secret; the recipient's own phone shows the same text). The
+      // auth key lives only in the request header, never in this body or any log line.
+      console.log(
+        `[SMS][MSG91][FLOW][REQUEST] ${tag}${JSON.stringify({
+          ...requestPayload,
+          recipients: [{ ...recipient, mobiles: maskPhone(to) }],
+        })}`,
+      );
+
+      const res = await fetchWithTimeout("https://control.msg91.com/api/v5/flow", {
+        method: "POST",
+        headers: {
+          accept: "application/json",
+          authkey: authKey,
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(requestPayload),
+      });
+
+      const body = await res.text();
+      if (!res.ok || body.includes('"type":"error"')) {
+        const reason = classifyMsg91Failure(res.status, body);
+        console.error(
+          `[SMS][MSG91][FLOW] ${tag}Failed to ${maskPhone(to)} (template ${templateId}): ${reason} :: ${body.slice(0, 400)}`,
+        );
+        return { ok: false, provider: "msg91", error: `${reason} :: ${body.slice(0, 400)}` };
+      }
+
+      // Same acceptance-vs-delivery distinction as `send` — the Flow API's synchronous response
+      // only confirms MSG91 accepted the request; it is not proof the handset received it.
+      const requestId = extractMsg91RequestId(body);
+      console.log(
+        `[SMS][MSG91][FLOW] ${tag}Accepted for ${maskPhone(to)} (template ${templateId})` +
+          `${requestId ? ` requestId=${requestId}` : ""} — API accepted, not proof of handset delivery`,
+      );
+      return { ok: true, provider: "msg91", detail: requestId ?? undefined };
+    },
   };
 }
