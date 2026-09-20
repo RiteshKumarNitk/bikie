@@ -290,6 +290,34 @@ describe("safety-location domain", () => {
       );
     });
 
+    it("locks the exact whitespace around the third variable against the MSG91-dashboard-pasted template (ADR-087) — fails if a space is added or removed before ';Please'", () => {
+      // Mirrors `packages/database/prisma/diagnose-sms-body.cjs`'s `APPROVED_TEMPLATE_WITH_MARKERS`
+      // — the literal text pasted from MSG91's dashboard for the BIKIE_SR template, independently
+      // re-verified against real production alerts (ADR-087). This is deliberately NOT copied from
+      // ADR-059's original submission text (which has a space before `;Please`) — ADR-087 found
+      // that text does not match what MSG91 actually has registered.
+      const APPROVED_TEMPLATE_WITH_MARKERS =
+        "Hello Riders/Service Providers, Rider ##alphanumeric##, with Vehicle registration number is " +
+        "##alphanumeric## having some emergency situation at ##alphanumeric##;Please reach out to Rider " +
+        "to Provide Moral support and Adequate help, as noted by Kiesh India";
+
+      // Substitute the same three variables with unique sentinels, so the code's own static
+      // segments (everything between variables) can be diffed against the approved template's,
+      // independent of any particular alert's data.
+      const codeBody = buildSmsTemplateBody(
+        sampleAlert({ userName: "VAR1", riderVehicleRegistrationNumber: "VAR2", area: "VAR3", placeName: null, city: "" }),
+      );
+      const codeSegments = codeBody.split(/VAR1|VAR2|VAR3/);
+      const approvedSegments = APPROVED_TEMPLATE_WITH_MARKERS.split("##alphanumeric##");
+
+      expect(codeSegments.length).toBe(4); // 3 variables -> 4 static segments, in order
+      expect(codeSegments).toEqual(approvedSegments);
+
+      // Explicit, human-readable guard on the exact defect ADR-087 fixed.
+      expect(codeBody).not.toContain(" ;Please");
+      expect(codeBody).toContain(";Please");
+    });
+
     it("falls back to N/A when the rider never filled in a vehicle registration number", () => {
       const alert = sampleAlert({ riderVehicleRegistrationNumber: null });
       expect(buildSmsTemplateBody(alert)).toContain("Vehicle registration number is N/A having");
