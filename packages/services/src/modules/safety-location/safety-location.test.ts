@@ -53,6 +53,7 @@ import {
 } from "./domain/dispatch-message";
 import { dispatchToRecipient, emptySummary, markSmsEligibility, sendSosSmsSequentially } from "./application/fan-out.application";
 import { formatDistance, mapsNavigateUrl, mapsPinUrl } from "./domain/maps";
+import { redactAlertForViewer } from "./domain/pii-redaction";
 import {
   channelsForRecipient,
   createSafetyLocationModule,
@@ -576,6 +577,141 @@ describe("sos createAlert reverse geocoding (ADR-038)", () => {
     expect(createAlert).toHaveBeenCalledWith(
       expect.objectContaining({ placeName: null, area: null, formattedAddress: null }),
     );
+  });
+});
+
+describe("sos createAlert city fallback (root-cause fix — server-geocoded city replaces client's 'Unknown')", () => {
+  const createInput = {
+    type: "ACCIDENT",
+    latitude: 26.9124,
+    longitude: 75.7873,
+    city: "Unknown",
+  };
+
+  it("overrides the client's 'Unknown' city with the server-geocoded city", async () => {
+    const createAlert = vi.fn(async (data: unknown) => ({ ...sampleAlert(), ...(data as object) }));
+    const reverseGeocode = vi.fn(async () => ({
+      placeName: null,
+      area: "Malviya Nagar",
+      city: "Jaipur",
+      state: "Rajasthan",
+      country: "India",
+      formattedAddress: "Malviya Nagar, Jaipur, Rajasthan, India",
+    }));
+    const module = createSafetyLocationModule({
+      ...emptyRepos({ sosAlerts: { ...emptyRepos().sosAlerts!, createAlert }, geocoding: { reverseGeocode } }),
+      communications: fakeCommunications(),
+    });
+
+    await module.sos.createAlert("u1", createInput);
+
+    expect(createAlert).toHaveBeenCalledWith(expect.objectContaining({ city: "Jaipur" }));
+  });
+
+  it("stores the geocoded city even when it matches what the client already sent", async () => {
+    const createAlert = vi.fn(async (data: unknown) => ({ ...sampleAlert(), ...(data as object) }));
+    const reverseGeocode = vi.fn(async () => ({
+      placeName: null,
+      area: null,
+      city: "Jaipur",
+      state: "Rajasthan",
+      country: "India",
+      formattedAddress: "Jaipur, Rajasthan, India",
+    }));
+    const module = createSafetyLocationModule({
+      ...emptyRepos({ sosAlerts: { ...emptyRepos().sosAlerts!, createAlert }, geocoding: { reverseGeocode } }),
+      communications: fakeCommunications(),
+    });
+
+    await module.sos.createAlert("u1", { ...createInput, city: "Jaipur" });
+
+    expect(createAlert).toHaveBeenCalledWith(expect.objectContaining({ city: "Jaipur" }));
+  });
+
+  it("preserves the client's city when geocoding returns nothing (network failure, no results)", async () => {
+    const createAlert = vi.fn(async (data: unknown) => ({ ...sampleAlert(), ...(data as object) }));
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        sosAlerts: { ...emptyRepos().sosAlerts!, createAlert },
+        geocoding: { reverseGeocode: vi.fn(async () => null) },
+      }),
+      communications: fakeCommunications(),
+    });
+
+    await module.sos.createAlert("u1", createInput);
+
+    expect(createAlert).toHaveBeenCalledWith(expect.objectContaining({ city: "Unknown" }));
+  });
+
+  it("preserves the client's city when geocoding succeeds but returns no city (e.g. remote/unmapped area)", async () => {
+    const createAlert = vi.fn(async (data: unknown) => ({ ...sampleAlert(), ...(data as object) }));
+    const reverseGeocode = vi.fn(async () => ({
+      placeName: "Some Shop",
+      area: "Some Area",
+      city: null,
+      state: null,
+      country: null,
+      formattedAddress: "Some Shop, Some Area",
+    }));
+    const module = createSafetyLocationModule({
+      ...emptyRepos({ sosAlerts: { ...emptyRepos().sosAlerts!, createAlert }, geocoding: { reverseGeocode } }),
+      communications: fakeCommunications(),
+    });
+
+    await module.sos.createAlert("u1", createInput);
+
+    expect(createAlert).toHaveBeenCalledWith(expect.objectContaining({ city: "Unknown" }));
+  });
+
+  it("keeps redaction (ADR-045) unchanged: a candidate responder still sees city but not area/placeName/formattedAddress/GPS", async () => {
+    // Simulates the alert as it's now persisted after the fix: city holds the geocoded value,
+    // not the client's "Unknown".
+    const alert = sampleAlert({
+      city: "Jaipur",
+      area: "Malviya Nagar",
+      placeName: "City Park",
+      formattedAddress: "City Park, Malviya Nagar, Jaipur, Rajasthan, India",
+      latitude: 26.9124,
+      longitude: 75.7873,
+    });
+    const communications = fakeCommunications();
+    const availability = resolveChannelAvailability(communications);
+    const ports = emptyRepos() as unknown as Parameters<typeof dispatchToRecipient>[4];
+
+    await dispatchToRecipient(
+      alert,
+      { role: "NEARBY_RIDER", name: "Nearby Rider", phone: "8888888888", email: "rider@example.com", userId: "rider-1" },
+      emptySummary(availability),
+      communications,
+      ports,
+      availability,
+    );
+
+    const riderText = (communications.whatsapp.send as any).mock.calls.find((c: any[]) => c[0] === "+918888888888")?.[1];
+    expect(riderText).toContain("Jaipur");
+    expect(riderText).not.toContain("Malviya Nagar");
+    expect(riderText).not.toContain("City Park");
+    expect(riderText).not.toContain("26.9124");
+  });
+
+  it("describeShortLocation() now produces the server-geocoded city for a redacted candidate responder, not 'Unknown'", () => {
+    // Before the fix: the DB `city` column held the client's literal "Unknown" even when
+    // geocoding succeeded, so a redacted candidate responder's SMS said "...at Unknown". After
+    // the fix, `city` holds the geocoded value, and that's what survives redaction.
+    const alert = sampleAlert({
+      city: "Jaipur",
+      area: "Malviya Nagar",
+      placeName: "City Park",
+      formattedAddress: "City Park, Malviya Nagar, Jaipur, Rajasthan, India",
+    });
+    const redacted = redactAlertForViewer(alert, false);
+
+    expect(redacted.area).toBeNull();
+    expect(redacted.placeName).toBeNull();
+    expect(redacted.formattedAddress).toBeNull();
+    expect(redacted.city).toBe("Jaipur");
+    expect(describeShortLocation(redacted)).toBe("Jaipur");
+    expect(describeShortLocation(redacted)).not.toBe("Unknown");
   });
 });
 

@@ -29,6 +29,12 @@ export function createSosApplication(ports: SafetyLocationPorts) {
         placeName: geocoded?.placeName ?? null,
         area: geocoded?.area ?? null,
         formattedAddress: geocoded?.formattedAddress ?? null,
+        // Prefer the server-geocoded city over the client's — the client falls back to the
+        // literal string "Unknown" when the reporter doesn't type one, and `city` is the one
+        // location field ADR-045 keeps visible to a pre-assignment candidate responder, so a
+        // bad client value here is what they see in the SOS SMS. Only override when geocoding
+        // actually produced a city; otherwise keep whatever the client sent.
+        city: geocoded?.city ?? data.city,
       });
     },
 
