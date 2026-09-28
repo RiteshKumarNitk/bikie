@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Mobile: notification permission flow (2026-09-28, ADR-092)
+
+| Task | Status |
+|---|---|
+| Audit: manifest, FCM init, channels, token registration, where permission was requested | Completed — `POST_NOTIFICATIONS` declared; requested only silently inside `registerForCurrentUser()` after login |
+| `NotificationPermissionService`/controller: granted / can-request / blocked (2 denials, or Android ≤12 disabled); re-check on resume; register token on grant | Completed |
+| Explanation sheet before the system dialog (Rider + Service Provider wording), Settings fallback, re-prompt intervals, once per launch, shown only inside the signed-in shell | Completed |
+| `PushRegistrationService` registers the token without requesting permission | Completed |
+| Profile "Push notifications" status tile | Completed |
+| Tests (controller + gate) | Completed — `flutter test` 178 |
+| Real-device check: fresh install Android 13+ (allow / deny / deny twice → Settings), Android 12, enabling from Settings then receiving an SOS push without restart | Pending |
+| SOS follow-up types (offers/session updates) share `SOS_ALERT`; confirm they use `sos_channel` end to end on device | Pending |
+
 ## Mobile: Service Provider location setup (2026-09-28, ADR-091)
 
 | Task | Status |

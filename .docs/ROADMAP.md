@@ -1,5 +1,11 @@
 # BIKIE — Roadmap
 
+## Mobile: Notification Permission Asked Deliberately (2026-09-28, ADR-092)
+New installs are now asked to turn on notifications with a clear explanation of what they're for,
+at a calm moment after sign-in, instead of a bare system dialog fired mid-login. People who said no
+can see the status and fix it from Profile, and enabling notifications later takes effect
+immediately. See ADR-092.
+
 ## Mobile: Service Provider Location Setup Fixed (2026-09-28, ADR-091)
 Service Providers now start location setup on their own GPS position instead of a map of all of
 India, adjust by moving the map under a fixed pin, and confirm deliberately. A confirmed location

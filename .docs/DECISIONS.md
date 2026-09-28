@@ -4706,3 +4706,29 @@ changes:
   they must set one); they remain invisible to SOS dispatch until they do — a follow-up prompt or
   admin report is backlog. No SOS eligibility, radius, escalation, SMS or membership logic changed.
   `serviceRadiusKm` remains unused by dispatch (separate decision).
+
+## ADR-092: Notification permission is requested from the signed-in shell with an explanation; token registration no longer depends on it
+
+- **Context.** Fresh Android 13+ installs showed "Notifications: Blocked". The manifest already
+  declared `POST_NOTIFICATIONS`; the only runtime request was inside
+  `PushRegistrationService.registerForCurrentUser()`, fired unawaited right after
+  login/OTP-verify/session bootstrap — mid-navigation, with no explanation, and for a new Service
+  Provider concurrently with the location dialog (Android shows one permission dialog at a time).
+  A denial was never revisited in-app and there was no way to see or fix the state. Token
+  registration was also skipped whenever permission was denied, so enabling notifications later in
+  Settings did nothing until a restart.
+- **Decision.**
+  1. Permission is requested only after an in-app explanation sheet (role-aware reasons), shown by
+     `NotificationPermissionGate` inside the signed-in `AppShell` — never during login, signup or
+     onboarding. At most once per launch; "Not now" suppresses it for 3 days, 7 once blocked.
+  2. States: granted / canRequest / blocked / unsupported. "Blocked" = two recorded denials on
+     Android 13+ (the OS stops showing the dialog) or notifications off on Android ≤12 (no dialog
+     exists); blocked offers the app's system settings page (`Geolocator.openAppSettings`, already a
+     dependency — no new package).
+  3. The permission is re-checked on app resume; becoming granted registers the FCM token.
+  4. `PushRegistrationService` registers the token regardless of permission (a token is valid while
+     notifications are off), so enabling them in Settings takes effect immediately.
+  5. Profile shows "Push notifications" status with the fix.
+- **Consequences.** No manifest, channel, server or notification-type changes. The app still cannot
+  force-enable notifications — a user who declines twice must use Settings, which the app now points
+  to. iOS remains out of scope (ADR-035).

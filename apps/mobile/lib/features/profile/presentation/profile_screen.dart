@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/push/notification_permission.dart';
+import '../../../core/widgets/notification_permission_prompt.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../../auth/domain/role_provider.dart';
@@ -55,6 +57,7 @@ class ProfileScreen extends ConsumerWidget {
             badgeCount: unreadNotifications,
             onTap: () => context.push('/notifications'),
           ),
+          const _PushNotificationsTile(),
           if (isPartnerMode) ...const [_PartnerProfileSection()] else ...const [_RiderProfileSection()],
           _ProfileTile(icon: Icons.chat_bubble_outline, label: 'Messages', onTap: () => context.push('/messages')),
           _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
@@ -316,6 +319,32 @@ class _PartnerProfileSectionState extends ConsumerState<_PartnerProfileSection> 
           onTap: () => context.push('/account-type-request'),
         ),
       ],
+    );
+  }
+}
+
+/// Push notification permission status + the way to fix it (Android). SOS alerts depend on this,
+/// so it stays visible in Profile rather than only being offered once.
+class _PushNotificationsTile extends ConsumerWidget {
+  const _PushNotificationsTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(notificationPermissionProvider);
+    if (state == null || state == NotificationPermissionState.unsupported) return const SizedBox.shrink();
+
+    final granted = state == NotificationPermissionState.granted;
+    return _ProfileTile(
+      icon: granted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+      label: 'Push notifications',
+      subtitle: switch (state) {
+        NotificationPermissionState.granted => 'On',
+        NotificationPermissionState.canRequest => "Off — you won't get SOS alerts. Tap to turn on.",
+        _ => "Off in phone settings — you won't get SOS alerts. Tap to fix.",
+      },
+      onTap: () => granted
+          ? ref.read(notificationPermissionProvider.notifier).openSystemSettings()
+          : showNotificationPermissionPrompt(context),
     );
   }
 }

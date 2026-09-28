@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-28 — Mobile: notification permission asked deliberately, with an explanation (ADR-092)
+
+Android 13+ shows a fresh install's notifications as "Blocked" until the user answers the
+`POST_NOTIFICATIONS` dialog (the manifest already declared it). The app used to fire that dialog
+silently from `PushRegistrationService` right after OTP verification — mid-navigation, with no
+explanation, at the same moment a new Service Provider gets the location dialog — and never asked
+again or offered a way to fix it. Now: once the user is in the signed-in app, a role-aware sheet
+explains why (SOS alerts near you / responses to your SOS / SP assistance requests) before showing
+the system dialog; after two denials it offers phone Settings instead; "Not now" is respected for
+3 days (7 once only Settings can help). Profile shows "Push notifications: On/Off" with the fix.
+The permission is re-checked when the app resumes, and the FCM token is registered regardless of
+permission, so turning notifications on in Settings works immediately — no restart or re-login.
+No server/channel changes. `flutter test` 168→178. Not yet tested on a real device.
+
 ## 2026-09-28 — Mobile: Service Provider location setup opens at the provider's location (ADR-091)
 
 The Service Provider location map used to open on a zoom-5 view of all of India with no GPS
