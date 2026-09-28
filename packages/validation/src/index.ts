@@ -18,3 +18,4 @@ export * from "./rider-location.schema";
 export * from "./places.schema";
 export * from "./push-subscription.schema";
 export * from "./account-type-request.schema";
+export * from "./legal.schema";

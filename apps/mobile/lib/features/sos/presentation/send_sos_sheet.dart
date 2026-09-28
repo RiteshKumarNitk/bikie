@@ -198,8 +198,12 @@ class _SendSosSheetState extends ConsumerState<SendSosSheet> {
     }
   }
 
+  // Scrolls rather than overflowing when the sheet's content is taller than the screen —
+  // landscape, small phones, large system font, or the city field's keyboard open.
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => SingleChildScrollView(child: _buildStep(context));
+
+  Widget _buildStep(BuildContext context) {
     final kind = _openKind;
     if (kind == null) return _ChooserView(onOpen: _openModal);
 
@@ -370,13 +374,10 @@ class _ConfirmView extends StatelessWidget {
           Text(theme.confirmBody, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
           if (kind == _AlertKind.amber) ...[
             const SizedBox(height: 16),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 3.2,
+            // Two per row, but each row sizes to its tallest label (a fixed-aspect grid clipped
+            // two-line labels on narrow screens / large fonts).
+            _TwoColumnRows(
+              spacing: 8,
               children: theme.categories.map((c) {
                 final selected = category?.label == c.label;
                 // `Theme.of(context).dividerColor` is the same literal hex as this sheet's own
@@ -391,7 +392,7 @@ class _ConfirmView extends StatelessWidget {
                     side: BorderSide(color: selected ? theme.color : onSurface.withValues(alpha: 0.28)),
                     foregroundColor: selected ? theme.color : null,
                   ),
-                  child: Text('${c.icon} ${c.label}', style: const TextStyle(fontSize: 12)),
+                  child: Text('${c.icon} ${c.label}', textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)),
                 );
               }).toList(),
             ),
@@ -430,24 +431,24 @@ class _ConfirmView extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 20),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              FilledButton(
-                onPressed: sending || category == null ? null : onSend,
-                style: FilledButton.styleFrom(backgroundColor: theme.color),
-                child: sending
-                    ? const SizedBox(
-                        height: 18,
-                        width: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(theme.sendLabel),
-              ),
-              const SizedBox(width: 12),
-              TextButton(onPressed: sending ? null : onCancel, child: const Text('Cancel')),
-            ],
+          // Stacked full-width rather than side by side: the send button is the one thing that
+          // must never be squeezed or pushed off a narrow screen.
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: sending || category == null ? null : onSend,
+              style: FilledButton.styleFrom(backgroundColor: theme.color, minimumSize: const Size.fromHeight(52)),
+              child: sending
+                  ? const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : Text(theme.sendLabel, textAlign: TextAlign.center),
+            ),
           ),
+          const SizedBox(height: 8),
+          TextButton(onPressed: sending ? null : onCancel, child: const Text('Cancel')),
         ],
       ),
     );
@@ -601,6 +602,35 @@ class _DispatchReport extends StatelessWidget {
               '${off.join(' and ')} ${off.length > 1 ? 'are' : 'is'} not configured on this deployment, '
               'so those messages were not sent.',
               style: const TextStyle(fontSize: 11),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Lays [children] out two per row with equal widths; each row is as tall as its tallest child.
+class _TwoColumnRows extends StatelessWidget {
+  const _TwoColumnRows({required this.children, required this.spacing});
+
+  final List<Widget> children;
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var i = 0; i < children.length; i += 2) ...[
+          if (i > 0) SizedBox(height: spacing),
+          IntrinsicHeight(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Expanded(child: children[i]),
+                SizedBox(width: spacing),
+                Expanded(child: i + 1 < children.length ? children[i + 1] : const SizedBox.shrink()),
+              ],
             ),
           ),
         ],

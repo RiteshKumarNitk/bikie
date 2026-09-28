@@ -241,11 +241,13 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
             const SizedBox(height: 12),
             Row(
               children: [
-                Text(
-                  '₹${widget.plan.price.toStringAsFixed(0)} / ${widget.plan.durationDays} days',
-                  style: Theme.of(context).textTheme.titleSmall,
+                Expanded(
+                  child: Text(
+                    '₹${widget.plan.price.toStringAsFixed(0)} / ${widget.plan.durationDays} days',
+                    style: Theme.of(context).textTheme.titleSmall,
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 12),
                 ElevatedButton(
                   onPressed: _isPurchasing ? null : _purchase,
                   child: _isPurchasing

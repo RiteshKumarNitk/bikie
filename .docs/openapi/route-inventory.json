@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-08T10:55:47.244Z",
-  "count": 152,
+  "generatedAt": "2026-09-28T06:18:47.025Z",
+  "count": 160,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -103,6 +103,49 @@
       ],
       "auth": "admin",
       "file": "apps/web/app/api/admin/groups/route.ts"
+    },
+    {
+      "path": "/api/admin/legal/{type}/versions",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/legal/[type]/versions/route.ts"
+    },
+    {
+      "path": "/api/admin/legal/acceptances",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/legal/acceptances/route.ts"
+    },
+    {
+      "path": "/api/admin/legal",
+      "methods": [
+        "GET"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/legal/route.ts"
+    },
+    {
+      "path": "/api/admin/legal/versions/{id}/publish",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/legal/versions/[id]/publish/route.ts"
+    },
+    {
+      "path": "/api/admin/legal/versions/{id}",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/legal/versions/[id]/route.ts"
     },
     {
       "path": "/api/admin/membership/plans/{id}",
@@ -575,6 +618,30 @@
       ],
       "auth": "public-or-unclassified",
       "file": "apps/web/app/api/firebase-config/route.ts"
+    },
+    {
+      "path": "/api/legal/accept",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/legal/accept/route.ts"
+    },
+    {
+      "path": "/api/legal/current",
+      "methods": [
+        "GET"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/legal/current/route.ts"
+    },
+    {
+      "path": "/api/legal/status",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/legal/status/route.ts"
     },
     {
       "path": "/api/membership/active",

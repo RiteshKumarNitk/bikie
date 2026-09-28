@@ -287,6 +287,32 @@ Invoice creation is a side effect of `POST /api/membership/purchase` / `POST /ap
 | `/api/referrals/me` | GET | Returns (and lazily creates) the caller's referral code, plus who they've referred. |
 | `/api/referrals/link` | POST | `{ code }` — links the caller as referred by the code owner. Tracking only, no auto-reward. |
 
+## Legal Terms & Consent (ADR-090)
+
+Legal documents (Terms & Conditions, Privacy Policy, User Agreement) are versioned and managed only
+from the web Admin Dashboard. Every edit is a new immutable version (`DRAFT → PUBLISHED → ARCHIVED`).
+
+**Signup consent is enforced server-side**, not by these routes: the account-creating call
+(`POST /api/auth/phone-number/verify` for a brand-new number — or any other Better Auth account
+creation) must carry two headers, checked by the `user.create` database hook in
+`packages/auth/src/server.ts`:
+
+| Header | Value |
+|---|---|
+| `x-legal-consent-versions` | Comma-separated version ids — must equal `versionIds` from `GET /api/legal/current` exactly. |
+| `x-legal-consent-account-type` | `RIDER` \| `SERVICE_PROVIDER` — recorded on the acceptance snapshot only; authorizes nothing. |
+
+Missing → `400 { code: "LEGAL_CONSENT_REQUIRED", message }`. Any other set (e.g. a version published
+since the user loaded the page) → `409 { code: "LEGAL_VERSION_OUTDATED", message }` — re-fetch and ask
+again. No account is created in either case. If the acceptance rows can't be written, the new account
+is deleted again and the call fails (`500 LEGAL_CONSENT_NOT_RECORDED`).
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/legal/current` | GET | Public, `no-store`. `{ documents: CurrentLegalDocumentDTO[], terms, privacy, userAgreement, versionIds }` — every currently published version (`documentId, type, title, versionId, version, content, publishedAt`). `content` is plain text: `# `/`## ` lines are headings, blank lines separate paragraphs. |
+| `/api/legal/status` | GET | Session. `{ requiresConsent, pending: CurrentLegalDocumentDTO[], accepted: [{ type, versionId, versionNumber, acceptedAt }] }` — `pending` = current versions this user has not accepted. Never infers acceptance. |
+| `/api/legal/accept` | POST | Session. `{ versionIds: string[] }` — re-consent to newly published versions. Appends `RECONSENT` acceptance rows; earlier rows are untouched. `409 LEGAL_VERSION_OUTDATED` if any id is not a current published version. |
+
 ## Account Type Request (auth required, ADR-053)
 
 "I picked the wrong account type at signup" support ticket — Profile → Help & Support. `User.accountType` is never self-service; it's set once at registration (`PATCH /api/user/complete-phone-signup`, only within a short window of account creation) and otherwise changed only by an admin approving a request here (see the admin table above). **ADR-055**: every one of those write paths also sets `User.role` in the same statement (`SERVICE_PROVIDER → PARTNER`, `RIDER → RENTER`, `ADMIN` preserved) and then calls `refreshCachedUserSessions` so the caller's session doesn't keep routing by the old value.
@@ -384,6 +410,19 @@ There is no dedicated "members" route — the room's real member list is the sam
 | `/api/admin/transactions/export` | GET | ADR-076. Same query params as the list route (pagination ignored) — streams a CSV of the filtered set, capped at `MAX_ADMIN_CSV_ROWS`. |
 | `/api/admin/email` | POST | `{ to, subject, html }` — send via the email gateway |
 | `/api/admin/sms` | POST | `{ to, message }` — send via the SMS gateway |
+
+### Legal / Terms (role: ADMIN — ADR-090, consumed by `/admin/legal`)
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/admin/legal` | GET | `{ documents: LegalDocumentOverviewDTO[] }` — per document: current version (number, publishedAt, acceptanceCount), open draft, version count, last updated. |
+| `/api/admin/legal/[type]/versions` | GET | `type` = `TERMS_AND_CONDITIONS` \| `PRIVACY_POLICY` \| `USER_AGREEMENT`. Full history, newest first, with acceptance counts. |
+| `/api/admin/legal/[type]/versions` | POST | `{ content? }` — starts the next version number as a `DRAFT` (content defaults to the current published text). One draft per document: `409 { error: "DRAFT_EXISTS", draftId }`. Audit: `LEGAL_DRAFT_CREATED`. |
+| `/api/admin/legal/versions/[id]` | GET | `LegalVersionDetailDTO` — any status, full content, created/published/archived timestamps + admins, acceptance count. |
+| `/api/admin/legal/versions/[id]` | PATCH | `{ content }` — `DRAFT` only; published/archived → `409 NOT_DRAFT` (also enforced by a DB trigger). |
+| `/api/admin/legal/versions/[id]` | DELETE | Discards a `DRAFT` only; published/archived versions can never be deleted (`409 NOT_DRAFT`). Audit: `LEGAL_DRAFT_DISCARDED`. |
+| `/api/admin/legal/versions/[id]/publish` | POST | One transaction: lock document → archive previous `PUBLISHED` → publish draft → move `currentVersionId`. `409 NOT_DRAFT`, `400 EMPTY_CONTENT`, `409 CONFLICT` (concurrent publish lost). Existing acceptances are not changed. Audit: `LEGAL_VERSION_PUBLISHED`. |
+| `/api/admin/legal/acceptances` | GET | Compliance search. `?search` (name/phone/email/user id), `accountType`, `documentType`, `version`, `from`, `to` (dates, inclusive), `page`, `pageSize` (≤100). `LegalAcceptancePageDTO`. |
 
 ### Moderation (role: ADMIN — Milestone 8.6/8.6b, consumed by `/admin/moderation`)
 

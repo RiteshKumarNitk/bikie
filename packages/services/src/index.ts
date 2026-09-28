@@ -37,6 +37,14 @@ export { PushService } from "./push.service";
 export { PlacesService } from "./places.service";
 export { AuditService } from "./audit.service";
 export {
+  LegalService,
+  parseLegalConsentHeaders,
+  LEGAL_CONSENT_VERSIONS_HEADER,
+  LEGAL_CONSENT_ACCOUNT_TYPE_HEADER,
+  type LegalConsentCheck,
+  type LegalConsentErrorCode,
+} from "./legal.service";
+export {
   createCommunicationsPorts,
   getCommunicationsPorts,
   whatsappShareUrl as communicationsWhatsappShareUrl,

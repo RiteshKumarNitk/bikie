@@ -40,6 +40,7 @@ const STATIC_ROUTES: { path: string; changeFrequency: ChangeFrequency; priority:
   { path: "/partners/success-stories", changeFrequency: "monthly", priority: 0.4 },
   { path: "/terms-and-conditions", changeFrequency: "yearly", priority: 0.2 },
   { path: "/privacy-policy", changeFrequency: "yearly", priority: 0.2 },
+  { path: "/user-agreement", changeFrequency: "yearly", priority: 0.2 },
   { path: "/cookie-policy", changeFrequency: "yearly", priority: 0.2 },
 ];
 

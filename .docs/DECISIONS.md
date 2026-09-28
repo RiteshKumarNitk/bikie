@@ -4582,4 +4582,127 @@ changes:
   3 fan-out + 1 whitespace-lock from the same session's earlier work), `tsc --noEmit` clean. No SMS
   sent during implementation — not committed, not pushed, not deployed.
 
+## ADR-089: Mobile rider Home is SOS-only; responsiveness handled by one app-wide frame plus local layout fixes
 
+- **Context.** Product direction: the rider's landing screen should exist to start an SOS, not to
+  browse the marketplace; and the app must hold up on small phones, landscape, tablets and large
+  system fonts. An audit found Home led with SOS cards but followed them with a marketplace feed
+  (featured bikes, destinations, testimonials) — and that rider SOS history, the nearby-alerts list
+  (`/sos`) and destinations were reachable *only* from Home or a push notification. Layout risks
+  were concentrated in non-scrolling bottom sheets, fixed-aspect grids, `Text` + `Spacer()` rows,
+  and fixed-height intro slides.
+- **Decision.**
+  1. **Rider Home = one SOS button** sized from `LayoutBuilder` constraints, opening the existing
+     `showSendSosSheet` unchanged (Red/Amber choice, categories, GPS, dispatch report all stay
+     there). Kept on Home because they are SOS state, not secondary features: the rider's own
+     active-alert banner and a compact form of the location-sharing switch (the nearby-rider
+     dispatch tier depends on it). Static halo, no pulsing animation (no continuous repaint).
+  2. **No new navigation surface.** Secondary entry points moved to existing places: SOS history
+     and nearby alerts → Home app-bar icons (SOS-scoped, so they belong on the SOS screen);
+     Destinations → a Profile tile alongside Wishlist / Service Providers; the profile-completion
+     banner → a subtitle on Profile's existing "Rider Details" tile; featured bikes → the Bikes tab.
+     Testimonials (marketing copy) are no longer shown in the app. Tabs unchanged.
+  3. **Service Provider Home unchanged in purpose.** It is already an emergency-assistance
+     dashboard; a Service Provider responds to SOS and cannot send one, so putting a send-SOS
+     button there would contradict the Rider vs Service Provider rules. It got layout fixes only.
+  4. **One app-wide `ResponsiveFrame`** (`core/widgets/responsive_frame.dart`) in
+     `MaterialApp.builder`: centers content at max 840dp (M3 "expanded" breakpoint — phones are
+     never constrained) and clamps text scale to 1.0–1.4x. Chosen over per-screen breakpoints: every
+     screen is a single-column phone layout, so a capped column is the correct tablet behavior and
+     costs one widget instead of touching ~40 screens. 1.4x keeps accessibility sizes meaningful
+     while stopping fixed-height chrome (nav labels, chips) from clipping.
+  5. **Local fixes, no new dependency**: bottom sheets wrap content in `SingleChildScrollView`;
+     fixed-aspect grids become content-sized rows (`IntrinsicHeight`, small N) or
+     `SliverGridDelegateWithMaxCrossAxisExtent`; `BikeCard`'s photo flexes to fill the grid cell so
+     large text shrinks the photo instead of overflowing; `MediaQuery.sizeOf` where size is read
+     (avoids rebuilds on keyboard inset changes).
+- **Consequences.** SOS API contracts, eligibility, severity, SMS/MSG91, escalation, location and
+  fan-out logic untouched; the only new side effect is Home invalidating `mySosAlertsProvider`
+  when the SOS sheet closes so the active-alert banner appears immediately. `featuredBikesProvider`,
+  `popularDestinationsProvider` and `testimonialsProvider` are no longer watched by Home (still
+  defined). Guarded by `test/features/home/home_screen_layout_test.dart` (overflow checks across
+  four screen sizes × two font scales). Not yet verified on a physical device.
+
+## ADR-090: Versioned legal terms with immutable consent records; consent enforced in Better Auth's user-create hook
+
+- **Context.** Users must accept the current Terms & Conditions, Privacy Policy and Legal Terms before
+  an account exists, on both Rider and Service Provider signup, with the backend — not the client —
+  authoritative. Legal text must be managed only from the web Admin Dashboard, never edited in place,
+  and every acceptance must reference the exact immutable version accepted, surviving later versions.
+  Signup is phone-OTP only: Better Auth's phone-number plugin creates the user inside
+  `POST /api/auth/phone-number/verify` (`signUpOnVerification`), on web and mobile alike.
+- **Decision.**
+  1. **Schema** (`20260928100000_legal_terms_consent`): `LegalDocument` (one per `LegalDocumentType`,
+     `currentVersionId` pointer), `LegalDocumentVersion` (`versionNumber` unique per document, status
+     `DRAFT/PUBLISHED/ARCHIVED`, created/published-by admin, timestamps), `LegalAcceptance` (user,
+     exact version, plus snapshots of `documentType`, `versionNumber`, `accountType`, `source`
+     `SIGNUP/RECONSENT`, IP, user agent; unique per user + version). Existing `User`/`AccountType`
+     reused, cuid ids, `snake_case` table names — same conventions as every other model.
+  2. **Invariants in the database.** Partial unique indexes: ≤1 `PUBLISHED` and ≤1 `DRAFT` version per
+     document. Triggers: a non-`DRAFT` version's content/number/publish time can never change and it can
+     never be deleted (only `PUBLISHED → ARCHIVED` is allowed); `legal_acceptance` rows can never be
+     updated or deleted. `LegalAcceptance.userId` is `onDelete: Restrict`, which routes such users to
+     `adminRepository.deleteUser`'s existing anonymize-in-place path instead of a hard delete.
+  3. **Publishing is one transaction** with a `SELECT … FOR UPDATE` on the parent document: archive the
+     previous published version, publish the draft, move `currentVersionId`. A concurrent publish either
+     waits on the lock or fails on the partial unique index and rolls back — never two active versions.
+     Version numbers are assigned at draft creation (latest + 1) under the same lock.
+  4. **Consent is enforced in `databaseHooks.user.create`**, chosen over checking in the signup screens,
+     in `complete-phone-signup`, or in the auth route gate: it is the one code path every Better Auth
+     account creation takes (phone OTP today; email/Google are enabled server-side too), and it fires
+     only when a user is actually being created, so logins are unaffected. `before` rejects unless the
+     request's `x-legal-consent-versions` header equals the current published set exactly
+     (`LEGAL_CONSENT_REQUIRED` 400 / `LEGAL_VERSION_OUTDATED` 409). Headers, not body, because Better
+     Auth validates and strips the verify endpoint's body. Only HTTP-originated creation is gated
+     (`ctx.request` set) — server-side `auth.api.*` calls have no end user; none exist today.
+  5. **Recording can't share Better Auth's transaction**, so `after` writes the acceptances and, if that
+     fails, deletes the just-created user (guarded to users with no acceptances) and fails the request.
+     An account never survives without its consent record.
+  6. **Clients check consent before sending the OTP**, because a signup the server rejects has already
+     consumed the code. The checkbox is never pre-checked; document names open the current version.
+     `LEGAL_VERSION_OUTDATED` (terms published mid-signup) re-fetches, unchecks and asks again.
+  7. **Re-consent is backend-only for now**: `GET /api/legal/status` compares current published versions
+     with the user's own acceptances (never inferred); `POST /api/legal/accept` appends `RECONSENT`
+     rows. No client prompts yet — adding a blocking prompt would immediately hit every pre-existing
+     user (none have acceptance rows), which is a product decision.
+  8. **Content format is plain text** (`# `/`## ` headings, blank-line paragraphs), rendered as text on
+     web and mobile — no HTML, so admin-entered content can't inject markup. Public legal pages now
+     render the current published version, so the site and signup can't disagree.
+  9. **Seed**: the migration publishes v1 of all three documents (Terms and Privacy from the existing
+     site pages verbatim; a new User Agreement that needs legal review — revise by publishing v2).
+- **Consequences.** Signup on any client that doesn't send the headers now fails — web and mobile are
+  updated in the same change; an older mobile build in the field will be unable to create accounts
+  until updated (existing users can still log in). Admin actions are audit-logged
+  (`LEGAL_DRAFT_CREATED`, `LEGAL_DRAFT_DISCARDED`, `LEGAL_VERSION_PUBLISHED`). Verified: 18 service
+  unit tests, 26 migration invariant checks run against real Postgres (PGlite), mobile consent widget
+  + repository tests. Not yet exercised end-to-end against a running server + database.
+
+## ADR-091: Service Provider map location is required (GPS is not); picker opens on the device location and saves only on confirm
+
+- **Context.** An audit of mobile Service Provider onboarding found the location picker opened on a
+  zoom-5 India view with no GPS lookup, placed pins by tap only, reverse-geocoded on every tap (no
+  identifying User-Agent, overwriting typed address fields, via an undeclared `package:http`), and
+  labelled the map "optional". But every provider geo query — `findEligiblePartnersNearPoint` (SOS
+  dispatch), `findPartnersNearPoint` (nearby providers), `findPartnersNearPointForDispatch` — filters
+  on `latitude: { not: null }`, so a provider without a pin never receives an SOS and never appears
+  nearby. "Optional" was not operationally true.
+- **Decision.**
+  1. **A confirmed map location is required** to save the Service Provider profile (new and edit),
+     enforced in the mobile form. **GPS permission is not required**: denial falls back to manual
+     map selection. Backend validation is unchanged (coordinates remain optional in the API) so no
+     existing client or record breaks.
+  2. **Confirm mode** on `LocationPickerField`, opt-in: fixed centre pin (the map centre is the
+     selection — drag-to-adjust without a custom draggable marker), `MapController`, "Use current
+     location", "Confirm location". Coordinates reach the form only on confirm. The default
+     tap-to-place mode (ride meeting point) is unchanged.
+  3. **Initial position:** saved pin (never auto-replaced by GPS) → GPS at zoom 16 via the existing
+     `captureOneShotLocation` → the typed city (Nominatim search, India-only) at zoom 12 → India. A
+     placeholder centre can't be confirmed until the user moves the map or locates.
+  4. **Reverse geocoding** once per confirmation, through a dedicated Dio client (never the app
+     client — it carries the user's bearer token) with an identifying User-Agent; fills only empty
+     address fields.
+- **Consequences.** New and edited provider profiles always carry coordinates the provider chose.
+  Existing providers saved without a pin are unaffected until they next edit their profile (then
+  they must set one); they remain invisible to SOS dispatch until they do — a follow-up prompt or
+  admin report is backlog. No SOS eligibility, radius, escalation, SMS or membership logic changed.
+  `serviceRadiusKm` remains unused by dispatch (separate decision).

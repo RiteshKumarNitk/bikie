@@ -38,6 +38,13 @@ Future<({double latitude, double longitude})?> captureOneShotLocation() async {
   }
 }
 
+/// [captureOneShotLocation] behind a provider, so screens that capture a fix on demand (Service
+/// Provider location setup) can be driven by a fake fix in tests. Same permission flow — no
+/// second copy of it.
+final oneShotLocationProvider = Provider<Future<({double latitude, double longitude})?> Function()>(
+  (ref) => captureOneShotLocation,
+);
+
 final activeSosAlertsProvider = FutureProvider.autoDispose<List<SOSAlert>>((ref) {
   final location = ref.watch(sosActiveAlertsLocationProvider);
   return ref.watch(sosRepositoryProvider).getActive(latitude: location?.latitude, longitude: location?.longitude);

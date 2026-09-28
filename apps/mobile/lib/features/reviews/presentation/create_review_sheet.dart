@@ -12,7 +12,9 @@ Future<void> showCreateReviewSheet(BuildContext context, BookingModel booking) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) => CreateReviewSheet(booking: booking),
+    useSafeArea: true,
+    // Scrolls instead of overflowing on short screens, landscape, or with the keyboard open.
+    builder: (context) => SingleChildScrollView(child: CreateReviewSheet(booking: booking)),
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
+import type { CurrentLegalDocumentsResponse } from "@bikie/types";
 import { Button } from "@bikie/ui";
 import { authClient } from "@/lib/auth-client";
 import { SELECTED_ROLE_COOKIE, type SelectedRole } from "@/lib/role";
@@ -10,6 +11,11 @@ import { useResendCountdown } from "@/lib/use-resend-countdown";
 import { useMsg91Widget, type OtpChannel } from "@/lib/use-msg91-widget";
 import { LogoMark } from "@/components/layout/LogoMark";
 import { useToast } from "@/components/ui/Toast";
+import {
+  LegalConsentCheckbox,
+  LEGAL_CONSENT_REQUIRED_MESSAGE,
+  legalConsentHeaders,
+} from "@/components/auth/LegalConsentCheckbox";
 import Link from "next/link";
 
 const inputClassName =
@@ -48,9 +54,28 @@ export default function SignUpPage() {
 
   const [sendingOtp, setSendingOtp] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  // ADR-090 — the currently published legal versions, and the user's explicit consent to them.
+  // `legalAccepted` must start false: consent is never pre-checked.
+  const [legal, setLegal] = useState<CurrentLegalDocumentsResponse | null>(null);
+  const [legalAccepted, setLegalAccepted] = useState(false);
   const resendTimer = useResendCountdown(60);
   const widget = useMsg91Widget();
   const toast = useToast();
+
+  const loadLegal = useCallback(async () => {
+    const res = await fetch("/api/legal/current", { cache: "no-store" });
+    if (!res.ok) throw new Error("Could not load the legal terms. Please try again.");
+    const data: CurrentLegalDocumentsResponse = await res.json();
+    setLegal(data);
+    return data;
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/legal/current", { cache: "no-store" })
+      .then((res) => (res.ok ? (res.json() as Promise<CurrentLegalDocumentsResponse>) : null))
+      .then((data) => data && setLegal(data))
+      .catch(() => undefined); // retried by handleSendCode before any OTP is sent
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -91,9 +116,14 @@ export default function SignUpPage() {
       setServerError("Enter a 10-digit phone number.");
       return;
     }
+    if (!legalAccepted) {
+      setServerError(LEGAL_CONSENT_REQUIRED_MESSAGE);
+      return;
+    }
     setSendingOtp(true);
     let proceeded = false;
     try {
+      if (!legal) await loadLegal();
       // Checked before sending any OTP (ADR-053) — for an existing number, this also lets us
       // catch a Rider-vs-Service-Provider mismatch immediately instead of only after a full
       // verify, and for a brand-new number we skip straight to sending the code.
@@ -145,9 +175,22 @@ export default function SignUpPage() {
       // opaque access token — our backend re-verifies that token server-side before Better Auth
       // issues a session (ADR-034).
       const widgetResult = await widget.verifyOtp(otpCode);
-      const { error } = await authClient.phoneNumber.verify({ phoneNumber, code: widgetResult.message });
+      // ADR-090 — for a brand-new number this call creates the account, and the server refuses to
+      // unless these headers name exactly the legal versions currently published.
+      const { error } = await authClient.phoneNumber.verify({
+        phoneNumber,
+        code: widgetResult.message,
+        fetchOptions: { headers: legalConsentHeaders(legal?.versionIds ?? [], selectedRole) },
+      });
       if (error) {
         const message = error.message ?? "Invalid or expired code. Please try again.";
+        if (error.code === "LEGAL_VERSION_OUTDATED" || error.code === "LEGAL_CONSENT_REQUIRED") {
+          // The terms changed while they were signing up: show the new ones and ask again.
+          setLegalAccepted(false);
+          setOtpCode("");
+          setStep("phone");
+          await loadLegal().catch(() => undefined);
+        }
         setServerError(message);
         toast.error(message);
         return;
@@ -282,6 +325,16 @@ export default function SignUpPage() {
               </div>
 
               <OtpChannelToggle value={otpChannel} onChange={setOtpChannel} disabled={sendingOtp} />
+
+              <LegalConsentCheckbox
+                legal={legal}
+                checked={legalAccepted}
+                disabled={sendingOtp}
+                onChange={(checked) => {
+                  setLegalAccepted(checked);
+                  if (checked && serverError === LEGAL_CONSENT_REQUIRED_MESSAGE) setServerError(null);
+                }}
+              />
 
               {serverError && (
                 <div className="rounded-xl bg-red-500/10 px-4 py-3 text-sm text-red-400">

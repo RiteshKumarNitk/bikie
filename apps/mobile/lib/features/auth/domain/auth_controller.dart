@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/auth_interceptor.dart';
 import '../../../core/push/push_registration_service.dart';
+import '../../legal/data/legal_models.dart';
 import '../data/auth_repository.dart';
 import 'auth_state.dart';
 
@@ -75,8 +76,18 @@ class AuthController extends StateNotifier<AuthState> {
   /// its own inline error, same as the web's local `serverError` state.
   /// ADR-057 — `reqId` non-null routes through MSG91's widget verify first (release builds);
   /// see `AuthRepository.verifyOtp`.
-  Future<void> verifyOtp({required String phoneNumber, required String code, String? reqId}) async {
-    final user = await _repository.verifyOtp(phoneNumber: phoneNumber, code: code, reqId: reqId);
+  Future<void> verifyOtp({
+    required String phoneNumber,
+    required String code,
+    String? reqId,
+    LegalConsent? legalConsent,
+  }) async {
+    final user = await _repository.verifyOtp(
+      phoneNumber: phoneNumber,
+      code: code,
+      reqId: reqId,
+      legalConsent: legalConsent,
+    );
     state = AuthState.authenticated(user);
     unawaited(_push.registerForCurrentUser());
   }

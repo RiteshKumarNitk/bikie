@@ -85,6 +85,7 @@ export function Footer({ role }: { role: SelectedRole | null }) {
           <div className="flex items-center gap-6 text-xs text-foreground/40">
             <Link href="/privacy-policy" className="hover:text-foreground/60">Privacy</Link>
             <Link href="/terms-and-conditions" className="hover:text-foreground/60">Terms</Link>
+            <Link href="/user-agreement" className="hover:text-foreground/60">User Agreement</Link>
             <Link href="/cookie-policy" className="hover:text-foreground/60">Cookies</Link>
             {role && (
               <SwitchRoleLink to={otherRole(role)} className="text-accent-text hover:underline">

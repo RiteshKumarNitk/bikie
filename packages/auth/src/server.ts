@@ -2,8 +2,9 @@ import { betterAuth } from "better-auth";
 import { bearer, phoneNumber } from "better-auth/plugins";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { Redis } from "@upstash/redis";
+import { APIError } from "better-auth/api";
 import { prisma, userRepository } from "@bikie/database";
-import { getIdentityAccessModule, isValidIndianMobile } from "@bikie/services";
+import { getIdentityAccessModule, isValidIndianMobile, LegalService, parseLegalConsentHeaders } from "@bikie/services";
 
 // Rate limiting needs shared state across serverless function instances (Vercel), so
 // Better Auth's default "memory" storage (per-instance, in-process) can't actually enforce
@@ -84,8 +85,62 @@ function tempEmailForPhone(phoneNumber: string) {
 /** Shared by the plugin's own expiry and the OTP SMS copy so the two can't disagree. */
 const OTP_EXPIRES_IN_SECONDS = 300;
 
+function requestIp(headers: Headers | undefined): string | null {
+  const forwarded = headers?.get("x-forwarded-for");
+  return forwarded ? forwarded.split(",")[0]!.trim() : (headers?.get("x-real-ip") ?? null);
+}
+
+/**
+ * ADR-090 — the backend's authoritative legal-consent gate. Every way Better Auth can create an
+ * account (phone-OTP `signUpOnVerification` — the only one the apps use — plus email sign-up and
+ * Google, which are enabled server-side) goes through `internalAdapter.createUser`, which runs
+ * these hooks. So a client that skips the signup checkbox, or talks to the API directly, cannot
+ * get an account created: `before` rejects unless the request names exactly the currently
+ * published legal versions (`x-legal-consent-versions`), and `after` records one immutable
+ * `LegalAcceptance` per version, deleting the new account again if that write fails.
+ *
+ * Only HTTP-originated creation is gated (`ctx.request` set). Server-side `auth.api.*` calls with
+ * no request — none exist today, seeds write Prisma directly — have no end user to consent.
+ */
+const legalConsentHooks = {
+  before: async (_user: unknown, ctx: { request?: Request; headers?: Headers } | null) => {
+    if (!ctx?.request) return;
+    const headers = ctx.headers ?? ctx.request.headers;
+    const { versionIds } = parseLegalConsentHeaders(headers);
+    const check = await LegalService.validateSignupConsent(versionIds);
+    if (!check.ok) {
+      console.log(`[LEGAL][CONSENT][REJECTED] code=${check.code} provided=${versionIds.length}`);
+      throw new APIError(check.status === 409 ? "CONFLICT" : "BAD_REQUEST", {
+        message: check.message,
+        code: check.code,
+      });
+    }
+  },
+  after: async (user: { id: string }, ctx: { request?: Request; headers?: Headers } | null) => {
+    if (!ctx?.request) return;
+    const headers = ctx.headers ?? ctx.request.headers;
+    const { versionIds, accountType } = parseLegalConsentHeaders(headers);
+    const result = await LegalService.recordSignupConsent({
+      userId: user.id,
+      versionIds,
+      accountType,
+      ipAddress: requestIp(headers),
+      userAgent: headers.get("user-agent"),
+    });
+    if (!result.ok) {
+      throw new APIError("INTERNAL_SERVER_ERROR", {
+        message: "We couldn't record your acceptance of the legal terms, so your account wasn't created. Please try again.",
+        code: "LEGAL_CONSENT_NOT_RECORDED",
+      });
+    }
+  },
+};
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, { provider: "postgresql" }),
+  databaseHooks: {
+    user: { create: legalConsentHooks },
+  },
   emailAndPassword: {
     enabled: true,
   },

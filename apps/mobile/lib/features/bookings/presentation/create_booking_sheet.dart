@@ -12,7 +12,9 @@ Future<void> showCreateBookingSheet(BuildContext context, BikeDetail bike) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
-    builder: (context) => CreateBookingSheet(bike: bike),
+    useSafeArea: true,
+    // Scrolls instead of overflowing on short screens, landscape, or with the keyboard open.
+    builder: (context) => SingleChildScrollView(child: CreateBookingSheet(bike: bike)),
   );
 }
 

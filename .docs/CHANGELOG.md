@@ -1,5 +1,58 @@
 # BIKIE Changelog
 
+## 2026-09-28 — Mobile: Service Provider location setup opens at the provider's location (ADR-091)
+
+The Service Provider location map used to open on a zoom-5 view of all of India with no GPS
+lookup, so providers had to hunt for their city — and because the pin was labelled "optional",
+many could save without one, which silently excludes them from SOS dispatch and nearby-provider
+search. Now: new providers are asked for location permission and the map opens at their GPS
+position (zoom 16); the pin is fixed in the centre and the map moves under it; "Use current
+location" re-centres; nothing is saved until "Confirm location". Permission denied never blocks
+onboarding — the map opens near the typed city (or India) with a "select manually" message.
+Existing providers open on their saved pin and are never auto-relocated. A confirmed pin is now
+required to save; GPS permission is not. Reverse geocoding runs once per confirmation (not per
+tap), identifies itself to Nominatim, and only fills empty address fields. Removed the undeclared
+`package:http` dependency (the app's last `flutter analyze` warning). Ride meeting-point picker
+unchanged (confirm mode is opt-in). No backend/API/schema/SOS changes. `flutter test` 151→168.
+Not yet tested on a real device.
+
+## 2026-09-28 — Versioned legal terms + mandatory signup consent (ADR-090)
+
+New Admin → Legal section (`/admin/legal`): overview of Terms & Conditions, Privacy Policy and User
+Agreement (current version, published/updated dates, acceptance counts), version history, a draft
+editor with preview and transactional publish, and a filterable Consent Records audit
+(`/admin/legal/acceptances`). Published versions are immutable — enforced by DB triggers — and
+publishing archives the previous version in the same transaction; partial unique indexes make two
+active versions impossible. Web and mobile signup (Rider and Service Provider) now show an
+unchecked-by-default consent checkbox linking to the current documents and won't send the OTP until
+it's checked; the backend refuses to create any account whose request doesn't name exactly the
+current published versions (Better Auth `user.create` hook) and stores one immutable acceptance row
+per exact version. Re-consent API (`/api/legal/status`, `/api/legal/accept`) added; no client prompt
+yet. Public legal pages render the live published version; new `/user-agreement` page. Migration
+`20260928100000_legal_terms_consent` seeds v1 of each document (User Agreement text needs legal
+review). `vitest` 332→350, `flutter test` 144→151, migration invariants verified on PGlite.
+**Existing mobile builds can't create new accounts after this deploys** — ship the app update with it.
+
+## 2026-09-28 — Mobile: SOS-first rider Home + app-wide responsive layout pass (ADR-089)
+
+Rider Home (`home_screen.dart`) is now a single, screen-sized SOS button that opens the existing
+`SendSosSheet` unchanged, plus the rider's active-alert banner and a compact "Be findable in an
+emergency" location-sharing switch. The marketplace feed (featured bikes, destinations,
+testimonials, profile-completion banner) is gone from Home; everything it linked to is still
+reachable — Bikes tab, a new Profile → Destinations tile, Profile → Rider Details (now carries the
+completion nudge). Home's app bar gains Nearby SOS alerts (`/sos`) and SOS history
+(`/sos/history`), which riders previously could only reach from a push notification. Service
+Provider Home is unchanged in structure (Service Providers respond to SOS, they don't send it).
+
+Responsive pass: new `ResponsiveFrame` in `MaterialApp.builder` caps content at 840dp (centered on
+tablets / wide landscape) and system font scale at 1.4x; every bottom sheet now scrolls instead of
+overflowing (SOS, booking, review, partner details, message actions); fixed-aspect grids replaced
+(SOS category picker, partner stats, bike grids now `maxCrossAxisExtent`); `Spacer`-flanked text
+rows made flexible; intro slides scroll in landscape; SOS chat card height is screen-relative.
+No SOS API, eligibility, severity, SMS, escalation or fan-out code touched. `flutter analyze`
+clean (one pre-existing `http` info), `flutter test` 126→144 (new overflow tests across
+small/large/landscape/tablet at 1x and 2x font). Not yet verified on a physical device.
+
 ## 2026-09-20 — SOS SMS moved from MSG91 v2 sendsms + DLT_TE_ID to the MSG91 Flow API (ADR-088)
 
 A manually-tested MSG91 Flow API request (Flow template `6a7b54abd6f241632f0bc273`) confirmed

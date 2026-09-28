@@ -375,6 +375,10 @@ model User {
   pushSubscriptions   PushSubscription[]
   accountTypeChangeRequests         AccountTypeChangeRequest[] @relation("AccountTypeChangeRequests")
   accountTypeChangeRequestsReviewed AccountTypeChangeRequest[] @relation("AccountTypeChangeRequestsReviewed")
+  // ADR-090 — versioned legal terms + consent.
+  legalAcceptances       LegalAcceptance[]
+  legalVersionsCreated   LegalDocumentVersion[] @relation("LegalVersionCreatedBy")
+  legalVersionsPublished LegalDocumentVersion[] @relation("LegalVersionPublishedBy")
 
   @@map("user")
 }
@@ -1353,4 +1357,95 @@ model PushSubscription {
 
   @@index([userId])
   @@map("push_subscription")
+}
+
+// --- Legal terms + consent (ADR-090) ---
+//
+// Managed only from the web Admin Dashboard. Every edit is a new immutable version:
+// DRAFT → PUBLISHED → ARCHIVED. At most one DRAFT and one PUBLISHED version per document, both
+// enforced by partial unique indexes (raw SQL in the migration — Prisma can't express them). A
+// non-DRAFT version's content can never change and it can never be deleted, and acceptance rows
+// can never be updated or deleted — all three enforced by DB triggers, not just app code.
+
+enum LegalDocumentType {
+  TERMS_AND_CONDITIONS
+  PRIVACY_POLICY
+  USER_AGREEMENT
+}
+
+enum LegalVersionStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LegalAcceptanceSource {
+  SIGNUP
+  RECONSENT
+}
+
+/** One row per document type. `currentVersionId` points at the single PUBLISHED version and is
+ * moved only inside the publish transaction. */
+model LegalDocument {
+  id               String                 @id @default(cuid())
+  type             LegalDocumentType      @unique
+  title            String
+  currentVersionId String?                @unique
+  currentVersion   LegalDocumentVersion?  @relation("LegalDocumentCurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict)
+  versions         LegalDocumentVersion[] @relation("LegalDocumentVersions")
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@map("legal_document")
+}
+
+model LegalDocumentVersion {
+  id              String             @id @default(cuid())
+  legalDocumentId String
+  legalDocument   LegalDocument      @relation("LegalDocumentVersions", fields: [legalDocumentId], references: [id], onDelete: Restrict)
+  currentFor      LegalDocument?     @relation("LegalDocumentCurrentVersion")
+  // Denormalized from the parent document so acceptance/version filters don't need a join.
+  documentType    LegalDocumentType
+  // Assigned when the draft is created (latest + 1); unique per document.
+  versionNumber   Int
+  content         String
+  status          LegalVersionStatus @default(DRAFT)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  createdById     String?
+  createdBy       User?              @relation("LegalVersionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  publishedById   String?
+  publishedBy     User?              @relation("LegalVersionPublishedBy", fields: [publishedById], references: [id], onDelete: SetNull)
+  acceptances     LegalAcceptance[]
+
+  @@unique([legalDocumentId, versionNumber])
+  @@index([documentType, status])
+  @@map("legal_document_version")
+}
+
+/** Immutable record that a user accepted one exact version. `documentType`, `versionNumber` and
+ * `accountType` are snapshots taken at acceptance time — later versions, or a later account type
+ * change, never alter them. `onDelete: Restrict` on `user` means a user with consent history is
+ * anonymized rather than hard-deleted (see adminRepository.deleteUser), keeping the record. */
+model LegalAcceptance {
+  id                     String                @id @default(cuid())
+  userId                 String
+  user                   User                  @relation(fields: [userId], references: [id], onDelete: Restrict)
+  legalDocumentVersionId String
+  legalDocumentVersion   LegalDocumentVersion  @relation(fields: [legalDocumentVersionId], references: [id], onDelete: Restrict)
+  documentType           LegalDocumentType
+  versionNumber          Int
+  accountType            AccountType
+  source                 LegalAcceptanceSource
+  ipAddress              String?
+  userAgent              String?
+  acceptedAt             DateTime              @default(now())
+
+  @@unique([userId, legalDocumentVersionId])
+  @@index([legalDocumentVersionId])
+  @@index([documentType, versionNumber])
+  @@index([acceptedAt])
+  @@map("legal_acceptance")
 }

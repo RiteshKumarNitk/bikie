@@ -5,6 +5,7 @@ import 'package:mobile/core/network/api_exception.dart';
 import 'package:mobile/core/storage/secure_storage.dart';
 import 'package:mobile/features/auth/data/auth_repository.dart';
 import 'package:mobile/features/auth/data/user_model.dart';
+import 'package:mobile/features/legal/data/legal_models.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockDio extends Mock implements Dio {}
@@ -14,6 +15,7 @@ class _MockFlutterSecureStorage extends Mock implements FlutterSecureStorage {}
 void main() {
   setUpAll(() {
     registerFallbackValue(RequestOptions(path: '/api/auth/sign-in/email'));
+    registerFallbackValue(Options());
   });
 
   late _MockDio dio;
@@ -293,6 +295,57 @@ void main() {
       expect(
         () => repository.verifyOtp(phoneNumber: '+919876543210', code: '000000'),
         throwsA(isA<ApiException>().having((e) => e.isValidation, 'isValidation', true)),
+      );
+      verifyNever(() => flutterStorage.write(key: any(named: 'key'), value: any(named: 'value')));
+    });
+
+    test('ADR-090 — sends the signup legal consent as headers on the account-creating call', () async {
+      when(() => dio.post(any(), data: any(named: 'data'), options: any(named: 'options'))).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/auth/phone-number/verify'),
+          statusCode: 200,
+          data: {'status': true, 'token': 'otp-session-token', 'user': buildUserJson()},
+        ),
+      );
+
+      await repository.verifyOtp(
+        phoneNumber: '+919876543210',
+        code: '123456',
+        legalConsent: const LegalConsent(versionIds: ['terms-v3', 'privacy-v2'], accountType: 'SERVICE_PROVIDER'),
+      );
+
+      final options = verify(
+        () => dio.post('/api/auth/phone-number/verify', data: any(named: 'data'), options: captureAny(named: 'options')),
+      ).captured.single as Options;
+      expect(options.headers, {
+        'x-legal-consent-versions': 'terms-v3,privacy-v2',
+        'x-legal-consent-account-type': 'SERVICE_PROVIDER',
+      });
+    });
+
+    test('ADR-090 — surfaces the server consent gate as a typed legal-consent error', () async {
+      when(() => dio.post(any(), data: any(named: 'data'), options: any(named: 'options'))).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/auth/phone-number/verify'),
+          response: Response(
+            requestOptions: RequestOptions(path: '/api/auth/phone-number/verify'),
+            statusCode: 409,
+            // Better Auth's APIError body shape.
+            data: {'code': 'LEGAL_VERSION_OUTDATED', 'message': 'Our legal terms were updated.'},
+          ),
+          type: DioExceptionType.badResponse,
+        ),
+      );
+
+      expect(
+        () => repository.verifyOtp(
+          phoneNumber: '+919876543210',
+          code: '123456',
+          legalConsent: const LegalConsent(versionIds: ['terms-v2'], accountType: 'RIDER'),
+        ),
+        throwsA(isA<ApiException>()
+            .having((e) => e.isLegalConsentError, 'isLegalConsentError', true)
+            .having((e) => e.message, 'message', 'Our legal terms were updated.')),
       );
       verifyNever(() => flutterStorage.write(key: any(named: 'key'), value: any(named: 'value')));
     });

@@ -8,6 +8,7 @@ import 'core/push/push_bootstrap.dart';
 import 'core/router/app_router.dart';
 import 'core/storage/app_preferences.dart';
 import 'core/theme/app_theme.dart';
+import 'core/widgets/responsive_frame.dart';
 import 'features/auth/domain/auth_controller.dart';
 import 'features/auth/domain/auth_state.dart';
 import 'features/auth/presentation/widgets/msg91_widget_host.dart';
@@ -82,7 +83,7 @@ class BikieApp extends ConsumerWidget {
       // comment for why OTP send/verify runs through a WebView at all.
       builder: (context, child) => Stack(
         children: [
-          if (child != null) child,
+          if (child != null) ResponsiveFrame(child: child),
           const Msg91WidgetHost(),
         ],
       ),

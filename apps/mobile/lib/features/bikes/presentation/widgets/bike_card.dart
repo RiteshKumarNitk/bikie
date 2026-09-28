@@ -18,9 +18,14 @@ class BikeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 16 / 10,
-              child: Image.network(bike.imageUrl, fit: BoxFit.cover),
+            // Always laid out in a fixed-extent grid cell: the photo takes whatever height the
+            // text below leaves, so a larger system font shrinks the photo instead of
+            // overflowing the card.
+            Expanded(
+              child: SizedBox(
+                width: double.infinity,
+                child: Image.network(bike.imageUrl, fit: BoxFit.cover),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.all(12),
@@ -40,8 +45,15 @@ class BikeCard extends StatelessWidget {
                     children: [
                       Icon(Icons.star, size: 16, color: AppTheme.accentTextOf(context)),
                       const SizedBox(width: 4),
-                      Text('${bike.ratingAvg} (${bike.ratingCount})', style: Theme.of(context).textTheme.bodySmall),
-                      const Spacer(),
+                      Expanded(
+                        child: Text(
+                          '${bike.ratingAvg} (${bike.ratingCount})',
+                          style: Theme.of(context).textTheme.bodySmall,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
                       Text(
                         '₹${bike.pricePerDay.toStringAsFixed(0)}/day',
                         style: Theme.of(context).textTheme.titleSmall,

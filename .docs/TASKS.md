@@ -2,6 +2,48 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Mobile: Service Provider location setup (2026-09-28, ADR-091)
+
+| Task | Status |
+|---|---|
+| Audit the provider location flow (map default, GPS, geocoding, storage, SOS usage) | Completed |
+| `LocationPickerField` opt-in confirm mode: fixed centre pin, `MapController`, "Use current location", "Confirm location", auto-locate only without a saved pin, typed-city fallback centre | Completed |
+| Partner onboarding: GPS via existing `captureOneShotLocation`, confirmed pin required to save (GPS optional), unconfirmed-move guard | Completed |
+| Reverse geocoding: once per confirmation, identifying User-Agent, dedicated client (no app token), fills only empty fields; removed undeclared `package:http` | Completed |
+| Tests: picker (7), onboarding screen (6), geocoding client (4); ride picker regression | Completed — `flutter test` 168, `flutter analyze` clean |
+| Real-device check: GPS allowed / denied / existing provider / SOS discovery with saved pin | Pending |
+| Existing providers saved without a pin get no SOS dispatch — consider a prompt or an admin report to find them | Backlog |
+| `serviceRadiusKm` is collected but unused by dispatch/search | Backlog (separate product decision) |
+
+## Versioned legal terms + mandatory signup consent (2026-09-28, ADR-090)
+
+| Task | Status |
+|---|---|
+| Schema + migration: `LegalDocument`, `LegalDocumentVersion`, `LegalAcceptance`; partial unique indexes (1 published / 1 draft per document); immutability triggers; v1 seed of all three documents | Completed |
+| `legalRepository` (transactional publish with row lock, draft CRUD, acceptance recording, compliance search) + `LegalService` | Completed |
+| Backend consent gate in Better Auth `databaseHooks.user.create` (reject without exact current versions; record acceptances; roll back account if recording fails) | Completed |
+| Public/user API: `GET /api/legal/current`, `GET /api/legal/status`, `POST /api/legal/accept` | Completed |
+| Admin API + UI: overview, version history, draft editor/preview/publish/discard, Consent Records with filters; sidebar "Legal" group; audit logging | Completed |
+| Web `/signup` consent checkbox + headers; public legal pages render the published version; new `/user-agreement` | Completed |
+| Mobile `SignupScreen` consent checkbox (Rider + Service Provider), in-app document viewer, consent headers on OTP verify | Completed |
+| Tests: service unit tests, mobile repository + signup widget tests, OpenAPI inventory regenerated, migration invariants on PGlite | Completed — `vitest` 350, `flutter test` 151 |
+| Legal review of the seeded User Agreement v1 text; publish v2 from Admin → Legal if needed | Pending (operator) |
+| Deploy: run `prisma migrate deploy`, release the mobile build in step (older builds can't sign up) | Pending (operator) |
+| End-to-end check against a running server: signup with/without consent, publish v2 mid-signup | Pending |
+| Re-consent prompt UI (web + mobile) using `/api/legal/status` + `/api/legal/accept` — product decision on when to prompt existing users | Backlog |
+
+## Mobile: SOS-first rider Home + responsive layout pass (2026-09-28, ADR-089)
+
+| Task | Status |
+|---|---|
+| Rider Home reduced to one SOS action (opens existing `SendSosSheet`), active-alert banner, compact location-sharing switch | Completed |
+| Relocate Home's secondary entry points: SOS history + nearby alerts → Home app bar; Destinations → Profile; profile-completion nudge → Profile "Rider Details" subtitle; featured bikes → Bikes tab (already) | Completed |
+| `ResponsiveFrame` (840dp max content width, 1.4x max text scale) mounted once in `MaterialApp.builder` | Completed |
+| All bottom sheets scroll instead of overflowing (SOS, booking, review, partner details, message actions) | Completed |
+| Replace fixed-aspect grids / `Spacer`-flanked text rows (SOS categories, partner stats, bike grids, membership, trips, bike detail, partner requests) | Completed |
+| Widget tests: Home + SOS sheet at small/large/landscape/tablet × 1x/2x font, no overflow | Completed — `flutter test` 126→144 |
+| On-device check (small Android phone, tablet, large font) | Pending |
+
 ## SOS SMS content mismatch causing MSG91 Pause Code 211 (2026-09-19, ADR-087)
 
 | Task | Status |

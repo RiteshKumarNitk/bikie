@@ -60,6 +60,13 @@ const navGroups = [
     ],
   },
   {
+    label: "Legal",
+    items: [
+      { label: "Legal / Terms", href: "/admin/legal" },
+      { label: "Consent Records", href: "/admin/legal/acceptances" },
+    ],
+  },
+  {
     label: "System",
     items: [
       { label: "Audit Logs", href: "/admin/audit-logs" },

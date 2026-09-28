@@ -998,6 +998,408 @@
         }
       }
     },
+    "/api/admin/legal/{type}/versions": {
+      "get": {
+        "operationId": "get_api_admin_legal_type_versions",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/legal/{type}/versions",
+        "description": "Source: `apps/web/app/api/admin/legal/[type]/versions/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/legal/[type]/versions/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      },
+      "post": {
+        "operationId": "post_api_admin_legal_type_versions",
+        "tags": [
+          "admin"
+        ],
+        "summary": "POST /api/admin/legal/{type}/versions",
+        "description": "Source: `apps/web/app/api/admin/legal/[type]/versions/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/legal/[type]/versions/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/admin/legal/acceptances": {
+      "get": {
+        "operationId": "get_api_admin_legal_acceptances",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/legal/acceptances",
+        "description": "Source: `apps/web/app/api/admin/legal/acceptances/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/legal/acceptances/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/admin/legal": {
+      "get": {
+        "operationId": "get_api_admin_legal",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/legal",
+        "description": "Source: `apps/web/app/api/admin/legal/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/legal/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/admin/legal/versions/{id}/publish": {
+      "post": {
+        "operationId": "post_api_admin_legal_versions_id_publish",
+        "tags": [
+          "admin"
+        ],
+        "summary": "POST /api/admin/legal/versions/{id}/publish",
+        "description": "Source: `apps/web/app/api/admin/legal/versions/[id]/publish/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/legal/versions/[id]/publish/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/admin/legal/versions/{id}": {
+      "get": {
+        "operationId": "get_api_admin_legal_versions_id_",
+        "tags": [
+          "admin"
+        ],
+        "summary": "GET /api/admin/legal/versions/{id}",
+        "description": "Source: `apps/web/app/api/admin/legal/versions/[id]/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/legal/versions/[id]/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "patch_api_admin_legal_versions_id_",
+        "tags": [
+          "admin"
+        ],
+        "summary": "PATCH /api/admin/legal/versions/{id}",
+        "description": "Source: `apps/web/app/api/admin/legal/versions/[id]/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/legal/versions/[id]/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "delete_api_admin_legal_versions_id_",
+        "tags": [
+          "admin"
+        ],
+        "summary": "DELETE /api/admin/legal/versions/{id}",
+        "description": "Source: `apps/web/app/api/admin/legal/versions/[id]/route.ts`. Auth class: `admin`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "admin",
+        "x-bikie-source": "apps/web/app/api/admin/legal/versions/[id]/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
     "/api/admin/membership/plans/{id}": {
       "patch": {
         "operationId": "patch_api_admin_membership_plans_id_",
@@ -4515,6 +4917,152 @@
         "security": [],
         "x-bikie-auth": "public-or-unclassified",
         "x-bikie-source": "apps/web/app/api/firebase-config/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/legal/accept": {
+      "post": {
+        "operationId": "post_api_legal_accept",
+        "tags": [
+          "other"
+        ],
+        "summary": "POST /api/legal/accept",
+        "description": "Source: `apps/web/app/api/legal/accept/route.ts`. Auth class: `session`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "session",
+        "x-bikie-source": "apps/web/app/api/legal/accept/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/legal/current": {
+      "get": {
+        "operationId": "get_api_legal_current",
+        "tags": [
+          "other"
+        ],
+        "summary": "GET /api/legal/current",
+        "description": "Source: `apps/web/app/api/legal/current/route.ts`. Auth class: `public-or-unclassified`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [],
+        "x-bikie-auth": "public-or-unclassified",
+        "x-bikie-source": "apps/web/app/api/legal/current/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/legal/status": {
+      "get": {
+        "operationId": "get_api_legal_status",
+        "tags": [
+          "other"
+        ],
+        "summary": "GET /api/legal/status",
+        "description": "Source: `apps/web/app/api/legal/status/route.ts`. Auth class: `session`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "session",
+        "x-bikie-source": "apps/web/app/api/legal/status/route.ts",
         "responses": {
           "200": {
             "description": "Success (shape documented in .docs/API.md for this route).",
