@@ -1,5 +1,16 @@
 # BIKIE Changelog
 
+## 2026-09-30 — Service Provider test account activates membership without payment; checkout errors no longer masked (ADR-089)
+
+The web membership modal showed "Payment succeeded but couldn't be verified" for every failed
+`/purchase` response — including `409 ALREADY_ACTIVE_MEMBERSHIP` (e.g. an earlier payment had
+already activated it). It now treats "already active" as success and otherwise shows the server's
+actual reason plus the Razorpay payment id. The allowlisted Service Provider test account
+(`TEST_SERVICE_PROVIDER_PHONE`, only while the ADR-072 test bypass is configured) now gets the
+simulated checkout and activates paid Service Provider plans without Razorpay, in production too;
+no other account is affected. Signature-verification failures are now logged (ids only).
+`vitest` 332→336.
+
 ## 2026-09-20 — SOS SMS moved from MSG91 v2 sendsms + DLT_TE_ID to the MSG91 Flow API (ADR-088)
 
 A manually-tested MSG91 Flow API request (Flow template `6a7b54abd6f241632f0bc273`) confirmed

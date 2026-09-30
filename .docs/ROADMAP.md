@@ -1,5 +1,10 @@
 # BIKIE — Roadmap
 
+## Service Provider Test Account Can Activate Membership (2026-09-30, ADR-089)
+The store-review/QA Service Provider test account can now activate a paid membership without a
+real payment, and the checkout no longer reports every failure as "couldn't be verified" — an
+already-active membership is recognised as success. See ADR-089.
+
 ## Fixed: SOS SMS Content Mismatch Causing MSG91 Pause Code 211 (2026-09-19, ADR-087)
 Live production evidence — the app's own logs showed a successful SOS SMS send with a real MSG91
 request id, while MSG91's own Reports dashboard later marked the same request FAILED (Pause Code

@@ -27,6 +27,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ razorpayConfigured: false, free: true });
   }
 
+  // ADR-089 — the store-review/QA Service Provider test account never goes to Razorpay: it gets
+  // the simulated checkout (web shows the test card form, mobile activates directly), which
+  // `/purchase` accepts for this account only.
+  if (PartnerMembershipService.isPaymentExemptTestAccount(session.user.phoneNumber)) {
+    return NextResponse.json({ razorpayConfigured: false, testAccount: true });
+  }
+
   if (!RazorpayService.isConfigured()) {
     // ADR-069 — paid plan + unconfigured Razorpay in production = payments unavailable, not a
     // free pass via simulated checkout. A free plan already returned above and is unaffected.

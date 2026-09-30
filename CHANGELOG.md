@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-30 — Service Provider test account activates membership without payment; checkout errors no longer masked (ADR-089)
+
+The web membership modal showed "Payment succeeded but couldn't be verified" for every failed
+`/purchase` response — including `409 ALREADY_ACTIVE_MEMBERSHIP` (e.g. an earlier payment had
+already activated it). It now treats "already active" as success and otherwise shows the server's
+actual reason plus the Razorpay payment id. The allowlisted Service Provider test account
+(`TEST_SERVICE_PROVIDER_PHONE`, only while the ADR-072 test bypass is configured) now gets the
+simulated checkout and activates paid Service Provider plans without Razorpay, in production too;
+no other account is affected. Signature-verification failures are now logged (ids only).
+`vitest` 332→336.
+
 ## 2026-09-19 — Fixed: SOS SMS content mismatch causing MSG91/DLT Pause Code 211 rejections (ADR-087)
 
 Live production evidence showed the app's own logs reporting a successful SOS SMS send (real MSG91

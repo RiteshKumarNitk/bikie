@@ -4582,4 +4582,24 @@ changes:
   3 fan-out + 1 whitespace-lock from the same session's earlier work), `tsc --noEmit` clean. No SMS
   sent during implementation — not committed, not pushed, not deployed.
 
+## ADR-089: Service Provider test account is payment-exempt; checkout surfaces the real purchase error
 
+- **Context.** The Service Provider test account (9000000002) paid ₹12 but saw "Payment succeeded
+  but couldn't be verified". `PaymentModal` showed that one message for *any* non-2xx `/purchase`
+  response, so an already-active membership (`409 ALREADY_ACTIVE_MEMBERSHIP`), a signature
+  mismatch and an inactive plan were indistinguishable.
+- **Decision.**
+  1. `PaymentModal` treats `ALREADY_ACTIVE_MEMBERSHIP` as success and otherwise shows the server's
+     message plus the Razorpay payment id.
+  2. `PartnerMembershipService.isPaymentExemptTestAccount` — true only for
+     `TEST_SERVICE_PROVIDER_PHONE` numbers, under the ADR-072 enablement rule (production requires
+     `TEST_OTP` + a test phone to be configured). For that account, `/api/partner-membership/checkout`
+     returns the simulated mode (`razorpayConfigured: false, testAccount: true`) and `/purchase`
+     activates without a verified payment (recording any payment reference sent, else a `DUMMY-`
+     one); an already-active membership returns 200. Env-driven rather than a hardcoded number.
+  3. `/purchase` logs `[MEMBERSHIP][VERIFY_FAILED]` with order/payment ids (never the signature).
+- **Consequences.** Same blast radius as the ADR-072 OTP bypass: whoever can sign in as the test
+  account can already do so with the fixed code. A test activation still writes an invoice at the
+  plan price (as the existing dev-fallback path does), so revenue reports include it. Rider
+  membership is not exempted. Mobile needs no change — it already activates on
+  `razorpayConfigured: false`.

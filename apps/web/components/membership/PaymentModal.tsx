@@ -212,11 +212,21 @@ export function PaymentModal({
         if (res.ok) {
           toast.success("Subscription purchased successfully");
           onSuccess();
-        } else {
-          const message = "Payment succeeded but couldn't be verified. Contact support with your payment ID.";
-          setRazorpayError(message);
-          toast.error(message);
+          return;
         }
+        const data = (await res.json().catch(() => ({}))) as { error?: unknown; message?: unknown };
+        // A membership is already running (e.g. an earlier payment already activated it) — that's
+        // the outcome the user wanted, not a verification failure.
+        if (data.error === "ALREADY_ACTIVE_MEMBERSHIP") {
+          toast.success("Your membership is already active");
+          onSuccess();
+          return;
+        }
+        // Show the server's actual reason instead of one generic message for every failure.
+        const reason = typeof data.message === "string" ? data.message : "Your payment couldn't be verified.";
+        const message = `${reason} If you were charged, contact support with payment ID ${response.razorpay_payment_id}.`;
+        setRazorpayError(message);
+        toast.error(message);
       },
       modal: {
         ondismiss: () => {

@@ -52,6 +52,19 @@ export function isTestBypassPhoneNumber(phoneNumber: string): boolean {
   return testPhones.includes(toE164Phone(phoneNumber));
 }
 
+/**
+ * The allowlisted *Service Provider* test account(s) only (`TEST_SERVICE_PROVIDER_PHONE`, not the
+ * Rider ones), under exactly the same enablement rule as the OTP bypass. Lets the store-review /
+ * QA Service Provider account activate a paid membership without a real payment, so a reviewer
+ * can reach the operational Service Provider screens. Same blast radius as the OTP bypass itself:
+ * anyone who can sign in as that account already can, via the fixed test code.
+ */
+export function isTestServiceProviderAccount(phoneNumber: string | null | undefined): boolean {
+  if (!phoneNumber || !isTestOtpBypassEnabled()) return false;
+  const phones = parseTestPhones(process.env.TEST_SERVICE_PROVIDER_PHONE);
+  return phones.length > 0 && phones.includes(toE164Phone(phoneNumber));
+}
+
 export function matchesTestOtpCode(code: string): boolean {
   if (!isTestOtpBypassEnabled()) return false;
   return configuredTestOtp() === code;

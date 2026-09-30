@@ -2,6 +2,7 @@ import { billingRepository, partnerMembershipRepository, userRepository } from "
 import type { PartnerMembershipPlanDTO, PartnerMembershipDTO } from "@bikie/types";
 import { isRealRazorpayPaymentId } from "./billing.internal";
 import { maskPhone } from "./modules/communications/domain/phone";
+import { isTestServiceProviderAccount } from "./modules/identity-access/domain/test-otp-bypass";
 import { MSG91_SMS_TEMPLATE_ENV, SMSService } from "./sms.service";
 
 /** ADR-069 — mirrors `MembershipService`'s `PurchaseMembershipResult`. */
@@ -21,6 +22,13 @@ export const PartnerMembershipService = {
 
   async getPlanById(planId: string): Promise<PartnerMembershipPlanDTO | null> {
     return partnerMembershipRepository.findPlanById(planId);
+  },
+
+  /** ADR-089 — the allowlisted store-review/QA Service Provider test account
+   * (`TEST_SERVICE_PROVIDER_PHONE`, only while the ADR-072 test bypass is enabled) activates paid
+   * plans without a real payment. Never true for any other account. */
+  isPaymentExemptTestAccount(phoneNumber: string | null | undefined): boolean {
+    return isTestServiceProviderAccount(phoneNumber);
   },
 
   async purchaseMembership(

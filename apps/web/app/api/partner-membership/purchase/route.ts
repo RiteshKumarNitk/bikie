@@ -36,6 +36,21 @@ export async function POST(request: Request) {
     return NextResponse.json({ membership: result.membership });
   }
 
+  // ADR-089 — store-review/QA Service Provider test account: activates without a verified
+  // payment, in production too (only while the ADR-072 test bypass is configured). Any payment
+  // reference the client sent is recorded; otherwise a DUMMY- one, which billing already treats as
+  // "not a real Razorpay payment". Already active = success, not an error, for this account.
+  if (PartnerMembershipService.isPaymentExemptTestAccount(session.user.phoneNumber)) {
+    const reference = razorpayPaymentId ?? paymentId ?? `DUMMY-TEST-ACCOUNT-${crypto.randomUUID()}`;
+    const result = await PartnerMembershipService.purchaseMembership(session.user.id, planId, reference, razorpayOrderId);
+    console.log(`[MEMBERSHIP][TEST_ACCOUNT] partner membership user=${session.user.id} ok=${result.ok}`);
+    if (!result.ok) {
+      const active = await PartnerMembershipService.getActiveMembership(session.user.id);
+      return NextResponse.json({ membership: active, alreadyActive: true });
+    }
+    return NextResponse.json({ membership: result.membership });
+  }
+
   if (RazorpayService.isConfigured()) {
     if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
       return NextResponse.json(
@@ -49,6 +64,11 @@ export async function POST(request: Request) {
       signature: razorpaySignature,
     });
     if (!verified) {
+      // Ids only — never the signature or key secret. A spike of these means the key id used to
+      // create orders doesn't match RAZORPAY_KEY_SECRET used to verify them.
+      console.warn(
+        `[MEMBERSHIP][VERIFY_FAILED] partner user=${session.user.id} order=${razorpayOrderId} payment=${razorpayPaymentId}`,
+      );
       return NextResponse.json(
         { error: "PAYMENT_VERIFICATION_FAILED", message: "Payment could not be verified. Please try again." },
         { status: 400 },

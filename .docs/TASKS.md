@@ -2,6 +2,16 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Service Provider test-account membership bypass + unmasked checkout errors (2026-09-30, ADR-089)
+
+| Task | Status |
+|---|---|
+| `PaymentModal`: `409 ALREADY_ACTIVE_MEMBERSHIP` = success; show server reason + payment id otherwise | Completed |
+| Test SP account (`TEST_SERVICE_PROVIDER_PHONE`) → simulated checkout; `/purchase` activates without verified payment | Completed |
+| Log `[MEMBERSHIP][VERIFY_FAILED]` (order/payment ids only) | Completed |
+| Operator: confirm `TEST_OTP` + `TEST_SERVICE_PROVIDER_PHONE=9000000002` are set in production, redeploy, retry | Pending (operator) |
+| Operator: check production logs for `[MEMBERSHIP][VERIFY_FAILED]` — if present for real users, the Razorpay key id and `RAZORPAY_KEY_SECRET` don't match | Pending (operator) |
+
 ## SOS SMS content mismatch causing MSG91 Pause Code 211 (2026-09-19, ADR-087)
 
 | Task | Status |
