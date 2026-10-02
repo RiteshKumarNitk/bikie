@@ -92,5 +92,10 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|welcome|login|signup|delete-account).*)"],
+  // Public legal pages (Google Play / app-store reviewers, and anyone logged out, must reach
+  // these with no session/cookie check at all — not just "redirect skipped", excluded from this
+  // function running on them in the first place) alongside the existing unauthenticated routes.
+  matcher: [
+    "/((?!api|_next/static|_next/image|favicon.ico|welcome|login|signup|delete-account|privacy-policy|terms-and-conditions|cookie-policy).*)",
+  ],
 };
