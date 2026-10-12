@@ -4,10 +4,13 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/push/notification_permission.dart';
+import '../../../core/widgets/notification_permission_prompt.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../../auth/domain/role_provider.dart';
 import '../../notifications/domain/notification_providers.dart';
+import '../../onboarding/domain/rider_profile_providers.dart';
 import '../../onboarding/data/partner_profile_repository.dart';
 import '../data/profile_repository.dart';
 
@@ -30,13 +33,21 @@ class ProfileScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          CircleAvatar(
-            radius: 36,
-            child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 28)),
+          Center(
+            child: CircleAvatar(
+              radius: 36,
+              child: Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : '?', style: const TextStyle(fontSize: 28)),
+            ),
           ),
           const SizedBox(height: 12),
-          Center(child: Text(user.name, style: Theme.of(context).textTheme.titleLarge)),
-          Center(child: Text(user.email, style: Theme.of(context).textTheme.bodyMedium)),
+          Text(user.name, textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            user.email,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodyMedium,
+          ),
           const SizedBox(height: 24),
           _PhoneField(initialPhone: user.phone),
           const SizedBox(height: 24),
@@ -46,6 +57,7 @@ class ProfileScreen extends ConsumerWidget {
             badgeCount: unreadNotifications,
             onTap: () => context.push('/notifications'),
           ),
+          const _PushNotificationsTile(),
           if (isPartnerMode) ...const [_PartnerProfileSection()] else ...const [_RiderProfileSection()],
           _ProfileTile(icon: Icons.chat_bubble_outline, label: 'Messages', onTap: () => context.push('/messages')),
           _ProfileTile(icon: Icons.card_giftcard, label: 'Referrals', onTap: () => context.push('/referrals')),
@@ -173,16 +185,18 @@ class _DeleteAccountButtonState extends ConsumerState<_DeleteAccountButton> {
 }
 
 /// The Rider-specific tiles, shown whenever the account's `accountType` is RIDER.
-class _RiderProfileSection extends StatelessWidget {
+class _RiderProfileSection extends ConsumerWidget {
   const _RiderProfileSection();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final needsCompletion = ref.watch(profileCompletionReminderProvider).valueOrNull ?? false;
     return Column(
       children: [
         _ProfileTile(
           icon: Icons.badge_outlined,
           label: 'Rider Details',
+          subtitle: needsCompletion ? 'Finish your profile — it makes your SOS alerts far more useful' : null,
           onTap: () => context.push('/onboarding'),
         ),
         _ProfileTile(
@@ -191,6 +205,11 @@ class _RiderProfileSection extends StatelessWidget {
           onTap: () => context.push('/partners'),
         ),
         _ProfileTile(icon: Icons.favorite_border, label: 'Wishlist', onTap: () => context.push('/wishlist')),
+        _ProfileTile(
+          icon: Icons.landscape_outlined,
+          label: 'Destinations',
+          onTap: () => context.push('/destinations'),
+        ),
         _ProfileTile(
           icon: Icons.workspace_premium_outlined,
           label: 'Membership',
@@ -300,6 +319,32 @@ class _PartnerProfileSectionState extends ConsumerState<_PartnerProfileSection> 
           onTap: () => context.push('/account-type-request'),
         ),
       ],
+    );
+  }
+}
+
+/// Push notification permission status + the way to fix it (Android). SOS alerts depend on this,
+/// so it stays visible in Profile rather than only being offered once.
+class _PushNotificationsTile extends ConsumerWidget {
+  const _PushNotificationsTile();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(notificationPermissionProvider);
+    if (state == null || state == NotificationPermissionState.unsupported) return const SizedBox.shrink();
+
+    final granted = state == NotificationPermissionState.granted;
+    return _ProfileTile(
+      icon: granted ? Icons.notifications_active_outlined : Icons.notifications_off_outlined,
+      label: 'Push notifications',
+      subtitle: switch (state) {
+        NotificationPermissionState.granted => 'On',
+        NotificationPermissionState.canRequest => "Off — you won't get SOS alerts. Tap to turn on.",
+        _ => "Off in phone settings — you won't get SOS alerts. Tap to fix.",
+      },
+      onTap: () => granted
+          ? ref.read(notificationPermissionProvider.notifier).openSystemSettings()
+          : showNotificationPermissionPrompt(context),
     );
   }
 }

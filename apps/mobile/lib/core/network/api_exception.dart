@@ -34,9 +34,12 @@ class ApiException implements Exception {
           fieldErrors: fieldErrors,
         );
       }
+      // Better Auth's own errors are `{ message, code }` (e.g. ADR-090's `LEGAL_VERSION_OUTDATED`
+      // from the signup consent gate) — keep the code so callers can branch on it.
       final apiMessage = data['message'];
       if (apiMessage is String) {
-        return ApiException(statusCode: statusCode, message: apiMessage);
+        final code = data['code'];
+        return ApiException(statusCode: statusCode, message: apiMessage, errorCode: code is String ? code : null);
       }
     }
     return ApiException(statusCode: statusCode, message: 'Something went wrong');
@@ -52,6 +55,9 @@ class ApiException implements Exception {
   bool get isNotFound => statusCode == 404;
   bool get isValidation => statusCode == 400;
   bool get isMembershipRequired => errorCode == 'MEMBERSHIP_REQUIRED';
+
+  /// ADR-090 — signup was rejected because consent was missing or named superseded versions.
+  bool get isLegalConsentError => errorCode == 'LEGAL_CONSENT_REQUIRED' || errorCode == 'LEGAL_VERSION_OUTDATED';
 
   @override
   String toString() => 'ApiException($statusCode, $message)';

@@ -95,7 +95,9 @@ export const config = {
   // Public legal pages (Google Play / app-store reviewers, and anyone logged out, must reach
   // these with no session/cookie check at all — not just "redirect skipped", excluded from this
   // function running on them in the first place) alongside the existing unauthenticated routes.
+  // `/user-agreement` added alongside the other three on the dev-prod merge (ADR-091) — same gap,
+  // same fix, new route.
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|welcome|login|signup|delete-account|privacy-policy|terms-and-conditions|cookie-policy).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|welcome|login|signup|delete-account|privacy-policy|terms-and-conditions|cookie-policy|user-agreement).*)",
   ],
 };

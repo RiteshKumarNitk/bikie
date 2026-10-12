@@ -9,6 +9,9 @@ import '../domain/auth_controller.dart';
 import '../domain/role_provider.dart';
 import '../../../core/widgets/app_logo.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../legal/data/legal_models.dart';
+import '../../legal/domain/legal_providers.dart';
+import '../../legal/presentation/legal_consent_checkbox.dart';
 import 'widgets/dev_otp_banner.dart';
 import 'widgets/otp_channel_toggle.dart';
 import 'widgets/phone_number_field.dart';
@@ -45,6 +48,12 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
   bool _sendingOtp = false;
   bool _verifying = false;
 
+  // ADR-090 — explicit consent to the currently published legal versions. Never pre-checked.
+  // [_consentedLegal] is the exact set of versions that was on screen when the user checked the
+  // box and sent the code; that is what gets sent as consent when the account is created.
+  bool _legalAccepted = false;
+  CurrentLegalDocuments? _consentedLegal;
+
   @override
   void dispose() {
     _otpController.dispose();
@@ -63,6 +72,13 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       setState(() => _error = 'Enter a 10-digit phone number.');
       return;
     }
+    // Checked before any OTP is sent — a signup the server rejects for missing consent would
+    // otherwise burn the code.
+    final legal = ref.read(currentLegalDocumentsProvider).valueOrNull;
+    if (!_legalAccepted || legal == null) {
+      setState(() => _error = legalConsentRequiredMessage);
+      return;
+    }
     setState(() => _sendingOtp = true);
     try {
       final repo = ref.read(authRepositoryProvider);
@@ -77,6 +93,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       }
       final sendResult = await repo.sendOtp(normalized, channel: _otpChannel);
       setState(() {
+        _consentedLegal = legal;
         _phoneNumber = normalized;
         _exists = false;
         _reqId = sendResult.reqId;
@@ -113,9 +130,15 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       _verifying = true;
     });
     try {
-      await ref
-          .read(authControllerProvider.notifier)
-          .verifyOtp(phoneNumber: _phoneNumber, code: _otpController.text.trim(), reqId: _reqId);
+      final consented = _consentedLegal;
+      await ref.read(authControllerProvider.notifier).verifyOtp(
+            phoneNumber: _phoneNumber,
+            code: _otpController.text.trim(),
+            reqId: _reqId,
+            legalConsent: consented == null
+                ? null
+                : LegalConsent(versionIds: consented.versionIds, accountType: ref.read(selectedRoleProvider)),
+          );
       if (_exists == false) {
         final accountType = ref.read(selectedRoleProvider);
         await ref.read(authRepositoryProvider).completePhoneSignup(accountType: accountType);
@@ -140,6 +163,18 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
         context.go('/');
       }
     } on ApiException catch (e) {
+      if (e.isLegalConsentError) {
+        // The terms were updated while they were signing up: show the new versions and ask for
+        // consent again. The account was not created.
+        ref.invalidate(currentLegalDocumentsProvider);
+        setState(() {
+          _legalAccepted = false;
+          _consentedLegal = null;
+          _step = 'phone';
+          _otpController.clear();
+          _reqId = null;
+        });
+      }
       setState(() => _error = e.message);
       if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
@@ -150,6 +185,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
   @override
   Widget build(BuildContext context) {
     final selectedRole = ref.watch(selectedRoleProvider);
+    final legalAsync = ref.watch(currentLegalDocumentsProvider);
 
     return Scaffold(
       appBar: AppBar(
@@ -203,6 +239,36 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
                           value: _otpChannel,
                           onChanged: (c) => setState(() => _otpChannel = c),
                           enabled: !_sendingOtp,
+                        ),
+                        const SizedBox(height: 12),
+                        legalAsync.when(
+                          data: (legal) => LegalConsentCheckbox(
+                            documents: legal.documents,
+                            checked: _legalAccepted,
+                            enabled: !_sendingOtp,
+                            onChanged: (v) => setState(() {
+                              _legalAccepted = v;
+                              if (v && _error == legalConsentRequiredMessage) _error = null;
+                            }),
+                          ),
+                          loading: () => const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 8),
+                            child: LinearProgressIndicator(),
+                          ),
+                          error: (_, __) => Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  "Couldn't load the Terms & Conditions.",
+                                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                                ),
+                              ),
+                              TextButton(
+                                onPressed: () => ref.invalidate(currentLegalDocumentsProvider),
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ),
                         if (_error == _accountExistsError)
                           Padding(

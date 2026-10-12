@@ -1,8 +1,11 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/responsive_frame.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../data/message_models.dart';
 import '../domain/message_providers.dart';
@@ -120,53 +123,55 @@ class _ConversationThreadBodyState extends ConsumerState<ConversationThreadBody>
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: _reactionEmojis
-                    .map(
-                      (emoji) => IconButton(
-                        onPressed: () {
-                          Navigator.pop(context);
-                          _react(message, emoji, myId);
-                        },
-                        icon: Text(emoji, style: const TextStyle(fontSize: 22)),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.reply_outlined),
-              title: const Text('Reply'),
-              onTap: () {
-                Navigator.pop(context);
-                setState(() => _replyTo = message);
-              },
-            ),
-            if (isMine) ...[
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Edit'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _edit(message);
-                },
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  children: _reactionEmojis
+                      .map(
+                        (emoji) => IconButton(
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _react(message, emoji, myId);
+                          },
+                          icon: Text(emoji, style: const TextStyle(fontSize: 22)),
+                        ),
+                      )
+                      .toList(),
+                ),
               ),
               ListTile(
-                leading: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
-                title: Text('Delete', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                leading: const Icon(Icons.reply_outlined),
+                title: const Text('Reply'),
                 onTap: () {
                   Navigator.pop(context);
-                  _delete(message);
+                  setState(() => _replyTo = message);
                 },
               ),
+              if (isMine) ...[
+                ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Edit'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _edit(message);
+                  },
+                ),
+                ListTile(
+                  leading: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
+                  title: Text('Delete', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _delete(message);
+                  },
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -364,7 +369,9 @@ class _MessageBubble extends StatelessWidget {
           GestureDetector(
             onLongPress: onLongPress,
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
+              // `sizeOf` (not `of`) so bubbles don't rebuild on keyboard inset changes; capped at the
+              // app's content column width so bubbles stay proportionate on tablets.
+              constraints: BoxConstraints(maxWidth: math.min(MediaQuery.sizeOf(context).width, kMaxContentWidth) * 0.78),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 decoration: BoxDecoration(

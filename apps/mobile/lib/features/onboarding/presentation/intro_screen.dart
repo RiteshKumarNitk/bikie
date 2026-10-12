@@ -79,25 +79,28 @@ class _IntroScreenState extends ConsumerState<IntroScreen> {
                 onPageChanged: (i) => setState(() => _page = i),
                 itemBuilder: (context, index) {
                   final slide = _slides[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 32),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(slide.emoji, style: const TextStyle(fontSize: 88)),
-                        const SizedBox(height: 32),
-                        Text(
-                          slide.title,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 12),
-                        Text(
-                          slide.description,
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ],
+                  // Centered when it fits, scrollable when it doesn't (landscape, large font).
+                  return Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 32),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(slide.emoji, style: const TextStyle(fontSize: 88)),
+                          const SizedBox(height: 32),
+                          Text(
+                            slide.title,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.headlineSmall,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            slide.description,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        ],
+                      ),
                     ),
                   );
                 },

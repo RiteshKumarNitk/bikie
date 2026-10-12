@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../features/auth/domain/auth_controller.dart';
 import '../../features/auth/domain/role_provider.dart';
 import '../../features/partner_dashboard/presentation/widgets/partner_availability_banner.dart';
+import 'notification_permission_prompt.dart';
 
 /// Which bottom-nav tab a given `matchedLocation` selects — pure, so ADR-044's role-based tab
 /// sets are unit-testable without pumping the widget tree. Exact-matches `/` (never treats a
@@ -52,21 +53,23 @@ class AppShell extends ConsumerWidget {
     final location = GoRouterState.of(context).matchedLocation;
     final currentIndex = indexForTab(tabs, location);
 
-    return Scaffold(
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        child: Column(
-          children: [
-            if (isPartner) const PartnerAvailabilityBanner(),
-            Expanded(child: child),
-          ],
+    return NotificationPermissionGate(
+      child: Scaffold(
+        body: SafeArea(
+          top: true,
+          bottom: false,
+          child: Column(
+            children: [
+              if (isPartner) const PartnerAvailabilityBanner(),
+              Expanded(child: child),
+            ],
+          ),
         ),
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: currentIndex,
-        onDestinationSelected: (index) => context.go(tabs[index]),
-        destinations: destinations,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: currentIndex,
+          onDestinationSelected: (index) => context.go(tabs[index]),
+          destinations: destinations,
+        ),
       ),
     );
   }

@@ -157,6 +157,28 @@ are now separate:
 `/api/partner/**` route; the policy itself lives in `identity-access`'s
 `evaluatePartnerCapability`.
 
+## Legal terms & consent (ADR-090)
+
+Legal documents are versioned rows (`LegalDocument` → `LegalDocumentVersion`, `DRAFT → PUBLISHED →
+ARCHIVED`), managed only from the web Admin Dashboard (`/admin/legal`) — the mobile app is read-only
+and has no admin surface. Invariants live in the database, not just app code: partial unique indexes
+allow at most one `PUBLISHED` and one `DRAFT` version per document, a trigger makes any non-`DRAFT`
+version's content immutable and undeletable, and a trigger makes `LegalAcceptance` rows append-only.
+`LegalAcceptance.userId` is `onDelete: Restrict`, so a user with consent history is anonymized rather
+than hard-deleted by `adminRepository.deleteUser`.
+
+Consent at signup is enforced in **Better Auth's `databaseHooks.user.create`** (`packages/auth`),
+the single point every account-creation path passes through — not in the signup screens. `before`
+rejects creation unless the request's `x-legal-consent-versions` header names exactly the current
+published versions (`LegalService.validateSignupConsent`); `after` writes one immutable acceptance
+per version and deletes the new user again if that write fails (the user insert is Better Auth's,
+so the two can't share a transaction). Web `/signup` and mobile `SignupScreen` fetch
+`GET /api/legal/current`, require an unchecked-by-default consent checkbox before sending the OTP,
+and send the headers on the verify call. Re-consent for existing users is supported by
+`GET /api/legal/status` + `POST /api/legal/accept`; no client UI prompts for it yet. The public
+`/terms-and-conditions`, `/privacy-policy` and `/user-agreement` pages render the current published
+version.
+
 ## Rides (community rides)
 
 User-organized group rides (`Trip`/`TripParticipant` models — internal name unchanged,

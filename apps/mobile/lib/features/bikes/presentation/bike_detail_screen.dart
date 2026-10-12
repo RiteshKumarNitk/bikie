@@ -78,8 +78,14 @@ class _BikeDetailBody extends ConsumerWidget {
                   children: [
                     Icon(Icons.star, size: 18, color: AppTheme.accentTextOf(context)),
                     const SizedBox(width: 4),
-                    Text('${bike.ratingAvg} (${bike.ratingCount} reviews)'),
-                    const Spacer(),
+                    Expanded(
+                      child: Text(
+                        '${bike.ratingAvg} (${bike.ratingCount} reviews)',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
                     Text(
                       '₹${bike.pricePerDay.toStringAsFixed(0)}/day',
                       style: Theme.of(context).textTheme.titleMedium,

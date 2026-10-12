@@ -7,6 +7,7 @@ import '../../../core/network/app_config.dart' show isTestPhoneNumber;
 import '../../../core/network/dio_client.dart';
 import '../../../core/providers.dart';
 import '../../../core/storage/secure_storage.dart';
+import '../../legal/data/legal_models.dart';
 import 'msg91_otp_repository.dart';
 import 'user_model.dart';
 
@@ -123,12 +124,22 @@ class AuthRepository {
   /// against MSG91 directly (`Msg91OtpRepository.verifyOtp`), and its resulting access token —
   /// not the user-typed digits — is what actually gets sent to our backend below. `reqId: null`
   /// (debug mode) sends the user-typed code straight through unchanged, exactly as before ADR-057.
-  Future<UserModel> verifyOtp({required String phoneNumber, required String code, String? reqId}) {
+  ///
+  /// ADR-090 — [legalConsent] is required when this call creates a brand-new account (signup):
+  /// the server's `user.create` hook refuses to create one unless these headers name exactly the
+  /// currently published legal versions. Ignored by the server for an existing account's login.
+  Future<UserModel> verifyOtp({
+    required String phoneNumber,
+    required String code,
+    String? reqId,
+    LegalConsent? legalConsent,
+  }) {
     return apiGuard(() async {
       final verifiedCode = reqId != null ? await _msg91.verifyOtp(reqId, code) : code;
       final res = await _dio.post(
         '/api/auth/phone-number/verify',
         data: {'phoneNumber': phoneNumber, 'code': verifiedCode},
+        options: legalConsent != null ? Options(headers: legalConsent.toHeaders()) : null,
       );
       final token = res.data['token'] as String?;
       if (token != null) await _storage.writeToken(token);

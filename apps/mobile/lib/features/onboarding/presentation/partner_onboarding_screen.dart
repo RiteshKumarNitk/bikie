@@ -1,15 +1,14 @@
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/app_toast.dart';
 import '../../auth/data/auth_repository.dart';
 import '../../auth/domain/auth_controller.dart';
+import '../../sos/domain/sos_providers.dart';
+import '../data/geocoding_repository.dart';
 import '../data/partner_profile_model.dart';
 import '../data/partner_profile_repository.dart';
 import 'location_picker_field.dart';
@@ -54,7 +53,12 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
 
   String _type = partnerTypes.first;
   String? _governmentIdType;
+  /// The last *confirmed* map location — only ever set by "Confirm location" (or loaded from the
+  /// saved profile), never by merely moving the map. Required to save: SOS dispatch and nearby
+  /// provider search only consider providers with coordinates (ADR-091).
   LatLng? _location;
+  bool _locationUnconfirmed = false;
+  int _geocodeRequest = 0;
   bool _showContactPerson2 = false;
 
   bool _saving = false;
@@ -144,6 +148,46 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
 
   static final _emailRegex = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
+  static const _locationRequiredMessage = 'Please select and confirm your service location to continue.';
+
+  /// Reuses the app's one GPS/permission path (`captureOneShotLocation`). Denied or unavailable
+  /// returns null — the picker then falls back to manual selection; onboarding is never blocked.
+  Future<LatLng?> _locateUser() async {
+    final fix = await ref.read(oneShotLocationProvider)();
+    return fix == null ? null : LatLng(fix.latitude, fix.longitude);
+  }
+
+  /// Runs once per confirmed pin (not per map movement). Only fills address fields that are still
+  /// empty — anything the provider typed is kept as-is.
+  Future<void> _onLocationConfirmed(LatLng position) async {
+    setState(() {
+      _location = position;
+      _locationUnconfirmed = false;
+      if (_error == _locationRequiredMessage) _error = null;
+    });
+    final request = ++_geocodeRequest;
+    final address = await ref.read(geocodingRepositoryProvider).reverse(position);
+    // A newer confirmation superseded this one while it was in flight.
+    if (!mounted || address == null || request != _geocodeRequest) return;
+
+    var filled = 0;
+    void fillIfEmpty(TextEditingController controller, String? value) {
+      if (value == null || controller.text.trim().isNotEmpty) return;
+      controller.text = value;
+      filled++;
+    }
+
+    setState(() {
+      fillIfEmpty(_city, address.city);
+      fillIfEmpty(_area, address.area);
+      fillIfEmpty(_pincode, address.pincode);
+      fillIfEmpty(_addressLine, address.road);
+    });
+    if (filled > 0) {
+      showAppToast(context, 'Filled empty address fields from your map location — please check them.');
+    }
+  }
+
   Future<void> _save() async {
     if (_businessName.text.trim().isEmpty || _city.text.trim().isEmpty) {
       setState(() => _error = 'Business name and city are required.');
@@ -155,6 +199,15 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
     }
     if (!_emailRegex.hasMatch(_businessEmail.text.trim())) {
       setState(() => _error = 'Enter a valid business email address.');
+      return;
+    }
+    // A confirmed map location is required; GPS permission is not (manual selection works).
+    if (_location == null) {
+      setState(() => _error = _locationRequiredMessage);
+      return;
+    }
+    if (_locationUnconfirmed) {
+      setState(() => _error = 'You moved the map but didn\'t confirm the new location. Tap "Confirm location" to use it.');
       return;
     }
 
@@ -304,38 +357,21 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
                     keyboardType: TextInputType.number,
                   ),
                   const SizedBox(height: 4),
-                  Text('Map location (optional)', style: Theme.of(context).textTheme.labelLarge),
+                  Text('Service location on map *', style: Theme.of(context).textTheme.labelLarge),
+                  const SizedBox(height: 2),
+                  Text(
+                    'SOS assistance requests reach you based on this pin. Place it where you actually operate.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   const SizedBox(height: 8),
                   LocationPickerField(
                     value: _location,
-                    onChanged: (position) async {
-                      setState(() => _location = position);
-                      try {
-                        final uri = Uri.parse('https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.latitude}&lon=${position.longitude}&zoom=18&addressdetails=1');
-                        final response = await http.get(uri);
-                        if (response.statusCode == 200) {
-                          final data = jsonDecode(response.body);
-                          final addr = data['address'] as Map<String, dynamic>?;
-                          if (addr != null && mounted) {
-                            setState(() {
-                              final city = addr['city'] ?? addr['town'] ?? addr['village'] ?? addr['county'];
-                              if (city != null) _city.text = city;
-                              
-                              final area = addr['suburb'] ?? addr['neighbourhood'] ?? addr['residential'];
-                              if (area != null) _area.text = area;
-                              
-                              final postcode = addr['postcode'];
-                              if (postcode != null) _pincode.text = postcode.toString();
-                              
-                              final road = addr['road'];
-                              if (road != null) _addressLine.text = road;
-                            });
-                          }
-                        }
-                      } catch (_) {
-                        // Ignore reverse geocoding errors (network fail, etc)
-                      }
-                    },
+                    confirmMode: true,
+                    autoLocate: true,
+                    locateUser: _locateUser,
+                    resolveFallbackCenter: () => ref.read(geocodingRepositoryProvider).searchCity(_city.text),
+                    onUnconfirmedChange: (v) => setState(() => _locationUnconfirmed = v),
+                    onChanged: _onLocationConfirmed,
                   ),
                 ],
               ),

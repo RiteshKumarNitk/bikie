@@ -45,7 +45,12 @@ class PartnerHomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
           children: [
-            Text(me != null ? 'Hello, ${me.name}' : 'Hello', style: Theme.of(context).textTheme.headlineSmall),
+            Text(
+              me != null ? 'Hello, ${me.name}' : 'Hello',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.headlineSmall,
+            ),
             const SizedBox(height: 16),
             const _ActivationCard(),
             statsAsync.when(
@@ -166,20 +171,27 @@ class _StatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.8,
+    // 2x2 rows that size to their content — a fixed-aspect grid clipped the labels on small
+    // phones and at larger system font sizes.
+    Widget pair(Widget a, Widget b) => IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [Expanded(child: a), const SizedBox(width: 12), Expanded(child: b)],
+          ),
+        );
+    return Column(
       children: [
-        _StatCard(label: '🚨 Active Requests', value: '${stats.activeRequests}', accent: Colors.red),
-        _StatCard(label: "Today's Assistance", value: '${stats.todayAssistanceCount}'),
-        _StatCard(label: 'Completed', value: '${stats.completedCount}'),
-        _StatCard(
-          label: 'Rating',
-          value: stats.ratingCount > 0 ? '${stats.ratingAvg.toStringAsFixed(1)} ★' : '—',
+        pair(
+          _StatCard(label: '🚨 Active Requests', value: '${stats.activeRequests}', accent: Colors.red),
+          _StatCard(label: "Today's Assistance", value: '${stats.todayAssistanceCount}'),
+        ),
+        const SizedBox(height: 12),
+        pair(
+          _StatCard(label: 'Completed', value: '${stats.completedCount}'),
+          _StatCard(
+            label: 'Rating',
+            value: stats.ratingCount > 0 ? '${stats.ratingAvg.toStringAsFixed(1)} ★' : '—',
+          ),
         ),
       ],
     );
@@ -197,13 +209,21 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = accent ?? Theme.of(context).colorScheme.primary;
     return Card(
+      margin: EdgeInsets.zero,
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(value, style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: color, fontWeight: FontWeight.bold)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                value,
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(color: color, fontWeight: FontWeight.bold),
+              ),
+            ),
             Text(label, style: Theme.of(context).textTheme.labelMedium),
           ],
         ),
@@ -289,8 +309,7 @@ class _SectionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text(title, style: Theme.of(context).textTheme.titleMedium),
-        const Spacer(),
+        Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
         TextButton(onPressed: onSeeAll, child: const Text('See all')),
       ],
     );

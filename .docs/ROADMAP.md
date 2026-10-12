@@ -5,6 +5,33 @@ The store-review/QA Service Provider test account can now activate a paid member
 real payment, and the checkout no longer reports every failure as "couldn't be verified" — an
 already-active membership is recognised as success. See ADR-089.
 
+## Mobile: Notification Permission Asked Deliberately (2026-09-28, ADR-093)
+New installs are now asked to turn on notifications with a clear explanation of what they're for,
+at a calm moment after sign-in, instead of a bare system dialog fired mid-login. People who said no
+can see the status and fix it from Profile, and enabling notifications later takes effect
+immediately. See ADR-093.
+
+## Mobile: Service Provider Location Setup Fixed (2026-09-28, ADR-092)
+Service Providers now start location setup on their own GPS position instead of a map of all of
+India, adjust by moving the map under a fixed pin, and confirm deliberately. A confirmed location
+is required to finish the profile, because SOS dispatch and nearby-provider search only reach
+providers with a map location; GPS permission stays optional. See ADR-092.
+
+## Versioned Legal Terms + Mandatory Signup Consent (2026-09-28, ADR-091)
+Legal documents are now managed as immutable, versioned records from Admin → Legal, and no account
+can be created without the new user explicitly accepting the exact current versions — enforced by
+the backend at the single point every account creation passes through, not just by the signup
+screens. Every acceptance is stored against the exact version for audit, never rewritten when a newer
+version is published; admins can search those records. Re-consent is supported by the API; prompting
+existing users is the next step. See ADR-091.
+
+## Mobile: SOS-First Rider Home + Responsive Layout Pass (2026-09-28, ADR-090)
+The rider's landing screen is now purely an emergency screen — one large SOS button, the rider's
+live alert if any, and the location-sharing switch SOS dispatch depends on. Marketplace content
+moved to the tabs/Profile entries that already existed; SOS history and nearby alerts became
+reachable from Home for the first time. An app-wide pass removed overflow risks on small phones,
+landscape, tablets and large system fonts. UI only — no SOS or backend behavior changed. See ADR-090.
+
 ## Fixed: SOS SMS Content Mismatch Causing MSG91 Pause Code 211 (2026-09-19, ADR-087)
 Live production evidence — the app's own logs showed a successful SOS SMS send with a real MSG91
 request id, while MSG91's own Reports dashboard later marked the same request FAILED (Pause Code

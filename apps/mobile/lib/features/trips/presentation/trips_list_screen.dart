@@ -139,11 +139,15 @@ class TripsListScreen extends ConsumerWidget {
                                     const SizedBox(height: 4),
                                     Row(
                                       children: [
-                                        Text(
-                                          '${trip.type.replaceAll('_', ' ')} · ${trip.difficulty}',
-                                          style: Theme.of(context).textTheme.bodySmall,
+                                        Expanded(
+                                          child: Text(
+                                            '${trip.type.replaceAll('_', ' ')} · ${trip.difficulty}',
+                                            style: Theme.of(context).textTheme.bodySmall,
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
                                         ),
-                                        const Spacer(),
+                                        const SizedBox(width: 8),
                                         Container(
                                           width: 8,
                                           height: 8,

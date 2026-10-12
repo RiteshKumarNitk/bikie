@@ -122,8 +122,14 @@ class _RequestCard extends StatelessWidget {
                     backgroundColor: Colors.red.withValues(alpha: 0.15),
                     visualDensity: VisualDensity.compact,
                   ),
-                const Spacer(),
-                Text(_formatDistance(request.distanceMeters), style: Theme.of(context).textTheme.labelMedium),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    _formatDistance(request.distanceMeters),
+                    textAlign: TextAlign.end,
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),

@@ -80,7 +80,7 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
   void _showPartnerDetails(NearbyPartner p) {
     showModalBottomSheet(
       context: context,
-      builder: (context) => Padding(
+      builder: (context) => SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
           mainAxisSize: MainAxisSize.min,

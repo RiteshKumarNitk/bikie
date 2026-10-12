@@ -254,7 +254,8 @@ class _SosDetailScreenState extends ConsumerState<SosDetailScreen> {
                     Text('Chat', style: Theme.of(context).textTheme.titleMedium),
                     const SizedBox(height: 8),
                     SizedBox(
-                      height: 420,
+                      // Most of a short (landscape) screen, capped on tall ones.
+                      height: (MediaQuery.sizeOf(context).height * 0.6).clamp(280.0, 420.0),
                       child: Card(
                         clipBehavior: Clip.antiAlias,
                         child: ConversationThreadBody(conversationId: session.conversationId!, fast: true),
