@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-18T09:14:46.153Z",
-  "count": 163,
+  "generatedAt": "2026-10-20T14:56:30.495Z",
+  "count": 164,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -260,6 +260,15 @@
       ],
       "auth": "admin",
       "file": "apps/web/app/api/admin/moderation/users/[id]/warn/route.ts"
+    },
+    {
+      "path": "/api/admin/notifications",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/notifications/route.ts"
     },
     {
       "path": "/api/admin/overview",

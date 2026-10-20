@@ -48,6 +48,7 @@ const navGroups = [
   {
     label: "Comms",
     items: [
+      { label: "Notifications", href: "/admin/notifications" },
       { label: "Email", href: "/admin/email" },
       { label: "SMS", href: "/admin/sms" },
     ],

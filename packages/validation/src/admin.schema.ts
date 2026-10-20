@@ -131,3 +131,24 @@ export const adminRevenueReportQuerySchema = z.object({
 });
 
 export type AdminRevenueReportQuery = z.infer<typeof adminRevenueReportQuerySchema>;
+
+// --- Admin → Notifications broadcast ---
+
+export const sendAdminNotificationSchema = z
+  .object({
+    audience: z.enum(["ALL", "RIDER", "SERVICE_PROVIDER", "USER"]),
+    userId: z.string().min(1).optional(),
+    title: z.string().min(1).max(120),
+    body: z.string().min(1).max(500),
+  })
+  .superRefine((data, ctx) => {
+    if (data.audience === "USER" && !data.userId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["userId"],
+        message: "userId is required when audience is USER",
+      });
+    }
+  });
+
+export type SendAdminNotificationInput = z.infer<typeof sendAdminNotificationSchema>;

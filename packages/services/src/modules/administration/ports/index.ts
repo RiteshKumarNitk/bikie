@@ -53,6 +53,12 @@ export interface AdminRepositoryPort {
   exportUsersCsvRows(take: number): Promise<Record<string, unknown>[]>;
   exportBookingsCsvRows(take: number): Promise<Record<string, unknown>[]>;
   exportPartnersCsvRows(take: number): Promise<Record<string, unknown>[]>;
+  /** Admin → Notifications — resolves an audience into userIds via the existing
+   * `User.accountType` field (ADR-053), never a second targeting system. */
+  findUserIdsByAudience(audience: "ALL" | "RIDER" | "SERVICE_PROVIDER"): Promise<string[]>;
+  /** Reuses the existing `AuditLog` (same ledger partner-verification decisions already write
+   * to) filtered to this feature's own entity — no new table for "basic history". */
+  findNotificationHistory(limit?: number): Promise<any[]>;
 }
 
 /** ADR-046b — applicant-facing notification on a verification decision. Same shape as
@@ -60,6 +66,9 @@ export interface AdminRepositoryPort {
  * one so each module's port surface stays independently mockable in tests. */
 export interface AdminNotificationPort {
   notify(userId: string, type: string, title: string, body: string, entity?: string, entityId?: string): Promise<void>;
+  /** Admin → Notifications broadcast — same `NotificationService.notifyMany` every bulk notify
+   * already uses, never a parallel send path. */
+  notifyMany(userIds: string[], type: string, title: string, body: string, entity?: string, entityId?: string): Promise<void>;
 }
 
 export interface AdministrationPorts {

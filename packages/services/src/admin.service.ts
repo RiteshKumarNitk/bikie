@@ -184,4 +184,16 @@ export const AdminService = {
   exportCsv(type: "users" | "bookings" | "partners") {
     return getAdministrationModule().admin.exportCsv(type);
   },
+  sendNotification(input: {
+    adminUserId: string;
+    audience: "ALL" | "RIDER" | "SERVICE_PROVIDER" | "USER";
+    userId?: string;
+    title: string;
+    body: string;
+  }) {
+    return getAdministrationModule().admin.sendNotification(input);
+  },
+  listNotificationHistory(limit?: number) {
+    return getAdministrationModule().admin.listNotificationHistory(limit);
+  },
 };

@@ -48,6 +48,18 @@ export async function getAdminOverviewStats() {
   return { totalUsers, totalPartners, totalBikes, totalBookings, totalTrips, revenueTotal, monthlyBookings, monthlyRevenue, bookingsByStatus, bikesByCity };
 }
 
+/** Admin → Notifications broadcast — resolves an audience into the exact userIds
+ * `NotificationService.notifyMany` should reach. Reuses `User.accountType`, the same
+ * server-authoritative field every other Rider/Service-Provider gate already reads (ADR-053) —
+ * no second targeting system. */
+export type NotificationAudience = "ALL" | "RIDER" | "SERVICE_PROVIDER";
+
+export async function findUserIdsByAudience(audience: NotificationAudience): Promise<string[]> {
+  const where = audience === "ALL" ? {} : { accountType: audience };
+  const users = await prisma.user.findMany({ where, select: { id: true } });
+  return users.map((u) => u.id);
+}
+
 export async function findAllUsers() {
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },

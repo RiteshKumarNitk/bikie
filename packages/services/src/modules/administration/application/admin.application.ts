@@ -185,6 +185,40 @@ export function createAdminApplication(ports: AdministrationPorts) {
       }
       return { csv: buildCsv(rows), filename: exportFilenameFor(type) };
     },
+
+    /**
+     * Admin → Notifications: sends a title/body announcement to every user in the chosen
+     * audience. Reuses the exact same `NotificationService.notifyMany` → `notify()` → in-app
+     * row + realtime publish + fire-and-forget push every other notification type already goes
+     * through (bookings, SOS, moderation, partner decisions) — no second send path. The
+     * "SYSTEM" `NotificationType` already exists for exactly this: a generic admin announcement.
+     * Logs to the existing `AuditLog` (same ledger partner-verification decisions use) so
+     * `findNotificationHistory` has something to show — no new table.
+     */
+    async sendNotification(input: {
+      adminUserId: string;
+      audience: "ALL" | "RIDER" | "SERVICE_PROVIDER" | "USER";
+      userId?: string;
+      title: string;
+      body: string;
+    }): Promise<{ recipientCount: number }> {
+      const userIds =
+        input.audience === "USER"
+          ? input.userId
+            ? [input.userId]
+            : []
+          : await ports.admin.findUserIdsByAudience(input.audience);
+
+      if (userIds.length === 0) {
+        return { recipientCount: 0 };
+      }
+
+      await ports.notifications.notifyMany(userIds, "SYSTEM", input.title, input.body);
+
+      return { recipientCount: userIds.length };
+    },
+
+    listNotificationHistory: (limit?: number) => ports.admin.findNotificationHistory(limit),
   };
 }
 

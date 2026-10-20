@@ -1,4 +1,4 @@
-import { adminRepository } from "@bikie/database";
+import { adminRepository, auditRepository } from "@bikie/database";
 import { NotificationService } from "../../../notification.service";
 import type { AdminNotificationPort, AdminRepositoryPort } from "../ports";
 
@@ -46,6 +46,8 @@ export function createAdminRepositoryAdapter(): AdminRepositoryPort {
     exportUsersCsvRows: (take) => adminRepository.exportUsersCsvRows(take),
     exportBookingsCsvRows: (take) => adminRepository.exportBookingsCsvRows(take),
     exportPartnersCsvRows: (take) => adminRepository.exportPartnersCsvRows(take),
+    findUserIdsByAudience: (audience) => adminRepository.findUserIdsByAudience(audience),
+    findNotificationHistory: (limit) => auditRepository.findLogs({ entity: "Notification", limit }),
   };
 }
 
@@ -53,5 +55,7 @@ export function createAdminNotificationAdapter(): AdminNotificationPort {
   return {
     notify: (userId, type, title, body, entity, entityId) =>
       NotificationService.notify(userId, type as never, title, body, entity, entityId),
+    notifyMany: (userIds, type, title, body, entity, entityId) =>
+      NotificationService.notifyMany(userIds, type as never, title, body, entity, entityId),
   };
 }
