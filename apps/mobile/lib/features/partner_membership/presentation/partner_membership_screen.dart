@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -101,14 +102,57 @@ class PartnerMembershipScreen extends ConsumerWidget {
   }
 }
 
-class _ActivePartnerMembershipCard extends StatelessWidget {
+class _ActivePartnerMembershipCard extends ConsumerStatefulWidget {
   const _ActivePartnerMembershipCard({required this.membership});
 
   final PartnerMembership membership;
 
   @override
+  ConsumerState<_ActivePartnerMembershipCard> createState() => _ActivePartnerMembershipCardState();
+}
+
+class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMembershipCard> {
+  bool _isCancelling = false;
+
+  Future<void> _cancel() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel subscription?'),
+        content: const Text(
+          'No further monthly charges will be made. You keep your membership until the current billing period ends.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep subscription')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel subscription')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _isCancelling = true);
+    try {
+      await ref.read(partnerMembershipRepositoryProvider).cancelSubscription();
+      ref.invalidate(activePartnerMembershipProvider);
+      if (mounted) showAppToast(context, 'Subscription cancelled — no further charges', variant: AppToastVariant.success);
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
+    } finally {
+      if (mounted) setState(() => _isCancelling = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final membership = widget.membership;
     final expiry = DateTime.tryParse(membership.endDate);
+    final isSubscription = membership.razorpaySubscriptionId != null;
+    final isCancelled = membership.cancelledAt != null;
+    final hasPaymentIssue = isSubscription &&
+        !isCancelled &&
+        membership.subscriptionStatus != null &&
+        !['created', 'authenticated', 'active'].contains(membership.subscriptionStatus);
+
     return Card(
       color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
       child: Padding(
@@ -139,6 +183,47 @@ class _ActivePartnerMembershipCard extends StatelessWidget {
                   : '${membership.daysLeft} days remaining · Expires ${DateFormat('d MMMM y').format(expiry)}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
+            if (isSubscription) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: hasPaymentIssue
+                      ? Colors.red.withValues(alpha: 0.1)
+                      : Theme.of(context).colorScheme.surface.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isCancelled
+                          ? 'Subscription cancelled — access continues until the date above'
+                          : hasPaymentIssue
+                              ? 'There is a problem with your last payment (${membership.subscriptionStatus}). Please check your payment method.'
+                              : 'Monthly subscription active · renews automatically',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: hasPaymentIssue ? Colors.red : null,
+                            fontWeight: hasPaymentIssue ? FontWeight.w600 : null,
+                          ),
+                    ),
+                    if (!isCancelled) ...[
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton(
+                          onPressed: _isCancelling ? null : _cancel,
+                          style: TextButton.styleFrom(foregroundColor: Colors.red),
+                          child: _isCancelling
+                              ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Text('Cancel Subscription'),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
             if (membership.plan.benefits.isNotEmpty) ...[
               const SizedBox(height: 16),
               Text('Benefits included', style: Theme.of(context).textTheme.titleSmall),
@@ -182,6 +267,37 @@ class _PlanCard extends ConsumerStatefulWidget {
 
 class _PlanCardState extends ConsumerState<_PlanCard> {
   bool _isPurchasing = false;
+  bool _isSubscribing = false;
+
+  /// Starts a recurring ₹99/month Razorpay Subscription (distinct from [_purchase]'s one-time
+  /// flow — both remain available side by side). Membership does NOT activate here: the server
+  /// only stores the Razorpay subscription id against a placeholder row; a webhook-confirmed
+  /// charge is what actually grants eligibility. Opens Razorpay's hosted authorization page
+  /// externally (no native-SDK subscription flow yet) — the user completes authorization there
+  /// and returns to the app, where pull-to-refresh (or the next launch) picks up the activated
+  /// state once the webhook has run.
+  Future<void> _subscribe() async {
+    setState(() => _isSubscribing = true);
+    try {
+      final repo = ref.read(partnerMembershipRepositoryProvider);
+      final result = await repo.startSubscription(planId: widget.plan.id);
+      final uri = Uri.tryParse(result.shortUrl);
+      if (uri != null) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+      if (mounted) {
+        showAppToast(
+          context,
+          'Complete the payment authorization, then pull to refresh here once done.',
+          variant: AppToastVariant.success,
+        );
+      }
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
+    } finally {
+      if (mounted) setState(() => _isSubscribing = false);
+    }
+  }
 
   Future<void> _purchase() async {
     final isFree = widget.plan.price == 0;
@@ -297,6 +413,20 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
                 ),
               ],
             ),
+            // Recurring auto-renewing alternative to the one-time Purchase above — only for a
+            // paid monthly plan; the one-time path above remains available either way.
+            if (!isFree && widget.plan.durationDays == 30) ...[
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: OutlinedButton(
+                  onPressed: _isSubscribing ? null : _subscribe,
+                  child: _isSubscribing
+                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Start Monthly Subscription (auto-renew)'),
+                ),
+              ),
+            ],
           ],
         ),
       ),

@@ -21,6 +21,15 @@ export interface RazorpayOrder {
   keyId: string;
 }
 
+export interface RazorpaySubscription {
+  id: string;
+  status: string;
+  shortUrl: string;
+  /** Unix seconds (Razorpay's own unit) — converted to `Date` by the caller when persisting. */
+  currentStart: number | null;
+  currentEnd: number | null;
+}
+
 /**
  * Real order creation + payment-signature verification (ADR-043) — DEV fallback (no live
  * order, `purchase` accepts a client-supplied `paymentId` directly) preserves the pre-existing
@@ -99,5 +108,98 @@ export const RazorpayService = {
       expectedBuf as unknown as Uint8Array,
       actualBuf as unknown as Uint8Array,
     );
+  },
+
+  /** A Subscription has no natural end, but Razorpay's API requires a finite `total_count` of
+   * billing cycles — 1200 months (100 years) is the conventional "effectively indefinite" value
+   * for an open-ended monthly membership; cancellation is a separate explicit action
+   * (`cancelSubscription`), never reaching this count in practice. */
+  SUBSCRIPTION_TOTAL_COUNT: 1200,
+
+  /**
+   * Creates a Razorpay Subscription against the given Plan id (a Razorpay Plan — a different
+   * object from BIKIE's own `PartnerMembershipPlan` row, configured in env, never hardcoded).
+   * Returns `null` on any Razorpay-side failure, same convention as `createOrder` — the caller
+   * turns that into a clean 503 rather than a 500.
+   */
+  async createSubscription(
+    planId: string,
+    notes?: Record<string, string>,
+  ): Promise<RazorpaySubscription | null> {
+    const creds = credentials();
+    if (!creds) return null;
+
+    try {
+      const sub = await getClient(creds.keyId, creds.keySecret).subscriptions.create({
+        plan_id: planId,
+        total_count: RazorpayService.SUBSCRIPTION_TOTAL_COUNT,
+        customer_notify: true,
+        ...(notes ? { notes } : {}),
+      });
+      return {
+        id: sub.id,
+        status: sub.status,
+        shortUrl: sub.short_url,
+        currentStart: sub.current_start ?? null,
+        currentEnd: sub.current_end ?? null,
+      };
+    } catch (err) {
+      console.error("[Razorpay][createSubscription] subscription creation failed:", err);
+      return null;
+    }
+  },
+
+  /** `cancelAtCycleEnd: true` lets the provider keep the already-paid-for current period instead
+   * of losing access immediately — the caller decides based on `currentPeriodEnd`/`endDate`,
+   * this just forwards to Razorpay. Returns `null` on failure (logged), never throws. */
+  async cancelSubscription(
+    razorpaySubscriptionId: string,
+    cancelAtCycleEnd: boolean,
+  ): Promise<RazorpaySubscription | null> {
+    const creds = credentials();
+    if (!creds) return null;
+
+    try {
+      const sub = await getClient(creds.keyId, creds.keySecret).subscriptions.cancel(
+        razorpaySubscriptionId,
+        cancelAtCycleEnd,
+      );
+      return {
+        id: sub.id,
+        status: sub.status,
+        shortUrl: sub.short_url,
+        currentStart: sub.current_start ?? null,
+        currentEnd: sub.current_end ?? null,
+      };
+    } catch (err) {
+      console.error("[Razorpay][cancelSubscription] subscription cancellation failed:", err);
+      return null;
+    }
+  },
+
+  /** Whether `RAZORPAY_WEBHOOK_SECRET` is set — distinct from `isConfigured()` (the
+   * order/payment key pair): a deployment can have one without the other mid-rollout. */
+  isWebhookConfigured(): boolean {
+    return !!process.env.RAZORPAY_WEBHOOK_SECRET?.trim();
+  },
+
+  /**
+   * Razorpay webhook signature verification (ADR-093-style additive change) — HMAC-SHA256 of the
+   * exact raw request body, keyed by `RAZORPAY_WEBHOOK_SECRET`. Deliberately a DIFFERENT secret
+   * from `RAZORPAY_KEY_SECRET` (`verifyPaymentSignature` above): webhooks and the checkout
+   * callback are signed with different keys by Razorpay's own design. Uses the SDK's own
+   * `Razorpay.validateWebhookSignature` (already timing-safe) rather than hand-rolling HMAC
+   * comparison a second time. `rawBody` MUST be the literal, unparsed request body text — the
+   * signature is computed over the exact bytes Razorpay sent, not a re-serialized JSON object.
+   */
+  verifyWebhookSignature(rawBody: string, signature: string): boolean {
+    const secret = process.env.RAZORPAY_WEBHOOK_SECRET?.trim();
+    if (!secret || !signature) return false;
+    try {
+      return Razorpay.validateWebhookSignature(rawBody, signature, secret);
+    } catch (err) {
+      console.error("[Razorpay][verifyWebhookSignature] validation threw:", err);
+      return false;
+    }
   },
 };

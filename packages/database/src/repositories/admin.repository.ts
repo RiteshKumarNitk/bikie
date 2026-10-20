@@ -2,6 +2,7 @@ import { prisma } from "../client";
 import { Prisma } from "../generated/prisma/client.js";
 import { sumCompletedBookingRevenue } from "./booking.repository";
 import { toPartnerDTO } from "./partner.repository";
+import { findLatestMembershipForUser } from "./partner-membership.repository";
 
 export async function getAdminOverviewStats() {
   const [totalUsers, totalPartners, totalBikes, totalBookings, totalTrips, revenueTotal] = await Promise.all([
@@ -265,8 +266,16 @@ export async function findPartnerDetailById(partnerId: string) {
     : [];
   const actorNameById = new Map(actors.map((a) => [a.id, a.name]));
 
+  // Recurring Razorpay Subscriptions (additive) — admin-informational membership/subscription
+  // section. Also fixes a pre-existing bug unrelated to subscriptions: this returned `partner:`
+  // but `AdminPartnerDetailDTO`/the admin page have always expected `profile:` (the page
+  // destructures `const { profile } = detail`, so `profile` was `undefined` and
+  // `profile.verificationStatus` would throw) — corrected here since this is the exact line that
+  // needed touching anyway.
+  const membership = await findLatestMembershipForUser(partner.userId);
+
   return {
-    partner: toPartnerDTO(partner),
+    profile: toPartnerDTO(partner),
     owner: {
       id: partner.user.id,
       name: partner.user.name,
@@ -281,6 +290,7 @@ export async function findPartnerDetailById(partnerId: string) {
       actorName: h.userId ? (actorNameById.get(h.userId) ?? null) : null,
       createdAt: h.createdAt.toISOString(),
     })),
+    membership,
   };
 }
 

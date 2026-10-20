@@ -72,6 +72,9 @@ export interface AdminPartnerDetailDTO {
     actorName: string | null;
     createdAt: string;
   }>;
+  /** `null` if this Service Provider has never activated a membership (one-time or
+   * subscription) — admin-informational only, not an eligibility source of truth. */
+  membership: import("./partner-membership").PartnerMembershipDTO | null;
 }
 
 export interface PartnerDashboardStatsDTO {

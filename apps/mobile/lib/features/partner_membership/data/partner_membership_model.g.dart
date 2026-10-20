@@ -43,6 +43,13 @@ _$PartnerMembershipImpl _$$PartnerMembershipImplFromJson(
   endDate: json['endDate'] as String,
   status: json['status'] as String,
   daysLeft: (json['daysLeft'] as num).toInt(),
+  razorpaySubscriptionId: json['razorpaySubscriptionId'] as String?,
+  razorpayPlanId: json['razorpayPlanId'] as String?,
+  subscriptionStatus: json['subscriptionStatus'] as String?,
+  currentPeriodStart: json['currentPeriodStart'] as String?,
+  currentPeriodEnd: json['currentPeriodEnd'] as String?,
+  cancelledAt: json['cancelledAt'] as String?,
+  lastPaymentId: json['lastPaymentId'] as String?,
 );
 
 Map<String, dynamic> _$$PartnerMembershipImplToJson(
@@ -56,4 +63,11 @@ Map<String, dynamic> _$$PartnerMembershipImplToJson(
   'endDate': instance.endDate,
   'status': instance.status,
   'daysLeft': instance.daysLeft,
+  'razorpaySubscriptionId': instance.razorpaySubscriptionId,
+  'razorpayPlanId': instance.razorpayPlanId,
+  'subscriptionStatus': instance.subscriptionStatus,
+  'currentPeriodStart': instance.currentPeriodStart,
+  'currentPeriodEnd': instance.currentPeriodEnd,
+  'cancelledAt': instance.cancelledAt,
+  'lastPaymentId': instance.lastPaymentId,
 };

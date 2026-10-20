@@ -4758,3 +4758,83 @@ changes:
 - **Consequences.** No manifest, channel, server or notification-type changes. The app still cannot
   force-enable notifications — a user who declines twice must use Settings, which the app now points
   to. iOS remains out of scope (ADR-035).
+
+## ADR-094: Recurring Razorpay Subscriptions for Service Provider membership (₹99/month), additive to the existing one-time flow
+
+- **Context.** Service Providers could only buy membership as a fixed-duration one-time purchase
+  (`PartnerMembershipService.purchaseMembership`, a new `PartnerMembership` row per payment).
+  Requested: a real recurring ₹99/month subscription via Razorpay Subscriptions, reusing the
+  existing `hasActiveMembership`-equivalent eligibility (`status === "ACTIVE" && endDate >= now()`)
+  rather than a second system — SOS dispatch (`findEligiblePartnersNearPoint`) and the
+  active-membership screen (`getActiveMembership`) both already inline that exact condition.
+- **Decision — extend the same `PartnerMembership` row, never replace it.**
+  1. **Schema (additive).** `PartnerMembership` gains nullable `razorpaySubscriptionId` (unique),
+     `razorpayPlanId`, `subscriptionStatus` (Razorpay's own lifecycle string — a different concept
+     from the existing `PartnerMembershipStatus` enum, which stays the one eligibility actually
+     reads), `currentPeriodStart/End`, `cancelledAt`, `lastPaymentId` — all NULL on every existing
+     one-time/free/test-account row. `MembershipInvoice.partnerMembershipId` loses its `@unique`
+     (a subscription accumulates one invoice per recurring charge against the same membership row;
+     idempotency was always enforced by `paymentId`/`razorpayPaymentId`'s own uniqueness, never by
+     this column) — `PartnerMembership.invoice` becomes `.invoices[]`. New `RazorpayWebhookEvent`
+     (one row per processed webhook event id, inserted before the event is acted on — a
+     unique-violation means "already handled," same insert-wins-the-race idempotency pattern
+     `createMembership` already uses). Migration `20261018120000_partner_membership_subscription`
+     is hand-authored (not `prisma migrate dev`'s auto-diff — this dev database's migration
+     history has unrelated drift, and the diff engine also wanted to drop the hand-written PostGIS
+     indexes on `rider_location`, which ADR-016 already warned is permanently invisible to it).
+     **Not yet applied to any database** — `prisma generate` only, so the stack typechecks.
+  2. **`razorpay.service.ts`** gains `createSubscription`/`cancelSubscription` (the official SDK's
+     `subscriptions.create`/`.cancel`, `total_count: 1200` — Razorpay requires a finite cycle
+     count; 100 years models "indefinite" monthly billing) and `verifyWebhookSignature` (the SDK's
+     own `Razorpay.validateWebhookSignature`, keyed by a NEW, separate `RAZORPAY_WEBHOOK_SECRET` —
+     never `RAZORPAY_KEY_SECRET`, which signs the checkout callback instead). `createOrder`/
+     `verifyPaymentSignature` (the one-time flow) are untouched.
+  3. **`partner-membership.service.ts`** gains `startSubscription`, `cancelSubscription`,
+     `recordRecurringCharge`, `recordSubscriptionStatusChange`, `claimWebhookEvent` —
+     `purchaseMembership` is untouched. `startSubscription` creates the Razorpay Subscription and
+     a placeholder `PartnerMembership` row with `startDate === endDate === now` (so it immediately
+     fails the existing eligibility check — "do not activate merely because subscription creation
+     succeeded"); blocks a second subscription while one is already open (`findOpenSubscriptionFor
+     User`, "created/authenticated/active/pending/halted"). `recordRecurringCharge` (webhook:
+     `subscription.activated` with a payment, or `subscription.charged`) is the one write that
+     flips eligibility: `status: ACTIVE, endDate: currentPeriodEnd` — the exact condition SOS
+     dispatch already checks, so eligibility just works once this fires, with zero SOS code
+     touched. Every successful charge gets its OWN invoice (`billing.repository.ts`'s new
+     `createRecurringPartnerInvoice`, idempotent on `razorpayPaymentId` alone — deliberately NOT
+     reusing `createInvoice`, whose idempotency check trusted `partnerMembershipId` as a dedup key,
+     correct only under the old 1-membership-row-=-1-payment assumption). Cancellation
+     (app-initiated or Razorpay-initiated) never touches `status`/`endDate` — `cancelAtCycleEnd:
+     true` plus `cancelledAt` only, so the already-paid-for period rides out naturally via the
+     unchanged `endDate` check, exactly like a one-time membership already does.
+  4. **New routes**: `POST /api/partner-membership/subscription` (start),
+     `POST /api/partner-membership/subscription/cancel`, `POST /api/webhooks/razorpay` (reads the
+     RAW body — required for signature verification over the literal bytes sent — verifies, claims
+     the event id, dispatches by `event` type, always 200s once understood so Razorpay doesn't
+     retry forever).
+  5. **UI (additive, one-time flow untouched)**: web `/partner/membership` and the Flutter
+     `PartnerMembershipScreen` both get a "Start Monthly Subscription" action alongside the
+     existing one-time button (renamed "Subscribe" → "Pay once" on web only, to disambiguate now
+     that two payment modes coexist), subscription status/next-billing-date display, a Cancel
+     action, and payment-problem messaging. `/admin/partners/[id]` gets a read-only Membership
+     section (Razorpay subscription/plan id, status, current period, last payment, cancelled
+     date) — surfaced via a new `findLatestMembershipForUser` (unlike `getActiveMembership`, shows
+     a halted/cancelled/lapsed membership too, admin-informational only, never an eligibility
+     source). Fixed an unrelated pre-existing bug in the same `admin.repository.ts` return
+     statement: it returned key `partner:` while the type/page have always expected `profile:`
+     (would throw at render) — corrected since it was the exact line already being touched.
+  6. **New env vars**: `RAZORPAY_SP_MEMBERSHIP_PLAN_ID` (a Razorpay Plan id — a different object
+     from BIKIE's own `PartnerMembershipPlan` row — never hardcoded; `503 NOT_CONFIGURED` until
+     set, one-time flow unaffected either way), `RAZORPAY_WEBHOOK_SECRET`.
+- **What is unchanged.** Rider membership (`UserMembership`, `MembershipService`) — no recurring
+  subscription was built for Riders; their ₹99/year stays the existing one-time purchase. SOS
+  eligibility/escalation/radius/`findEligiblePartnersNearPoint`, MSG91/SMS, FCM/push, OTP, payment
+  SMS — none of this touched any of it.
+- **Consequences.** `vitest` 354→385 (`razorpay.service.test.ts` new, 11 tests;
+  `partner-membership.service.test.ts` +24), `tsc --noEmit` clean (database/services/web),
+  `prisma validate` clean, `next build` clean (163 routes, +3), `web lint` clean (0 new issues),
+  `flutter analyze` clean, `flutter test` 178/178. Razorpay Dashboard configuration done by the
+  operator: Plan `plan_Tpn09XxQUYiKjI` ("BIKIE SP Monthly Membership", ₹99, monthly) and the
+  webhook (`https://bikie.app/api/webhooks/razorpay`, the six `subscription.*` events) both
+  registered; both env vars set locally. **Migration not yet applied to any database; nothing
+  deployed to production yet** — `startSubscription` will error against a live DB until the
+  migration runs there.

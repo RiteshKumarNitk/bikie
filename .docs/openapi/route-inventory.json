@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-28T06:18:47.025Z",
-  "count": 160,
+  "generatedAt": "2026-10-18T09:14:46.153Z",
+  "count": 163,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -760,6 +760,22 @@
       "file": "apps/web/app/api/partner-membership/purchase/route.ts"
     },
     {
+      "path": "/api/partner-membership/subscription/cancel",
+      "methods": [
+        "POST"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner-membership/subscription/cancel/route.ts"
+    },
+    {
+      "path": "/api/partner-membership/subscription",
+      "methods": [
+        "POST"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner-membership/subscription/route.ts"
+    },
+    {
       "path": "/api/partner/application/reapply",
       "methods": [
         "POST"
@@ -1305,6 +1321,14 @@
       ],
       "auth": "session",
       "file": "apps/web/app/api/users/me/presence/route.ts"
+    },
+    {
+      "path": "/api/webhooks/razorpay",
+      "methods": [
+        "POST"
+      ],
+      "auth": "public-or-unclassified",
+      "file": "apps/web/app/api/webhooks/razorpay/route.ts"
     },
     {
       "path": "/api/wishlist/{bikeId}",

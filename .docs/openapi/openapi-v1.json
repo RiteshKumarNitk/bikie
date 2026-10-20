@@ -5965,6 +5965,108 @@
         }
       }
     },
+    "/api/partner-membership/subscription/cancel": {
+      "post": {
+        "operationId": "post_api_partner-membership_subscription_cancel",
+        "tags": [
+          "partner"
+        ],
+        "summary": "POST /api/partner-membership/subscription/cancel",
+        "description": "Source: `apps/web/app/api/partner-membership/subscription/cancel/route.ts`. Auth class: `partner`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "partner",
+        "x-bikie-source": "apps/web/app/api/partner-membership/subscription/cancel/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/partner-membership/subscription": {
+      "post": {
+        "operationId": "post_api_partner-membership_subscription",
+        "tags": [
+          "partner"
+        ],
+        "summary": "POST /api/partner-membership/subscription",
+        "description": "Source: `apps/web/app/api/partner-membership/subscription/route.ts`. Auth class: `partner`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [
+          {
+            "SessionCookie": []
+          },
+          {
+            "BearerAuth": []
+          }
+        ],
+        "x-bikie-auth": "partner",
+        "x-bikie-source": "apps/web/app/api/partner-membership/subscription/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
     "/api/partner/application/reapply": {
       "post": {
         "operationId": "post_api_partner_application_reapply",
@@ -9832,6 +9934,50 @@
         ],
         "x-bikie-auth": "session",
         "x-bikie-source": "apps/web/app/api/users/me/presence/route.ts",
+        "responses": {
+          "200": {
+            "description": "Success (shape documented in .docs/API.md for this route).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation / bad request"
+          },
+          "401": {
+            "description": "Unauthenticated"
+          },
+          "403": {
+            "description": "Forbidden / membership / role"
+          },
+          "404": {
+            "description": "Not found"
+          },
+          "409": {
+            "description": "Conflict"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/api/webhooks/razorpay": {
+      "post": {
+        "operationId": "post_api_webhooks_razorpay",
+        "tags": [
+          "other"
+        ],
+        "summary": "POST /api/webhooks/razorpay",
+        "description": "Source: `apps/web/app/api/webhooks/razorpay/route.ts`. Auth class: `public-or-unclassified`. Current stable surface is v1 under `/api/*` (no `/api/v2` without ADR approval). Narrative docs: `.docs/API.md`.",
+        "security": [],
+        "x-bikie-auth": "public-or-unclassified",
+        "x-bikie-source": "apps/web/app/api/webhooks/razorpay/route.ts",
         "responses": {
           "200": {
             "description": "Success (shape documented in .docs/API.md for this route).",

@@ -131,6 +131,59 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceD
   throw new Error("[billing.repository] could not allocate a unique receipt number after 6 attempts");
 }
 
+/**
+ * Recurring Razorpay Subscriptions (ADR-093-style additive change) — a SEPARATE creation path
+ * from `createInvoice` above, deliberately NOT reusing it: `createInvoice`'s idempotency check
+ * (`findExistingFor`) treats "an invoice already exists for this `partnerMembershipId`" as "this
+ * is a replay, don't create another" — correct for the one-time flow (one membership row = one
+ * payment = one invoice, forever), but wrong here, where the SAME `PartnerMembership` row
+ * legitimately accumulates one new invoice per monthly charge. This function's idempotency is
+ * keyed ONLY on `razorpayPaymentId` (Razorpay guarantees it globally unique per charge) — never
+ * on `partnerMembershipId` — so a webhook retry for the same charge returns the existing invoice,
+ * but the next month's genuinely different charge always gets its own. The previous invoice is
+ * never touched either way. Same receipt-numbering/retry-on-collision behavior as `createInvoice`.
+ */
+export async function createRecurringPartnerInvoice(input: CreateInvoiceInput & { razorpayPaymentId: string }): Promise<InvoiceDetailDTO> {
+  const existing = await prisma.membershipInvoice.findUnique({ where: { razorpayPaymentId: input.razorpayPaymentId } });
+  if (existing) return toDetail(existing);
+
+  for (let attempt = 0; attempt < 6; attempt++) {
+    try {
+      const inv = await prisma.membershipInvoice.create({
+        data: {
+          receiptNo: await nextReceiptNo(),
+          userId: input.userId,
+          accountType: input.accountType,
+          userMembershipId: input.userMembershipId ?? null,
+          partnerMembershipId: input.partnerMembershipId ?? null,
+          planId: input.planId,
+          planName: input.planName,
+          amount: input.amount,
+          currency: input.currency ?? "INR",
+          durationDays: input.durationDays,
+          membershipStartDate: input.membershipStartDate,
+          membershipEndDate: input.membershipEndDate,
+          customerName: input.customerName,
+          customerPhone: input.customerPhone ?? null,
+          paymentId: input.paymentId ?? null,
+          razorpayPaymentId: input.razorpayPaymentId,
+          razorpayOrderId: input.razorpayOrderId ?? null,
+          paidAt: input.paidAt,
+        },
+      });
+      return toDetail(inv);
+    } catch (err) {
+      if (isUniqueViolation(err)) {
+        const now = await prisma.membershipInvoice.findUnique({ where: { razorpayPaymentId: input.razorpayPaymentId } });
+        if (now) return toDetail(now);
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("[billing.repository] could not allocate a unique receipt number after 6 attempts (recurring)");
+}
+
 /** Newest first. Scoped to one user — the route never accepts a userId from the client. */
 export async function listForUser(userId: string): Promise<InvoiceSummaryDTO[]> {
   const rows = await prisma.membershipInvoice.findMany({

@@ -20,7 +20,9 @@ class PartnerMembershipPlan with _$PartnerMembershipPlan {
   factory PartnerMembershipPlan.fromJson(Map<String, dynamic> json) => _$PartnerMembershipPlanFromJson(json);
 }
 
-/// Mirrors `packages/types/src/partner-membership.ts` `PartnerMembershipDTO`.
+/// Mirrors `packages/types/src/partner-membership.ts` `PartnerMembershipDTO`. The subscription
+/// fields are nullable/optional — absent for the existing one-time/free/test-account rows,
+/// populated only once a ₹99/month recurring subscription has been started.
 @freezed
 class PartnerMembership with _$PartnerMembership {
   const factory PartnerMembership({
@@ -32,6 +34,13 @@ class PartnerMembership with _$PartnerMembership {
     required String endDate,
     required String status,
     required int daysLeft,
+    String? razorpaySubscriptionId,
+    String? razorpayPlanId,
+    String? subscriptionStatus,
+    String? currentPeriodStart,
+    String? currentPeriodEnd,
+    String? cancelledAt,
+    String? lastPaymentId,
   }) = _PartnerMembership;
 
   factory PartnerMembership.fromJson(Map<String, dynamic> json) => _$PartnerMembershipFromJson(json);

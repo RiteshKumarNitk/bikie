@@ -20,4 +20,14 @@ export interface PartnerMembershipDTO {
   endDate: string;
   status: string;
   daysLeft: number;
+  // --- Recurring Razorpay Subscriptions — optional: absent/undefined for the existing
+  // one-time/free/test-account rows (`getActiveMembership`/`findByPaymentReference`/
+  // `createMembership` never set these), populated only for a subscription-backed row. ---
+  razorpaySubscriptionId?: string | null;
+  razorpayPlanId?: string | null;
+  subscriptionStatus?: string | null;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelledAt?: string | null;
+  lastPaymentId?: string | null;
 }

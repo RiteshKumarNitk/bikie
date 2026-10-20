@@ -43,6 +43,15 @@ export const purchasePartnerMembershipSchema = z
 
 export type PurchasePartnerMembershipInput = z.infer<typeof purchasePartnerMembershipSchema>;
 
+/** `POST /api/partner-membership/subscription` — starts a recurring Razorpay Subscription for
+ * the given BIKIE plan (the Razorpay Plan id itself comes from `RAZORPAY_SP_MEMBERSHIP_PLAN_ID`
+ * server-side, never the client). */
+export const startPartnerSubscriptionSchema = z.object({
+  planId: z.string().min(1),
+});
+
+export type StartPartnerSubscriptionInput = z.infer<typeof startPartnerSubscriptionSchema>;
+
 export const createPartnerMembershipPlanSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().min(1).max(2000),

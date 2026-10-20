@@ -1,5 +1,22 @@
 # BIKIE Changelog
 
+## 2026-10-19 — Recurring Razorpay Subscriptions for Service Provider membership, ₹99/month (ADR-094)
+
+Service Providers can now subscribe to recurring monthly membership via Razorpay Subscriptions,
+additive to the existing one-time purchase (which stays exactly as it was). `PartnerMembership`
+gains nullable subscription fields (`razorpaySubscriptionId`, `subscriptionStatus`,
+`currentPeriodStart/End`, `cancelledAt`, `lastPaymentId`) — a recurring charge just extends the
+same row's `endDate`, so SOS eligibility (`findEligiblePartnersNearPoint`) and the active-
+membership screen work unchanged, zero SOS code touched. New `startSubscription`/
+`cancelSubscription` routes, a signature-verified `POST /api/webhooks/razorpay` (idempotent on
+Razorpay's event id via a new `RazorpayWebhookEvent` table), and every recurring charge gets its
+own invoice (never modifying a prior one). Web (`/partner/membership`, `/admin/partners/[id]`)
+and the Flutter membership screen both get subscribe/cancel/status UI. New env vars:
+`RAZORPAY_SP_MEMBERSHIP_PLAN_ID`, `RAZORPAY_WEBHOOK_SECRET`. Rider membership untouched — no
+recurring subscription was built for Riders. `vitest` 354→385, `tsc`/`prisma validate`/`next
+build`/`flutter analyze` all clean, `flutter test` 178/178. Migration
+`20261018120000_partner_membership_subscription` not yet applied to any database. See ADR-094.
+
 ## 2026-09-30 — Service Provider test account activates membership without payment; checkout errors no longer masked (ADR-089)
 
 The web membership modal showed "Payment succeeded but couldn't be verified" for every failed

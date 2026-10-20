@@ -340,6 +340,13 @@ mixin _$PartnerMembership {
   String get endDate => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
   int get daysLeft => throw _privateConstructorUsedError;
+  String? get razorpaySubscriptionId => throw _privateConstructorUsedError;
+  String? get razorpayPlanId => throw _privateConstructorUsedError;
+  String? get subscriptionStatus => throw _privateConstructorUsedError;
+  String? get currentPeriodStart => throw _privateConstructorUsedError;
+  String? get currentPeriodEnd => throw _privateConstructorUsedError;
+  String? get cancelledAt => throw _privateConstructorUsedError;
+  String? get lastPaymentId => throw _privateConstructorUsedError;
 
   /// Serializes this PartnerMembership to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -367,6 +374,13 @@ abstract class $PartnerMembershipCopyWith<$Res> {
     String endDate,
     String status,
     int daysLeft,
+    String? razorpaySubscriptionId,
+    String? razorpayPlanId,
+    String? subscriptionStatus,
+    String? currentPeriodStart,
+    String? currentPeriodEnd,
+    String? cancelledAt,
+    String? lastPaymentId,
   });
 
   $PartnerMembershipPlanCopyWith<$Res> get plan;
@@ -395,6 +409,13 @@ class _$PartnerMembershipCopyWithImpl<$Res, $Val extends PartnerMembership>
     Object? endDate = null,
     Object? status = null,
     Object? daysLeft = null,
+    Object? razorpaySubscriptionId = null,
+    Object? razorpayPlanId = null,
+    Object? subscriptionStatus = null,
+    Object? currentPeriodStart = null,
+    Object? currentPeriodEnd = null,
+    Object? cancelledAt = null,
+    Object? lastPaymentId = null,
   }) {
     return _then(
       _value.copyWith(
@@ -430,6 +451,34 @@ class _$PartnerMembershipCopyWithImpl<$Res, $Val extends PartnerMembership>
                 ? _value.daysLeft
                 : daysLeft // ignore: cast_nullable_to_non_nullable
                       as int,
+            razorpaySubscriptionId: null == razorpaySubscriptionId
+                ? _value.razorpaySubscriptionId
+                : razorpaySubscriptionId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            razorpayPlanId: null == razorpayPlanId
+                ? _value.razorpayPlanId
+                : razorpayPlanId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            subscriptionStatus: null == subscriptionStatus
+                ? _value.subscriptionStatus
+                : subscriptionStatus // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            currentPeriodStart: null == currentPeriodStart
+                ? _value.currentPeriodStart
+                : currentPeriodStart // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            currentPeriodEnd: null == currentPeriodEnd
+                ? _value.currentPeriodEnd
+                : currentPeriodEnd // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            cancelledAt: null == cancelledAt
+                ? _value.cancelledAt
+                : cancelledAt // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            lastPaymentId: null == lastPaymentId
+                ? _value.lastPaymentId
+                : lastPaymentId // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -464,6 +513,13 @@ abstract class _$$PartnerMembershipImplCopyWith<$Res>
     String endDate,
     String status,
     int daysLeft,
+    String? razorpaySubscriptionId,
+    String? razorpayPlanId,
+    String? subscriptionStatus,
+    String? currentPeriodStart,
+    String? currentPeriodEnd,
+    String? cancelledAt,
+    String? lastPaymentId,
   });
 
   @override
@@ -492,6 +548,13 @@ class __$$PartnerMembershipImplCopyWithImpl<$Res>
     Object? endDate = null,
     Object? status = null,
     Object? daysLeft = null,
+    Object? razorpaySubscriptionId = null,
+    Object? razorpayPlanId = null,
+    Object? subscriptionStatus = null,
+    Object? currentPeriodStart = null,
+    Object? currentPeriodEnd = null,
+    Object? cancelledAt = null,
+    Object? lastPaymentId = null,
   }) {
     return _then(
       _$PartnerMembershipImpl(
@@ -527,6 +590,34 @@ class __$$PartnerMembershipImplCopyWithImpl<$Res>
             ? _value.daysLeft
             : daysLeft // ignore: cast_nullable_to_non_nullable
                   as int,
+        razorpaySubscriptionId: null == razorpaySubscriptionId
+            ? _value.razorpaySubscriptionId
+            : razorpaySubscriptionId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        razorpayPlanId: null == razorpayPlanId
+            ? _value.razorpayPlanId
+            : razorpayPlanId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        subscriptionStatus: null == subscriptionStatus
+            ? _value.subscriptionStatus
+            : subscriptionStatus // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        currentPeriodStart: null == currentPeriodStart
+            ? _value.currentPeriodStart
+            : currentPeriodStart // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        currentPeriodEnd: null == currentPeriodEnd
+            ? _value.currentPeriodEnd
+            : currentPeriodEnd // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        cancelledAt: null == cancelledAt
+            ? _value.cancelledAt
+            : cancelledAt // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        lastPaymentId: null == lastPaymentId
+            ? _value.lastPaymentId
+            : lastPaymentId // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -544,6 +635,13 @@ class _$PartnerMembershipImpl implements _PartnerMembership {
     required this.endDate,
     required this.status,
     required this.daysLeft,
+    this.razorpaySubscriptionId,
+    this.razorpayPlanId,
+    this.subscriptionStatus,
+    this.currentPeriodStart,
+    this.currentPeriodEnd,
+    this.cancelledAt,
+    this.lastPaymentId,
   });
 
   factory _$PartnerMembershipImpl.fromJson(Map<String, dynamic> json) =>
@@ -565,10 +663,24 @@ class _$PartnerMembershipImpl implements _PartnerMembership {
   final String status;
   @override
   final int daysLeft;
+  @override
+  final String? razorpaySubscriptionId;
+  @override
+  final String? razorpayPlanId;
+  @override
+  final String? subscriptionStatus;
+  @override
+  final String? currentPeriodStart;
+  @override
+  final String? currentPeriodEnd;
+  @override
+  final String? cancelledAt;
+  @override
+  final String? lastPaymentId;
 
   @override
   String toString() {
-    return 'PartnerMembership(id: $id, userId: $userId, planId: $planId, plan: $plan, startDate: $startDate, endDate: $endDate, status: $status, daysLeft: $daysLeft)';
+    return 'PartnerMembership(id: $id, userId: $userId, planId: $planId, plan: $plan, startDate: $startDate, endDate: $endDate, status: $status, daysLeft: $daysLeft, razorpaySubscriptionId: $razorpaySubscriptionId, razorpayPlanId: $razorpayPlanId, subscriptionStatus: $subscriptionStatus, currentPeriodStart: $currentPeriodStart, currentPeriodEnd: $currentPeriodEnd, cancelledAt: $cancelledAt, lastPaymentId: $lastPaymentId)';
   }
 
   @override
@@ -585,7 +697,21 @@ class _$PartnerMembershipImpl implements _PartnerMembership {
             (identical(other.endDate, endDate) || other.endDate == endDate) &&
             (identical(other.status, status) || other.status == status) &&
             (identical(other.daysLeft, daysLeft) ||
-                other.daysLeft == daysLeft));
+                other.daysLeft == daysLeft) &&
+            (identical(other.razorpaySubscriptionId, razorpaySubscriptionId) ||
+                other.razorpaySubscriptionId == razorpaySubscriptionId) &&
+            (identical(other.razorpayPlanId, razorpayPlanId) ||
+                other.razorpayPlanId == razorpayPlanId) &&
+            (identical(other.subscriptionStatus, subscriptionStatus) ||
+                other.subscriptionStatus == subscriptionStatus) &&
+            (identical(other.currentPeriodStart, currentPeriodStart) ||
+                other.currentPeriodStart == currentPeriodStart) &&
+            (identical(other.currentPeriodEnd, currentPeriodEnd) ||
+                other.currentPeriodEnd == currentPeriodEnd) &&
+            (identical(other.cancelledAt, cancelledAt) ||
+                other.cancelledAt == cancelledAt) &&
+            (identical(other.lastPaymentId, lastPaymentId) ||
+                other.lastPaymentId == lastPaymentId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -600,6 +726,13 @@ class _$PartnerMembershipImpl implements _PartnerMembership {
     endDate,
     status,
     daysLeft,
+    razorpaySubscriptionId,
+    razorpayPlanId,
+    subscriptionStatus,
+    currentPeriodStart,
+    currentPeriodEnd,
+    cancelledAt,
+    lastPaymentId,
   );
 
   /// Create a copy of PartnerMembership
@@ -629,6 +762,13 @@ abstract class _PartnerMembership implements PartnerMembership {
     required String endDate,
     required String status,
     required int daysLeft,
+    final String? razorpaySubscriptionId,
+    final String? razorpayPlanId,
+    final String? subscriptionStatus,
+    final String? currentPeriodStart,
+    final String? currentPeriodEnd,
+    final String? cancelledAt,
+    final String? lastPaymentId,
   }) = _$PartnerMembershipImpl;
 
   factory _PartnerMembership.fromJson(Map<String, dynamic> json) =
@@ -650,6 +790,20 @@ abstract class _PartnerMembership implements PartnerMembership {
   String get status;
   @override
   int get daysLeft;
+  @override
+  String? get razorpaySubscriptionId;
+  @override
+  String? get razorpayPlanId;
+  @override
+  String? get subscriptionStatus;
+  @override
+  String? get currentPeriodStart;
+  @override
+  String? get currentPeriodEnd;
+  @override
+  String? get cancelledAt;
+  @override
+  String? get lastPaymentId;
 
   /// Create a copy of PartnerMembership
   /// with the given fields replaced by the non-null parameter values.

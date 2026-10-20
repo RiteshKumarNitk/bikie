@@ -20,6 +20,11 @@ interface ActiveMembership {
   plan: { name: string };
   daysLeft: number;
   endDate: string;
+  razorpaySubscriptionId?: string | null;
+  subscriptionStatus?: string | null;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelledAt?: string | null;
 }
 
 /** Renders "/month" or "/year" for the common billing periods, falling back to the raw day
@@ -85,6 +90,62 @@ export default function PartnerMembershipPage() {
     setCheckoutPlan(null);
   }
 
+  const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [subscriptionNotice, setSubscriptionNotice] = useState<string | null>(null);
+
+  /** Starts a recurring ₹99/month Razorpay Subscription — distinct from `handleSubscribe` below
+   * (the existing one-time purchase flow, kept exactly as-is). Opens Razorpay's hosted
+   * authorization page in a new tab; the membership only actually activates once Razorpay's
+   * webhook confirms the first charge, so this reloads the active-membership state afterward
+   * rather than assuming success. */
+  async function handleStartSubscription(plan: Plan) {
+    setPurchaseError(null);
+    setSubscribingPlanId(plan.id);
+    try {
+      const res = await fetch("/api/partner-membership/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: plan.id }),
+      });
+      const data = await res.json().catch(() => ({}) as { error?: string; subscription?: { shortUrl: string } });
+      if (!res.ok) {
+        throw new Error(
+          typeof data.error === "string" ? data.error : "Could not start the subscription. Please try again.",
+        );
+      }
+      if (data.subscription?.shortUrl) {
+        window.open(data.subscription.shortUrl, "_blank", "noopener,noreferrer");
+      }
+      setSubscriptionNotice(
+        "Complete the payment authorization in the new tab. Your membership activates once the first payment is confirmed — refresh this page afterward.",
+      );
+    } catch (err) {
+      setPurchaseError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setSubscribingPlanId(null);
+    }
+  }
+
+  /** Stops future recurring charges (`cancelAtCycleEnd`). The already-paid-for current period is
+   * never retroactively revoked — membership stays active until `endDate` naturally passes. */
+  async function handleCancelSubscription() {
+    setIsCancelling(true);
+    setPurchaseError(null);
+    try {
+      const res = await fetch("/api/partner-membership/subscription/cancel", { method: "POST" });
+      const data = await res.json().catch(() => ({}) as { error?: string; membership?: ActiveMembership });
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Could not cancel the subscription.");
+      }
+      setActiveMembership(data.membership ?? null);
+    } catch (err) {
+      setPurchaseError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setIsCancelling(false);
+    }
+  }
+
   async function handleSubscribe(plan: Plan) {
     setPurchaseError(null);
     if (plan.price > 0) {
@@ -146,6 +207,43 @@ export default function PartnerMembershipPage() {
         <div className="mt-6 max-w-md rounded-2xl bg-success/10 px-6 py-4 text-sm text-success">
           ✓ Your {activeMembership.plan.name} membership is active — {activeMembership.daysLeft} day
           {activeMembership.daysLeft === 1 ? "" : "s"} left.
+          {activeMembership.razorpaySubscriptionId && (
+            <div className="mt-3 border-t border-success/20 pt-3 text-foreground/70">
+              {activeMembership.cancelledAt ? (
+                <p>Subscription cancelled — access continues until the date above.</p>
+              ) : (
+                <>
+                  <p>
+                    Auto-renews monthly
+                    {activeMembership.currentPeriodEnd &&
+                      ` · next charge around ${new Date(activeMembership.currentPeriodEnd).toLocaleDateString()}`}
+                    .
+                  </p>
+                  {activeMembership.subscriptionStatus &&
+                    !["created", "authenticated", "active"].includes(activeMembership.subscriptionStatus) && (
+                      <p className="mt-1 font-medium text-red-400">
+                        There&apos;s a problem with your last payment ({activeMembership.subscriptionStatus}). Please
+                        check your payment method.
+                      </p>
+                    )}
+                  <button
+                    type="button"
+                    onClick={handleCancelSubscription}
+                    disabled={isCancelling}
+                    className="mt-2 text-red-400 underline disabled:opacity-50"
+                  >
+                    {isCancelling ? "Cancelling…" : "Cancel Subscription"}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {subscriptionNotice && (
+        <div className="mt-6 max-w-md rounded-2xl bg-accent/10 px-6 py-4 text-sm text-accent-text">
+          {subscriptionNotice}
         </div>
       )}
 
@@ -192,8 +290,20 @@ export default function PartnerMembershipPage() {
                       ? "Activating…"
                       : isFree
                         ? "Activate for free"
-                        : "Subscribe"}
+                        : "Pay once"}
                 </button>
+                {/* Recurring auto-renewing alternative to the one-time button above — only for a
+                    paid monthly plan; the one-time path remains available either way. */}
+                {!isFree && plan.durationDays === 30 && (
+                  <button
+                    type="button"
+                    onClick={() => handleStartSubscription(plan)}
+                    disabled={isActivePlan || subscribingPlanId === plan.id}
+                    className="mt-2 w-full rounded-xl border border-accent py-3 text-sm font-semibold text-accent-text transition-colors hover:bg-accent/10 disabled:opacity-50"
+                  >
+                    {subscribingPlanId === plan.id ? "Starting…" : "Start Monthly Subscription (auto-renew)"}
+                  </button>
+                )}
               </div>
             );
           })}

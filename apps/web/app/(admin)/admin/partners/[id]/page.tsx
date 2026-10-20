@@ -105,7 +105,7 @@ export default function AdminPartnerDetailPage() {
   if (loading) return <div className="h-64 animate-pulse rounded-3xl bg-card" />;
   if (!detail) return <div className="text-sm text-foreground/50">Partner not found.</div>;
 
-  const { profile, owner, history } = detail;
+  const { profile, owner, history, membership } = detail;
   const actions = ACTIONS_BY_STATUS[profile.verificationStatus] ?? [];
 
   return (
@@ -148,6 +148,30 @@ export default function AdminPartnerDetailPage() {
             {profile.shopPhotoUrls.map((url, i) => (
               <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="text-xs text-accent-text underline">Shop photo {i + 1}</a>
             ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-3xl bg-card p-6">
+        <p className="text-xs font-semibold uppercase tracking-wider text-accent-text">Membership</p>
+        {!membership ? (
+          <p className="mt-3 text-sm text-foreground/50">No membership activated yet.</p>
+        ) : (
+          <div className="mt-3 grid grid-cols-2 gap-4 text-sm">
+            <div><p className="text-foreground/50">Plan</p><p>{membership.plan.name}{membership.plan.price ? ` — ₹${membership.plan.price}/mo` : " (free)"}</p></div>
+            <div><p className="text-foreground/50">Membership status</p><p>{membership.status}</p></div>
+            <div><p className="text-foreground/50">Current period</p><p>{new Date(membership.startDate).toLocaleDateString()} – {new Date(membership.endDate).toLocaleDateString()}</p></div>
+            <div><p className="text-foreground/50">Days left</p><p>{membership.daysLeft}</p></div>
+            {membership.razorpaySubscriptionId && (
+              <>
+                <div><p className="text-foreground/50">Razorpay subscription ID</p><p className="font-mono text-xs">{membership.razorpaySubscriptionId}</p></div>
+                <div><p className="text-foreground/50">Razorpay plan ID</p><p className="font-mono text-xs">{membership.razorpayPlanId ?? "—"}</p></div>
+                <div><p className="text-foreground/50">Subscription status</p><p>{membership.subscriptionStatus ?? "—"}</p></div>
+                <div><p className="text-foreground/50">Current billing period</p><p>{membership.currentPeriodStart ? new Date(membership.currentPeriodStart).toLocaleDateString() : "—"} – {membership.currentPeriodEnd ? new Date(membership.currentPeriodEnd).toLocaleDateString() : "—"}</p></div>
+                <div><p className="text-foreground/50">Last payment ID</p><p className="font-mono text-xs">{membership.lastPaymentId ?? "—"}</p></div>
+                <div><p className="text-foreground/50">Cancelled</p><p>{membership.cancelledAt ? new Date(membership.cancelledAt).toLocaleString() : "No"}</p></div>
+              </>
+            )}
           </div>
         )}
       </section>

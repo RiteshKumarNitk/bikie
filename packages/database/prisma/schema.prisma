@@ -1080,8 +1080,26 @@ model PartnerMembership {
   paymentId String? @unique
   razorpayOrderId String? @unique
   createdAt DateTime                 @default(now())
-  // ADR-070 — the immutable billing receipt for this activation (at most one).
-  invoice   MembershipInvoice?
+
+  // --- Recurring subscription (Razorpay Subscriptions) — all nullable: NULL on every existing
+  // one-time/free/test-account row, exactly as before. `status`/`startDate`/`endDate` above
+  // remain the ONLY fields SOS eligibility / the active-membership screen read — a recurring
+  // charge keeps this same row and simply extends `endDate`, so neither needs to know a
+  // subscription exists. `subscriptionStatus` is Razorpay's own lifecycle string
+  // (created/authenticated/active/pending/halted/cancelled/completed), deliberately a different
+  // concept from `PartnerMembershipStatus` above.
+  razorpaySubscriptionId String?   @unique
+  razorpayPlanId         String?
+  subscriptionStatus     String?
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelledAt            DateTime?
+  lastPaymentId          String?
+
+  // ADR-070 — immutable billing receipts for this membership. One for a one-time/free/test
+  // activation; one PER successful recurring charge for a subscription (never mutated after
+  // creation) — so this is a list, not the single optional relation it used to be.
+  invoices  MembershipInvoice[]
 
   @@index([userId])
   @@index([status])
@@ -1112,7 +1130,12 @@ model MembershipInvoice {
 
   userMembershipId    String?            @unique
   userMembership      UserMembership?    @relation(fields: [userMembershipId], references: [id], onDelete: SetNull)
-  partnerMembershipId String?            @unique
+  // Not @unique (unlike userMembershipId above): a one-time/free/test Partner membership still
+  // gets exactly one invoice in practice, but a subscription-backed one accumulates a new invoice
+  // per recurring charge against the SAME PartnerMembership row (ADR-093-style additive change —
+  // see PartnerMembership.invoices). Invoice idempotency is unaffected: it was always enforced by
+  // paymentId/razorpayPaymentId's own @unique constraints below, never by this column.
+  partnerMembershipId String?
   partnerMembership   PartnerMembership? @relation(fields: [partnerMembershipId], references: [id], onDelete: SetNull)
 
   // Snapshot at purchase time — never re-read from the plan.
@@ -1141,7 +1164,24 @@ model MembershipInvoice {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+  @@index([partnerMembershipId])
   @@map("membership_invoice")
+}
+
+// --- Razorpay Subscriptions webhook idempotency ---
+// One row per processed Razorpay webhook event id. `POST /api/webhooks/razorpay` inserts this
+// row (unique on razorpayEventId) BEFORE acting on the event; a unique-violation means the event
+// was already handled, so the handler short-circuits with a 200 and does nothing else — the
+// same "insert wins the race, loser reads the winner's row" pattern `partner-membership.
+// repository.ts`'s `createMembership` already uses for payment-reference idempotency.
+model RazorpayWebhookEvent {
+  id              String   @id @default(cuid())
+  razorpayEventId String   @unique
+  eventType       String
+  processedAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+
+  @@map("razorpay_webhook_event")
 }
 
 // --- SOS / Emergency ---
