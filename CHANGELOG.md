@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-10-22 — Firebase project migrated to `bikie-3baba`, including a fresh VAPID key (ADR-016)
+
+Backend Admin SDK, web client config, the Android `google-services.json`, and
+`NEXT_PUBLIC_FIREBASE_VAPID_KEY` (regenerated under the new project's Web Push certificate) were
+all moved together from `bikie-b9459` to a new project, `bikie-3baba`, so all four keep naming
+the same project (a mismatch between the token-issuing project and the sending project breaks
+FCM silently). Local config is now fully consistent; **the production VPS's env vars and the
+`web` container still need the same update** — prod otherwise keeps sending from `bikie-b9459`.
+No SMS/MSG91, Razorpay, SOS, or auth code touched.
+
 ## 2026-09-30 — Service Provider test account activates membership without payment; checkout errors no longer masked (ADR-089)
 
 The web membership modal showed "Payment succeeded but couldn't be verified" for every failed

@@ -1052,6 +1052,7 @@ the OTP system of record — see ADR-032 for why MSG91's own OTP API was deliber
 | `sms.adapter.ts` rewritten against MSG91 v2 `sendsms`; `MSG91_*` env vars replace `TWILIO_*` for SMS | Completed |
 | Live credential + delivery verification against MSG91's API (auth key, sender ID, IP-whitelist gotcha found and resolved) | Completed |
 | Firebase push client config switched to `bikie-b9459` project (unrelated side request, same session) | Completed |
+| Firebase project migrated `bikie-b9459` → `bikie-3baba` across backend/web/mobile (ADR-016), including a freshly generated `NEXT_PUBLIC_FIREBASE_VAPID_KEY` for the new project | Completed locally — VPS env vars + container recreate still pending |
 | `isValidIndianMobile` validator wired into Better Auth's `phoneNumberValidator` | Completed |
 | `allowedAttempts` 3→5 for wrong-code verification | Completed |
 | Rate-limit gate in `apps/web/app/api/auth/[...all]/route.ts`: 60s resend cooldown, 3/10min per-phone send cap, 10/10min per-IP send cap, 20/10min per-IP verify cap | Completed |

@@ -347,6 +347,20 @@ reasoning still holds and was re-confirmed against a competing stack proposal):
   `Trip.meetingLat`/`meetingLng` fields, is a separate future feature), and any push notification
   path for the mobile app.
 
+**2026-10-21 ? Firebase project migrated to `bikie-3baba`.** Per explicit user decision, the
+Firebase project backing this ADR changed from `bikie-b9459` to a brand-new project,
+`bikie-3baba`, on all three platforms at once: backend Admin SDK (`FIREBASE_PROJECT_ID` /
+`FIREBASE_CLIENT_EMAIL` / `FIREBASE_PRIVATE_KEY` in `apps/web/.env`), web client config
+(`NEXT_PUBLIC_FIREBASE_*` in the same file), and `apps/mobile/android/app/google-services.json`
+(gitignored, package `com.bikie.mobile`) ? all three must always name the same project, since FCM
+rejects a token issued by one project when sent from another. `NEXT_PUBLIC_FIREBASE_VAPID_KEY`
+is project-scoped (tied to the Web Push certificate under that project's Cloud Messaging
+settings) ? it was regenerated under `bikie-3baba` on 2026-10-22, so all Firebase config is now
+consistently on `bikie-3baba` locally. **Still required**: the same set of env vars (listed
+above) must be applied to the production VPS's `.env` and the `web` container force-recreated,
+or prod keeps sending from the old `bikie-b9459` credentials while this repo's local config and
+any newly-issued client tokens point at `bikie-3baba`.
+
 **Operational note**: applying this migration required resolving pre-existing, unrelated schema
 drift on the dev database (a `message_reaction` table, extra `TripStatus` enum values, `message
 .metadata`, and `user.lastActiveAt` existed in the live Neon database with no corresponding
