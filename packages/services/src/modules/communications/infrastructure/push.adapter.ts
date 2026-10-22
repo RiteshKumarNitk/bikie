@@ -1,7 +1,11 @@
 import { pushSubscriptionRepository } from "@bikie/database";
 import { getApps, initializeApp, cert } from "firebase-admin/app";
 import { getMessaging } from "firebase-admin/messaging";
-import { androidPriorityForNotificationType, channelIdForNotificationType } from "../domain/push-channel";
+import {
+  androidNotificationOverridesForType,
+  androidPriorityForNotificationType,
+  channelIdForNotificationType,
+} from "../domain/push-channel";
 import type { PushMessage, PushPort } from "../ports";
 
 let configured = false;
@@ -55,7 +59,10 @@ export function createPushAdapter(): PushPort {
         data: payload.data,
         android: {
           priority: androidPriorityForNotificationType(type),
-          notification: { channelId: channelIdForNotificationType(type) },
+          notification: {
+            channelId: channelIdForNotificationType(type),
+            ...androidNotificationOverridesForType(type),
+          },
         },
       });
 

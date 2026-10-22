@@ -29,3 +29,32 @@ export function channelIdForNotificationType(type: string): string {
 export function androidPriorityForNotificationType(type: string): "high" | "normal" {
   return channelIdForNotificationType(type) === "general_channel" ? "normal" : "high";
 }
+
+/**
+ * Extra `android.notification` fields for the background/terminated case (the OS draws these
+ * directly from the FCM payload — the foreground case sets the Flutter-side equivalents itself,
+ * see `push_bootstrap.dart`'s `buildAndroidNotificationDetails`). Only `SOS_ALERT` gets
+ * emergency-grade presentation; every other type returns `{}` and renders exactly as before —
+ * deliberately not "the whole app is high priority now."
+ *
+ * `sos_channel` itself already has `Importance.max` + sound + vibration (`push_channels.dart`),
+ * which is what actually drives heads-up/sound/vibration on Android 8+ — these fields are a
+ * belt-and-suspenders layer for pre-channel behavior and visual distinction (red tint, visible
+ * on the lock screen) that the channel alone doesn't cover.
+ */
+export function androidNotificationOverridesForType(type: string): {
+  color?: string;
+  visibility?: "private" | "public" | "secret";
+  defaultSound?: boolean;
+  defaultVibrateTimings?: boolean;
+  priority?: "min" | "low" | "default" | "high" | "max";
+} {
+  if (type !== "SOS_ALERT") return {};
+  return {
+    color: "#EF4444",
+    visibility: "public",
+    defaultSound: true,
+    defaultVibrateTimings: true,
+    priority: "max",
+  };
+}

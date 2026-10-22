@@ -1100,6 +1100,31 @@ changes:
   a real `google-services.json` is added — both are one-time, user-side setup steps, not code
   gaps.
 
+**2026-10-22 — SOS notifications get emergency-grade presentation, scoped to `SOS_ALERT` only.**
+`sos_channel` (`push_channels.dart`) already had `Importance.max` + sound + vibration since it
+was first created — the channel itself was never the gap, and because it's never been created
+with lower importance on any shipped build, there's no Android channel-immutability problem to
+work around (a tester's existing install would already have the right channel; a reinstall is
+only "just in case," not required). Two small additions, both gated to `SOS_ALERT` so every other
+notification type renders exactly as before:
+- **Backend** (`push-channel.ts`'s new `androidNotificationOverridesForType`, consumed by
+  `push.adapter.ts`): the background/terminated case (OS auto-displays straight from the FCM
+  payload) now also sets `color: "#EF4444"` (the existing `error` red token, `app_theme.dart`),
+  `visibility: "public"` (full content on the lock screen, not redacted), and
+  `defaultSound`/`defaultVibrateTimings` for SOS only — belt-and-suspenders for pre-channel
+  devices, since the channel's own settings are what actually drive heads-up/sound/vibration on
+  Android 8+.
+- **Mobile** (`push_bootstrap.dart`'s new `buildAndroidNotificationDetails`, a pure function
+  factored out of the foreground `onMessage` listener so it's unit-testable without a platform
+  channel): the foreground case gets the same red tint, public visibility, and
+  `AndroidNotificationCategory.alarm` when the resolved channel is `sos_channel`; every other
+  channel gets `null` for all three, i.e. unchanged.
+- **Deliberately not done**: no new channel, no custom sound asset (none existed; default system
+  sound reused), no full-screen intent (explicitly deferred pending an actual Play Store
+  policy/UX review), no change to SOS recipient selection, eligibility, radius, escalation, or
+  the `entity`/`entityId` deep-link contract (`notification_deep_link.dart` untouched — a tap
+  still resolves `sos_alert` → `/sos/<alertId>` exactly as before).
+
 ## ADR-036: Partner gains a real shop location (address + map pin) and a typed government ID
 
 - **Context.** `Partner` only ever stored a plain `city` string — no shop address, no map

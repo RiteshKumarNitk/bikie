@@ -982,6 +982,7 @@ Backend: code-complete, migration written but not applied. Mobile: code-complete
 | Real on-device foreground/background/terminated verification | **Not done** — needs the two steps above first |
 | Custom monochrome small notification icon (falls back to the launcher icon today) | Backlog — cosmetic |
 | iOS push | Backlog — explicitly out of scope for this pass |
+| SOS emergency-grade notification presentation: red tint, public lock-screen visibility, `alarm` category, scoped to `SOS_ALERT` only (`androidNotificationOverridesForType`, `buildAndroidNotificationDetails`) — `sos_channel` was already max importance/sound/vibration, no channel fix needed | Completed (2026-10-22) |
 
 ## MSG91 becomes OTP system of record, superseding ADR-032 (2026-08-05, ADR-034)
 

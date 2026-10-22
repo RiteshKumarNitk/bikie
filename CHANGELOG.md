@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-10-22 — SOS push notifications now feel like a real emergency alert (ADR-035)
+
+Android SOS pushes were being delivered but didn't feel urgent enough. `sos_channel` already had
+max importance + sound + vibration since it was created, so no channel/importance fix was needed
+there — added a red tint, public lock-screen visibility, and the `alarm` notification category,
+scoped strictly to `SOS_ALERT` (background/terminated via a new `push-channel.ts` helper;
+foreground via a new, unit-tested `buildAndroidNotificationDetails` in `push_bootstrap.dart`).
+Every other notification type is unchanged. No change to SOS recipient selection, eligibility,
+radius, escalation, deep-link routing, SMS/MSG91, Razorpay, or the Firebase project. `vitest`
+399 (+8), `flutter test` 178→190.
+
 ## 2026-10-22 — Firebase project migrated to `bikie-3baba`, including a fresh VAPID key (ADR-016)
 
 Backend Admin SDK, web client config, the Android `google-services.json`, and

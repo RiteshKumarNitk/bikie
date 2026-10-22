@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show Color;
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -21,6 +22,25 @@ final FlutterLocalNotificationsPlugin localNotificationsPlugin = FlutterLocalNot
 
 Map<String, String> _stringData(Map<String, dynamic> data) =>
     data.map((key, value) => MapEntry(key, value?.toString() ?? ''));
+
+/// Foreground display details for a notification in [channel]. `sos_channel` already has
+/// `Importance.max` + sound + vibration (`push_channels.dart`), which is what actually drives
+/// heads-up/sound/vibration on Android 8+ — the extras here (red tint, public lock-screen
+/// visibility, the `alarm` category) are the visual/semantic layer on top, scoped to SOS only
+/// so every other notification type renders exactly as before.
+AndroidNotificationDetails buildAndroidNotificationDetails(AndroidNotificationChannel channel) {
+  final isSos = channel.id == PushChannels.sos.id;
+  return AndroidNotificationDetails(
+    channel.id,
+    channel.name,
+    channelDescription: channel.description,
+    importance: Importance.max,
+    priority: Priority.high,
+    color: isSos ? const Color(0xFFEF4444) : null,
+    visibility: isSos ? NotificationVisibility.public : null,
+    category: isSos ? AndroidNotificationCategory.alarm : null,
+  );
+}
 
 /// Must be a top-level (or static) function — firebase_messaging spawns a fresh background
 /// isolate to run this for a backgrounded/terminated app, which shares no state with the main
@@ -99,15 +119,7 @@ Future<void> _bootstrapPushNotificationsInner() async {
         message.hashCode,
         notification.title,
         notification.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            channel.id,
-            channel.name,
-            channelDescription: channel.description,
-            importance: Importance.max,
-            priority: Priority.high,
-          ),
-        ),
+        NotificationDetails(android: buildAndroidNotificationDetails(channel)),
         payload: jsonEncode(_stringData(message.data)),
       );
     });
