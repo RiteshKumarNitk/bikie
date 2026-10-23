@@ -5,6 +5,13 @@
 export type InvoiceStatusDTO = "PAID" | "REFUNDED";
 export type InvoiceAccountTypeDTO = "RIDER" | "SERVICE_PROVIDER";
 
+/** `ONE_TIME` — a Rider annual purchase, or an SP membership bought via the one-time/free path
+ * (never recurring). `INITIAL_SUBSCRIPTION` — the first, authorization-triggered charge on a
+ * recurring SP subscription. `AUTO_RENEWAL` — a later, webhook-confirmed recurring charge on the
+ * same subscription. Derived server-side (earliest `paidAt` among a subscription's own invoices
+ * = initial, every later one = auto-renewal) — never guessed by the client. */
+export type InvoicePaymentTypeDTO = "ONE_TIME" | "INITIAL_SUBSCRIPTION" | "AUTO_RENEWAL";
+
 export interface InvoiceSummaryDTO {
   id: string;
   receiptNo: string;
@@ -18,6 +25,18 @@ export interface InvoiceSummaryDTO {
   paidAt: string;
   membershipStartDate: string;
   membershipEndDate: string;
+  paymentType: InvoicePaymentTypeDTO;
+}
+
+/** The live Razorpay subscription state as of whenever this invoice is read — `null` for a
+ * `ONE_TIME` invoice. Lets a single receipt independently show "what you paid then" (the
+ * invoice's own snapshot fields) alongside "what happens next" (the subscription's current
+ * state) — both server-authoritative, neither guessed by the client. */
+export interface InvoiceSubscriptionStateDTO {
+  razorpaySubscriptionId: string;
+  status: string | null;
+  currentPeriodEnd: string | null;
+  cancelledAt: string | null;
 }
 
 export interface InvoiceDetailDTO extends InvoiceSummaryDTO {
@@ -33,6 +52,7 @@ export interface InvoiceDetailDTO extends InvoiceSummaryDTO {
   paymentId: string | null;
   confirmationSmsSentAt: string | null;
   createdAt: string;
+  subscription: InvoiceSubscriptionStateDTO | null;
 }
 
 export interface BillingHistoryDTO {

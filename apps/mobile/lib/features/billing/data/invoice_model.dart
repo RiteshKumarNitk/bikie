@@ -2,6 +2,24 @@
 // deliberately — this project's `build_runner` codegen is broken on the current toolchain, and
 // these are read-only DTOs that don't need freezed's copyWith/equality.
 
+/// `ONE_TIME` — a Rider annual purchase, or an SP membership bought via the one-time/free path.
+/// `INITIAL_SUBSCRIPTION` — the first, authorization-triggered charge on a recurring SP
+/// subscription. `AUTO_RENEWAL` — a later, webhook-confirmed recurring charge on the same
+/// subscription. Mirrors `packages/types/src/billing.ts`'s `InvoicePaymentTypeDTO` — computed
+/// server-side, never guessed here.
+enum InvoicePaymentType { oneTime, initialSubscription, autoRenewal }
+
+InvoicePaymentType _parsePaymentType(String? value) {
+  switch (value) {
+    case 'INITIAL_SUBSCRIPTION':
+      return InvoicePaymentType.initialSubscription;
+    case 'AUTO_RENEWAL':
+      return InvoicePaymentType.autoRenewal;
+    default:
+      return InvoicePaymentType.oneTime;
+  }
+}
+
 class InvoiceSummary {
   const InvoiceSummary({
     required this.id,
@@ -14,6 +32,7 @@ class InvoiceSummary {
     required this.paidAt,
     required this.membershipStartDate,
     required this.membershipEndDate,
+    required this.paymentType,
   });
 
   final String id;
@@ -26,6 +45,7 @@ class InvoiceSummary {
   final String paidAt;
   final String membershipStartDate;
   final String membershipEndDate;
+  final InvoicePaymentType paymentType;
 
   factory InvoiceSummary.fromJson(Map<String, dynamic> json) => InvoiceSummary(
         id: json['id'] as String,
@@ -38,6 +58,30 @@ class InvoiceSummary {
         paidAt: json['paidAt'] as String,
         membershipStartDate: json['membershipStartDate'] as String,
         membershipEndDate: json['membershipEndDate'] as String,
+        paymentType: _parsePaymentType(json['paymentType'] as String?),
+      );
+}
+
+/// Mirrors `packages/types/src/billing.ts`'s `InvoiceSubscriptionStateDTO` — the live Razorpay
+/// subscription state as of whenever the invoice is read, `null` for a `ONE_TIME` invoice.
+class InvoiceSubscriptionState {
+  const InvoiceSubscriptionState({
+    required this.razorpaySubscriptionId,
+    required this.status,
+    required this.currentPeriodEnd,
+    required this.cancelledAt,
+  });
+
+  final String razorpaySubscriptionId;
+  final String? status;
+  final String? currentPeriodEnd;
+  final String? cancelledAt;
+
+  factory InvoiceSubscriptionState.fromJson(Map<String, dynamic> json) => InvoiceSubscriptionState(
+        razorpaySubscriptionId: json['razorpaySubscriptionId'] as String,
+        status: json['status'] as String?,
+        currentPeriodEnd: json['currentPeriodEnd'] as String?,
+        cancelledAt: json['cancelledAt'] as String?,
       );
 }
 
@@ -54,6 +98,7 @@ class InvoiceDetail {
     required this.paymentId,
     required this.confirmationSmsSentAt,
     required this.createdAt,
+    required this.subscription,
   });
 
   final InvoiceSummary summary;
@@ -67,6 +112,7 @@ class InvoiceDetail {
   final String? paymentId;
   final String? confirmationSmsSentAt;
   final String createdAt;
+  final InvoiceSubscriptionState? subscription;
 
   String get id => summary.id;
   String get receiptNo => summary.receiptNo;
@@ -83,5 +129,8 @@ class InvoiceDetail {
         paymentId: json['paymentId'] as String?,
         confirmationSmsSentAt: json['confirmationSmsSentAt'] as String?,
         createdAt: json['createdAt'] as String,
+        subscription: json['subscription'] == null
+            ? null
+            : InvoiceSubscriptionState.fromJson(json['subscription'] as Map<String, dynamic>),
       );
 }

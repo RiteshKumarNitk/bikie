@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../data/invoice_model.dart';
 import '../domain/billing_providers.dart';
@@ -51,12 +52,27 @@ class _InvoiceCard extends StatelessWidget {
 
   final InvoiceSummary invoice;
 
+  /// "Subscription payment" for the authorization charge, "Auto-debited" for every later
+  /// recurring charge — `null` for a plain one-time purchase, where no extra label is shown.
+  String? get _paymentTypeLabel {
+    switch (invoice.paymentType) {
+      case InvoicePaymentType.initialSubscription:
+        return 'Subscription payment';
+      case InvoicePaymentType.autoRenewal:
+        return 'Auto-debited';
+      case InvoicePaymentType.oneTime:
+        return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final paid = DateTime.tryParse(invoice.paidAt);
     final amount = invoice.currency == 'INR'
         ? '₹${invoice.amount.toStringAsFixed(2)}'
         : '${invoice.currency} ${invoice.amount.toStringAsFixed(2)}';
+    final typeLabel = _paymentTypeLabel;
+    final statusLabel = invoice.status == 'PAID' ? 'Paid' : 'Refunded';
     return Card(
       child: ListTile(
         onTap: () => context.push('/billing/${invoice.id}'),
@@ -73,8 +89,11 @@ class _InvoiceCard extends StatelessWidget {
             Text(amount, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
-              invoice.status == 'PAID' ? 'Paid' : 'Refunded',
-              style: Theme.of(context).textTheme.labelSmall,
+              typeLabel == null ? statusLabel : '$typeLabel · $statusLabel',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: typeLabel == null ? null : AppTheme.accentTextOf(context),
+                    fontWeight: typeLabel == null ? null : FontWeight.w600,
+                  ),
             ),
           ],
         ),

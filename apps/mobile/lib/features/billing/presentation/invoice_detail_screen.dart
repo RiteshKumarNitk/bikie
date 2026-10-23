@@ -39,9 +39,22 @@ class _Receipt extends StatelessWidget {
     return d == null ? iso : DateFormat('d MMM y').format(d);
   }
 
+  String _paymentTypeLabel(InvoicePaymentType type) {
+    switch (type) {
+      case InvoicePaymentType.initialSubscription:
+        return 'Monthly Auto-Renewal';
+      case InvoicePaymentType.autoRenewal:
+        return 'Automatic Renewal';
+      case InvoicePaymentType.oneTime:
+        return 'One-time payment';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = inv.summary;
+    final sub = inv.subscription;
+    final isSubscriptionInvoice = s.paymentType != InvoicePaymentType.oneTime;
     final amount = s.currency == 'INR'
         ? '₹${s.amount.toStringAsFixed(2)}'
         : '${s.currency} ${s.amount.toStringAsFixed(2)}';
@@ -52,12 +65,20 @@ class _Receipt extends StatelessWidget {
       if (inv.customerPhone != null) ('Mobile', inv.customerPhone!),
       ('Account type', s.accountType == 'SERVICE_PROVIDER' ? 'Service Provider' : 'Rider'),
       ('Plan', s.planName),
+      if (isSubscriptionInvoice) ('Payment type', _paymentTypeLabel(s.paymentType)),
+      if (isSubscriptionInvoice) ('Auto-debited', s.paymentType == InvoicePaymentType.autoRenewal ? 'Yes' : 'No'),
       ('Membership term', '${inv.durationDays} days'),
       ('Membership start', _date(s.membershipStartDate)),
       ('Membership expiry', _date(s.membershipEndDate)),
       ('Payment date', _date(s.paidAt)),
       if (inv.razorpayPaymentId != null) ('Razorpay payment ID', inv.razorpayPaymentId!),
       if (inv.razorpayOrderId != null) ('Razorpay order ID', inv.razorpayOrderId!),
+      if (sub != null) ('Subscription status', sub.cancelledAt != null ? 'Cancelled' : 'Active'),
+      if (sub != null) ('Auto-renewal', sub.cancelledAt != null ? 'OFF' : 'ON'),
+      if (sub != null && sub.cancelledAt == null && sub.currentPeriodEnd != null)
+        ('Next automatic payment', _date(sub.currentPeriodEnd!)),
+      if (sub != null && sub.cancelledAt == null && sub.currentPeriodEnd != null)
+        ('Next payment amount', amount),
     ];
 
     return ListView(

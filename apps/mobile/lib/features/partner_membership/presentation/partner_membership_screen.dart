@@ -14,6 +14,7 @@ import '../../auth/domain/auth_controller.dart';
 import '../data/partner_membership_model.dart';
 import '../data/partner_membership_repository.dart';
 import '../domain/partner_membership_providers.dart';
+import '../domain/partner_subscription_display.dart';
 
 /// ADR-051/056 — mirrors `MembershipScreen`, entirely separate data: a Service Provider's own
 /// membership, not the Rider one.
@@ -115,16 +116,19 @@ class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMemb
   bool _isCancelling = false;
 
   Future<void> _cancel() async {
+    final validUntil = DateTime.tryParse(widget.membership.endDate);
+    final validUntilLabel = validUntil == null ? 'the date above' : DateFormat('d MMMM y').format(validUntil);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Cancel subscription?'),
-        content: const Text(
-          'No further monthly charges will be made. You keep your membership until the current billing period ends.',
+        title: const Text('Cancel auto-renewal?'),
+        content: Text(
+          'Your membership will remain active until $validUntilLabel. After cancellation, no further '
+          '₹${widget.membership.plan.price.toStringAsFixed(0)} automatic payments will be taken.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep subscription')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel subscription')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Subscription')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel Auto-Renewal')),
         ],
       ),
     );
@@ -134,7 +138,13 @@ class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMemb
     try {
       await ref.read(partnerMembershipRepositoryProvider).cancelSubscription();
       ref.invalidate(activePartnerMembershipProvider);
-      if (mounted) showAppToast(context, 'Subscription cancelled — no further charges', variant: AppToastVariant.success);
+      if (mounted) {
+        showAppToast(
+          context,
+          'Subscription scheduled for cancellation — no further automatic payments will be taken',
+          variant: AppToastVariant.success,
+        );
+      }
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {
@@ -142,16 +152,28 @@ class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMemb
     }
   }
 
+  Widget _row(BuildContext context, String label, String value, {Color? valueColor}) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Theme.of(context).hintColor)),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, color: valueColor),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final membership = widget.membership;
     final expiry = DateTime.tryParse(membership.endDate);
-    final isSubscription = membership.razorpaySubscriptionId != null;
-    final isCancelled = membership.cancelledAt != null;
-    final hasPaymentIssue = isSubscription &&
-        !isCancelled &&
-        membership.subscriptionStatus != null &&
-        !['created', 'authenticated', 'active'].contains(membership.subscriptionStatus);
+    final state = subscriptionDisplayState(membership);
+    final price = membership.plan.price.toStringAsFixed(0);
 
     return Card(
       color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.12),
@@ -183,12 +205,12 @@ class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMemb
                   : '${membership.daysLeft} days remaining · Expires ${DateFormat('d MMMM y').format(expiry)}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
-            if (isSubscription) ...[
+            if (state.kind != SubscriptionDisplayKind.none) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: hasPaymentIssue
+                  color: state.kind == SubscriptionDisplayKind.paymentProblem
                       ? Colors.red.withValues(alpha: 0.1)
                       : Theme.of(context).colorScheme.surface.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(12),
@@ -196,19 +218,65 @@ class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMemb
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text('Auto-Renewal', style: Theme.of(context).textTheme.titleSmall),
                     Text(
-                      isCancelled
-                          ? 'Subscription cancelled — access continues until the date above'
-                          : hasPaymentIssue
-                              ? 'There is a problem with your last payment (${membership.subscriptionStatus}). Please check your payment method.'
-                              : 'Monthly subscription active · renews automatically',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: hasPaymentIssue ? Colors.red : null,
-                            fontWeight: hasPaymentIssue ? FontWeight.w600 : null,
-                          ),
+                      '₹$price/month · Automatic payment',
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
-                    if (!isCancelled) ...[
+                    if (state.kind == SubscriptionDisplayKind.cancelled) ...[
                       const SizedBox(height: 8),
+                      Text(
+                        'Your subscription has been scheduled for cancellation. No further automatic payments '
+                        'will be taken after the current paid period.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                      _row(context, 'Current membership valid until', state.validUntilDate!),
+                      _row(context, 'Next automatic payment', 'Cancelled'),
+                      _row(context, 'Auto-renewal', 'OFF'),
+                    ] else if (state.kind == SubscriptionDisplayKind.paymentProblem) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.red.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Auto-payment failed',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold, color: Colors.red),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              "We couldn't collect your ₹$price membership renewal payment. Please "
+                              'update/check your payment method to keep your membership active.',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.red),
+                            ),
+                          ],
+                        ),
+                      ),
+                      _row(context, 'Payment status', state.statusLabel!, valueColor: Colors.red),
+                      _row(context, 'Membership valid until', state.validUntilDate!),
+                    ] else ...[
+                      _row(context, 'Next payment', state.nextPaymentDate!),
+                      _row(context, 'Amount to be charged', '₹$price'),
+                      _row(context, 'Membership renews', state.renewalDate!),
+                      _row(context, 'Current membership valid until', state.validUntilDate!),
+                      _row(context, 'Auto-renewal', 'ON'),
+                      const SizedBox(height: 4),
+                      Text(
+                        '₹$price will be automatically charged on ${state.nextPaymentDate}. Your membership '
+                        'will renew for another month after the successful payment.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                    if (state.kind != SubscriptionDisplayKind.cancelled) ...[
+                      const SizedBox(height: 10),
                       Align(
                         alignment: Alignment.centerLeft,
                         child: TextButton(

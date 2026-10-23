@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-10-23 — Mobile SP subscription: Auto-Renewal card, auto-debit labeling, richer receipts
+
+Extends the web subscription-transparency work to mobile and to payment history/receipts on both
+platforms. `partner_membership_screen.dart` gets a dedicated "Auto-Renewal" section (next payment
+date + amount, renewal date, valid-until date, ON/OFF state), a proper payment-failure warning,
+and a "Cancel auto-renewal?" confirmation naming the exact date access continues until — all
+driven by a new `partner_subscription_display.dart` that mirrors the web's pure logic field for
+field (same priority order: cancelled > payment-problem > active), unit-tested the same way.
+Every successful recurring Razorpay charge already created its own invoice (unchanged) — what was
+missing was labeling: invoices now carry a server-computed `paymentType` (`ONE_TIME` /
+`INITIAL_SUBSCRIPTION` / `AUTO_RENEWAL`, derived from each subscription's earliest-paid invoice,
+never guessed client-side) and, for subscription invoices, the live `subscription` state
+(status/next payment/cancelled). Payment History (web + mobile) now shows "Subscription payment"/
+"Auto-debited" badges, and both receipt views (mobile's native screen, web's printable HTML) show
+payment type, auto-debited yes/no, subscription status, auto-renewal on/off, and the next
+automatic payment date + amount. No change to Rider membership, the one-time Razorpay order flow,
+SOS, SMS, FCM, or the webhook's own idempotency/activation logic. `vitest` 423→429,
+`flutter test` 210→221.
+
 ## 2026-10-23 — Service Provider subscription page now shows real auto-renewal dates
 
 `/partner/membership` previously had dead code: it read `razorpaySubscriptionId`/

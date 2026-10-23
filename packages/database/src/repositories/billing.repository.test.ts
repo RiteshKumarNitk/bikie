@@ -9,7 +9,11 @@ const inv = vi.hoisted(() => ({
   updateMany: vi.fn(),
 }));
 
-vi.mock("../client", () => ({ prisma: { membershipInvoice: inv } }));
+const partnerMembership = vi.hoisted(() => ({
+  findUnique: vi.fn(),
+}));
+
+vi.mock("../client", () => ({ prisma: { membershipInvoice: inv, partnerMembership } }));
 
 import { createInvoice, findByIdForUser, listForUser } from "./billing.repository";
 
@@ -40,8 +44,27 @@ function row(overrides: Record<string, unknown> = {}) {
     confirmationSmsSentAt: null,
     createdAt: D("2026-08-30T09:00:00.000Z"),
     paidAt: D("2026-08-30T09:00:00.000Z"),
+    partnerMembership: null,
     ...overrides,
   };
+}
+
+/** A subscription-backed invoice row, as `listForUser`'s `include` would return it. */
+function subscriptionRow(overrides: Record<string, unknown> = {}) {
+  return row({
+    accountType: "SERVICE_PROVIDER",
+    userMembershipId: null,
+    partnerMembershipId: "pm-1",
+    razorpayOrderId: null,
+    paymentId: null,
+    partnerMembership: {
+      razorpaySubscriptionId: "sub_1",
+      subscriptionStatus: "active",
+      currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
+      cancelledAt: null,
+    },
+    ...overrides,
+  });
 }
 
 const baseInput = {
@@ -137,5 +160,96 @@ describe("billing.repository.findByIdForUser — ownership (IDOR)", () => {
     inv.findUnique.mockResolvedValueOnce(null);
     const result = await findByIdForUser("nope", "user-1");
     expect(result).toBeNull();
+  });
+});
+
+describe("billing.repository — recurring-subscription paymentType/subscription labeling", () => {
+  it("listForUser: a one-time Rider invoice is ONE_TIME with no subscription state", async () => {
+    inv.findMany.mockResolvedValueOnce([row()]);
+
+    const [summary] = await listForUser("user-1");
+
+    expect(summary.paymentType).toBe("ONE_TIME");
+  });
+
+  it("listForUser: the earliest invoice for a subscription is the initial charge, later ones are auto-renewals", async () => {
+    inv.findMany.mockResolvedValueOnce([
+      // Newest first, as the real query orders them.
+      subscriptionRow({ id: "inv-3", paidAt: D("2026-12-23T09:00:00.000Z") }),
+      subscriptionRow({ id: "inv-2", paidAt: D("2026-11-23T09:00:00.000Z") }),
+      subscriptionRow({ id: "inv-1", paidAt: D("2026-10-23T09:00:00.000Z") }), // first charge
+    ]);
+
+    const result = await listForUser("user-1");
+
+    expect(result.find((r) => r.id === "inv-1")?.paymentType).toBe("INITIAL_SUBSCRIPTION");
+    expect(result.find((r) => r.id === "inv-2")?.paymentType).toBe("AUTO_RENEWAL");
+    expect(result.find((r) => r.id === "inv-3")?.paymentType).toBe("AUTO_RENEWAL");
+  });
+
+  it("listForUser: a one-time SP purchase (partnerMembershipId set, but no razorpaySubscriptionId on the membership) is still ONE_TIME", async () => {
+    inv.findMany.mockResolvedValueOnce([row({ partnerMembershipId: "pm-2", partnerMembership: null })]);
+
+    const [summary] = await listForUser("user-1");
+
+    expect(summary.paymentType).toBe("ONE_TIME");
+  });
+
+  it("findByIdForUser: a subscription invoice carries the live subscription state and the correct paymentType", async () => {
+    inv.findUnique.mockResolvedValueOnce(
+      row({
+        partnerMembershipId: "pm-1",
+        accountType: "SERVICE_PROVIDER",
+        userMembershipId: null,
+        paidAt: D("2026-11-23T09:00:00.000Z"),
+      }),
+    );
+    partnerMembership.findUnique.mockResolvedValueOnce({
+      razorpaySubscriptionId: "sub_1",
+      subscriptionStatus: "active",
+      currentPeriodEnd: D("2026-12-23T00:00:00.000Z"),
+      cancelledAt: null,
+    });
+    inv.count.mockResolvedValueOnce(1); // one earlier charge exists → this is a renewal
+
+    const result = await findByIdForUser("inv-1", "user-1");
+
+    expect(result?.paymentType).toBe("AUTO_RENEWAL");
+    expect(result?.subscription).toEqual({
+      razorpaySubscriptionId: "sub_1",
+      status: "active",
+      currentPeriodEnd: "2026-12-23T00:00:00.000Z",
+      cancelledAt: null,
+    });
+  });
+
+  it("findByIdForUser: the authorization charge itself (no earlier invoices) is INITIAL_SUBSCRIPTION", async () => {
+    inv.findUnique.mockResolvedValueOnce(row({ partnerMembershipId: "pm-1", userMembershipId: null }));
+    partnerMembership.findUnique.mockResolvedValueOnce({
+      razorpaySubscriptionId: "sub_1",
+      subscriptionStatus: "active",
+      currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
+      cancelledAt: null,
+    });
+    inv.count.mockResolvedValueOnce(0); // no earlier charge → this is the first one
+
+    const result = await findByIdForUser("inv-1", "user-1");
+
+    expect(result?.paymentType).toBe("INITIAL_SUBSCRIPTION");
+  });
+
+  it("findByIdForUser: a cancelled subscription's invoice reflects cancelledAt", async () => {
+    inv.findUnique.mockResolvedValueOnce(row({ partnerMembershipId: "pm-1", userMembershipId: null }));
+    partnerMembership.findUnique.mockResolvedValueOnce({
+      razorpaySubscriptionId: "sub_1",
+      subscriptionStatus: "active",
+      currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
+      cancelledAt: D("2026-10-25T00:00:00.000Z"),
+    });
+    inv.count.mockResolvedValueOnce(1);
+
+    const result = await findByIdForUser("inv-1", "user-1");
+
+    expect(result?.subscription?.cancelledAt).toBe("2026-10-25T00:00:00.000Z");
   });
 });

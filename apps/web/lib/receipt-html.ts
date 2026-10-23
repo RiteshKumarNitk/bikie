@@ -21,8 +21,18 @@ function date(iso: string): string {
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/** "Monthly Auto-Renewal" for the authorization charge, "Automatic Renewal" for a later recurring
+ * charge, "One-time payment" otherwise — matches the mobile receipt's identical labeling. */
+function paymentTypeLabel(paymentType: InvoiceDetailDTO["paymentType"]): string {
+  if (paymentType === "INITIAL_SUBSCRIPTION") return "Monthly Auto-Renewal";
+  if (paymentType === "AUTO_RENEWAL") return "Automatic Renewal";
+  return "One-time payment";
+}
+
 export function renderReceiptHtml(inv: InvoiceDetailDTO): string {
   const accountLabel = inv.accountType === "SERVICE_PROVIDER" ? "Service Provider" : "Rider";
+  const isSubscriptionInvoice = inv.paymentType !== "ONE_TIME";
+  const sub = inv.subscription;
   const rows: Array<[string, string]> = [
     ["Receipt no.", esc(inv.receiptNo)],
     ["Status", inv.status === "PAID" ? "Paid" : "Refunded"],
@@ -30,12 +40,24 @@ export function renderReceiptHtml(inv: InvoiceDetailDTO): string {
     ...(inv.customerPhone ? [["Mobile", esc(inv.customerPhone)] as [string, string]] : []),
     ["Account type", accountLabel],
     ["Plan", esc(inv.planName)],
+    ...(isSubscriptionInvoice ? [["Payment type", paymentTypeLabel(inv.paymentType)] as [string, string]] : []),
+    ...(isSubscriptionInvoice
+      ? [["Auto-debited", inv.paymentType === "AUTO_RENEWAL" ? "Yes" : "No"] as [string, string]]
+      : []),
     ["Membership term", `${inv.durationDays} days`],
     ["Membership start", date(inv.membershipStartDate)],
     ["Membership expiry", date(inv.membershipEndDate)],
     ["Payment date", date(inv.paidAt)],
     ...(inv.razorpayPaymentId ? [["Razorpay payment ID", esc(inv.razorpayPaymentId)] as [string, string]] : []),
     ...(inv.razorpayOrderId ? [["Razorpay order ID", esc(inv.razorpayOrderId)] as [string, string]] : []),
+    ...(sub ? [["Subscription status", sub.cancelledAt ? "Cancelled" : "Active"] as [string, string]] : []),
+    ...(sub ? [["Auto-renewal", sub.cancelledAt ? "OFF" : "ON"] as [string, string]] : []),
+    ...(sub && !sub.cancelledAt && sub.currentPeriodEnd
+      ? [["Next automatic payment", date(sub.currentPeriodEnd)] as [string, string]]
+      : []),
+    ...(sub && !sub.cancelledAt && sub.currentPeriodEnd
+      ? [["Next payment amount", money(inv.amount, inv.currency)] as [string, string]]
+      : []),
   ];
 
   return `<!doctype html>

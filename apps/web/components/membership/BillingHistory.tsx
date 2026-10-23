@@ -3,6 +3,14 @@
 import { useEffect, useState } from "react";
 import type { InvoiceSummaryDTO } from "@bikie/types";
 
+/** "Subscription payment" for the authorization charge, "Auto-debited" for a later recurring
+ * charge — `null` for a plain one-time purchase, matching the mobile list's identical labeling. */
+function paymentTypeLabel(paymentType: InvoiceSummaryDTO["paymentType"]): string | null {
+  if (paymentType === "INITIAL_SUBSCRIPTION") return "Subscription payment";
+  if (paymentType === "AUTO_RENEWAL") return "Auto-debited";
+  return null;
+}
+
 /** ADR-070 — the signed-in user's own membership payment/invoice history. Reads
  * `GET /api/billing/history` (always scoped to the session user); "View receipt" opens the
  * server-rendered printable HTML for that invoice in a new tab. Works unchanged for both
@@ -68,15 +76,22 @@ export function BillingHistory() {
                 {inv.amount.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </td>
               <td className="px-4 py-3">
-                <span
-                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                    inv.status === "PAID"
-                      ? "bg-success/15 text-success"
-                      : "bg-foreground/10 text-foreground/60"
-                  }`}
-                >
-                  {inv.status === "PAID" ? "Paid" : "Refunded"}
-                </span>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {paymentTypeLabel(inv.paymentType) && (
+                    <span className="rounded-full bg-accent/15 px-2 py-0.5 text-xs font-medium text-accent-text">
+                      {paymentTypeLabel(inv.paymentType)}
+                    </span>
+                  )}
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      inv.status === "PAID"
+                        ? "bg-success/15 text-success"
+                        : "bg-foreground/10 text-foreground/60"
+                    }`}
+                  >
+                    {inv.status === "PAID" ? "Paid" : "Refunded"}
+                  </span>
+                </div>
               </td>
               <td className="px-4 py-3">
                 <a

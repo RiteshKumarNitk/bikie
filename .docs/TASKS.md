@@ -2,6 +2,18 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SP subscription: mobile Auto-Renewal UI + auto-debit labeling on invoices (2026-10-23)
+
+| Task | Status |
+|---|---|
+| `partner_membership_screen.dart`: "Auto-Renewal" section — next payment date/amount, renewal date, valid-until, ON/OFF, payment-failure warning, "Cancel auto-renewal?" confirmation naming the exact paid-through date | Completed |
+| New `partner_subscription_display.dart` (mirrors web's `partner-subscription-display.ts` field for field) | Completed — `flutter test` +11 |
+| `InvoiceSummaryDTO`/`InvoiceDetailDTO` (`@bikie/types`), mobile `InvoiceSummary`/`InvoiceDetail`: new server-computed `paymentType` (`ONE_TIME`/`INITIAL_SUBSCRIPTION`/`AUTO_RENEWAL`) + `subscription` state, derived from each subscription's earliest-paid invoice — never guessed client-side | Completed |
+| Payment History (web table + mobile list): "Subscription payment"/"Auto-debited" badge | Completed |
+| Receipts (mobile native screen + web printable HTML): payment type, auto-debited, subscription status, auto-renewal on/off, next automatic payment + amount | Completed |
+| Tests: `billing.repository.ts` payment-type/subscription-state derivation (6 new) | Completed — `vitest` 423→429 |
+| Rider membership, one-time Razorpay order flow, SOS, SMS/MSG91, FCM, webhook idempotency/activation logic | Confirmed untouched |
+
 ## SP subscription page: make auto-renewal/next-payment dates actually visible (2026-10-23)
 
 | Task | Status |
