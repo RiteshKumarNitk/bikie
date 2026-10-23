@@ -2,6 +2,18 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Admin Transactions: full auto-payment lifecycle visibility (2026-10-24)
+
+| Task | Status |
+|---|---|
+| New `InvoiceSubscriptionStateDTO.renewalCount` (total invoices on the subscription minus the 1 initial charge) | Completed |
+| Unified `paymentTypesFor` (was 2 parallel implementations — `detailForRow`'s per-row queries + the admin list's bulk `groupBy`) — one derivation used by `listForUser`, `detailForRow`, and every admin transaction reader | Completed |
+| New `apps/web/lib/admin-subscription-display.ts` — admin-facing pure display logic (raw status, renewal count, payment-problem vs. cancelled vs. active), mirrors `partner-subscription-display.ts`'s priority order | Completed |
+| Drawer: "Auto-Payment / Subscription" section — Auto-Renewal ON/OFF, raw subscription status, "Automatic subscription payment" method label, renewal period (Monthly), recurring-payments-so-far count, Razorpay subscription id, next debit date+amount, renews-on date, paid-through date, or (cancelled) cancelled-on date + "No further automatic debit", or (failed) a distinct "Auto-payment failed" banner | Completed |
+| List: new dedicated "Auto-Renewal" column (ON/OFF/FAILED badge) | Completed |
+| Tests: 11 new for the pure display module (active/cancelled/halted/pending/initial/recurring/next-debit-tracks-server/none/priority-order), 7 new backend (renewalCount across both single-row and bulk/paginated paths, halted/pending/cancelled status passthrough) | Completed — `vitest` 432→450 |
+| Component-level "drawer" test | Not applicable — this app has no component-testing infra (`@testing-library/react` not installed, 0 existing `.tsx` tests anywhere); covered instead via the pure display-logic module, matching the project's existing test strategy for this exact class of UI |
+
 ## Admin Transactions: next-debit visibility for SP subscriptions (2026-10-23)
 
 | Task | Status |

@@ -10,11 +10,7 @@ const inv = vi.hoisted(() => ({
   groupBy: vi.fn(),
 }));
 
-const partnerMembership = vi.hoisted(() => ({
-  findUnique: vi.fn(),
-}));
-
-vi.mock("../client", () => ({ prisma: { membershipInvoice: inv, partnerMembership } }));
+vi.mock("../client", () => ({ prisma: { membershipInvoice: inv } }));
 
 import {
   createInvoice,
@@ -56,12 +52,14 @@ function row(overrides: Record<string, unknown> = {}) {
   };
 }
 
-/** A subscription-backed invoice row, as `listForUser`'s `include` would return it. */
+/** A subscription-backed invoice row (`include: membershipPaymentTypeInclude`'s shape). The real
+ * Golden Service Provider Community plan is ₹99/month (`durationDays: 30`), not the base
+ * fixture's 365-day Rider default. */
 function subscriptionRow(overrides: Record<string, unknown> = {}) {
   return row({
     accountType: "SERVICE_PROVIDER",
     userMembershipId: null,
-    durationDays: 30, // the real SP plan is monthly, not the base fixture's 365-day default
+    durationDays: 30,
     partnerMembershipId: "pm-1",
     razorpayOrderId: null,
     paymentId: null,
@@ -73,6 +71,13 @@ function subscriptionRow(overrides: Record<string, unknown> = {}) {
     },
     ...overrides,
   });
+}
+
+/** Stubs the `groupBy` call `paymentTypesFor` makes for a single membership id. */
+function stubGroupBy(partnerMembershipId: string, earliestPaidAt: Date, totalCount: number) {
+  inv.groupBy.mockResolvedValueOnce([
+    { partnerMembershipId, _min: { paidAt: earliestPaidAt }, _count: { _all: totalCount } },
+  ]);
 }
 
 const baseInput = {
@@ -117,6 +122,7 @@ describe("billing.repository.createInvoice — ADR-070", () => {
     });
     expect(result.receiptNo).toBe(`BIKIE-${new Date().getFullYear()}-000006`);
     expect(result.amount).toBe(99);
+    expect(result.paymentType).toBe("ONE_TIME");
   });
 
   it("is idempotent: an existing invoice for the same membership row is returned, no create", async () => {
@@ -171,13 +177,14 @@ describe("billing.repository.findByIdForUser — ownership (IDOR)", () => {
   });
 });
 
-describe("billing.repository — recurring-subscription paymentType/subscription labeling", () => {
-  it("listForUser: a one-time Rider invoice is ONE_TIME with no subscription state", async () => {
+describe("billing.repository — recurring-subscription paymentType/subscription labeling (user-facing)", () => {
+  it("listForUser: a one-time Rider invoice is ONE_TIME with no subscription state, no groupBy needed", async () => {
     inv.findMany.mockResolvedValueOnce([row()]);
 
     const [summary] = await listForUser("user-1");
 
     expect(summary.paymentType).toBe("ONE_TIME");
+    expect(inv.groupBy).not.toHaveBeenCalled();
   });
 
   it("listForUser: the earliest invoice for a subscription is the initial charge, later ones are auto-renewals", async () => {
@@ -187,6 +194,7 @@ describe("billing.repository — recurring-subscription paymentType/subscription
       subscriptionRow({ id: "inv-2", paidAt: D("2026-11-23T09:00:00.000Z") }),
       subscriptionRow({ id: "inv-1", paidAt: D("2026-10-23T09:00:00.000Z") }), // first charge
     ]);
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 3);
 
     const result = await listForUser("user-1");
 
@@ -203,72 +211,91 @@ describe("billing.repository — recurring-subscription paymentType/subscription
     expect(summary.paymentType).toBe("ONE_TIME");
   });
 
-  it("findByIdForUser: a subscription invoice carries the live subscription state and the correct paymentType", async () => {
+  it("findByIdForUser: an active, healthy renewal carries the live subscription state, correct paymentType, and renewalCount", async () => {
     inv.findUnique.mockResolvedValueOnce(
-      row({
-        partnerMembershipId: "pm-1",
-        accountType: "SERVICE_PROVIDER",
-        userMembershipId: null,
+      subscriptionRow({
+        id: "inv-2",
         paidAt: D("2026-11-23T09:00:00.000Z"),
+        partnerMembership: {
+          razorpaySubscriptionId: "sub_1",
+          subscriptionStatus: "active",
+          currentPeriodEnd: D("2026-12-23T00:00:00.000Z"),
+          cancelledAt: null,
+        },
       }),
     );
-    partnerMembership.findUnique.mockResolvedValueOnce({
-      razorpaySubscriptionId: "sub_1",
-      subscriptionStatus: "active",
-      currentPeriodEnd: D("2026-12-23T00:00:00.000Z"),
-      cancelledAt: null,
-    });
-    inv.count.mockResolvedValueOnce(1); // one earlier charge exists → this is a renewal
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 2); // initial + this one = 2 total
 
-    const result = await findByIdForUser("inv-1", "user-1");
+    const result = await findByIdForUser("inv-2", "user-1");
 
     expect(result?.paymentType).toBe("AUTO_RENEWAL");
     expect(result?.subscription).toEqual({
       razorpaySubscriptionId: "sub_1",
       status: "active",
       currentPeriodEnd: "2026-12-23T00:00:00.000Z",
-      nextPeriodEnd: "2027-12-23T00:00:00.000Z", // row()'s default durationDays (365)
+      nextPeriodEnd: "2027-01-22T00:00:00.000Z", // currentPeriodEnd + this invoice's 30-day duration
       cancelledAt: null,
+      renewalCount: 1, // 2 total invoices - the 1 initial charge
     });
   });
 
-  it("findByIdForUser: the authorization charge itself (no earlier invoices) is INITIAL_SUBSCRIPTION", async () => {
-    inv.findUnique.mockResolvedValueOnce(row({ partnerMembershipId: "pm-1", userMembershipId: null }));
-    partnerMembership.findUnique.mockResolvedValueOnce({
-      razorpaySubscriptionId: "sub_1",
-      subscriptionStatus: "active",
-      currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
-      cancelledAt: null,
-    });
-    inv.count.mockResolvedValueOnce(0); // no earlier charge → this is the first one
+  it("findByIdForUser: the authorization charge itself (sole invoice) is INITIAL_SUBSCRIPTION with renewalCount 0", async () => {
+    const paidAt = D("2026-10-23T09:00:00.000Z");
+    inv.findUnique.mockResolvedValueOnce(subscriptionRow({ paidAt }));
+    stubGroupBy("pm-1", paidAt, 1); // only this one exists so far — it IS the earliest
 
     const result = await findByIdForUser("inv-1", "user-1");
 
     expect(result?.paymentType).toBe("INITIAL_SUBSCRIPTION");
+    expect(result?.subscription?.renewalCount).toBe(0);
   });
 
-  it("findByIdForUser: a cancelled subscription's invoice reflects cancelledAt", async () => {
-    inv.findUnique.mockResolvedValueOnce(row({ partnerMembershipId: "pm-1", userMembershipId: null }));
-    partnerMembership.findUnique.mockResolvedValueOnce({
-      razorpaySubscriptionId: "sub_1",
-      subscriptionStatus: "active",
-      currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
-      cancelledAt: D("2026-10-25T00:00:00.000Z"),
-    });
-    inv.count.mockResolvedValueOnce(1);
+  it("findByIdForUser: a cancelled subscription's invoice reflects cancelledAt and has no nextPeriodEnd", async () => {
+    inv.findUnique.mockResolvedValueOnce(
+      subscriptionRow({
+        partnerMembership: {
+          razorpaySubscriptionId: "sub_1",
+          subscriptionStatus: "active",
+          currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
+          cancelledAt: D("2026-10-25T00:00:00.000Z"),
+        },
+      }),
+    );
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 1);
 
     const result = await findByIdForUser("inv-1", "user-1");
 
     expect(result?.subscription?.cancelledAt).toBe("2026-10-25T00:00:00.000Z");
+    expect(result?.subscription?.nextPeriodEnd).toBeNull(); // cancelled — no next period to compute
+  });
+
+  it("findByIdForUser: a halted (failed) subscription still reports its raw status, with no nextPeriodEnd fabricated", async () => {
+    inv.findUnique.mockResolvedValueOnce(
+      subscriptionRow({
+        partnerMembership: {
+          razorpaySubscriptionId: "sub_1",
+          subscriptionStatus: "halted",
+          currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
+          cancelledAt: null,
+        },
+      }),
+    );
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 2);
+
+    const result = await findByIdForUser("inv-1", "user-1");
+
+    expect(result?.subscription?.status).toBe("halted");
+    // Not cancelled, so nextPeriodEnd IS still computed from currentPeriodEnd — a halted payment
+    // doesn't retroactively erase the last known billing schedule, it's surfaced as a warning by
+    // the UI layer instead (subscription.status !== a healthy value).
+    expect(result?.subscription?.nextPeriodEnd).not.toBeNull();
   });
 });
 
-describe("admin transactions — paymentType/subscription computed GLOBALLY, not just within a page", () => {
-  it("getTransactionForAdmin: a single subscription transaction carries paymentType and next-debit data", async () => {
+describe("admin transactions — paymentType/subscription/renewalCount computed GLOBALLY, not just within a page", () => {
+  it("getTransactionForAdmin: an active subscription transaction carries paymentType and next-debit data", async () => {
     inv.findUnique.mockResolvedValueOnce(subscriptionRow({ id: "inv-2", paidAt: D("2026-11-23T09:00:00.000Z") }));
-    inv.groupBy.mockResolvedValueOnce([
-      { partnerMembershipId: "pm-1", _min: { paidAt: D("2026-10-23T09:00:00.000Z") } },
-    ]);
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 2);
 
     const result = await getTransactionForAdmin("inv-2");
 
@@ -279,22 +306,115 @@ describe("admin transactions — paymentType/subscription computed GLOBALLY, not
       currentPeriodEnd: "2026-11-23T00:00:00.000Z",
       nextPeriodEnd: "2026-12-23T00:00:00.000Z",
       cancelledAt: null,
+      renewalCount: 1,
     });
   });
 
-  it("listTransactionsForAdmin: a renewal on page 2 is still correctly labeled even though its initial charge is on page 1 (earliest is computed globally via groupBy, not from the current page's rows alone)", async () => {
+  it("getTransactionForAdmin: a cancelled subscription shows cancelledAt and no next debit", async () => {
+    inv.findUnique.mockResolvedValueOnce(
+      subscriptionRow({
+        partnerMembership: {
+          razorpaySubscriptionId: "sub_1",
+          subscriptionStatus: "cancelled",
+          currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
+          cancelledAt: D("2026-10-28T00:00:00.000Z"),
+        },
+      }),
+    );
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 1);
+
+    const result = await getTransactionForAdmin("inv-1");
+
+    expect(result?.subscription?.cancelledAt).toBe("2026-10-28T00:00:00.000Z");
+    expect(result?.subscription?.nextPeriodEnd).toBeNull();
+  });
+
+  it("getTransactionForAdmin: a halted subscription reports status halted for the admin to see", async () => {
+    inv.findUnique.mockResolvedValueOnce(
+      subscriptionRow({
+        partnerMembership: {
+          razorpaySubscriptionId: "sub_1",
+          subscriptionStatus: "halted",
+          currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
+          cancelledAt: null,
+        },
+      }),
+    );
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 2);
+
+    const result = await getTransactionForAdmin("inv-1");
+
+    expect(result?.subscription?.status).toBe("halted");
+  });
+
+  it("getTransactionForAdmin: a pending subscription reports status pending", async () => {
+    inv.findUnique.mockResolvedValueOnce(
+      subscriptionRow({
+        partnerMembership: {
+          razorpaySubscriptionId: "sub_1",
+          subscriptionStatus: "pending",
+          currentPeriodEnd: D("2026-11-23T00:00:00.000Z"),
+          cancelledAt: null,
+        },
+      }),
+    );
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 2);
+
+    const result = await getTransactionForAdmin("inv-1");
+
+    expect(result?.subscription?.status).toBe("pending");
+  });
+
+  it("getTransactionForAdmin: the authorization charge is INITIAL_SUBSCRIPTION with renewalCount 0", async () => {
+    const paidAt = D("2026-10-23T09:00:00.000Z");
+    inv.findUnique.mockResolvedValueOnce(subscriptionRow({ paidAt }));
+    stubGroupBy("pm-1", paidAt, 1);
+
+    const result = await getTransactionForAdmin("inv-1");
+
+    expect(result?.paymentType).toBe("INITIAL_SUBSCRIPTION");
+    expect(result?.subscription?.renewalCount).toBe(0);
+  });
+
+  it("getTransactionForAdmin: a one-time Rider transaction has no subscription state at all", async () => {
+    inv.findUnique.mockResolvedValueOnce(row());
+
+    const result = await getTransactionForAdmin("inv-1");
+
+    expect(result?.paymentType).toBe("ONE_TIME");
+    expect(result?.subscription).toBeNull();
+    expect(inv.groupBy).not.toHaveBeenCalled();
+  });
+
+  it("listTransactionsForAdmin: a renewal on page 2 is still correctly labeled even though its initial charge is on page 1 (earliest/count computed globally via groupBy, not from the current page's rows alone)", async () => {
     // Page 2 of the admin list contains ONLY the renewal — the initial charge (the true earliest)
     // is on page 1 and never appears in `rows` here. If the code mistakenly computed "earliest"
     // from just this page's rows, it would wrongly treat this lone row as the initial charge.
     inv.findMany.mockResolvedValueOnce([subscriptionRow({ id: "inv-2", paidAt: D("2026-11-23T09:00:00.000Z") })]);
     inv.count.mockResolvedValueOnce(2);
-    inv.groupBy.mockResolvedValueOnce([
-      { partnerMembershipId: "pm-1", _min: { paidAt: D("2026-10-23T09:00:00.000Z") } },
-    ]);
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 2); // 2 total invoices for this subscription, globally
 
     const result = await listTransactionsForAdmin({}, { page: 2, pageSize: 1, sort: "newest" });
 
     expect(result.transactions[0].paymentType).toBe("AUTO_RENEWAL");
+    expect(result.transactions[0].subscription?.renewalCount).toBe(1);
+  });
+
+  it("listTransactionsForAdmin: distinguishes ONE_TIME / INITIAL_SUBSCRIPTION / AUTO_RENEWAL within the same page", async () => {
+    inv.findMany.mockResolvedValueOnce([
+      row({ id: "inv-rider" }), // ONE_TIME
+      subscriptionRow({ id: "inv-initial", paidAt: D("2026-10-23T09:00:00.000Z") }),
+      subscriptionRow({ id: "inv-renewal", paidAt: D("2026-11-23T09:00:00.000Z") }),
+    ]);
+    inv.count.mockResolvedValueOnce(3);
+    stubGroupBy("pm-1", D("2026-10-23T09:00:00.000Z"), 2);
+
+    const result = await listTransactionsForAdmin({}, { page: 1, pageSize: 25, sort: "newest" });
+
+    const byId = Object.fromEntries(result.transactions.map((t) => [t.id, t.paymentType]));
+    expect(byId["inv-rider"]).toBe("ONE_TIME");
+    expect(byId["inv-initial"]).toBe("INITIAL_SUBSCRIPTION");
+    expect(byId["inv-renewal"]).toBe("AUTO_RENEWAL");
   });
 
   it("listTransactionsForAdmin: a one-time Rider transaction is ONE_TIME with no subscription state, and groupBy is never called", async () => {

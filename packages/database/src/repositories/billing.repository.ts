@@ -88,7 +88,7 @@ function paymentTypeFor(inv: InvoiceRowWithSubscription, isEarliestForSubscripti
   return isEarliestForSubscription ? "INITIAL_SUBSCRIPTION" : "AUTO_RENEWAL";
 }
 
-function subscriptionStateFor(inv: InvoiceRowWithSubscription): InvoiceSubscriptionStateDTO | null {
+function subscriptionStateFor(inv: InvoiceRowWithSubscription, totalInvoiceCount: number): InvoiceSubscriptionStateDTO | null {
   const sub = inv.partnerMembership;
   if (!sub?.razorpaySubscriptionId) return null;
   const nextPeriodEnd =
@@ -101,7 +101,55 @@ function subscriptionStateFor(inv: InvoiceRowWithSubscription): InvoiceSubscript
     nextPeriodEnd: nextPeriodEnd ? nextPeriodEnd.toISOString() : null,
     currentPeriodEnd: sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,
     cancelledAt: sub.cancelledAt ? sub.cancelledAt.toISOString() : null,
+    renewalCount: Math.max(0, totalInvoiceCount - 1),
   };
+}
+
+/** Shared by `listForUser`, `detailForRow`, and every admin transaction reader — a single bulk
+ * `groupBy` finds each referenced subscription's globally earliest `paidAt` (the authorization
+ * charge) AND its total invoice count, in one query, regardless of how many of its invoices are
+ * actually present in `rows` (a paginated admin page, a single invoice via `detailForRow`, or a
+ * user's full history all take this same path). Critical for pagination correctness: a renewal
+ * must never be mislabeled as the initial charge just because its own authorization charge
+ * happens to live outside the current page/row set. */
+async function paymentTypesFor(
+  rows: InvoiceRowWithSubscription[],
+): Promise<Map<string, { paymentType: InvoicePaymentTypeDTO; subscription: InvoiceSubscriptionStateDTO | null }>> {
+  const subscriptionMembershipIds = [
+    ...new Set(
+      rows
+        .filter((r) => r.partnerMembershipId && r.partnerMembership?.razorpaySubscriptionId)
+        .map((r) => r.partnerMembershipId as string),
+    ),
+  ];
+
+  const earliestByMembership = new Map<string, number>();
+  const countByMembership = new Map<string, number>();
+  if (subscriptionMembershipIds.length > 0) {
+    const grouped = await prisma.membershipInvoice.groupBy({
+      by: ["partnerMembershipId"],
+      where: { partnerMembershipId: { in: subscriptionMembershipIds } },
+      _min: { paidAt: true },
+      _count: { _all: true },
+    });
+    for (const row of grouped) {
+      if (!row.partnerMembershipId) continue;
+      if (row._min.paidAt) earliestByMembership.set(row.partnerMembershipId, row._min.paidAt.getTime());
+      countByMembership.set(row.partnerMembershipId, row._count._all);
+    }
+  }
+
+  const result = new Map<string, { paymentType: InvoicePaymentTypeDTO; subscription: InvoiceSubscriptionStateDTO | null }>();
+  for (const row of rows) {
+    const isEarliest =
+      !!row.partnerMembershipId && earliestByMembership.get(row.partnerMembershipId) === row.paidAt.getTime();
+    const totalCount = (row.partnerMembershipId && countByMembership.get(row.partnerMembershipId)) || 0;
+    result.set(row.id, {
+      paymentType: paymentTypeFor(row, isEarliest),
+      subscription: subscriptionStateFor(row, totalCount),
+    });
+  }
+  return result;
 }
 
 /** `BIKIE-<year>-<6-digit sequence>`. The sequence is derived from the current per-year count;
@@ -170,36 +218,14 @@ export async function createInvoice(input: CreateInvoiceInput): Promise<InvoiceD
   throw new Error("[billing.repository] could not allocate a unique receipt number after 6 attempts");
 }
 
-/** Shared by `createRecurringPartnerInvoice` and `findByIdForUser` — determines whether this
- * invoice's membership is subscription-backed, and if so whether it's the authorization charge
- * (earliest `paidAt` among its own subscription's invoices) or a later renewal. One extra query
- * per call; acceptable here since both callers already operate on a single invoice, never a list
- * (`listForUser` does the equivalent in bulk, in-memory, to avoid N+1 queries over a whole page). */
-async function detailForRow(inv: InvoiceRow): Promise<InvoiceDetailDTO> {
-  if (!inv.partnerMembershipId) return toDetail(inv, "ONE_TIME", null);
-
-  const partnerMembership = await prisma.partnerMembership.findUnique({
-    where: { id: inv.partnerMembershipId },
-    select: { razorpaySubscriptionId: true, subscriptionStatus: true, currentPeriodEnd: true, cancelledAt: true },
-  });
-  if (!partnerMembership?.razorpaySubscriptionId) return toDetail(inv, "ONE_TIME", null);
-
-  const earlierCount = await prisma.membershipInvoice.count({
-    where: { partnerMembershipId: inv.partnerMembershipId, paidAt: { lt: inv.paidAt } },
-  });
-  const paymentType: InvoicePaymentTypeDTO = earlierCount === 0 ? "INITIAL_SUBSCRIPTION" : "AUTO_RENEWAL";
-  const nextPeriodEnd =
-    !partnerMembership.cancelledAt && partnerMembership.currentPeriodEnd
-      ? new Date(partnerMembership.currentPeriodEnd.getTime() + inv.durationDays * 24 * 60 * 60 * 1000)
-      : null;
-  const subscription: InvoiceSubscriptionStateDTO = {
-    razorpaySubscriptionId: partnerMembership.razorpaySubscriptionId,
-    status: partnerMembership.subscriptionStatus,
-    currentPeriodEnd: partnerMembership.currentPeriodEnd ? partnerMembership.currentPeriodEnd.toISOString() : null,
-    nextPeriodEnd: nextPeriodEnd ? nextPeriodEnd.toISOString() : null,
-    cancelledAt: partnerMembership.cancelledAt ? partnerMembership.cancelledAt.toISOString() : null,
-  };
-  return toDetail(inv, paymentType, subscription);
+/** Shared by `createRecurringPartnerInvoice` and `findByIdForUser` — resolves this one invoice's
+ * `paymentType`/`subscription` via the same `paymentTypesFor` every other reader uses (a single
+ * row is just a one-element bulk call), so a subscription's renewal count / "is this the
+ * authorization charge" determination is identical everywhere, never a second implementation. */
+async function detailForRow(inv: InvoiceRowWithSubscription): Promise<InvoiceDetailDTO> {
+  const types = await paymentTypesFor([inv]);
+  const t = types.get(inv.id)!;
+  return toDetail(inv, t.paymentType, t.subscription);
 }
 
 /**
@@ -215,7 +241,10 @@ async function detailForRow(inv: InvoiceRow): Promise<InvoiceDetailDTO> {
  * never touched either way. Same receipt-numbering/retry-on-collision behavior as `createInvoice`.
  */
 export async function createRecurringPartnerInvoice(input: CreateInvoiceInput & { razorpayPaymentId: string }): Promise<InvoiceDetailDTO> {
-  const existing = await prisma.membershipInvoice.findUnique({ where: { razorpayPaymentId: input.razorpayPaymentId } });
+  const existing = await prisma.membershipInvoice.findUnique({
+    where: { razorpayPaymentId: input.razorpayPaymentId },
+    include: membershipPaymentTypeInclude,
+  });
   if (existing) return detailForRow(existing);
 
   for (let attempt = 0; attempt < 6; attempt++) {
@@ -241,11 +270,15 @@ export async function createRecurringPartnerInvoice(input: CreateInvoiceInput & 
           razorpayOrderId: input.razorpayOrderId ?? null,
           paidAt: input.paidAt,
         },
+        include: membershipPaymentTypeInclude,
       });
       return detailForRow(inv);
     } catch (err) {
       if (isUniqueViolation(err)) {
-        const now = await prisma.membershipInvoice.findUnique({ where: { razorpayPaymentId: input.razorpayPaymentId } });
+        const now = await prisma.membershipInvoice.findUnique({
+          where: { razorpayPaymentId: input.razorpayPaymentId },
+          include: membershipPaymentTypeInclude,
+        });
         if (now) return detailForRow(now);
         continue;
       }
@@ -255,37 +288,21 @@ export async function createRecurringPartnerInvoice(input: CreateInvoiceInput & 
   throw new Error("[billing.repository] could not allocate a unique receipt number after 6 attempts (recurring)");
 }
 
-/** Newest first. Scoped to one user — the route never accepts a userId from the client. Computes
- * `paymentType` in bulk, in-memory (group by `partnerMembershipId`, the earliest `paidAt` per
- * group is the authorization charge) rather than one query per row — a user's own invoices are
- * always a small, already-fetched set, and every invoice for a given subscription necessarily
- * belongs to this same user, so nothing is missed by not querying across users. */
+/** Newest first. Scoped to one user — the route never accepts a userId from the client. */
 export async function listForUser(userId: string): Promise<InvoiceSummaryDTO[]> {
   const rows = await prisma.membershipInvoice.findMany({
     where: { userId },
     orderBy: { createdAt: "desc" },
     include: membershipPaymentTypeInclude,
   });
-
-  const earliestPaidAtByMembership = new Map<string, number>();
-  for (const row of rows) {
-    if (!row.partnerMembershipId || !row.partnerMembership?.razorpaySubscriptionId) continue;
-    const t = row.paidAt.getTime();
-    const current = earliestPaidAtByMembership.get(row.partnerMembershipId);
-    if (current === undefined || t < current) earliestPaidAtByMembership.set(row.partnerMembershipId, t);
-  }
-
-  return rows.map((row) => {
-    const isEarliest =
-      !!row.partnerMembershipId && earliestPaidAtByMembership.get(row.partnerMembershipId) === row.paidAt.getTime();
-    return toSummary(row, paymentTypeFor(row, isEarliest));
-  });
+  const types = await paymentTypesFor(rows);
+  return rows.map((row) => toSummary(row, types.get(row.id)!.paymentType));
 }
 
 /** Returns `null` both when the invoice does not exist and when it belongs to another user —
  * the caller maps both to 404, so invoice ids can't be probed. */
 export async function findByIdForUser(id: string, userId: string): Promise<InvoiceDetailDTO | null> {
-  const inv = await prisma.membershipInvoice.findUnique({ where: { id } });
+  const inv = await prisma.membershipInvoice.findUnique({ where: { id }, include: membershipPaymentTypeInclude });
   if (!inv || inv.userId !== userId) return null;
   return detailForRow(inv);
 }
@@ -371,43 +388,6 @@ function toAdminTransaction(
   };
 }
 
-/** Bulk equivalent of `listForUser`'s in-memory earliest-computation, for a (possibly paginated,
- * possibly cross-user) admin row set: a single `groupBy` finds each referenced subscription's
- * globally earliest `paidAt` — not just the earliest among the current page — so a renewal never
- * gets mislabeled as the initial charge just because its own authorization charge happened to
- * fall on a different page. */
-async function adminPaymentTypesFor(
-  rows: InvoiceRowWithSubscription[],
-): Promise<Map<string, { paymentType: InvoicePaymentTypeDTO; subscription: InvoiceSubscriptionStateDTO | null }>> {
-  const subscriptionMembershipIds = [
-    ...new Set(
-      rows
-        .filter((r) => r.partnerMembershipId && r.partnerMembership?.razorpaySubscriptionId)
-        .map((r) => r.partnerMembershipId as string),
-    ),
-  ];
-
-  const earliestByMembership = new Map<string, number>();
-  if (subscriptionMembershipIds.length > 0) {
-    const earliest = await prisma.membershipInvoice.groupBy({
-      by: ["partnerMembershipId"],
-      where: { partnerMembershipId: { in: subscriptionMembershipIds } },
-      _min: { paidAt: true },
-    });
-    for (const row of earliest) {
-      if (row.partnerMembershipId && row._min.paidAt) earliestByMembership.set(row.partnerMembershipId, row._min.paidAt.getTime());
-    }
-  }
-
-  const result = new Map<string, { paymentType: InvoicePaymentTypeDTO; subscription: InvoiceSubscriptionStateDTO | null }>();
-  for (const row of rows) {
-    const isEarliest =
-      !!row.partnerMembershipId && earliestByMembership.get(row.partnerMembershipId) === row.paidAt.getTime();
-    result.set(row.id, { paymentType: paymentTypeFor(row, isEarliest), subscription: subscriptionStateFor(row) });
-  }
-  return result;
-}
-
 /** Server-side paginated + filtered transaction list, newest or oldest first. */
 export async function listTransactionsForAdmin(
   filters: AdminTransactionFilters,
@@ -424,7 +404,7 @@ export async function listTransactionsForAdmin(
     }),
     prisma.membershipInvoice.count({ where }),
   ]);
-  const types = await adminPaymentTypesFor(rows);
+  const types = await paymentTypesFor(rows);
   return {
     transactions: rows.map((row) => {
       const t = types.get(row.id)!;
@@ -445,7 +425,7 @@ export async function listAllTransactionsForAdmin(
     take: opts.limit,
     include: membershipPaymentTypeInclude,
   });
-  const types = await adminPaymentTypesFor(rows);
+  const types = await paymentTypesFor(rows);
   return rows.map((row) => {
     const t = types.get(row.id)!;
     return toAdminTransaction(row, t.paymentType, t.subscription);
@@ -455,7 +435,7 @@ export async function listAllTransactionsForAdmin(
 export async function getTransactionForAdmin(id: string): Promise<AdminTransactionDTO | null> {
   const inv = await prisma.membershipInvoice.findUnique({ where: { id }, include: membershipPaymentTypeInclude });
   if (!inv) return null;
-  const types = await adminPaymentTypesFor([inv]);
+  const types = await paymentTypesFor([inv]);
   const t = types.get(inv.id)!;
   return toAdminTransaction(inv, t.paymentType, t.subscription);
 }

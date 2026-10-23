@@ -43,6 +43,10 @@ export interface InvoiceSubscriptionStateDTO {
    * whenever `currentPeriodEnd` itself is `null` (no charge confirmed yet) or the subscription is
    * cancelled (there is no next period). Computed server-side so the client never derives it. */
   nextPeriodEnd: string | null;
+  /** How many *recurring* (`AUTO_RENEWAL`) charges this subscription has collected so far —
+   * total invoices on the subscription minus the one `INITIAL_SUBSCRIPTION` charge. `0` right
+   * after authorization, before the first renewal has landed. */
+  renewalCount: number;
 }
 
 export interface InvoiceDetailDTO extends InvoiceSummaryDTO {

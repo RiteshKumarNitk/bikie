@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-10-24 — Admin Transactions: full subscription lifecycle, not just next-debit date
+
+Deepens yesterday's "next automatic debit" addition into the complete picture an admin needs
+without ever opening Razorpay: raw subscription status (ACTIVE/PENDING/HALTED/CANCELLED/…),
+"Payment method: Automatic subscription payment", how many renewals a subscription has collected
+(`renewalCount`, new), and a distinct "Auto-payment failed" banner for pending/halted
+subscriptions (previously shown the same as healthy — a real gap, since an admin couldn't
+actually tell a failed renewal from a normal one without reading the raw status word). New
+`apps/web/lib/admin-subscription-display.ts` is the admin-facing counterpart to the Service
+Provider's own `partner-subscription-display.ts` — same priority order (cancelled > payment
+problem > active), more raw detail for the admin audience. List gains a dedicated Auto-Renewal
+column (ON / OFF / FAILED). Backend: the two parallel paymentType-derivation code paths
+(`detailForRow`'s per-row queries, the admin list's bulk `groupBy`) are now one function,
+`paymentTypesFor`, used everywhere a `MembershipInvoice` is read — removes duplicate logic and
+makes `renewalCount` available consistently rather than needing a third implementation. No change
+to Rider membership, SOS, SMS/MSG91, FCM, the webhook, or eligibility logic. `vitest` 432→450.
+
 ## 2026-10-23 — Admin transaction detail/list now shows the next automatic debit
 
 The admin Transactions drawer (e.g. `BIKIE-2026-000012`) showed only what was already paid —

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AdminTransactionDTO } from "@bikie/types";
 import { formatCurrency } from "@bikie/utils";
+import { adminSubscriptionDisplayState } from "@/lib/admin-subscription-display";
 
 type Facets = { plans: { planId: string; planName: string }[] };
 
@@ -157,7 +158,7 @@ export function TransactionsBrowser() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl bg-white/5">
-          <table className="w-full min-w-[980px] text-sm">
+          <table className="w-full min-w-[1080px] text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-white/40">
                 <th className="px-4 py-3 font-medium">Receipt</th>
@@ -167,6 +168,7 @@ export function TransactionsBrowser() {
                 <th className="px-4 py-3 font-medium">Plan</th>
                 <th className="px-4 py-3 font-medium">Amount</th>
                 <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Auto-Renewal</th>
                 <th className="px-4 py-3 font-medium">Next debit</th>
                 <th className="px-4 py-3 font-medium">Razorpay Payment</th>
               </tr>
@@ -205,12 +207,15 @@ export function TransactionsBrowser() {
                       </span>
                     </div>
                   </td>
+                  <td className="px-4 py-3">
+                    <AutoRenewalBadge tx={t} />
+                  </td>
                   <td className="px-4 py-3 text-white/60">
                     {t.subscription
                       ? t.subscription.cancelledAt
-                        ? "Cancelled"
+                        ? "No further debit"
                         : t.subscription.currentPeriodEnd
-                          ? `${fmtDate(t.subscription.currentPeriodEnd)} · ${formatCurrency(t.amount)}`
+                          ? `${formatCurrency(t.amount)} · ${fmtDate(t.subscription.currentPeriodEnd)}`
                           : "—"
                       : "—"}
                   </td>
@@ -259,7 +264,7 @@ function Row({ label, value, mono, valueClassName }: { label: string; value: str
   );
 }
 
-/** "Subscription payment" for the authorization charge, "Auto-debited" for a later recurring
+/** "Subscription payment" for the authorization charge, "AUTO-DEBIT" for a later recurring
  * charge — `null` for a plain one-time transaction. Matches the user-facing BillingHistory's
  * identical labeling. */
 function paymentTypeLabel(paymentType: AdminTransactionDTO["paymentType"]): string | null {
@@ -268,42 +273,95 @@ function paymentTypeLabel(paymentType: AdminTransactionDTO["paymentType"]): stri
   return null;
 }
 
-/** The "Auto-Renewal" section of the transaction drawer — every date here comes straight from
- * `tx.subscription` (ultimately `PartnerMembership.currentPeriodEnd`/`cancelledAt`, written only
- * by the Razorpay webhook) — nothing is computed or guessed here. `null` for a one-time
- * transaction, where there's nothing recurring to show. */
-function AutoRenewalSection({ tx }: { tx: AdminTransactionDTO }) {
-  const sub = tx.subscription;
-  if (!sub) return null;
+/** A compact "ON"/status pill for the list's Auto-Renewal column. `null` for a one-time
+ * transaction, where the column is left blank rather than showing a misleading OFF. */
+function AutoRenewalBadge({ tx }: { tx: AdminTransactionDTO }) {
+  const state = adminSubscriptionDisplayState(tx);
+  if (state.kind === "none") return <span className="text-white/30">—</span>;
+  if (state.kind === "cancelled") return <span className="font-medium text-white/50">OFF</span>;
+  if (state.kind === "payment_problem") return <span className="font-medium text-red-400">FAILED</span>;
+  return <span className="font-medium text-green-400">ON</span>;
+}
 
-  const isCancelled = !!sub.cancelledAt;
+/**
+ * The admin "Auto-Payment / Subscription" section of the transaction drawer — answers every
+ * question an admin would otherwise have to open Razorpay for: is auto-payment on, how much and
+ * exactly when will it be deducted, when does the current paid period end, has it been cancelled
+ * (and when), was the last payment successful, how many renewals has this subscription collected.
+ * Every value comes from `adminSubscriptionDisplayState(tx)`, itself reading straight off
+ * `tx.subscription` (ultimately `PartnerMembership` + this invoice's own snapshot columns,
+ * written only by the Razorpay webhook / `recordSubscriptionCharge`) — nothing here is computed
+ * or guessed. Renders nothing for a `ONE_TIME` transaction (a Rider purchase, or a one-time SP
+ * purchase) — there's no recurring behavior to explain.
+ */
+function AutoRenewalSection({ tx }: { tx: AdminTransactionDTO }) {
+  const state = adminSubscriptionDisplayState(tx);
+  if (state.kind === "none") return null;
+
   return (
     <div className="mt-4 rounded-xl bg-white/5 p-3">
-      <p className="text-sm font-semibold text-white">Auto-Renewal</p>
-      <div className="mt-1">
-        <Row label="Auto-payment" value={isCancelled ? "OFF" : "ON"} valueClassName={isCancelled ? "text-red-400" : "text-green-400"} />
-        {isCancelled ? (
+      <p className="text-sm font-semibold text-white">Auto-Payment / Subscription</p>
+
+      {state.kind === "payment_problem" && (
+        <div className="mt-2 rounded-lg bg-red-500/10 px-3 py-2 text-red-400">
+          <p className="font-semibold">Auto-payment failed</p>
+          <p className="mt-0.5 text-xs">
+            Razorpay subscription status: <span className="font-medium">{state.statusLabel.toUpperCase()}</span>. The last
+            automatic payment was not completed.
+          </p>
+        </div>
+      )}
+
+      <div className="mt-2">
+        <Row
+          label="Auto-Renewal"
+          value={state.kind === "cancelled" ? "OFF" : state.kind === "payment_problem" ? "OFF (payment failed)" : "ON"}
+          valueClassName={state.kind === "active" ? "text-green-400" : "text-red-400"}
+        />
+        <Row label="Subscription status" value={state.statusLabel.toUpperCase()} />
+        <Row label="Payment method" value="Automatic subscription payment" mono={false} />
+        <Row label="Renewal period" value={state.kind === "active" ? state.renewalPeriodLabel : renewalPeriodLabelFallback(tx)} />
+        <Row label="Recurring payments so far" value={String(state.renewalCount)} />
+        <Row label="Razorpay subscription id" value={tx.subscription!.razorpaySubscriptionId} mono />
+
+        {state.kind === "active" && (
           <>
-            <Row label="Next automatic debit" value="Cancelled" />
-            <Row label="Membership remains active until" value={fmtDate(tx.membershipEndDate)} />
+            <Row label="Next automatic debit" value={`${formatCurrency(state.nextDebitAmount)} · ${fmtDate(state.nextDebitDate)}`} />
+            <Row label="Membership will renew on" value={fmtDate(state.renewsOnDate)} />
+            <Row label="Current paid-through date" value={fmtDate(state.paidThroughDate)} />
           </>
-        ) : (
+        )}
+
+        {state.kind === "payment_problem" && (
+          <Row label="Current paid-through date" value={fmtDate(state.paidThroughDate)} />
+        )}
+
+        {state.kind === "cancelled" && (
           <>
-            <Row label="Next automatic debit" value={sub.currentPeriodEnd ? fmtDate(sub.currentPeriodEnd) : "—"} />
-            <Row label="Amount" value={formatCurrency(tx.amount)} />
-            {sub.currentPeriodEnd && sub.nextPeriodEnd && (
-              <Row label="Renewal period" value={`${fmtDate(sub.currentPeriodEnd)} – ${fmtDate(sub.nextPeriodEnd)}`} />
-            )}
+            <Row label="Next automatic debit" value="No further automatic debit" />
+            <Row label="Access remains active until" value={fmtDate(state.paidThroughDate)} />
+            <Row label="Cancelled on" value={state.cancelledAtDate ? fmtDateTime(state.cancelledAtDate) : "—"} />
           </>
         )}
       </div>
-      {!isCancelled && sub.currentPeriodEnd && (
+
+      {state.kind === "active" && (
         <p className="mt-2 text-xs text-white/60">
-          {formatCurrency(tx.amount)} will be automatically debited on {fmtDate(sub.currentPeriodEnd)}.
+          {formatCurrency(state.nextDebitAmount)} will be automatically debited on {fmtDate(state.nextDebitDate)}. Membership
+          will renew on {fmtDate(state.renewsOnDate)}.
         </p>
       )}
     </div>
   );
+}
+
+/** `renewalPeriodLabel` only computes off `durationDays` — still meaningful for a cancelled/
+ * payment-problem subscription (the billing cadence it HAD), so this tiny fallback keeps that
+ * row populated for those states too without widening `AdminSubscriptionDisplayState` itself. */
+function renewalPeriodLabelFallback(tx: AdminTransactionDTO): string {
+  if (tx.durationDays === 30) return "Monthly";
+  if (tx.durationDays === 365) return "Yearly";
+  return `Every ${tx.durationDays} days`;
 }
 
 function TransactionDrawer({ tx, onClose }: { tx: AdminTransactionDTO; onClose: () => void }) {

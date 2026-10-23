@@ -3880,6 +3880,21 @@ boundary already computed this way, never guessed client-side. Drawer gets an "A
 section; the list gets a "Next debit" column and an AUTO-DEBIT/Subscription-payment badge, mirroring
 the user-facing Payment History's identical labeling (not a separate vocabulary).
 
+**2026-10-24 — The drawer couldn't actually answer "was the last payment successful?" — a
+pending/halted subscription looked identical to a healthy one.** Closed by giving the admin the
+raw detail a Rider/SP-facing view deliberately simplifies away: `InvoiceSubscriptionStateDTO`
+gains `renewalCount` (total invoices on the subscription minus the one `INITIAL_SUBSCRIPTION`
+charge), and a new "Auto-payment failed" banner distinct from the healthy-ON state whenever
+`subscription.status` isn't `created`/`authenticated`/`active`. New
+`apps/web/lib/admin-subscription-display.ts` is the admin counterpart to
+`apps/web/lib/partner-subscription-display.ts` (ADR-093-era) — same cancelled-beats-payment-
+problem priority, but surfaces the literal Razorpay status word and the renewal count the SP-
+facing one never needs. **Consolidation while implementing this**: `detailForRow` previously ran
+its own per-row `count` query for "is this the earliest invoice," duplicating the admin list's
+bulk `groupBy` — now both call one `paymentTypesFor(rows)`, which also makes `renewalCount`
+available everywhere (`listForUser`, `findByIdForUser`, every admin transaction reader) rather
+than needing a third implementation to add it only for admin.
+
 ## ADR-077: Exactly three MSG91 DLT templates — one per SMS type, no cross-fallback, no fourth
 
 - **Context.** `SmsPort.send(to, message, templateId?)` did `resolvedTemplateId = templateId ??
