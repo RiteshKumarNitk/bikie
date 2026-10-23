@@ -20,9 +20,10 @@ export interface PartnerMembershipDTO {
   endDate: string;
   status: string;
   daysLeft: number;
-  // --- Recurring Razorpay Subscriptions — optional: absent/undefined for the existing
-  // one-time/free/test-account rows (`getActiveMembership`/`findByPaymentReference`/
-  // `createMembership` never set these), populated only for a subscription-backed row. ---
+  // --- Recurring Razorpay Subscriptions — optional: `null` for a one-time/free/test-account
+  // row (`findByPaymentReference`/`createMembership` never set these columns), populated
+  // whenever the row is subscription-backed (every reader, including `getActiveMembership`,
+  // goes through `toMembershipDTO` and surfaces whatever the row actually has). ---
   razorpaySubscriptionId?: string | null;
   razorpayPlanId?: string | null;
   subscriptionStatus?: string | null;

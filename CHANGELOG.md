@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-10-23 — Service Provider subscription page now shows real auto-renewal dates
+
+`/partner/membership` previously had dead code: it read `razorpaySubscriptionId`/
+`currentPeriodEnd`/etc. to decide whether to show the "Auto-renews monthly" section, but
+`getActiveMembership` (what backs that page) never actually returned those columns — so the
+section never rendered for a real subscriber. Fixed by switching it onto the same `toMembershipDTO`
+every other subscription reader already uses (additive — a one-time/free membership's columns are
+`null` either way, so no behavior change there). The page now shows: exact next-payment and
+"valid until" dates (both straight from `currentPeriodEnd`/`endDate`, never computed client-side),
+a prominent warning + payment status when Razorpay reports pending/halted, correct "scheduled for
+cancellation, paid period continues" copy, a small period timeline, and pre-subscribe disclosure
+copy clarifying this is a recurring charge, not a one-time payment (deliberately without a
+fabricated pre-authorization date — Razorpay doesn't assign one until the subscription is actually
+authorized). New `apps/web/lib/partner-subscription-display.ts` holds the pure date/status
+decision logic, unit-tested directly (`apps/web/lib/**/*.test.ts` is now also picked up by
+`vitest.config.ts`, which previously only scanned `app/api/**`). No change to Rider membership, SOS,
+SMS, FCM, the webhook, or eligibility logic. `vitest` 412→423.
+
 ## 2026-10-23 — Account-type audit: closed a stale-session gap in admin deletion
 
 Full re-audit of signup → account creation → redirection, after a report of Service Provider

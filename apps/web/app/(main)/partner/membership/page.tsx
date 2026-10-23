@@ -5,6 +5,7 @@ import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { PaymentModal, prefillFromSessionUser } from "@/components/membership/PaymentModal";
 import { BillingHistory } from "@/components/membership/BillingHistory";
+import { subscriptionDisplayState } from "@/lib/partner-subscription-display";
 
 interface Plan {
   id: string;
@@ -17,7 +18,7 @@ interface Plan {
 
 interface ActiveMembership {
   planId: string;
-  plan: { name: string };
+  plan: { name: string; price: number };
   daysLeft: number;
   endDate: string;
   razorpaySubscriptionId?: string | null;
@@ -82,7 +83,7 @@ export default function PartnerMembershipPage() {
   function handleCheckoutSuccess(plan: Plan) {
     setActiveMembership({
       planId: plan.id,
-      plan: { name: plan.name },
+      plan: { name: plan.name, price: plan.price },
       daysLeft: plan.durationDays,
       endDate: new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000).toISOString(),
     });
@@ -207,37 +208,116 @@ export default function PartnerMembershipPage() {
         <div className="mt-6 max-w-md rounded-2xl bg-success/10 px-6 py-4 text-sm text-success">
           ✓ Your {activeMembership.plan.name} membership is active — {activeMembership.daysLeft} day
           {activeMembership.daysLeft === 1 ? "" : "s"} left.
-          {activeMembership.razorpaySubscriptionId && (
-            <div className="mt-3 border-t border-success/20 pt-3 text-foreground/70">
-              {activeMembership.cancelledAt ? (
-                <p>Subscription cancelled — access continues until the date above.</p>
-              ) : (
-                <>
-                  <p>
-                    Auto-renews monthly
-                    {activeMembership.currentPeriodEnd &&
-                      ` · next charge around ${new Date(activeMembership.currentPeriodEnd).toLocaleDateString()}`}
-                    .
+          {(() => {
+            const state = subscriptionDisplayState(activeMembership);
+
+            if (state.kind === "none") return null;
+
+            if (state.kind === "cancelled") {
+              return (
+                <div className="mt-3 border-t border-success/20 pt-3 text-foreground/70">
+                  <p className="font-medium">
+                    Your subscription has been scheduled for cancellation. No further automatic payments will be
+                    taken after the current paid period.
                   </p>
-                  {activeMembership.subscriptionStatus &&
-                    !["created", "authenticated", "active"].includes(activeMembership.subscriptionStatus) && (
-                      <p className="mt-1 font-medium text-red-400">
-                        There&apos;s a problem with your last payment ({activeMembership.subscriptionStatus}). Please
-                        check your payment method.
-                      </p>
-                    )}
+                  <dl className="mt-2 space-y-1">
+                    <div>
+                      <dt className="inline text-foreground/50">Current membership valid until: </dt>
+                      <dd className="inline font-medium">{state.validUntilDate}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline text-foreground/50">Next automatic payment: </dt>
+                      <dd className="inline font-medium">Cancelled</dd>
+                    </div>
+                  </dl>
+                </div>
+              );
+            }
+
+            if (state.kind === "payment_problem") {
+              return (
+                <div className="mt-3 border-t border-success/20 pt-3">
+                  <div className="rounded-xl bg-red-500/10 px-3 py-2 text-red-400">
+                    <p className="font-semibold">Automatic payment failed</p>
+                    <p className="mt-0.5">
+                      We couldn&apos;t collect your ₹{activeMembership.plan.price} membership renewal payment. Please
+                      update/check your payment method to keep your membership active.
+                    </p>
+                  </div>
+                  <dl className="mt-2 space-y-1 text-foreground/70">
+                    <div>
+                      <dt className="inline text-foreground/50">Payment status: </dt>
+                      <dd className="inline font-medium text-red-400">{state.statusLabel}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline text-foreground/50">Membership valid until: </dt>
+                      <dd className="inline font-medium">{state.validUntilDate}</dd>
+                    </div>
+                  </dl>
                   <button
                     type="button"
                     onClick={handleCancelSubscription}
                     disabled={isCancelling}
                     className="mt-2 text-red-400 underline disabled:opacity-50"
                   >
-                    {isCancelling ? "Cancelling…" : "Cancel Subscription"}
+                    {isCancelling ? "Cancelling…" : "Cancel Auto-Renewal"}
                   </button>
-                </>
-              )}
-            </div>
-          )}
+                </div>
+              );
+            }
+
+            // kind === "active"
+            return (
+              <div className="mt-3 border-t border-success/20 pt-3 text-foreground/70">
+                <p className="font-semibold text-foreground">
+                  ₹{activeMembership.plan.price}/month — Auto-renewing
+                </p>
+                <dl className="mt-2 space-y-1">
+                  <div>
+                    <dt className="inline text-foreground/50">Next payment: </dt>
+                    <dd className="inline font-medium">
+                      ₹{activeMembership.plan.price} on {state.nextPaymentDate}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="inline text-foreground/50">Membership valid until: </dt>
+                    <dd className="inline font-medium">{state.validUntilDate}</dd>
+                  </div>
+                  <div>
+                    <dt className="inline text-foreground/50">Next renewal: </dt>
+                    <dd className="inline font-medium">{state.renewalDate}</dd>
+                  </div>
+                </dl>
+                <p className="mt-2">
+                  ₹{activeMembership.plan.price} will be automatically charged on <strong>{state.nextPaymentDate}</strong>.
+                  Your membership will renew for another month after the successful payment.
+                </p>
+
+                {state.periodStartDate && (
+                  <ol className="mt-3 space-y-1 border-l-2 border-success/30 pl-3 text-xs text-foreground/60">
+                    <li>
+                      <span className="font-medium text-foreground/80">{state.periodStartDate}</span> — Current
+                      membership period started
+                    </li>
+                    <li>
+                      <span className="font-medium text-foreground/80">{state.renewalDate}</span> — ₹
+                      {activeMembership.plan.price} automatic deduction
+                    </li>
+                    <li>Membership renews for another month after the successful payment</li>
+                  </ol>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleCancelSubscription}
+                  disabled={isCancelling}
+                  className="mt-3 text-red-400 underline disabled:opacity-50"
+                >
+                  {isCancelling ? "Cancelling…" : "Cancel Auto-Renewal"}
+                </button>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -295,14 +375,27 @@ export default function PartnerMembershipPage() {
                 {/* Recurring auto-renewing alternative to the one-time button above — only for a
                     paid monthly plan; the one-time path remains available either way. */}
                 {!isFree && plan.durationDays === 30 && (
-                  <button
-                    type="button"
-                    onClick={() => handleStartSubscription(plan)}
-                    disabled={isActivePlan || subscribingPlanId === plan.id}
-                    className="mt-2 w-full rounded-xl border border-accent py-3 text-sm font-semibold text-accent-text transition-colors hover:bg-accent/10 disabled:opacity-50"
-                  >
-                    {subscribingPlanId === plan.id ? "Starting…" : "Start Monthly Subscription (auto-renew)"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleStartSubscription(plan)}
+                      disabled={isActivePlan || subscribingPlanId === plan.id}
+                      className="mt-2 w-full rounded-xl border border-accent py-3 text-sm font-semibold text-accent-text transition-colors hover:bg-accent/10 disabled:opacity-50"
+                    >
+                      {subscribingPlanId === plan.id ? "Starting…" : "Start Monthly Subscription (auto-renew)"}
+                    </button>
+                    {/* This is an auto-renewing subscription, not a one-time ₹{price} payment — say so
+                        explicitly rather than only implying it via the button label. No renewal date is
+                        shown here: Razorpay only assigns one once the authorization you complete on its
+                        hosted page actually goes through, so a date shown before that would be a guess,
+                        not server data — the exact date appears on this page once the first charge lands. */}
+                    <p className="mt-2 text-center text-xs text-foreground/50">
+                      Auto-renews monthly. By subscribing, you authorize BIKIE to automatically charge ₹
+                      {plan.price} every month until you cancel. This is <strong>not</strong> a one-time payment —
+                      the first charge happens as soon as you complete authorization, then every 30 days after
+                      that.
+                    </p>
+                  </>
                 )}
               </div>
             );

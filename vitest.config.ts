@@ -6,6 +6,7 @@ export default defineConfig({
       "packages/**/src/**/*.test.ts",
       "packages/**/src/**/*.spec.ts",
       "apps/web/app/api/**/*.test.ts",
+      "apps/web/lib/**/*.test.ts",
     ],
     environment: "node",
     globals: false,

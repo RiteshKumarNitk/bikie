@@ -2,6 +2,18 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## SP subscription page: make auto-renewal/next-payment dates actually visible (2026-10-23)
+
+| Task | Status |
+|---|---|
+| Found: `getActiveMembership` (backs `/api/partner-membership/active`) never returned `razorpaySubscriptionId`/`currentPeriodEnd`/etc. — the page's existing "Auto-renews monthly" section was dead code for every real subscriber | Completed |
+| Fixed: `getActiveMembership` now returns the full `toMembershipDTO` shape (additive — no behavior change for one-time/free memberships) | Completed |
+| New `apps/web/lib/partner-subscription-display.ts` — pure next-payment/valid-until/cancelled/payment-problem decision logic, date always read from the server row, never computed client-side | Completed |
+| `/partner/membership`: dedicated active-subscription card (next payment, valid-until, renewal date, mini timeline), prominent payment-failure warning, correct cancellation copy ("scheduled," paid period continues), pre-subscribe disclosure (recurring, not one-time — no fabricated pre-auth date) | Completed |
+| `vitest.config.ts` now also scans `apps/web/lib/**/*.test.ts` (previously only `app/api/**` — this is the first `apps/web/lib` unit test in the repo) | Completed |
+| Tests: 11 new cases covering all 6 date/status scenarios requested | Completed — `vitest` 412→423 |
+| Rider membership page (`apps/web/app/(main)/membership/page.tsx`) | Confirmed untouched |
+
 ## Account-type correctness audit: signup, deletion, redirection (2026-10-23)
 
 | Task | Status |

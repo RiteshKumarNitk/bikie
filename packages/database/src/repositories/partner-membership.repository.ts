@@ -84,6 +84,12 @@ export async function findPlanById(planId: string) {
   };
 }
 
+/** Includes the recurring-subscription fields (`razorpaySubscriptionId`/`subscriptionStatus`/
+ * `currentPeriodStart`/`currentPeriodEnd`/`cancelledAt`/`lastPaymentId`) via `toMembershipDTO`
+ * whenever the active row has them — a one-time/free/test-account row simply has `null` in all of
+ * those columns, so this is a strict superset of the previous hand-rolled return shape, not a
+ * behavior change for any non-subscription membership. Needed so `/partner/membership` (which
+ * reads this route) can show the real next-payment/renewal date instead of guessing one. */
 export async function getActiveMembership(userId: string) {
   const membership = await prisma.partnerMembership.findFirst({
     where: { userId, status: "ACTIVE", endDate: { gte: new Date() } },
@@ -92,25 +98,7 @@ export async function getActiveMembership(userId: string) {
   });
   if (!membership) return null;
 
-  const daysLeft = Math.ceil((membership.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  return {
-    id: membership.id,
-    userId: membership.userId,
-    planId: membership.planId,
-    plan: {
-      id: membership.plan.id,
-      name: membership.plan.name,
-      description: membership.plan.description,
-      price: membership.plan.price.toNumber(),
-      durationDays: membership.plan.durationDays,
-      benefits: membership.plan.benefits,
-      isActive: membership.plan.isActive,
-    },
-    startDate: membership.startDate.toISOString(),
-    endDate: membership.endDate.toISOString(),
-    status: membership.status,
-    daysLeft: Math.max(0, daysLeft),
-  };
+  return toMembershipDTO(membership);
 }
 
 /** ADR-069 — idempotency lookup, mirrors `membership.repository.ts`'s `findByPaymentReference`. */
