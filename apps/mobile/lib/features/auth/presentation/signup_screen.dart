@@ -158,6 +158,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
         }
         return;
       }
+      // This phone number already had an account — verify() just logged them into it.
+      // `_sendCode()` already refuses to text a code for an existing number in the normal case
+      // (shows "account exists", directs to Login instead), so this is a defensive fallback for
+      // the narrow race where the number became existing in the moments between that check and
+      // this verify. Mirrors web's identical defensive re-check (signup/page.tsx): never silently
+      // let a mismatch between what was picked here and the account's real, just-confirmed
+      // `accountType` decide where they land — sign back out and say so explicitly instead of
+      // routing them into an account that isn't the type they came here to create.
+      final actualAccountType = ref.read(authControllerProvider).user?.accountType;
+      final requestedAccountType = ref.read(selectedRoleProvider);
+      if (actualAccountType != null && actualAccountType != requestedAccountType) {
+        await ref.read(authControllerProvider.notifier).signOut();
+        if (mounted) {
+          final actualLabel = actualAccountType == 'SERVICE_PROVIDER' ? 'a Service Provider' : 'a Rider';
+          setState(() => _error = 'This phone number is already registered as $actualLabel. Please log in instead.');
+          showAppToast(context, _error!, variant: AppToastVariant.error);
+        }
+        return;
+      }
       if (mounted) {
         showAppToast(context, 'Signed in successfully', variant: AppToastVariant.success);
         context.go('/');

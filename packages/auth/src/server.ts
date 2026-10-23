@@ -308,6 +308,33 @@ export const auth = betterAuth({
  * Lives here rather than in `@bikie/database` because `@bikie/auth` already depends on that
  * package — the reverse import would be a cycle.
  */
+/**
+ * Admin account deletion (`adminRepository.deleteUser`) deletes/anonymizes `Session` rows via a
+ * raw Prisma `deleteMany`/transaction, same reason as the comment above: it goes through Prisma
+ * directly, never Better Auth's adapter, so it never touches `secondaryStorage`. Without this, a
+ * device that still holds the deleted account's bearer token/cookie keeps getting a valid
+ * `findSession()` result straight from the Upstash cache — the correct Postgres state (row gone,
+ * or anonymized + `accountStatus: BANNED`) is invisible to `findSession` until that cache entry's
+ * TTL happens to expire on its own. A no-op when `secondaryStorage` isn't configured.
+ *
+ * Must be called **before** the deletion itself (the fast hard-delete path removes the `Session`
+ * rows this reads to find the tokens to invalidate) — `AdminService.deleteUser`'s caller in
+ * `apps/web/app/api/admin/users/[id]/route.ts` calls this first, then proceeds with the delete.
+ *
+ * Uses `internalAdapter.deleteSessions` (takes session tokens, not a userId) rather than a second
+ * raw Prisma `session.deleteMany` — that method is also what correctly clears the matching
+ * `secondaryStorage` entries in the same call, which a second raw Prisma delete would not.
+ */
+export async function invalidateCachedUserSessions(userId: string): Promise<void> {
+  if (!secondaryStorage) return;
+
+  const sessions = await prisma.session.findMany({ where: { userId }, select: { token: true } });
+  if (sessions.length === 0) return;
+
+  const ctx = await auth.$context;
+  await ctx.internalAdapter.deleteSessions(sessions.map((s) => s.token));
+}
+
 export async function refreshCachedUserSessions(userId: string): Promise<void> {
   if (!secondaryStorage) return;
 

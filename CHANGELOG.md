@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-23 — Account-type audit: closed a stale-session gap in admin deletion
+
+Full re-audit of signup → account creation → redirection, after a report of Service Provider
+signups sometimes landing on the Rider page, and deleted-then-recreated accounts sometimes doing
+the same. Most of the chain was already correct (ADR-055 fixed the main version of this bug
+previously — `accountType`'s one write path always keeps `role` in step, both platforms check
+`complete-phone-signup`'s response before proceeding, both `proxy.ts` and `app_router.dart` read
+live server-authoritative `accountType`). The one real gap: `adminRepository.deleteUser` deletes
+`Session` rows via raw Prisma, never Better Auth's adapter, so a deleted/anonymized account's
+still-held session token could keep resolving from Better Auth's Upstash cache until its own TTL
+— bypassing the correct Postgres state. New `invalidateCachedUserSessions` (`packages/auth`)
+closes it, wired into `DELETE /api/admin/users/[id]` before the delete runs. Also added the
+accountType-mismatch safety check to mobile's signup screen that web's already had. No change to
+OTP/SMS, Razorpay, SOS, FCM, or onboarding forms. `vitest` 399→412.
+
 ## 2026-10-23 — "Be findable in an emergency" actually stays on
 
 Riders had to re-enable location sharing almost every time they reopened the app. Root cause: the

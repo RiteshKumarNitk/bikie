@@ -2616,6 +2616,43 @@ notification type renders exactly as before:
   all 8 packages, 199/199 tests pass, `next build` succeeds, and all changed files lint clean
   (the repo's 48 pre-existing `react-hooks` lint errors are untouched).
 
+**2026-10-23 — Full re-audit of signup/account-creation/redirection (requested after a reported
+"signed up as Service Provider, sometimes landed on the Rider page" and "deleted account,
+re-signed-up, sometimes wrong experience").** Traced the whole chain end to end: `accountType`'s
+one write path (`setAccountType`, always written atomically with `role` in the same statement —
+confirmed no other writer exists besides this and `adminRepository.updateUserAccountType`, both
+reviewed above), `completePhoneSignup`'s signup-window/placeholder-name guard (mobile and web both
+check the response and explicitly error rather than silently proceeding on failure — not a
+fire-and-forget), `proxy.ts`/mobile's `app_router.dart` redirect (both read live, server-authoritative
+`accountType` off the current session/auth state, never a client flag or previous route), and
+`adminRepository.deleteUser`'s hard-delete (cascades everything, including `Partner` — `onDelete:
+Cascade`) vs. anonymize path (phone/email cleared, so a real re-signup always creates a genuinely
+new row — no risk of inheriting the old row's accountType). Most of this was already solid, largely
+because of the ADR-055 fix above. **One real, confirmed gap found and closed**: `deleteUser`'s
+`Session` deletion goes through raw Prisma (`tx.session.deleteMany`/cascade), not Better Auth's
+adapter, so it never touched the Upstash `secondaryStorage` cache the way ADR-055's own
+`refreshCachedUserSessions` does for an *update* — a device still holding a deleted/anonymized
+account's session token could keep resolving a stale cached session (with the pre-deletion
+`accountType`) until that cache entry's own TTL happened to expire, bypassing the now-correct
+Postgres state (row gone, or `accountStatus: BANNED`). Fixed with a new
+`invalidateCachedUserSessions(userId)` (`packages/auth/src/server.ts`) — reads the user's session
+tokens from Postgres *before* deletion, then calls Better Auth's own
+`internalAdapter.deleteSessions(tokens)` (confirmed directly against the installed `better-auth`
+package: this is the one adapter method that clears both the DB rows and the matching
+`secondaryStorage` entries together, unlike a second raw Prisma delete) — wired into
+`DELETE /api/admin/users/[id]` *before* `AdminService.deleteUser` runs. A no-op today in this exact
+deployment (`UPSTASH_REDIS_REST_URL`/`TOKEN` are unset on the VPS's `apps/.env` as far as this audit
+could confirm from the repo side — though the very existence of ADR-055's fix implies Upstash has
+been configured in this production environment before), but correct and necessary the moment it is.
+Also hardened mobile's `signup_screen.dart`: the "this phone already has an account" branch of
+`_verify()` previously navigated to `/` unconditionally with no accountType check at all (web's
+signup page already had this exact guard — a "mismatch" screen); added the same defensive
+re-check (sign back out + explicit error, never silently route into the wrong experience) for the
+narrow race where a number becomes existing between `_sendCode()`'s up-front existence check and
+the verify call completing. New tests: `UserService.completePhoneSignup` (7 cases — applies/refuses
+per the signup-window+placeholder-name guard, NOT_FOUND), the admin delete/patch route (6 cases —
+invalidate-before-delete ordering, 401/404/ADMIN_PROTECTED, refresh-on-change). `vitest` 399→412.
+
 ## ADR-056: Service Provider membership is Rs 99/month, non-mandatory at onboarding, and actually enforced at SOS accept/dispatch
 
 - **Context.** Product direction: creating a Service Provider account/profile must never require

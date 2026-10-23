@@ -1,1 +1,1 @@
-export { auth, refreshCachedUserSessions } from "./server";
+export { auth, invalidateCachedUserSessions, refreshCachedUserSessions } from "./server";

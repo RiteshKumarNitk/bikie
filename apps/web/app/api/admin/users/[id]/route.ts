@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { refreshCachedUserSessions } from "@bikie/auth";
+import { invalidateCachedUserSessions, refreshCachedUserSessions } from "@bikie/auth";
 import { AdminService } from "@bikie/services";
 import { updateUserAdminSchema } from "@bikie/validation";
 import { requireRole } from "@/lib/require-role";
@@ -50,6 +50,10 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (error) return error;
 
   const { id } = await params;
+  // Before the delete/anonymize itself — the fast hard-delete path removes the `Session` rows
+  // this reads to find which cache entries to clear (see invalidateCachedUserSessions's doc
+  // comment: a raw Prisma session delete never touches the Upstash cache on its own).
+  await invalidateCachedUserSessions(id);
   const result = await AdminService.deleteUser(id);
   if (!result.ok) {
     if (result.reason === "NOT_FOUND") {

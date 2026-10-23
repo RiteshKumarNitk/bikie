@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Account-type correctness audit: signup, deletion, redirection (2026-10-23)
+
+| Task | Status |
+|---|---|
+| Audit `accountType`'s write path (`setAccountType`, admin `updateUserAccountType`) for drift/default/swap risk | Completed — no new issue found; `role` always written atomically with `accountType` |
+| Audit `completePhoneSignup`'s signup-window + placeholder-name guard | Completed — correct; added regression tests (none existed before) |
+| Audit web (`proxy.ts`) and mobile (`app_router.dart`) redirect logic for client-state-based routing | Completed — both already read live, server-authoritative `accountType`; no change needed |
+| Audit admin account deletion (hard-delete vs. anonymize) for stale-state leakage into a resignup | Found: `Session` rows deleted via raw Prisma never invalidated the Upstash session cache (if configured) — a deleted account's held token could keep resolving stale data |
+| New `invalidateCachedUserSessions` (`packages/auth`), wired into `DELETE /api/admin/users/[id]` before the delete | Completed |
+| Mobile `signup_screen.dart`: added the accountType-mismatch safety check web already had for the existing-account verify branch | Completed |
+| Regression tests: `UserService.completePhoneSignup` (7), admin delete/patch route ordering (6) | Completed — `vitest` 399→412 |
+| Root cause could not be reproduced live (no access to a real device/account to trigger the exact reported sequence) — fixes are based on static audit of every write/read/redirect site, not confirmed-live repro | Caveat — see final report |
+
 ## Mobile: "Be findable in an emergency" persists across restart/background (2026-10-23)
 
 | Task | Status |
