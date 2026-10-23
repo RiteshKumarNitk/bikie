@@ -11,10 +11,13 @@ import 'package:mobile/features/auth/data/auth_repository.dart';
 import 'package:mobile/features/auth/data/user_model.dart';
 import 'package:mobile/features/auth/domain/auth_controller.dart';
 import 'package:mobile/features/auth/domain/auth_state.dart';
+import 'package:mobile/features/nearby_riders/domain/rider_findability_service.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class _MockPush extends Mock implements PushRegistrationService {}
+
+class _MockFindability extends Mock implements RiderFindabilityService {}
 
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
@@ -51,10 +54,13 @@ UserModel _user(String accountType) => UserModel.fromJson({
 
 void main() {
   late _MockPush push;
+  late _MockFindability findability;
 
   setUp(() {
     push = _MockPush();
     when(() => push.registerForCurrentUser()).thenAnswer((_) async {});
+    findability = _MockFindability();
+    when(() => findability.restore()).thenAnswer((_) async {});
     resetNotificationPromptForTest();
   });
 
@@ -118,7 +124,8 @@ void main() {
           notificationPermissionServiceProvider.overrideWithValue(service),
           pushRegistrationServiceProvider.overrideWithValue(push),
           authControllerProvider.overrideWith(
-            (ref) => AuthController(authRepository, push)..state = AuthState.authenticated(_user(accountType)),
+            (ref) =>
+                AuthController(authRepository, push, findability)..state = AuthState.authenticated(_user(accountType)),
           ),
         ],
         child: MaterialApp(

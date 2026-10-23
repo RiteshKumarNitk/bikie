@@ -6,11 +6,16 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/network/auth_interceptor.dart';
 import '../../../core/push/push_registration_service.dart';
 import '../../legal/data/legal_models.dart';
+import '../../nearby_riders/domain/rider_findability_service.dart';
 import '../data/auth_repository.dart';
 import 'auth_state.dart';
 
 final authControllerProvider = StateNotifierProvider<AuthController, AuthState>((ref) {
-  final controller = AuthController(ref.watch(authRepositoryProvider), ref.watch(pushRegistrationServiceProvider));
+  final controller = AuthController(
+    ref.watch(authRepositoryProvider),
+    ref.watch(pushRegistrationServiceProvider),
+    ref.watch(riderFindabilityServiceProvider),
+  );
   ref.listen<int>(authLogoutSignalProvider, (previous, next) {
     if (previous != null && next != previous) {
       controller.forceLogout();
@@ -21,10 +26,11 @@ final authControllerProvider = StateNotifierProvider<AuthController, AuthState>(
 });
 
 class AuthController extends StateNotifier<AuthState> {
-  AuthController(this._repository, this._push) : super(const AuthState.unknown());
+  AuthController(this._repository, this._push, this._findability) : super(const AuthState.unknown());
 
   final AuthRepository _repository;
   final PushRegistrationService _push;
+  final RiderFindabilityService _findability;
 
   /// The very first thing that runs after `runApp()` — `main.dart` shows the branded
   /// `SplashScreen` (and the router's `redirect` refuses to navigate anywhere) for as long as
@@ -43,6 +49,7 @@ class AuthController extends StateNotifier<AuthState> {
       } else {
         state = AuthState.authenticated(user);
         unawaited(_push.registerForCurrentUser());
+        unawaited(_findability.restore());
       }
     } catch (_) {
       state = const AuthState.unauthenticated();
@@ -54,6 +61,7 @@ class AuthController extends StateNotifier<AuthState> {
       final user = await _repository.signIn(email: email, password: password);
       state = AuthState.authenticated(user);
       unawaited(_push.registerForCurrentUser());
+      unawaited(_findability.restore());
     } on ApiException catch (e) {
       state = AuthState.unauthenticated(e.message);
       rethrow;
@@ -65,6 +73,7 @@ class AuthController extends StateNotifier<AuthState> {
       final user = await _repository.signUp(name: name, email: email, password: password);
       state = AuthState.authenticated(user);
       unawaited(_push.registerForCurrentUser());
+      unawaited(_findability.restore());
     } on ApiException catch (e) {
       state = AuthState.unauthenticated(e.message);
       rethrow;
@@ -90,16 +99,19 @@ class AuthController extends StateNotifier<AuthState> {
     );
     state = AuthState.authenticated(user);
     unawaited(_push.registerForCurrentUser());
+    unawaited(_findability.restore());
   }
 
   Future<void> signOut() async {
     unawaited(_push.unregisterCurrentDevice());
+    _findability.stop();
     await _repository.signOut();
     state = const AuthState.unauthenticated();
   }
 
   void forceLogout() {
     unawaited(_push.unregisterCurrentDevice());
+    _findability.stop();
     state = const AuthState.unauthenticated('Your session expired. Please sign in again.');
   }
 

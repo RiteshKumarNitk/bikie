@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Mobile: "Be findable in an emergency" persists across restart/background (2026-10-23)
+
+| Task | Status |
+|---|---|
+| Root cause: the backend `rider-location-cleanup` cron (`autoDisableStaleSharing`, every 15min, 30min staleness) already auto-flips `sharingEnabled` off — the mobile client only ever pushed one fix at toggle-on and never again, so every Rider's setting silently lapsed within ~30 min regardless of restart | Found |
+| `RiderFindabilityService`: restores the persisted preference on login/signup/OTP-verify/bootstrap and on every app resume, pushes a fresh fix, and runs a 10-min periodic refresh while the app is alive — never caches the preference locally, always re-reads the signed-in account's own value | Completed |
+| `RiderLocationPermissionService`: read-only `check()` (used by `restore()` — never prompts) vs. `request()` (used by `enable()` — a deliberate user tap only) | Completed |
+| Home row + Nearby Riders screen toggles routed through the service instead of the repository directly — one place owns on/off + the timer, not two divergent copies | Completed |
+| Home row shows a distinct "permission needed" state (persisted on, Android permission revoked) instead of silently looking off | Completed |
+| `AuthController`: `restore()` on login, `stop()` on logout/forced-logout — never leaks one account's tracking into the next session on the same device | Completed |
+| `RiderFindabilityGate` (mirrors `NotificationPermissionGate`): re-restores on `AppLifecycleState.resumed`, covering background/recent-apps-removal/reopen | Completed |
+| No changes to SOS recipient selection, radius, escalation, eligibility rules, or the cron itself | Completed (verified untouched) |
+| Tests (service, auth wiring, gate) | Completed — `flutter test` 190→210 |
+| Real-device verification (the 15-step sequence: enable, background, swipe from recents, reopen, trigger a real SOS from another account, phone restart) | Pending (user) |
+
 ## Service Provider test-account membership bypass + unmasked checkout errors (2026-09-30, ADR-089)
 
 | Task | Status |

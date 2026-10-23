@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/network/api_exception.dart';
-import '../../nearby_riders/data/nearby_riders_repository.dart';
 import '../../nearby_riders/domain/nearby_riders_providers.dart';
+import '../../nearby_riders/domain/rider_findability_service.dart';
+import '../../nearby_riders/domain/rider_location_permission.dart';
 import '../../sos/data/sos_model.dart';
 import '../../sos/domain/sos_providers.dart';
 import '../../sos/presentation/send_sos_sheet.dart';
@@ -228,8 +227,11 @@ class _MyActiveSosAlertBanner extends ConsumerWidget {
 
 /// Compact form of Home's `rider_location.sharingEnabled` switch — kept on Home because SOS's
 /// nearby-rider dispatch tier depends on it, framed around what it buys the rider in an
-/// emergency. Enabling pushes an immediate location fix, same as the Nearby Riders screen's own
-/// toggle. It never tracks in the background.
+/// emergency. The persisted preference (`sharingEnabledProvider`) is the only source of truth for
+/// whether this reads on/off — `RiderFindabilityService` (restored on every login and app resume,
+/// via `AuthController`/`RiderFindabilityGate`) is what keeps that preference actually true in
+/// practice by refreshing the location fix in the background, instead of this row's toggle being
+/// the only thing that ever pushes one.
 class _LocationSharingRow extends ConsumerStatefulWidget {
   const _LocationSharingRow();
 
@@ -243,42 +245,50 @@ class _LocationSharingRowState extends ConsumerState<_LocationSharingRow> {
   Future<void> _toggle(bool value) async {
     setState(() => _busy = true);
     try {
-      await ref.read(nearbyRidersRepositoryProvider).setSharingEnabled(value);
-      if (value) await _pushLocation();
+      final service = ref.read(riderFindabilityServiceProvider);
+      if (value) {
+        final permission = await service.enable();
+        if (mounted && permission != RiderLocationPermissionState.granted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Location permission is required to turn this on.')),
+          );
+        }
+      } else {
+        await service.disable();
+      }
       ref.invalidate(sharingEnabledProvider);
-    } on ApiException catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      ref.invalidate(riderLocationPermissionStateProvider);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
   }
 
-  Future<void> _pushLocation() async {
+  /// Persisted preference says on, but Android's permission has since been revoked (e.g. turned
+  /// off from Settings while the app wasn't running) — a persisted `true` must never be read as
+  /// license to bypass that. Tapping here fixes the permission specifically; it never re-asks the
+  /// Rider to turn the BIKIE setting back on, since it's already on.
+  Future<void> _fixPermission() async {
+    setState(() => _busy = true);
     try {
-      var permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
+      final permissionService = ref.read(riderLocationPermissionServiceProvider);
+      final current = await permissionService.check();
+      if (current == RiderLocationPermissionState.blocked) {
+        await permissionService.openSystemSettings();
+      } else {
+        await ref.read(riderFindabilityServiceProvider).enable();
       }
-      if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission is required to turn this on.')),
-          );
-        }
-        return;
-      }
-      final position = await Geolocator.getCurrentPosition();
-      await ref.read(nearbyRidersRepositoryProvider).updateLocation(position.latitude, position.longitude);
-    } catch (_) {
-      // Sharing is still enabled either way — a fresher fix can land next time it's refreshed;
-      // not worth blocking the toggle itself over one failed GPS read.
+      ref.invalidate(riderLocationPermissionStateProvider);
+    } finally {
+      if (mounted) setState(() => _busy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final enabled = ref.watch(sharingEnabledProvider).valueOrNull ?? false;
-    final accent = Theme.of(context).colorScheme.primary;
+    final permission = ref.watch(riderLocationPermissionStateProvider).valueOrNull;
+    final needsPermission = enabled && permission != null && permission != RiderLocationPermissionState.granted;
+    final accent = needsPermission ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary;
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
@@ -289,7 +299,12 @@ class _LocationSharingRowState extends ConsumerState<_LocationSharingRow> {
       ),
       child: Row(
         children: [
-          Icon(enabled ? Icons.location_on : Icons.location_off_outlined, size: 20),
+          Icon(
+            needsPermission
+                ? Icons.location_disabled_outlined
+                : (enabled ? Icons.location_on : Icons.location_off_outlined),
+            size: 20,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -301,9 +316,11 @@ class _LocationSharingRowState extends ConsumerState<_LocationSharingRow> {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  enabled
-                      ? 'On — nearby riders are alerted if you send an SOS, and you if they do.'
-                      : "Off — nearby riders won't be alerted if you send an SOS.",
+                  needsPermission
+                      ? "On, but location permission was turned off — tap Fix to restore it."
+                      : (enabled
+                          ? 'On — nearby riders are alerted if you send an SOS, and you if they do.'
+                          : "Off — nearby riders won't be alerted if you send an SOS."),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ],
@@ -315,7 +332,9 @@ class _LocationSharingRowState extends ConsumerState<_LocationSharingRow> {
             child: Center(
               child: _busy
                   ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Switch(value: enabled, onChanged: _toggle),
+                  : (needsPermission
+                      ? TextButton(onPressed: _fixPermission, child: const Text('Fix'))
+                      : Switch(value: enabled, onChanged: _toggle)),
             ),
           ),
         ],

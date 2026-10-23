@@ -356,10 +356,9 @@ Firebase project backing this ADR changed from `bikie-b9459` to a brand-new proj
 rejects a token issued by one project when sent from another. `NEXT_PUBLIC_FIREBASE_VAPID_KEY`
 is project-scoped (tied to the Web Push certificate under that project's Cloud Messaging
 settings) ? it was regenerated under `bikie-3baba` on 2026-10-22, so all Firebase config is now
-consistently on `bikie-3baba` locally. **Still required**: the same set of env vars (listed
-above) must be applied to the production VPS's `.env` and the `web` container force-recreated,
-or prod keeps sending from the old `bikie-b9459` credentials while this repo's local config and
-any newly-issued client tokens point at `bikie-3baba`.
+consistently on `bikie-3baba` locally. The same env vars were applied to the production VPS and
+the `web` container force-recreated on 2026-10-22 ? confirmed live (`FIREBASE_PROJECT_ID=bikie-3baba`
+set in the running container).
 
 **Operational note**: applying this migration required resolving pre-existing, unrelated schema
 drift on the dev database (a `message_reaction` table, extra `TripStatus` enum values, `message
@@ -368,6 +367,30 @@ migration file ? likely from an earlier `prisma db push`). Per explicit user con
 no real users yet), this was resolved via `prisma migrate reset`, which reseeded the three
 standard test accounts but **did not** restore any ad hoc account created outside the seed
 script (e.g. a real phone-OTP signup) ? those are gone and would need to be recreated.
+
+**2026-10-23 ? "Be findable in an emergency" didn't survive app restart; fixed client-side, cron
+untouched.** Reported as a persistence bug ("I have to turn it on again every time"), but the real
+cause was upstream of persistence: `rider_location.sharingEnabled` was always correctly saved
+server-side (`PUT /api/rider-location/consent`), and the existing `rider-location-cleanup` cron
+(`autoDisableStaleSharing`, every 15min, 30min staleness ? by design, so opt-in consent doesn't
+silently persist forever once the client stops reporting) was working exactly as built. The gap:
+the Flutter client only ever pushed one location fix at toggle-on time and genuinely "never tracked
+in the background" (the old code comment said so outright) ? so the cron auto-disabled sharing
+within ~30 minutes of every single toggle-on, independent of whether the app was ever restarted.
+New `apps/mobile/lib/features/nearby_riders/domain/rider_findability_service.dart` restores the
+persisted preference (re-read fresh from the backend on every call, never cached locally) on
+login/signup/OTP-verify/bootstrap (`AuthController`) and on every app resume
+(`RiderFindabilityGate`, mirroring `NotificationPermissionGate`'s `WidgetsBindingObserver`
+pattern), and runs a 10-minute periodic refresh while the app process is alive ? comfortably under
+the cron's 30-minute window, with no change to the cron, `staleMinutes`, SOS eligibility, radius,
+or escalation. Android permission is only ever *requested* on an explicit toggle tap
+(`enable()`); `restore()` only *checks* it, so reopening the app never re-prompts for a permission
+that's already granted ? if it's been revoked since, the Home row shows a distinct "permission
+needed" state instead of silently reading as off. `rider_location_permission.dart` mirrors
+`notification_permission.dart`'s `NotificationPermissionService` interface shape for the same
+reason that one exists: a fake in tests, not `Geolocator`'s static calls. The one-shot GPS capture
+itself reuses the existing `oneShotLocationProvider`/`captureOneShotLocation`
+(`sos_providers.dart`) rather than calling `Geolocator.getCurrentPosition()` a third way.
 
 ## ADR-017: "Continue with Google" via Better Auth's `socialProviders`, not Firebase Authentication
 

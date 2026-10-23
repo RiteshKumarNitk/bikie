@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-23 — "Be findable in an emergency" actually stays on
+
+Riders had to re-enable location sharing almost every time they reopened the app. Root cause: the
+existing `rider-location-cleanup` cron auto-disables `sharingEnabled` after 30 minutes without a
+fresh fix (by design, so opt-in consent doesn't persist forever after the client stops reporting)
+— but the mobile client only ever pushed one fix at toggle-on and never again, so the setting
+lapsed on its own well before most sessions ended, restart or not. New `RiderFindabilityService`
+restores the persisted preference (never cached locally) on every login and app resume, and keeps
+a 10-minute background refresh running while the app is alive, so the existing freshness rule
+naturally keeps seeing the Rider as active. Logout stops it; a different account logging in on the
+same device gets its own setting, never the previous one's. Android permission state is checked,
+never silently bypassed or re-requested on every launch. No change to SOS recipient selection,
+radius, escalation, or the cron itself. `flutter test` 190→210.
+
 ## 2026-10-22 — SOS push notifications now feel like a real emergency alert (ADR-035)
 
 Android SOS pushes were being delivered but didn't feel urgent enough. `sos_channel` already had

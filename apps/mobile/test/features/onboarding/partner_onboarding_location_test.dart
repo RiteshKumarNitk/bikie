@@ -13,6 +13,7 @@ import 'package:mobile/features/auth/domain/auth_state.dart';
 import 'package:mobile/features/onboarding/data/geocoding_repository.dart';
 import 'package:mobile/features/onboarding/data/partner_profile_model.dart';
 import 'package:mobile/features/onboarding/data/partner_profile_repository.dart';
+import 'package:mobile/features/nearby_riders/domain/rider_findability_service.dart';
 import 'package:mobile/features/onboarding/presentation/partner_onboarding_screen.dart';
 import 'package:mobile/features/sos/domain/sos_providers.dart';
 import 'package:mocktail/mocktail.dart';
@@ -20,6 +21,8 @@ import 'package:mocktail/mocktail.dart';
 class _MockAuthRepository extends Mock implements AuthRepository {}
 
 class _MockPush extends Mock implements PushRegistrationService {}
+
+class _MockFindability extends Mock implements RiderFindabilityService {}
 
 class _MockPartnerRepository extends Mock implements PartnerProfileRepository {}
 
@@ -87,7 +90,8 @@ void main() {
       overrides: [
         authRepositoryProvider.overrideWithValue(authRepository),
         authControllerProvider.overrideWith(
-          (ref) => AuthController(authRepository, _MockPush())..state = AuthState.authenticated(_serviceProvider),
+          (ref) => AuthController(authRepository, _MockPush(), _MockFindability())
+            ..state = AuthState.authenticated(_serviceProvider),
         ),
         partnerProfileRepositoryProvider.overrideWithValue(partnerRepository),
         geocodingRepositoryProvider.overrideWithValue(geocoding),

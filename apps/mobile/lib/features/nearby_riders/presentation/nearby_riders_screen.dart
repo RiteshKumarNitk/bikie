@@ -6,6 +6,8 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../data/nearby_riders_repository.dart';
 import '../domain/nearby_riders_providers.dart';
+import '../domain/rider_findability_service.dart';
+import '../domain/rider_location_permission.dart';
 
 class NearbyRidersScreen extends ConsumerStatefulWidget {
   const NearbyRidersScreen({super.key});
@@ -22,14 +24,23 @@ class _NearbyRidersScreenState extends ConsumerState<NearbyRidersScreen> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  /// Routes through `RiderFindabilityService` rather than the repository directly — so turning
+  /// this on also (re)starts the periodic background refresh that keeps it from lapsing, same as
+  /// Home's compact toggle, instead of each screen having its own divergent on/off logic.
   Future<void> _toggleSharing(bool enabled) async {
     setState(() => _busy = true);
     try {
-      await ref.read(nearbyRidersRepositoryProvider).setSharingEnabled(enabled);
-      if (enabled) await _pushLocation(silent: true);
+      final service = ref.read(riderFindabilityServiceProvider);
+      if (enabled) {
+        final permission = await service.enable();
+        if (permission != RiderLocationPermissionState.granted) {
+          _showMessage('Location permission is required to share your position.');
+        }
+      } else {
+        await service.disable();
+      }
       ref.invalidate(sharingEnabledProvider);
-    } on ApiException catch (e) {
-      _showMessage(e.message);
+      ref.invalidate(riderLocationPermissionStateProvider);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
