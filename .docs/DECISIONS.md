@@ -3865,6 +3865,21 @@ invalidate-before-delete ordering, 401/404/ADMIN_PROTECTED, refresh-on-change). 
   types/validation/database/services/web, lint adds nothing over baseline, OpenAPI inventory
   regenerated (148 → 152 routes).
 
+**2026-10-23 — `AdminTransactionDTO` gains `paymentType`/`subscription` (next automatic debit).**
+The Transactions drawer showed what was already paid but nothing about an SP subscription's next
+charge. `toAdminTransaction` now takes the same `paymentType`/`subscription` the user-facing
+billing history already derives (`ONE_TIME`/`INITIAL_SUBSCRIPTION`/`AUTO_RENEWAL`, the earliest
+invoice per subscription = initial, every later one = renewal) ? `listForUser`'s in-memory version
+only works because it fetches one user's whole history at once, which doesn't hold for the admin
+list's pagination/cross-user queries, so a bulk `groupBy` finds each referenced subscription's
+*globally* earliest invoice instead (a renewal on page 2 must never be mislabeled just because its
+authorization charge happens to land on page 1 — regression-tested). New
+`InvoiceSubscriptionStateDTO.nextPeriodEnd` (the END of the period the upcoming charge starts) is
+`currentPeriodEnd + that invoice's own durationDays` — identical arithmetic to every other period
+boundary already computed this way, never guessed client-side. Drawer gets an "Auto-Renewal"
+section; the list gets a "Next debit" column and an AUTO-DEBIT/Subscription-payment badge, mirroring
+the user-facing Payment History's identical labeling (not a separate vocabulary).
+
 ## ADR-077: Exactly three MSG91 DLT templates — one per SMS type, no cross-fallback, no fourth
 
 - **Context.** `SmsPort.send(to, message, templateId?)` did `resolvedTemplateId = templateId ??

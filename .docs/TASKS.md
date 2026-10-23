@@ -2,6 +2,17 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Admin Transactions: next-debit visibility for SP subscriptions (2026-10-23)
+
+| Task | Status |
+|---|---|
+| New `InvoiceSubscriptionStateDTO.nextPeriodEnd` (the next period's own end date), computed server-side as `currentPeriodEnd + invoice.durationDays` — same arithmetic as every other period boundary, never client-guessed | Completed |
+| `AdminTransactionDTO` gains `paymentType`/`subscription`, wired through `listTransactionsForAdmin`/`listAllTransactionsForAdmin`/`getTransactionForAdmin` | Completed |
+| Admin list's payment-type derivation uses a `groupBy` for each referenced subscription's *globally* earliest invoice — correct across pagination, not just within one page | Completed |
+| `TransactionsBrowser.tsx`: drawer gets an "Auto-Renewal" section (ON/OFF, next debit date + amount, renewal period, or "remains active until" when cancelled); list gets a "Next debit" column + AUTO-DEBIT/Subscription-payment badge | Completed |
+| Tests: 3 new (single-row + paginated cross-page + one-time no-op) | Completed — `vitest` 429→432 |
+| CSV export (`/api/admin/transactions/export`) | Not updated — out of scope for this round, task was about the drawer/list UI |
+
 ## SP subscription: mobile Auto-Renewal UI + auto-debit labeling on invoices (2026-10-23)
 
 | Task | Status |

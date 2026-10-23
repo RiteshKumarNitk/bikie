@@ -157,7 +157,7 @@ export function TransactionsBrowser() {
         </div>
       ) : (
         <div className="overflow-x-auto rounded-2xl bg-white/5">
-          <table className="w-full min-w-[880px] text-sm">
+          <table className="w-full min-w-[980px] text-sm">
             <thead>
               <tr className="text-left text-xs uppercase tracking-wide text-white/40">
                 <th className="px-4 py-3 font-medium">Receipt</th>
@@ -167,6 +167,7 @@ export function TransactionsBrowser() {
                 <th className="px-4 py-3 font-medium">Plan</th>
                 <th className="px-4 py-3 font-medium">Amount</th>
                 <th className="px-4 py-3 font-medium">Status</th>
+                <th className="px-4 py-3 font-medium">Next debit</th>
                 <th className="px-4 py-3 font-medium">Razorpay Payment</th>
               </tr>
             </thead>
@@ -189,13 +190,29 @@ export function TransactionsBrowser() {
                     {t.amount === 0 ? "Free" : formatCurrency(t.amount)}
                   </td>
                   <td className="px-4 py-3">
-                    <span
-                      className={`rounded px-2 py-0.5 text-xs ${
-                        t.status === "PAID" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"
-                      }`}
-                    >
-                      {t.status}
-                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {paymentTypeLabel(t.paymentType) && (
+                        <span className="rounded bg-accent/20 px-2 py-0.5 text-xs font-medium text-accent-text">
+                          {paymentTypeLabel(t.paymentType)}
+                        </span>
+                      )}
+                      <span
+                        className={`rounded px-2 py-0.5 text-xs ${
+                          t.status === "PAID" ? "bg-green-600/20 text-green-400" : "bg-red-600/20 text-red-400"
+                        }`}
+                      >
+                        {t.status}
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-white/60">
+                    {t.subscription
+                      ? t.subscription.cancelledAt
+                        ? "Cancelled"
+                        : t.subscription.currentPeriodEnd
+                          ? `${fmtDate(t.subscription.currentPeriodEnd)} · ${formatCurrency(t.amount)}`
+                          : "—"
+                      : "—"}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-white/50">{t.razorpayPaymentId ?? "—"}</td>
                 </tr>
@@ -233,11 +250,58 @@ export function TransactionsBrowser() {
   );
 }
 
-function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Row({ label, value, mono, valueClassName }: { label: string; value: string; mono?: boolean; valueClassName?: string }) {
   return (
     <div className="flex justify-between gap-4 border-b border-white/5 py-2 text-sm">
       <span className="text-white/40">{label}</span>
-      <span className={`text-right text-white/80 ${mono ? "font-mono text-xs" : ""}`}>{value}</span>
+      <span className={`text-right text-white/80 ${mono ? "font-mono text-xs" : ""} ${valueClassName ?? ""}`}>{value}</span>
+    </div>
+  );
+}
+
+/** "Subscription payment" for the authorization charge, "Auto-debited" for a later recurring
+ * charge — `null` for a plain one-time transaction. Matches the user-facing BillingHistory's
+ * identical labeling. */
+function paymentTypeLabel(paymentType: AdminTransactionDTO["paymentType"]): string | null {
+  if (paymentType === "INITIAL_SUBSCRIPTION") return "Subscription payment";
+  if (paymentType === "AUTO_RENEWAL") return "AUTO-DEBIT";
+  return null;
+}
+
+/** The "Auto-Renewal" section of the transaction drawer — every date here comes straight from
+ * `tx.subscription` (ultimately `PartnerMembership.currentPeriodEnd`/`cancelledAt`, written only
+ * by the Razorpay webhook) — nothing is computed or guessed here. `null` for a one-time
+ * transaction, where there's nothing recurring to show. */
+function AutoRenewalSection({ tx }: { tx: AdminTransactionDTO }) {
+  const sub = tx.subscription;
+  if (!sub) return null;
+
+  const isCancelled = !!sub.cancelledAt;
+  return (
+    <div className="mt-4 rounded-xl bg-white/5 p-3">
+      <p className="text-sm font-semibold text-white">Auto-Renewal</p>
+      <div className="mt-1">
+        <Row label="Auto-payment" value={isCancelled ? "OFF" : "ON"} valueClassName={isCancelled ? "text-red-400" : "text-green-400"} />
+        {isCancelled ? (
+          <>
+            <Row label="Next automatic debit" value="Cancelled" />
+            <Row label="Membership remains active until" value={fmtDate(tx.membershipEndDate)} />
+          </>
+        ) : (
+          <>
+            <Row label="Next automatic debit" value={sub.currentPeriodEnd ? fmtDate(sub.currentPeriodEnd) : "—"} />
+            <Row label="Amount" value={formatCurrency(tx.amount)} />
+            {sub.currentPeriodEnd && sub.nextPeriodEnd && (
+              <Row label="Renewal period" value={`${fmtDate(sub.currentPeriodEnd)} – ${fmtDate(sub.nextPeriodEnd)}`} />
+            )}
+          </>
+        )}
+      </div>
+      {!isCancelled && sub.currentPeriodEnd && (
+        <p className="mt-2 text-xs text-white/60">
+          {formatCurrency(tx.amount)} will be automatically debited on {fmtDate(sub.currentPeriodEnd)}.
+        </p>
+      )}
     </div>
   );
 }
@@ -266,10 +330,18 @@ function TransactionDrawer({ tx, onClose }: { tx: AdminTransactionDTO; onClose: 
           <Row label="Customer" value={tx.customerName} />
           <Row label="Mobile" value={tx.customerPhone ?? "—"} />
           <Row label="Plan" value={tx.planName} />
+          {paymentTypeLabel(tx.paymentType) && <Row label="Payment type" value={paymentTypeLabel(tx.paymentType)!} />}
+          {/* "Payment date" is this transaction's own charge — never confused with the Auto-Renewal
+              section below, which is the subscription's live, forward-looking state. */}
           <Row label="Payment date" value={fmtDateTime(tx.paidAt)} />
           <Row label="Membership start" value={fmtDate(tx.membershipStartDate)} />
           <Row label="Membership expiry" value={fmtDate(tx.membershipEndDate)} />
           <Row label="Duration" value={`${tx.durationDays} days`} />
+        </div>
+
+        <AutoRenewalSection tx={tx} />
+
+        <div className="mt-4">
           <Row label="Razorpay payment id" value={tx.razorpayPaymentId ?? "—"} mono />
           <Row label="Razorpay order id" value={tx.razorpayOrderId ?? "—"} mono />
           <Row label="Payment reference" value={tx.paymentId ?? "—"} mono />

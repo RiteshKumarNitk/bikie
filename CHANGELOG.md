@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-10-23 — Admin transaction detail/list now shows the next automatic debit
+
+The admin Transactions drawer (e.g. `BIKIE-2026-000012`) showed only what was already paid —
+payment date, membership expiry, Razorpay IDs — with nothing about the next automatic charge.
+Added a dedicated "Auto-Renewal" section (auto-payment ON/OFF, next automatic debit date +
+amount, renewal period) sourced from the same `subscription` state the earlier user-facing work
+already derives — reused, not reinvented. One new field: `nextPeriodEnd` (the END of the period
+the upcoming charge would start), computed server-side as `currentPeriodEnd + this invoice's own
+durationDays`, the identical arithmetic `endDate`/`currentPeriodEnd` were already computed with —
+never guessed on the client. The admin list's paginated, cross-user queries needed their own
+derivation (a `groupBy` finds each referenced subscription's *globally* earliest invoice, not just
+the earliest within the current page, so a renewal on page 2 is never mislabeled just because its
+authorization charge happens to be on page 1) — regression-tested explicitly. The list also gained
+a "Next debit" column and an "AUTO-DEBIT"/"Subscription payment" badge. No change to Rider
+membership, SOS, SMS/MSG91, FCM, the webhook, or eligibility logic. `vitest` 429→432.
+
 ## 2026-10-23 — Mobile SP subscription: Auto-Renewal card, auto-debit labeling, richer receipts
 
 Extends the web subscription-transparency work to mobile and to payment history/receipts on both

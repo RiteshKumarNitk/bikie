@@ -7,6 +7,7 @@ const inv = vi.hoisted(() => ({
   create: vi.fn(),
   count: vi.fn(),
   updateMany: vi.fn(),
+  groupBy: vi.fn(),
 }));
 
 const partnerMembership = vi.hoisted(() => ({
@@ -15,7 +16,13 @@ const partnerMembership = vi.hoisted(() => ({
 
 vi.mock("../client", () => ({ prisma: { membershipInvoice: inv, partnerMembership } }));
 
-import { createInvoice, findByIdForUser, listForUser } from "./billing.repository";
+import {
+  createInvoice,
+  findByIdForUser,
+  getTransactionForAdmin,
+  listForUser,
+  listTransactionsForAdmin,
+} from "./billing.repository";
 
 const D = (iso: string) => new Date(iso);
 const dec = (n: number) => ({ toNumber: () => n });
@@ -54,6 +61,7 @@ function subscriptionRow(overrides: Record<string, unknown> = {}) {
   return row({
     accountType: "SERVICE_PROVIDER",
     userMembershipId: null,
+    durationDays: 30, // the real SP plan is monthly, not the base fixture's 365-day default
     partnerMembershipId: "pm-1",
     razorpayOrderId: null,
     paymentId: null,
@@ -219,6 +227,7 @@ describe("billing.repository — recurring-subscription paymentType/subscription
       razorpaySubscriptionId: "sub_1",
       status: "active",
       currentPeriodEnd: "2026-12-23T00:00:00.000Z",
+      nextPeriodEnd: "2027-12-23T00:00:00.000Z", // row()'s default durationDays (365)
       cancelledAt: null,
     });
   });
@@ -251,5 +260,51 @@ describe("billing.repository — recurring-subscription paymentType/subscription
     const result = await findByIdForUser("inv-1", "user-1");
 
     expect(result?.subscription?.cancelledAt).toBe("2026-10-25T00:00:00.000Z");
+  });
+});
+
+describe("admin transactions — paymentType/subscription computed GLOBALLY, not just within a page", () => {
+  it("getTransactionForAdmin: a single subscription transaction carries paymentType and next-debit data", async () => {
+    inv.findUnique.mockResolvedValueOnce(subscriptionRow({ id: "inv-2", paidAt: D("2026-11-23T09:00:00.000Z") }));
+    inv.groupBy.mockResolvedValueOnce([
+      { partnerMembershipId: "pm-1", _min: { paidAt: D("2026-10-23T09:00:00.000Z") } },
+    ]);
+
+    const result = await getTransactionForAdmin("inv-2");
+
+    expect(result?.paymentType).toBe("AUTO_RENEWAL");
+    expect(result?.subscription).toEqual({
+      razorpaySubscriptionId: "sub_1",
+      status: "active",
+      currentPeriodEnd: "2026-11-23T00:00:00.000Z",
+      nextPeriodEnd: "2026-12-23T00:00:00.000Z",
+      cancelledAt: null,
+    });
+  });
+
+  it("listTransactionsForAdmin: a renewal on page 2 is still correctly labeled even though its initial charge is on page 1 (earliest is computed globally via groupBy, not from the current page's rows alone)", async () => {
+    // Page 2 of the admin list contains ONLY the renewal — the initial charge (the true earliest)
+    // is on page 1 and never appears in `rows` here. If the code mistakenly computed "earliest"
+    // from just this page's rows, it would wrongly treat this lone row as the initial charge.
+    inv.findMany.mockResolvedValueOnce([subscriptionRow({ id: "inv-2", paidAt: D("2026-11-23T09:00:00.000Z") })]);
+    inv.count.mockResolvedValueOnce(2);
+    inv.groupBy.mockResolvedValueOnce([
+      { partnerMembershipId: "pm-1", _min: { paidAt: D("2026-10-23T09:00:00.000Z") } },
+    ]);
+
+    const result = await listTransactionsForAdmin({}, { page: 2, pageSize: 1, sort: "newest" });
+
+    expect(result.transactions[0].paymentType).toBe("AUTO_RENEWAL");
+  });
+
+  it("listTransactionsForAdmin: a one-time Rider transaction is ONE_TIME with no subscription state, and groupBy is never called", async () => {
+    inv.findMany.mockResolvedValueOnce([row()]);
+    inv.count.mockResolvedValueOnce(1);
+
+    const result = await listTransactionsForAdmin({}, { page: 1, pageSize: 25, sort: "newest" });
+
+    expect(result.transactions[0].paymentType).toBe("ONE_TIME");
+    expect(result.transactions[0].subscription).toBeNull();
+    expect(inv.groupBy).not.toHaveBeenCalled();
   });
 });

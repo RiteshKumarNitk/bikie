@@ -2,7 +2,7 @@
  * per-activation receipt (ADR-070) — so every amount is the purchase-time snapshot and is never
  * recomputed from a plan's current price. */
 
-import type { InvoiceAccountTypeDTO, InvoiceStatusDTO } from "./billing";
+import type { InvoiceAccountTypeDTO, InvoicePaymentTypeDTO, InvoiceStatusDTO, InvoiceSubscriptionStateDTO } from "./billing";
 
 /** One financial transaction row for the admin Transactions table. Maps 1:1 to a
  * `MembershipInvoice` today (every recorded transaction is a completed activation). */
@@ -30,6 +30,12 @@ export interface AdminTransactionDTO {
   durationDays: number;
   confirmationSmsSentAt: string | null;
   createdAt: string;
+  /** `ONE_TIME` / `INITIAL_SUBSCRIPTION` / `AUTO_RENEWAL` — see `InvoicePaymentTypeDTO`. */
+  paymentType: InvoicePaymentTypeDTO;
+  /** The live Razorpay subscription state (next billing date, status, cancellation) — `null` for
+   * a `ONE_TIME` transaction. Lets the admin drawer show "what happens next," not just "what was
+   * paid," without the frontend ever computing or guessing a next-debit date. */
+  subscription: InvoiceSubscriptionStateDTO | null;
 }
 
 export interface AdminTransactionListDTO {

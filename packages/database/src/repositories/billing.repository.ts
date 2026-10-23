@@ -91,9 +91,14 @@ function paymentTypeFor(inv: InvoiceRowWithSubscription, isEarliestForSubscripti
 function subscriptionStateFor(inv: InvoiceRowWithSubscription): InvoiceSubscriptionStateDTO | null {
   const sub = inv.partnerMembership;
   if (!sub?.razorpaySubscriptionId) return null;
+  const nextPeriodEnd =
+    !sub.cancelledAt && sub.currentPeriodEnd
+      ? new Date(sub.currentPeriodEnd.getTime() + inv.durationDays * 24 * 60 * 60 * 1000)
+      : null;
   return {
     razorpaySubscriptionId: sub.razorpaySubscriptionId,
     status: sub.subscriptionStatus,
+    nextPeriodEnd: nextPeriodEnd ? nextPeriodEnd.toISOString() : null,
     currentPeriodEnd: sub.currentPeriodEnd ? sub.currentPeriodEnd.toISOString() : null,
     cancelledAt: sub.cancelledAt ? sub.cancelledAt.toISOString() : null,
   };
@@ -183,10 +188,15 @@ async function detailForRow(inv: InvoiceRow): Promise<InvoiceDetailDTO> {
     where: { partnerMembershipId: inv.partnerMembershipId, paidAt: { lt: inv.paidAt } },
   });
   const paymentType: InvoicePaymentTypeDTO = earlierCount === 0 ? "INITIAL_SUBSCRIPTION" : "AUTO_RENEWAL";
+  const nextPeriodEnd =
+    !partnerMembership.cancelledAt && partnerMembership.currentPeriodEnd
+      ? new Date(partnerMembership.currentPeriodEnd.getTime() + inv.durationDays * 24 * 60 * 60 * 1000)
+      : null;
   const subscription: InvoiceSubscriptionStateDTO = {
     razorpaySubscriptionId: partnerMembership.razorpaySubscriptionId,
     status: partnerMembership.subscriptionStatus,
     currentPeriodEnd: partnerMembership.currentPeriodEnd ? partnerMembership.currentPeriodEnd.toISOString() : null,
+    nextPeriodEnd: nextPeriodEnd ? nextPeriodEnd.toISOString() : null,
     cancelledAt: partnerMembership.cancelledAt ? partnerMembership.cancelledAt.toISOString() : null,
   };
   return toDetail(inv, paymentType, subscription);
@@ -330,7 +340,11 @@ function transactionWhere(f: AdminTransactionFilters): Prisma.MembershipInvoiceW
   return where;
 }
 
-function toAdminTransaction(inv: InvoiceRow): AdminTransactionDTO {
+function toAdminTransaction(
+  inv: InvoiceRow,
+  paymentType: InvoicePaymentTypeDTO,
+  subscription: InvoiceSubscriptionStateDTO | null,
+): AdminTransactionDTO {
   return {
     id: inv.id,
     receiptNo: inv.receiptNo,
@@ -352,7 +366,46 @@ function toAdminTransaction(inv: InvoiceRow): AdminTransactionDTO {
     durationDays: inv.durationDays,
     confirmationSmsSentAt: inv.confirmationSmsSentAt ? inv.confirmationSmsSentAt.toISOString() : null,
     createdAt: inv.createdAt.toISOString(),
+    paymentType,
+    subscription,
   };
+}
+
+/** Bulk equivalent of `listForUser`'s in-memory earliest-computation, for a (possibly paginated,
+ * possibly cross-user) admin row set: a single `groupBy` finds each referenced subscription's
+ * globally earliest `paidAt` — not just the earliest among the current page — so a renewal never
+ * gets mislabeled as the initial charge just because its own authorization charge happened to
+ * fall on a different page. */
+async function adminPaymentTypesFor(
+  rows: InvoiceRowWithSubscription[],
+): Promise<Map<string, { paymentType: InvoicePaymentTypeDTO; subscription: InvoiceSubscriptionStateDTO | null }>> {
+  const subscriptionMembershipIds = [
+    ...new Set(
+      rows
+        .filter((r) => r.partnerMembershipId && r.partnerMembership?.razorpaySubscriptionId)
+        .map((r) => r.partnerMembershipId as string),
+    ),
+  ];
+
+  const earliestByMembership = new Map<string, number>();
+  if (subscriptionMembershipIds.length > 0) {
+    const earliest = await prisma.membershipInvoice.groupBy({
+      by: ["partnerMembershipId"],
+      where: { partnerMembershipId: { in: subscriptionMembershipIds } },
+      _min: { paidAt: true },
+    });
+    for (const row of earliest) {
+      if (row.partnerMembershipId && row._min.paidAt) earliestByMembership.set(row.partnerMembershipId, row._min.paidAt.getTime());
+    }
+  }
+
+  const result = new Map<string, { paymentType: InvoicePaymentTypeDTO; subscription: InvoiceSubscriptionStateDTO | null }>();
+  for (const row of rows) {
+    const isEarliest =
+      !!row.partnerMembershipId && earliestByMembership.get(row.partnerMembershipId) === row.paidAt.getTime();
+    result.set(row.id, { paymentType: paymentTypeFor(row, isEarliest), subscription: subscriptionStateFor(row) });
+  }
+  return result;
 }
 
 /** Server-side paginated + filtered transaction list, newest or oldest first. */
@@ -367,10 +420,18 @@ export async function listTransactionsForAdmin(
       orderBy: { paidAt: opts.sort === "oldest" ? "asc" : "desc" },
       skip: (opts.page - 1) * opts.pageSize,
       take: opts.pageSize,
+      include: membershipPaymentTypeInclude,
     }),
     prisma.membershipInvoice.count({ where }),
   ]);
-  return { transactions: rows.map(toAdminTransaction), total };
+  const types = await adminPaymentTypesFor(rows);
+  return {
+    transactions: rows.map((row) => {
+      const t = types.get(row.id)!;
+      return toAdminTransaction(row, t.paymentType, t.subscription);
+    }),
+    total,
+  };
 }
 
 /** Unpaginated, for CSV export — caller applies `MAX_ADMIN_CSV_ROWS`. */
@@ -382,13 +443,21 @@ export async function listAllTransactionsForAdmin(
     where: transactionWhere(filters),
     orderBy: { paidAt: opts.sort === "oldest" ? "asc" : "desc" },
     take: opts.limit,
+    include: membershipPaymentTypeInclude,
   });
-  return rows.map(toAdminTransaction);
+  const types = await adminPaymentTypesFor(rows);
+  return rows.map((row) => {
+    const t = types.get(row.id)!;
+    return toAdminTransaction(row, t.paymentType, t.subscription);
+  });
 }
 
 export async function getTransactionForAdmin(id: string): Promise<AdminTransactionDTO | null> {
-  const inv = await prisma.membershipInvoice.findUnique({ where: { id } });
-  return inv ? toAdminTransaction(inv) : null;
+  const inv = await prisma.membershipInvoice.findUnique({ where: { id }, include: membershipPaymentTypeInclude });
+  if (!inv) return null;
+  const types = await adminPaymentTypesFor([inv]);
+  const t = types.get(inv.id)!;
+  return toAdminTransaction(inv, t.paymentType, t.subscription);
 }
 
 /** Distinct (planId, planName) pairs across all recorded transactions — powers the filter menu. */

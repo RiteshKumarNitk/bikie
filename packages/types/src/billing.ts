@@ -37,6 +37,12 @@ export interface InvoiceSubscriptionStateDTO {
   status: string | null;
   currentPeriodEnd: string | null;
   cancelledAt: string | null;
+  /** The END of the membership period that `currentPeriodEnd`'s charge would start, i.e. the
+   * *next* renewal's own expiry — `currentPeriodEnd + this invoice's own durationDays`, the same
+   * arithmetic every `endDate`/`currentPeriodEnd` on this row was already computed with. `null`
+   * whenever `currentPeriodEnd` itself is `null` (no charge confirmed yet) or the subscription is
+   * cancelled (there is no next period). Computed server-side so the client never derives it. */
+  nextPeriodEnd: string | null;
 }
 
 export interface InvoiceDetailDTO extends InvoiceSummaryDTO {
