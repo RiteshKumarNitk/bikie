@@ -2,6 +2,17 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Mobile: back button confirms before exiting the app (2026-10-24)
+
+| Task | Status |
+|---|---|
+| `AppShell` wraps its `Scaffold` in `PopScope` (`canPop: false`) — tabs switch via `context.go()`, which replaces the shell's route rather than pushing, so there was never anything for the system back button to pop; it was exiting the app immediately instead | Completed |
+| Not on Home tab: back returns to Home first (standard Android behavior) | Completed |
+| On Home tab: back shows an "Exit BIKIE?" confirmation dialog; app only exits (`SystemNavigator.pop()`) if "Exit" is tapped, not "Cancel" | Completed |
+| Routes pushed outside the `ShellRoute` (`/bikes/:slug`, `/trips/:slug`, …) unaffected — `AppShell` isn't mounted there, so they keep popping normally | Completed — verified by design, no code path touches them |
+| New `app_shell_back_button_test.dart` — 4 widget tests (non-Home→Home, Home shows dialog, Cancel keeps app open, Exit dismisses dialog) using `tester.binding.handlePopRoute()` to simulate the system back button | Completed |
+| `flutter analyze` / `flutter test` (full suite) | Completed — 0 issues, 225 passed |
+
 ## Admin Transactions: full auto-payment lifecycle visibility (2026-10-24)
 
 | Task | Status |

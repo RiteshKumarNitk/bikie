@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-24 — Mobile: back button confirms before exiting the app
+
+Pressing the Android system back button from any bottom-nav tab used to exit BIKIE
+immediately, since `AppShell`'s tabs switch via `context.go()` (which replaces the shell's
+route rather than pushing one), leaving nothing for the back button to pop. `AppShell` now
+wraps its `Scaffold` in a `PopScope` (`canPop: false`) that branches on the current tab: from
+any non-Home tab, back returns to Home first (standard Android behavior); already on Home, back
+shows an "Exit BIKIE?" confirmation dialog, and the app only actually closes
+(`SystemNavigator.pop()`) if "Exit" is tapped. Routes pushed outside the shell (`/bikes/:slug`,
+`/trips/:slug`, …) are unaffected — they already pop normally. New widget tests in
+`app_shell_back_button_test.dart` cover all four branches. `flutter analyze`: 0 issues;
+`flutter test`: 225 passed.
+
 ## 2026-10-24 — Admin Transactions: full subscription lifecycle, not just next-debit date
 
 Deepens yesterday's "next automatic debit" addition into the complete picture an admin needs

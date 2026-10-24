@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -56,24 +57,57 @@ class AppShell extends ConsumerWidget {
 
     return NotificationPermissionGate(
       child: RiderFindabilityGate(
-        child: Scaffold(
-          body: SafeArea(
-            top: true,
-            bottom: false,
-            child: Column(
-              children: [
-                if (isPartner) const PartnerAvailabilityBanner(),
-                Expanded(child: child),
-              ],
+        child: PopScope(
+          // Every tab switch uses `context.go`, which *replaces* the shell's single route rather
+          // than pushing a new one (see `onDestinationSelected` below) — so there's never
+          // anything for the system back button to pop within the shell itself; `canPop: false`
+          // makes that explicit instead of accidentally relying on the Navigator happening to be
+          // empty. Screens pushed on top of the shell (`/bikes/:slug`, `/trips/:slug`, …) are
+          // separate top-level routes outside this ShellRoute, so they already pop normally and
+          // never reach this handler at all.
+          canPop: false,
+          onPopInvokedWithResult: (didPop, result) => _handleBackPress(context, currentIndex),
+          child: Scaffold(
+            body: SafeArea(
+              top: true,
+              bottom: false,
+              child: Column(
+                children: [
+                  if (isPartner) const PartnerAvailabilityBanner(),
+                  Expanded(child: child),
+                ],
+              ),
             ),
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: currentIndex,
-            onDestinationSelected: (index) => context.go(tabs[index]),
-            destinations: destinations,
+            bottomNavigationBar: NavigationBar(
+              selectedIndex: currentIndex,
+              onDestinationSelected: (index) => context.go(tabs[index]),
+              destinations: destinations,
+            ),
           ),
         ),
       ),
     );
+  }
+
+  /// Not on the Home tab: back returns to Home first, matching standard Android back behavior,
+  /// rather than exiting from wherever the Rider/Service Provider happens to be. Already on Home:
+  /// back must ask before actually leaving the app — nothing should close BIKIE on a stray tap.
+  Future<void> _handleBackPress(BuildContext context, int currentTabIndex) async {
+    if (currentTabIndex != 0) {
+      context.go('/');
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exit BIKIE?'),
+        content: const Text('Are you sure you want to exit the app?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Exit')),
+        ],
+      ),
+    );
+    if (confirmed == true) SystemNavigator.pop();
   }
 }
