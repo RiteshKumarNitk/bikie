@@ -2,6 +2,22 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Service Provider membership: monthly auto-debit only, no "Pay once" (2026-10-24)
+
+| Task | Status |
+|---|---|
+| Audit confirmed the recurring-subscription code path is real (not UI-only) — `subscriptions.create`, mandate, `subscription.charged` webhook, new invoice, extended `endDate` all trace through and are unit-tested | Completed |
+| Audit found "Pay once" (one-time order, no mandate) was the *primary* button on the SP membership page, with the real subscription as a secondary alternative — a real SP could repeat it monthly and never auto-renew | Completed |
+| `POST /api/partner-membership/checkout` + `.../purchase` now return `403 ONE_TIME_CHECKOUT_DISABLED`/`ONE_TIME_PURCHASE_DISABLED` for any paid-plan request from a real (non-exempt) account | Completed |
+| Free-plan activation (price 0) and the ADR-089 store-review/QA test account's simulated checkout both still work exactly as before — neither reaches the new guard | Completed |
+| Web `/partner/membership`: "Pay once" removed for real SPs; single primary action "Start Membership — ₹{price}/month" with "Auto-renews automatically" + the auto-debit disclosure text; test account still sees the old UI | Completed |
+| Mobile `PartnerMembershipScreen`/`_PlanCard`: same change, same test-account exception (`isTestPhoneNumber`) | Completed |
+| Riders (`/api/membership/*`, Rider membership UI) — untouched, confirmed by file-tree separation | Completed — no change needed |
+| New `checkout/route.test.ts` + `purchase/route.test.ts` (8 tests: free/test-account pass-through, 403 for a real account with or without a signed payment reference) | Completed — `vitest` 450→458 |
+| `flutter analyze` / `flutter test` (full suite) | Completed — 0 issues, 225 passed (no new mobile tests — screen had none before) |
+| Verify `RAZORPAY_SP_MEMBERSHIP_PLAN_ID`/`RAZORPAY_WEBHOOK_SECRET` set on the VPS, and the webhook registered in the Razorpay Dashboard | **Not done** — blocked here by a sandboxed production-read restriction; see CHANGELOG entry. Must be confirmed before this ships, since a real SP now has no fallback if either is missing |
+| Inspect production DB for any `PartnerMembership` row with `razorpaySubscriptionId != null` (has anyone ever actually used the real subscription path) | **Not done** — same blocker |
+
 ## Mobile: back button confirms before exiting the app (2026-10-24)
 
 | Task | Status |

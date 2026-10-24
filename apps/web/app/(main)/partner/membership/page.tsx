@@ -6,6 +6,7 @@ import { authClient } from "@/lib/auth-client";
 import { PaymentModal, prefillFromSessionUser } from "@/components/membership/PaymentModal";
 import { BillingHistory } from "@/components/membership/BillingHistory";
 import { subscriptionDisplayState } from "@/lib/partner-subscription-display";
+import { isTestPhoneNumber } from "@/lib/test-phone";
 
 interface Plan {
   id: string;
@@ -61,6 +62,10 @@ export default function PartnerMembershipPage() {
   useEffect(() => {
     setIsOnboarding(new URLSearchParams(window.location.search).get("onboarding") === "1");
   }, []);
+
+  // ADR-089 store-review/QA account — see `showLegacyPayOnce` below, the only remaining use of
+  // the one-time flow for a paid plan.
+  const isTestAccount = isTestPhoneNumber(session?.user?.phoneNumber ?? "");
 
   useEffect(() => {
     fetch("/api/partner-membership/plans")
@@ -342,6 +347,13 @@ export default function PartnerMembershipPage() {
           {plans.map((plan) => {
             const isActivePlan = activeMembership?.planId === plan.id;
             const isFree = plan.price === 0;
+            // ADR-089 store-review/QA account only — the sole remaining path that can still use
+            // the one-time "Pay once" flow, since it can't complete a real Razorpay mandate
+            // authorization. Every other Service Provider sees exactly one paid action: the real
+            // monthly subscription. The backend enforces this independently of what the UI shows
+            // (`ONE_TIME_CHECKOUT_DISABLED`/`ONE_TIME_PURCHASE_DISABLED`), so this is a UX choice,
+            // not the only thing standing between a real SP and a one-time payment.
+            const showLegacyPayOnce = !isFree && isTestAccount;
             return (
               <div key={plan.id} className="rounded-3xl border border-foreground/10 bg-card p-8 text-left">
                 <p className="text-xs font-semibold uppercase tracking-wider text-foreground/40">{plan.name}</p>
@@ -350,6 +362,9 @@ export default function PartnerMembershipPage() {
                   <span className="text-3xl font-bold">{isFree ? "Free" : `₹${plan.price}`}</span>
                   <span className="text-sm text-foreground/50">{billingPeriodLabel(plan.durationDays)}</span>
                 </p>
+                {!isFree && !showLegacyPayOnce && (
+                  <p className="mt-1 text-sm font-medium text-accent-text">Auto-renews automatically</p>
+                )}
                 <ul className="mt-6 space-y-3">
                   {plan.benefits.map((benefit, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
@@ -358,42 +373,39 @@ export default function PartnerMembershipPage() {
                     </li>
                   ))}
                 </ul>
-                <button
-                  type="button"
-                  onClick={() => handleSubscribe(plan)}
-                  disabled={isActivePlan || activatingPlanId === plan.id}
-                  className="mt-8 w-full rounded-xl bg-accent py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
-                >
-                  {isActivePlan
-                    ? "✓ Active"
-                    : activatingPlanId === plan.id
-                      ? "Activating…"
-                      : isFree
-                        ? "Activate for free"
-                        : "Pay once"}
-                </button>
-                {/* Recurring auto-renewing alternative to the one-time button above — only for a
-                    paid monthly plan; the one-time path remains available either way. */}
-                {!isFree && plan.durationDays === 30 && (
+
+                {isFree || showLegacyPayOnce ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSubscribe(plan)}
+                    disabled={isActivePlan || activatingPlanId === plan.id}
+                    className="mt-8 w-full rounded-xl bg-accent py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                  >
+                    {isActivePlan
+                      ? "✓ Active"
+                      : activatingPlanId === plan.id
+                        ? "Activating…"
+                        : isFree
+                          ? "Activate for free"
+                          : "Pay once"}
+                  </button>
+                ) : (
                   <>
                     <button
                       type="button"
                       onClick={() => handleStartSubscription(plan)}
                       disabled={isActivePlan || subscribingPlanId === plan.id}
-                      className="mt-2 w-full rounded-xl border border-accent py-3 text-sm font-semibold text-accent-text transition-colors hover:bg-accent/10 disabled:opacity-50"
+                      className="mt-8 w-full rounded-xl bg-accent py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
                     >
-                      {subscribingPlanId === plan.id ? "Starting…" : "Start Monthly Subscription (auto-renew)"}
+                      {isActivePlan
+                        ? "✓ Active"
+                        : subscribingPlanId === plan.id
+                          ? "Starting…"
+                          : `Start Membership — ₹${plan.price}/month`}
                     </button>
-                    {/* This is an auto-renewing subscription, not a one-time ₹{price} payment — say so
-                        explicitly rather than only implying it via the button label. No renewal date is
-                        shown here: Razorpay only assigns one once the authorization you complete on its
-                        hosted page actually goes through, so a date shown before that would be a guess,
-                        not server data — the exact date appears on this page once the first charge lands. */}
                     <p className="mt-2 text-center text-xs text-foreground/50">
-                      Auto-renews monthly. By subscribing, you authorize BIKIE to automatically charge ₹
-                      {plan.price} every month until you cancel. This is <strong>not</strong> a one-time payment —
-                      the first charge happens as soon as you complete authorization, then every 30 days after
-                      that.
+                      Your payment will be automatically debited every month through your authorized Razorpay
+                      payment method.
                     </p>
                   </>
                 )}

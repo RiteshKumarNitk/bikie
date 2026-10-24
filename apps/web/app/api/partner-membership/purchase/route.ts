@@ -1,14 +1,15 @@
 import { NextResponse } from "next/server";
-import { PartnerMembershipService, RazorpayService } from "@bikie/services";
+import { PartnerMembershipService } from "@bikie/services";
 import { purchasePartnerMembershipSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
 
 /**
- * `POST /api/partner-membership/purchase` (ADR-051) — mirrors `POST /api/membership/purchase`,
- * plus a free-tier shortcut a Rider plan never needed: a plan whose server-side price is 0
- * activates immediately with no payment step at all, regardless of Razorpay configuration or
- * what the client sent — the price check happens here, never trusting a client-supplied "this is
- * free" claim.
+ * `POST /api/partner-membership/purchase` (ADR-051, narrowed by the monthly-auto-debit-only
+ * change) — a free plan (server-side price 0, never a client-asserted claim) activates
+ * immediately with no payment step. The ADR-089 test account still activates a paid plan without
+ * a verified payment. Every other paid-plan request is rejected: a real SP only ever activates
+ * through a Razorpay Subscription's webhook (`PartnerMembershipService.recordRecurringCharge`),
+ * never this route. `/api/membership/purchase` (Rider) is a separate route, untouched.
  */
 export async function POST(request: Request) {
   const { session, error } = await requireSession();
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { planId, paymentId, razorpayOrderId, razorpayPaymentId, razorpaySignature } = parsed.data;
+  const { planId, paymentId, razorpayOrderId, razorpayPaymentId } = parsed.data;
 
   const plan = await PartnerMembershipService.getPlanById(planId);
   if (!plan || !plan.isActive) {
@@ -51,64 +52,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ membership: result.membership });
   }
 
-  if (RazorpayService.isConfigured()) {
-    if (!razorpayOrderId || !razorpayPaymentId || !razorpaySignature) {
-      return NextResponse.json(
-        { error: "PAYMENT_VERIFICATION_REQUIRED", message: "A verified payment is required to activate membership." },
-        { status: 400 },
-      );
-    }
-    const verified = RazorpayService.verifyPaymentSignature({
-      orderId: razorpayOrderId,
-      paymentId: razorpayPaymentId,
-      signature: razorpaySignature,
-    });
-    if (!verified) {
-      // Ids only — never the signature or key secret. A spike of these means the key id used to
-      // create orders doesn't match RAZORPAY_KEY_SECRET used to verify them.
-      console.warn(
-        `[MEMBERSHIP][VERIFY_FAILED] partner user=${session.user.id} order=${razorpayOrderId} payment=${razorpayPaymentId}`,
-      );
-      return NextResponse.json(
-        { error: "PAYMENT_VERIFICATION_FAILED", message: "Payment could not be verified. Please try again." },
-        { status: 400 },
-      );
-    }
-    const result = await PartnerMembershipService.purchaseMembership(
-      session.user.id,
-      planId,
-      razorpayPaymentId,
-      razorpayOrderId,
-    );
-    if (!result.ok) {
-      return NextResponse.json(
-        { error: "ALREADY_ACTIVE_MEMBERSHIP", message: "You already have an active membership." },
-        { status: 409 },
-      );
-    }
-    return NextResponse.json({ membership: result.membership });
-  }
-
-  // ADR-069 — simulated-checkout path: no dummy-paymentId activation in production.
-  if (!RazorpayService.isDevFallbackAllowed()) {
-    return NextResponse.json(
-      { error: "PAYMENTS_UNAVAILABLE", message: "Payments are temporarily unavailable. Please try again later." },
-      { status: 503 },
-    );
-  }
-
-  if (!paymentId) {
-    return NextResponse.json(
-      { error: "VALIDATION_ERROR", message: "paymentId is required." },
-      { status: 400 },
-    );
-  }
-  const result = await PartnerMembershipService.purchaseMembership(session.user.id, planId, paymentId);
-  if (!result.ok) {
-    return NextResponse.json(
-      { error: "ALREADY_ACTIVE_MEMBERSHIP", message: "You already have an active membership." },
-      { status: 409 },
-    );
-  }
-  return NextResponse.json({ membership: result.membership });
+  // Service Provider membership is monthly-auto-debit-only — a real SP never completes a
+  // one-time purchase for a paid plan; `POST /api/partner-membership/subscription` (a real
+  // Razorpay Subscription + mandate) plus its `subscription.charged` webhook is the only way a
+  // paid SP membership activates. Checked server-side (not just hidden in the UI) so an old
+  // mobile build, a stale Razorpay order, or a direct API call can't buy a one-time membership
+  // that never auto-renews. Riders are untouched — `/api/membership/purchase` is a separate route.
+  return NextResponse.json(
+    {
+      error: "ONE_TIME_PURCHASE_DISABLED",
+      message: "Service Provider membership is monthly auto-renewing only. Use the subscription endpoint to start it.",
+    },
+    { status: 403 },
+  );
 }

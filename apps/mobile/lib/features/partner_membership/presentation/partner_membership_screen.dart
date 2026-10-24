@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/app_config.dart' show isTestPhoneNumber;
 import '../../../core/payments/razorpay_checkout.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
@@ -434,6 +435,16 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   @override
   Widget build(BuildContext context) {
     final isFree = widget.plan.price == 0;
+    final price = widget.plan.price.toStringAsFixed(0);
+    // ADR-089 store-review/QA account only — the sole remaining path that can still use the
+    // one-time Purchase flow, since it can't complete a real Razorpay mandate authorization.
+    // Every other Service Provider sees exactly one paid action: the real monthly subscription.
+    // The backend enforces this independently of what this screen shows
+    // (`ONE_TIME_CHECKOUT_DISABLED`/`ONE_TIME_PURCHASE_DISABLED`), so this is a UX choice, not the
+    // only thing standing between a real SP and a one-time payment.
+    final phoneNumber = ref.watch(authControllerProvider.select((s) => s.user?.phoneNumber));
+    final showLegacyPurchase = !isFree && isTestPhoneNumber(phoneNumber ?? '');
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -458,18 +469,27 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
               ),
             ),
             const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    isFree
-                        ? 'Free ${_billingPeriodLabel(widget.plan.durationDays)}'
-                        : '₹${widget.plan.price.toStringAsFixed(0)}${_billingPeriodLabel(widget.plan.durationDays)}',
-                    style: Theme.of(context).textTheme.titleSmall,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
+            Text(
+              isFree
+                  ? 'Free ${_billingPeriodLabel(widget.plan.durationDays)}'
+                  : '₹$price${_billingPeriodLabel(widget.plan.durationDays)}',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            if (!isFree && !showLegacyPurchase) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Auto-renews automatically',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppTheme.accentTextOf(context), fontWeight: FontWeight.w600),
+              ),
+            ],
+            const SizedBox(height: 12),
+            if (isFree || showLegacyPurchase)
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
                   onPressed: _isPurchasing ? null : _purchase,
                   child: _isPurchasing
                       ? const SizedBox(
@@ -479,20 +499,22 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
                         )
                       : Text(isFree ? 'Activate' : 'Purchase'),
                 ),
-              ],
-            ),
-            // Recurring auto-renewing alternative to the one-time Purchase above — only for a
-            // paid monthly plan; the one-time path above remains available either way.
-            if (!isFree && widget.plan.durationDays == 30) ...[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: OutlinedButton(
+              )
+            else ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
                   onPressed: _isSubscribing ? null : _subscribe,
                   child: _isSubscribing
                       ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Start Monthly Subscription (auto-renew)'),
+                      : Text('Start Membership — ₹$price/month'),
                 ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Your payment will be automatically debited every month through your authorized '
+                'Razorpay payment method.',
+                style: Theme.of(context).textTheme.bodySmall,
               ),
             ],
           ],

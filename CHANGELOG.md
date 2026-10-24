@@ -1,5 +1,37 @@
 # Changelog
 
+## 2026-10-24 — Service Provider membership: monthly auto-debit only, no more "Pay once"
+
+An audit of the recurring-payment implementation (traced the full chain: `subscriptions.create`
+→ mandate → `subscription.charged` webhook → new invoice → extended `endDate`, all real, all
+unit-tested) surfaced that it was entirely optional: the membership page offered "Pay once" (a
+one-time Razorpay Order, no mandate, never auto-renews) as the primary button, with "Start
+Monthly Subscription" as a secondary alternative. A Service Provider could — and evidence
+suggests at least one did — repeatedly click "Pay once" every month and never actually be on a
+subscription.
+
+Business decision: Service Provider membership must be monthly-auto-debit-only. "Pay once" is
+removed from the UI (web + mobile) for every real Service Provider; the only paid action is now
+"Start Membership — ₹99/month", which creates a real Razorpay Subscription. Enforced server-side,
+not just hidden in the UI — `POST /api/partner-membership/checkout` and `.../purchase` now return
+`403 ONE_TIME_CHECKOUT_DISABLED` / `ONE_TIME_PURCHASE_DISABLED` for any paid-plan request from a
+real account, so a stale mobile build or a direct API call can't bypass it either. Two exceptions,
+both unaffected by the 403: a free plan (price 0, none currently active) still activates with no
+payment step, and the ADR-089 store-review/QA test account still gets the old simulated one-time
+checkout, since Play Store review can't complete a real Razorpay mandate authorization. Riders
+(`/api/membership/*`) are a completely separate route tree and are untouched.
+
+New tests: `checkout/route.test.ts` + `purchase/route.test.ts` (8 tests) covering free/test-account
+pass-through and the 403 for a real account, with or without a signed Razorpay payment reference.
+`vitest` 450→458. Mobile: `flutter analyze` 0 issues, `flutter test` 225 passed (no new mobile
+tests — this screen had none before either).
+
+**Not yet verified — do before relying on this in production:** whether
+`RAZORPAY_SP_MEMBERSHIP_PLAN_ID` and `RAZORPAY_WEBHOOK_SECRET` are actually set on the VPS, and
+whether the webhook is actually registered in the Razorpay Dashboard. If either is missing, a real
+Service Provider now has **no way to get a paid membership at all** — the one-time fallback this
+change removes was, until now, the thing masking that gap.
+
 ## 2026-10-24 — Mobile: back button confirms before exiting the app
 
 Pressing the Android system back button from any bottom-nav tab used to exit BIKIE
