@@ -149,6 +149,29 @@ export const RazorpayService = {
     }
   },
 
+  /**
+   * Razorpay's own live, authoritative view of a Subscription — used (not the locally-stored
+   * `subscriptionStatus`/`endDate`, which can lag behind by exactly as long as a webhook takes
+   * to arrive) to decide whether a stale/abandoned subscription is genuinely safe to cancel and
+   * replace. `paidCount` (Razorpay's `paid_count`) is the number of billing cycles actually
+   * charged — `0` means no money has ever moved on this subscription, regardless of what its
+   * `status` says, which is the one fact that must never be guessed from local state alone.
+   * Returns `null` on any failure (logged) — callers must fail toward NOT touching the
+   * subscription when this can't be verified, never toward assuming it's safe.
+   */
+  async fetchSubscription(razorpaySubscriptionId: string): Promise<{ status: string; paidCount: number } | null> {
+    const creds = credentials();
+    if (!creds) return null;
+
+    try {
+      const sub = await getClient(creds.keyId, creds.keySecret).subscriptions.fetch(razorpaySubscriptionId);
+      return { status: sub.status, paidCount: sub.paid_count };
+    } catch (err) {
+      console.error("[Razorpay][fetchSubscription] fetch failed:", err);
+      return null;
+    }
+  },
+
   /** `cancelAtCycleEnd: true` lets the provider keep the already-paid-for current period instead
    * of losing access immediately — the caller decides based on `currentPeriodEnd`/`endDate`,
    * this just forwards to Razorpay. Returns `null` on failure (logged), never throws. */

@@ -114,10 +114,16 @@ export default function PartnerMembershipPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ planId: plan.id }),
       });
-      const data = await res.json().catch(() => ({}) as { error?: string; subscription?: { shortUrl: string } });
+      const data = await res
+        .json()
+        .catch(() => ({}) as { error?: string; message?: string; subscription?: { shortUrl: string } });
       if (!res.ok) {
         throw new Error(
-          typeof data.error === "string" ? data.error : "Could not start the subscription. Please try again.",
+          typeof data.message === "string"
+            ? data.message
+            : typeof data.error === "string"
+              ? data.error
+              : "Could not start the subscription. Please try again.",
         );
       }
       if (data.subscription?.shortUrl) {

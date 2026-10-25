@@ -161,7 +161,52 @@ export const PartnerMembershipService = {
     if (activeOneTime) return { ok: false, reason: "ALREADY_ACTIVE" };
 
     const openSubscription = await partnerMembershipRepository.findOpenSubscriptionForUser(userId);
-    if (openSubscription) return { ok: false, reason: "SUBSCRIPTION_ALREADY_EXISTS" };
+    if (openSubscription) {
+      // A locally-stored "open" subscription might just be a stale/abandoned authorization
+      // attempt (the SP's mandate was rejected by their bank/UPI app, or they backed out) — that
+      // should never permanently block a retry, since no money ever moved. But deciding that from
+      // our OWN row alone is unsafe: a webhook can still be in flight when the SP retries, so a
+      // locally-stale "created" status doesn't prove Razorpay agrees nothing was ever charged.
+      // Always ask Razorpay directly (`fetchSubscription` — its live `status` + `paid_count`,
+      // never inferred) before touching anything.
+      if (!openSubscription.razorpaySubscriptionId) {
+        // Shouldn't happen (`findOpenSubscriptionForUser` only ever matches rows with this set),
+        // but nothing to verify against if it ever does — fail toward safety, not toward guessing.
+        return { ok: false, reason: "SUBSCRIPTION_ALREADY_EXISTS" };
+      }
+
+      const live = await RazorpayService.fetchSubscription(openSubscription.razorpaySubscriptionId);
+      if (!live) {
+        // Could not verify Razorpay's own state (network/API error) — fail toward safety. Never
+        // silently cancel a subscription whose real status we couldn't confirm.
+        console.error(
+          `SUBSCRIPTION_RETRY_VERIFY_FAILED userId=${userId} razorpaySubscriptionId=${openSubscription.razorpaySubscriptionId}`,
+        );
+        return { ok: false, reason: "SUBSCRIPTION_ALREADY_EXISTS" };
+      }
+
+      if (live.paidCount > 0) {
+        // Razorpay's own record of at least one successful charge — a real, paying subscription,
+        // even if our local row hasn't caught up yet. Never silently replace this; the SP must
+        // cancel it explicitly (the existing Cancel Auto-Renewal flow) before starting another.
+        return { ok: false, reason: "SUBSCRIPTION_ALREADY_EXISTS" };
+      }
+
+      const TERMINAL_SUBSCRIPTION_STATUSES = new Set(["cancelled", "completed", "expired"]);
+      if (!TERMINAL_SUBSCRIPTION_STATUSES.has(live.status)) {
+        // Never charged (`paidCount === 0`) and not yet terminal on Razorpay's side either — a
+        // genuinely stale, abandoned authorization attempt. Cancel it (best-effort — an orphaned,
+        // unauthorized subscription never charges anything even if this call itself fails) before
+        // starting a fresh one. If it's already terminal on Razorpay's side, there's nothing left
+        // to cancel — fall straight through.
+        const cancelled = await RazorpayService.cancelSubscription(openSubscription.razorpaySubscriptionId, false);
+        console.log(
+          `SUBSCRIPTION_STALE_RETRY userId=${userId} previousMembershipId=${openSubscription.id} ` +
+            `previousRazorpaySubscriptionId=${openSubscription.razorpaySubscriptionId} liveStatus=${live.status} ` +
+            `cancelResult=${cancelled ? cancelled.status : "CANCEL_CALL_FAILED"}`,
+        );
+      }
+    }
 
     const razorpayPlanId = process.env.RAZORPAY_SP_MEMBERSHIP_PLAN_ID?.trim();
     if (!razorpayPlanId) {

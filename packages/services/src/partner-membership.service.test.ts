@@ -40,6 +40,7 @@ vi.mock("./razorpay.service", () => ({
     isConfigured: vi.fn(() => true),
     createSubscription: vi.fn(),
     cancelSubscription: vi.fn(),
+    fetchSubscription: vi.fn(),
   },
 }));
 
@@ -69,6 +70,7 @@ const razorpay = RazorpayService as unknown as {
   isConfigured: ReturnType<typeof vi.fn>;
   createSubscription: ReturnType<typeof vi.fn>;
   cancelSubscription: ReturnType<typeof vi.fn>;
+  fetchSubscription: ReturnType<typeof vi.fn>;
 };
 
 const paidPlan = { id: "sp-plan", name: "Service Provider Membership", description: "", price: 99, durationDays: 30, benefits: [], isActive: true };
@@ -300,15 +302,106 @@ describe("PartnerMembershipService.startSubscription (recurring)", () => {
     expect(razorpay.createSubscription).not.toHaveBeenCalled();
   });
 
-  it("rejects SUBSCRIPTION_ALREADY_EXISTS when the user already has an open subscription — never creates a second one", async () => {
+  it("rejects SUBSCRIPTION_ALREADY_EXISTS when Razorpay's own live state shows the open subscription was actually charged (paidCount > 0) — never creates a second one", async () => {
     repo.findPlanById.mockResolvedValueOnce(paidPlan);
-    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan));
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan, { subscriptionStatus: "active" }));
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "active", paidCount: 1 });
 
     const result = await PartnerMembershipService.startSubscription("user-1", "sp-plan");
 
     expect(result).toEqual({ ok: false, reason: "SUBSCRIPTION_ALREADY_EXISTS" });
     expect(razorpay.createSubscription).not.toHaveBeenCalled();
     expect(repo.createSubscriptionMembership).not.toHaveBeenCalled();
+    expect(razorpay.cancelSubscription).not.toHaveBeenCalled();
+  });
+
+  it("rejects SUBSCRIPTION_ALREADY_EXISTS when Razorpay reports paidCount > 0 even though the LOCAL row still looks unactivated — Razorpay's live state wins over a stale/lagging webhook, never silently replaced", async () => {
+    repo.findPlanById.mockResolvedValueOnce(paidPlan);
+    // Local row still shows "created"/startDate===endDate — as if the `subscription.charged`
+    // webhook simply hasn't landed yet when the SP retries. Must not be treated as stale.
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan));
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "active", paidCount: 1 });
+
+    const result = await PartnerMembershipService.startSubscription("user-1", "sp-plan");
+
+    expect(result).toEqual({ ok: false, reason: "SUBSCRIPTION_ALREADY_EXISTS" });
+    expect(razorpay.cancelSubscription).not.toHaveBeenCalled();
+    expect(razorpay.createSubscription).not.toHaveBeenCalled();
+  });
+
+  it("a genuinely STALE open subscription (Razorpay confirms paidCount 0, status still non-terminal) is cancelled and replaced — the SP could otherwise never retry after one failed/abandoned mandate authorization", async () => {
+    repo.findPlanById.mockResolvedValueOnce(paidPlan);
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan));
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "created", paidCount: 0 });
+    razorpay.cancelSubscription.mockResolvedValueOnce({ id: "sub_abc123", status: "cancelled", shortUrl: "" });
+    razorpay.createSubscription.mockResolvedValueOnce({
+      id: "sub_new456",
+      status: "created",
+      shortUrl: "https://rzp.io/i/new456",
+    });
+    const created = subscriptionMembershipOn(paidPlan, { id: "pm-2", razorpaySubscriptionId: "sub_new456" });
+    repo.createSubscriptionMembership.mockResolvedValueOnce(created);
+    vi.stubEnv("RAZORPAY_SP_MEMBERSHIP_PLAN_ID", "plan_xyz789");
+
+    const result = await PartnerMembershipService.startSubscription("user-1", "sp-plan");
+
+    expect(razorpay.fetchSubscription).toHaveBeenCalledWith("sub_abc123");
+    expect(razorpay.cancelSubscription).toHaveBeenCalledWith("sub_abc123", false);
+    expect(razorpay.createSubscription).toHaveBeenCalledWith("plan_xyz789", expect.objectContaining({ userId: "user-1" }));
+    expect(result).toEqual({
+      ok: true,
+      membership: created,
+      subscription: { id: "sub_new456", status: "created", shortUrl: "https://rzp.io/i/new456" },
+    });
+  });
+
+  it("skips the redundant cancel call when Razorpay already reports the stale subscription as terminal (cancelled/completed/expired)", async () => {
+    repo.findPlanById.mockResolvedValueOnce(paidPlan);
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan));
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "expired", paidCount: 0 });
+    razorpay.createSubscription.mockResolvedValueOnce({
+      id: "sub_new456",
+      status: "created",
+      shortUrl: "https://rzp.io/i/new456",
+    });
+    repo.createSubscriptionMembership.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan, { id: "pm-2" }));
+    vi.stubEnv("RAZORPAY_SP_MEMBERSHIP_PLAN_ID", "plan_xyz789");
+
+    const result = await PartnerMembershipService.startSubscription("user-1", "sp-plan");
+
+    expect(razorpay.cancelSubscription).not.toHaveBeenCalled();
+    expect(result.ok).toBe(true);
+  });
+
+  it("still creates a fresh subscription even if cancelling the stale one fails on Razorpay's side — an orphaned unauthorized subscription never charges anything regardless", async () => {
+    repo.findPlanById.mockResolvedValueOnce(paidPlan);
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan));
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "created", paidCount: 0 });
+    razorpay.cancelSubscription.mockResolvedValueOnce(null);
+    razorpay.createSubscription.mockResolvedValueOnce({
+      id: "sub_new456",
+      status: "created",
+      shortUrl: "https://rzp.io/i/new456",
+    });
+    repo.createSubscriptionMembership.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan, { id: "pm-2" }));
+    vi.stubEnv("RAZORPAY_SP_MEMBERSHIP_PLAN_ID", "plan_xyz789");
+
+    const result = await PartnerMembershipService.startSubscription("user-1", "sp-plan");
+
+    expect(result.ok).toBe(true);
+    expect(razorpay.createSubscription).toHaveBeenCalled();
+  });
+
+  it("fails SAFE (SUBSCRIPTION_ALREADY_EXISTS, no cancel/create) when Razorpay's live state can't be verified at all — never guesses toward cancelling", async () => {
+    repo.findPlanById.mockResolvedValueOnce(paidPlan);
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan));
+    razorpay.fetchSubscription.mockResolvedValueOnce(null);
+
+    const result = await PartnerMembershipService.startSubscription("user-1", "sp-plan");
+
+    expect(result).toEqual({ ok: false, reason: "SUBSCRIPTION_ALREADY_EXISTS" });
+    expect(razorpay.cancelSubscription).not.toHaveBeenCalled();
+    expect(razorpay.createSubscription).not.toHaveBeenCalled();
   });
 
   it("rejects NOT_CONFIGURED when RAZORPAY_SP_MEMBERSHIP_PLAN_ID is unset — never hardcodes a plan id", async () => {

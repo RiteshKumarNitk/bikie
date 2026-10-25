@@ -3,13 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 const subscriptionsCreate = vi.fn();
 const subscriptionsCancel = vi.fn();
+const subscriptionsFetch = vi.fn();
 const ordersCreate = vi.fn();
 
 // `razorpay.service.ts`'s `getClient()` memoizes one instance — mock the SDK's class itself so
 // every `new Razorpay(...)` call in this file returns the same spies, regardless of credentials.
 vi.mock("razorpay", () => {
   class MockRazorpay {
-    subscriptions = { create: subscriptionsCreate, cancel: subscriptionsCancel };
+    subscriptions = { create: subscriptionsCreate, cancel: subscriptionsCancel, fetch: subscriptionsFetch };
     orders = { create: ordersCreate };
     static validateWebhookSignature(body: string, signature: string, secret: string): boolean {
       // Real HMAC-SHA256, matching Razorpay's own documented algorithm exactly — not mocked, so
@@ -148,5 +149,50 @@ describe("RazorpayService.createSubscription / cancelSubscription", () => {
 
     expect(result).toBeNull();
     expect(subscriptionsCancel).not.toHaveBeenCalled();
+  });
+});
+
+describe("RazorpayService.fetchSubscription", () => {
+  it("returns Razorpay's live status and paid_count (renamed paidCount) for a given subscription", async () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    subscriptionsFetch.mockResolvedValueOnce({ id: "sub_abc", status: "active", paid_count: 3 });
+
+    const result = await RazorpayService.fetchSubscription("sub_abc");
+
+    expect(subscriptionsFetch).toHaveBeenCalledWith("sub_abc");
+    expect(result).toEqual({ status: "active", paidCount: 3 });
+  });
+
+  it("returns a never-charged subscription's paidCount as 0, not undefined/falsy-confused with 'unverifiable'", async () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    subscriptionsFetch.mockResolvedValueOnce({ id: "sub_abc", status: "created", paid_count: 0 });
+
+    const result = await RazorpayService.fetchSubscription("sub_abc");
+
+    expect(result).toEqual({ status: "created", paidCount: 0 });
+  });
+
+  it("returns null (no network call) when RAZORPAY_KEY_ID/SECRET are unset", async () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "");
+
+    const result = await RazorpayService.fetchSubscription("sub_abc");
+
+    expect(result).toBeNull();
+    expect(subscriptionsFetch).not.toHaveBeenCalled();
+  });
+
+  it("returns null (logged) when the SDK call throws — callers must treat this as 'could not verify', never as 'safe'", async () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    subscriptionsFetch.mockRejectedValueOnce(new Error("network down"));
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await RazorpayService.fetchSubscription("sub_abc");
+
+    expect(result).toBeNull();
+    err.mockRestore();
   });
 });

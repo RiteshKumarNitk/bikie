@@ -2,6 +2,17 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Fix: failed/abandoned subscription authorization permanently blocked retrying (2026-10-25)
+
+| Task | Status |
+|---|---|
+| Root cause: `startSubscription` treated a never-activated "created"-status subscription (mandate authorization abandoned/rejected by the SP's bank/UPI app) the same as a real, already-charged one — permanently blocking any retry | Completed |
+| New `RazorpayService.fetchSubscription` — Razorpay's own live `status` + `paid_count`, not inferred from BIKIE's locally-stored row (which can lag a webhook by however long delivery takes) | Completed |
+| Fix: `startSubscription` now verifies against Razorpay's live state before touching an existing open subscription — `paidCount > 0` always blocks (even if the local row looks unactivated); only a confirmed-zero-charge, non-terminal subscription is cancelled and replaced; a verification failure fails SAFE (blocks, touches nothing) rather than guessing | Completed |
+| `/api/partner-membership/subscription` error responses now include a `message` field; web's `handleStartSubscription` now reads it (was showing the raw `SUBSCRIPTION_ALREADY_EXISTS` enum string) | Completed |
+| Tests: `RazorpayService.fetchSubscription` unit tests + 6 `startSubscription` scenarios (real blocks / Razorpay-overrides-stale-local-row / stale-replaced / skip-redundant-cancel-when-terminal / proceeds-if-cancel-call-fails / fails-safe-when-verify-fails) | Completed — `vitest` 450→467 |
+| The underlying UPI AutoPay mandate failure itself (RuPay credit card via PhonePe, "Something went wrong") | Out of scope — confirmed to be a bank/UPI-network-side failure, not a BIKIE/Razorpay integration issue |
+
 ## Service Provider membership: monthly auto-debit only, no "Pay once" (2026-10-24)
 
 | Task | Status |

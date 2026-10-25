@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-10-25 — Fix: a failed/abandoned subscription authorization permanently blocked retrying
+
+Root cause of "I couldn't pay, and now I can't subscribe again": `startSubscription` treated ANY
+`PartnerMembership` row with a non-terminal `subscriptionStatus` ("created", "authenticated",
+"active", "pending", "halted") as an open subscription and refused to start a second one —
+correct for a real, already-charged subscription, but wrong for one still sitting in "created"
+because the SP's mandate authorization was never completed (their bank/UPI app rejected it,
+they backed out, or it simply failed, as happened here with a RuPay-credit-card UPI AutoPay
+attempt via PhonePe). No money ever moved and no real mandate exists in that case, yet the SP
+had no way to retry — `SUBSCRIPTION_ALREADY_EXISTS` forever, even though nothing was ever
+"already" active.
+
+Fixed in `PartnerMembershipService.startSubscription` — deliberately NOT decided from BIKIE's own
+stored row alone (a webhook can still be in flight when the SP retries, so a locally-stale
+"created" status doesn't prove Razorpay agrees nothing was charged). New `RazorpayService.
+fetchSubscription` asks Razorpay directly for its live `status` + `paid_count` (the number of
+billing cycles actually charged — the one authoritative "was this ever charged" fact). `paidCount
+> 0` always blocks a second subscription, even if the local row looks unactivated. Only when
+Razorpay itself confirms zero charges AND a non-terminal status is the old subscription cancelled
+(best-effort) and a fresh one created. If the verification call itself fails (network/API error),
+the fix fails SAFE — `SUBSCRIPTION_ALREADY_EXISTS`, nothing touched — rather than ever guessing
+toward cancelling a subscription whose real state is unknown. Also fixed: `/api/partner-membership/
+subscription`'s error responses now include a `message` field (web's `handleStartSubscription` was
+reading `data.error`, showing the raw enum string like `SUBSCRIPTION_ALREADY_EXISTS` verbatim —
+mobile already preferred `message` via `ApiException.fromResponseData`, so it needed no change).
+
+Note: the original payment failure itself ("Something went wrong. Please try again" on PhonePe's
+UPI AutoPay mandate screen, paying via a RuPay credit card) is outside BIKIE's code — that screen
+and its error belong to the UPI network/bank (PhonePe + Yes Bank in this case), not to our
+Razorpay integration, which never even received a webhook since the mandate was never confirmed.
+RuPay-credit-card UPI AutoPay is known to be inconsistently supported bank-to-bank as of this
+date; a debit card or bank-account-linked UPI ID is a more reliable retry path today.
+
+Tests: new `RazorpayService.fetchSubscription` unit tests (`razorpay.service.test.ts`); `partner-
+membership.service.test.ts` covers real-subscription-blocks, stale-subscription-replaced,
+Razorpay's-live-state-overrides-a-stale-local-row (the actual race this fix targets),
+skip-cancel-when-already-terminal, proceeds-even-if-cancel-call-fails, and
+fails-safe-when-verification-itself-fails. `vitest` 458→467.
+
 ## 2026-10-24 — Service Provider membership: monthly auto-debit only, no more "Pay once"
 
 An audit of the recurring-payment implementation (traced the full chain: `subscriptions.create`

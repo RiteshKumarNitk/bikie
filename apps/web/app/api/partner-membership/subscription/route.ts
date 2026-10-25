@@ -11,6 +11,18 @@ const ERROR_STATUS: Record<string, number> = {
   SUBSCRIPTION_CREATE_FAILED: 503,
 };
 
+// A stale/never-authorized attempt no longer reaches SUBSCRIPTION_ALREADY_EXISTS at all (the
+// service transparently cancels and replaces it) — this message is now shown only for a REAL
+// subscription that already took at least one successful payment, so "cancel it first" is always
+// accurate here, never shown after a merely-failed/abandoned authorization.
+const ERROR_MESSAGE: Record<string, string> = {
+  PLAN_NOT_FOUND: "This plan is no longer available.",
+  ALREADY_ACTIVE: "You already have an active membership.",
+  SUBSCRIPTION_ALREADY_EXISTS: "You already have an active subscription. Cancel it first if you want to start a new one.",
+  NOT_CONFIGURED: "Subscriptions are temporarily unavailable. Please try again later.",
+  SUBSCRIPTION_CREATE_FAILED: "Could not start the subscription. Please try again.",
+};
+
 /**
  * `POST /api/partner-membership/subscription` — starts a ₹99/month recurring Razorpay
  * Subscription. Mirrors `/api/partner-membership/checkout`+`/purchase`'s auth/validation shape,
@@ -28,7 +40,10 @@ export async function POST(request: Request) {
 
   const result = await PartnerMembershipService.startSubscription(session.user.id, parsed.data.planId);
   if (!result.ok) {
-    return NextResponse.json({ error: result.reason }, { status: ERROR_STATUS[result.reason] ?? 400 });
+    return NextResponse.json(
+      { error: result.reason, message: ERROR_MESSAGE[result.reason] },
+      { status: ERROR_STATUS[result.reason] ?? 400 },
+    );
   }
   return NextResponse.json({ membership: result.membership, subscription: result.subscription });
 }
