@@ -2,6 +2,20 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Admin: reconcile a Service Provider subscription straight from Razorpay (2026-10-25)
+
+| Task | Status |
+|---|---|
+| Production incident: a real Razorpay mandate was authorized and charged, but BIKIE never reflected it — the webhook never arrived (best-effort delivery, never a guarantee) | Completed |
+| New `RazorpayService.fetchSubscription`/`listSubscriptionInvoices` — Razorpay's own live status + every paid invoice for a subscription | Completed |
+| New `PartnerMembershipService.reconcileSubscription` — replays missing paid invoices through the exact same `recordRecurringCharge` path the webhook uses; idempotent, safe to re-run | Completed |
+| New admin-only `POST /api/admin/partner-membership/subscriptions/reconcile` + audit log entry | Completed |
+| New "Sync Subscription from Razorpay" button on `/admin/transactions` | Completed |
+| Verified against a real Razorpay test-mode subscription (localhost unreachable from Razorpay = real webhook-missed scenario); full automated checkout blocked by Razorpay's own anti-bot protections, not a BIKIE issue | Completed |
+| Applied 2 pending Prisma migrations to the dev/staging DB (unrelated to production) that were blocking local verification | Completed |
+| Tests: `fetchSubscription`/`listSubscriptionInvoices` units, `reconcileSubscription` (not-found/could-not-verify/replay/status-sync), route transport tests | Completed — `vitest` 467→480 |
+| No Rider, SOS, SMS, FCM, or one-time-payment code touched | Completed — confirmed via diff review |
+
 ## Fix: failed/abandoned subscription authorization permanently blocked retrying (2026-10-25)
 
 | Task | Status |

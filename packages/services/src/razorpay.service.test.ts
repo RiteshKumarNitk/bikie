@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const subscriptionsCreate = vi.fn();
 const subscriptionsCancel = vi.fn();
 const subscriptionsFetch = vi.fn();
+const invoicesAll = vi.fn();
 const ordersCreate = vi.fn();
 
 // `razorpay.service.ts`'s `getClient()` memoizes one instance — mock the SDK's class itself so
@@ -11,6 +12,7 @@ const ordersCreate = vi.fn();
 vi.mock("razorpay", () => {
   class MockRazorpay {
     subscriptions = { create: subscriptionsCreate, cancel: subscriptionsCancel, fetch: subscriptionsFetch };
+    invoices = { all: invoicesAll };
     orders = { create: ordersCreate };
     static validateWebhookSignature(body: string, signature: string, secret: string): boolean {
       // Real HMAC-SHA256, matching Razorpay's own documented algorithm exactly — not mocked, so
@@ -193,6 +195,86 @@ describe("RazorpayService.fetchSubscription", () => {
     const result = await RazorpayService.fetchSubscription("sub_abc");
 
     expect(result).toBeNull();
+    err.mockRestore();
+  });
+});
+
+describe("RazorpayService.listSubscriptionInvoices", () => {
+  it("returns only PAID invoices, oldest first, converted to rupees and real Dates", async () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    invoicesAll.mockResolvedValueOnce({
+      entity: "collection",
+      count: 3,
+      items: [
+        // Out of order on purpose — the newest one first, as Razorpay's `all()` typically returns.
+        {
+          id: "inv_3", status: "paid", payment_id: "pay_3", amount_paid: 9900,
+          billing_start: 1764000000, billing_end: 1766678400, paid_at: 1764000500, created_at: 1764000000,
+        },
+        { id: "inv_2", status: "issued", payment_id: null, amount_paid: 0, created_at: 1761408000 }, // never paid — excluded
+        {
+          id: "inv_1", status: "paid", payment_id: "pay_1", amount_paid: 9900,
+          billing_start: 1761321600, billing_end: 1764000000, paid_at: 1761322000, created_at: 1761321600,
+        },
+      ],
+    });
+
+    const result = await RazorpayService.listSubscriptionInvoices("sub_abc");
+
+    expect(invoicesAll).toHaveBeenCalledWith({ subscription_id: "sub_abc", count: 100 });
+    expect(result).toEqual([
+      {
+        razorpayPaymentId: "pay_1",
+        amount: 99,
+        billingStart: new Date(1761321600 * 1000),
+        billingEnd: new Date(1764000000 * 1000),
+        paidAt: new Date(1761322000 * 1000),
+      },
+      {
+        razorpayPaymentId: "pay_3",
+        amount: 99,
+        billingStart: new Date(1764000000 * 1000),
+        billingEnd: new Date(1766678400 * 1000),
+        paidAt: new Date(1764000500 * 1000),
+      },
+    ]);
+  });
+
+  it("falls back to created_at when an invoice has no paid_at", async () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    invoicesAll.mockResolvedValueOnce({
+      entity: "collection",
+      count: 1,
+      items: [{ id: "inv_1", status: "paid", payment_id: "pay_1", amount_paid: 9900, created_at: 1761321600 }],
+    });
+
+    const result = await RazorpayService.listSubscriptionInvoices("sub_abc");
+
+    expect(result[0].paidAt).toEqual(new Date(1761321600 * 1000));
+    expect(result[0].billingStart).toBeNull();
+  });
+
+  it("returns [] (no network call) when RAZORPAY_KEY_ID/SECRET are unset", async () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "");
+
+    const result = await RazorpayService.listSubscriptionInvoices("sub_abc");
+
+    expect(result).toEqual([]);
+    expect(invoicesAll).not.toHaveBeenCalled();
+  });
+
+  it("returns [] (logged) when the SDK call throws — never throws itself", async () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    invoicesAll.mockRejectedValueOnce(new Error("network down"));
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const result = await RazorpayService.listSubscriptionInvoices("sub_abc");
+
+    expect(result).toEqual([]);
     err.mockRestore();
   });
 });

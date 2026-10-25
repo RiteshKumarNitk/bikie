@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-20T14:56:30.495Z",
-  "count": 164,
+  "generatedAt": "2026-10-25T03:46:51.669Z",
+  "count": 165,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -295,6 +295,14 @@
       ],
       "auth": "admin",
       "file": "apps/web/app/api/admin/partner-membership/plans/route.ts"
+    },
+    {
+      "path": "/api/admin/partner-membership/subscriptions/reconcile",
+      "methods": [
+        "POST"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/partner-membership/subscriptions/reconcile/route.ts"
     },
     {
       "path": "/api/admin/partners/{id}",

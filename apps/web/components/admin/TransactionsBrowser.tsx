@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AdminTransactionDTO } from "@bikie/types";
 import { formatCurrency } from "@bikie/utils";
 import { adminSubscriptionDisplayState } from "@/lib/admin-subscription-display";
+import { ReconcileSubscriptionTool } from "./ReconcileSubscriptionTool";
 
 type Facets = { plans: { planId: string; planName: string }[] };
 
@@ -141,6 +142,7 @@ export function TransactionsBrowser() {
         >
           Export CSV
         </a>
+        <ReconcileSubscriptionTool onReconciled={load} />
       </div>
 
       <p className="text-xs text-white/40">

@@ -52,6 +52,15 @@ export const startPartnerSubscriptionSchema = z.object({
 
 export type StartPartnerSubscriptionInput = z.infer<typeof startPartnerSubscriptionSchema>;
 
+/** `POST /api/admin/partner-membership/subscriptions/reconcile` — admin-triggered replay of a
+ * subscription's paid-invoice history straight from Razorpay, for when its webhook never
+ * reached BIKIE. */
+export const reconcilePartnerSubscriptionSchema = z.object({
+  razorpaySubscriptionId: z.string().min(1),
+});
+
+export type ReconcilePartnerSubscriptionInput = z.infer<typeof reconcilePartnerSubscriptionSchema>;
+
 export const createPartnerMembershipPlanSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().min(1).max(2000),

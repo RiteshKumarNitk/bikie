@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-10-25 — Admin: reconcile a Service Provider subscription straight from Razorpay
+
+A production incident surfaced the gap this closes: a Service Provider's Razorpay mandate was
+genuinely authorized and charged (Razorpay's own page showed "active, next due 25 Nov 2026"), but
+BIKIE never reflected it — the `subscription.charged`/`subscription.activated` webhook never
+reached the server. Webhooks are best-effort delivery on Razorpay's side, never a guarantee, so
+this had to be assumed possible rather than treated as a one-off.
+
+New `RazorpayService.fetchSubscription`/`listSubscriptionInvoices` read Razorpay's own live status
+and every PAID invoice for a subscription directly. New `PartnerMembershipService.
+reconcileSubscription` replays any paid invoices BIKIE is missing through the exact same
+`recordRecurringCharge` path the webhook itself uses — idempotent (keyed on `razorpayPaymentId`,
+same as the webhook), so running it on an already-synced subscription, or running it twice, is
+always a safe no-op, never a double charge or duplicate invoice. New admin-only `POST /api/admin/
+partner-membership/subscriptions/reconcile`, and a "Sync Subscription from Razorpay" button on
+`/admin/transactions` — paste the Razorpay Subscription id, see exactly what was synced.
+
+Verified end-to-end against a real Razorpay test-mode subscription (created locally — `localhost`
+is unreachable from Razorpay's servers, perfectly reproducing "the webhook never arrives"); full
+automated checkout was blocked by Razorpay's own anti-bot checkout protections, not a BIKIE issue.
+Also applied 2 previously-pending Prisma migrations to the dev/staging database (unrelated to
+production, which already has them) that were blocking local verification of this and the
+existing admin Transactions page.
+
+Tests: `RazorpayService.fetchSubscription`/`listSubscriptionInvoices` unit tests,
+`reconcileSubscription` (not-found / could-not-verify / replays oldest-first / status-only sync /
+idempotency inherited from the existing webhook path), and route transport tests (401/400/404/503/
+200 + audit log). `vitest` 467→480. No Rider, SOS, SMS, FCM, or one-time-payment code touched.
+
 ## 2026-10-25 — Fix: a failed/abandoned subscription authorization permanently blocked retrying
 
 Root cause of "I couldn't pay, and now I can't subscribe again": `startSubscription` treated ANY

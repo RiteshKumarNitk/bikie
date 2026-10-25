@@ -279,6 +279,11 @@ export const PartnerMembershipService = {
       currentPeriodEnd: Date;
       razorpayPaymentId: string;
       amount: number;
+      /** The real time Razorpay recorded this charge — reconciliation (`reconcileSubscription`,
+       * replaying Razorpay's own invoice history) knows this exactly; the live webhook path
+       * doesn't carry it in the payload this code currently parses, so it keeps defaulting to
+       * "now" (the moment this function runs, same as before this param existed) unless passed. */
+      paidAt?: Date;
     },
   ): Promise<PartnerMembershipDTO | null> {
     const membership = await partnerMembershipRepository.findByRazorpaySubscriptionId(razorpaySubscriptionId);
@@ -308,7 +313,7 @@ export const PartnerMembershipService = {
       customerName: user?.name ?? "BIKIE Service Provider",
       customerPhone: user?.phoneNumber ?? null,
       razorpayPaymentId: data.razorpayPaymentId,
-      paidAt: new Date(),
+      paidAt: data.paidAt ?? new Date(),
     });
 
     console.log(
@@ -339,6 +344,54 @@ export const PartnerMembershipService = {
     );
     return updated;
   },
+
+  /**
+   * Admin-triggered safety net for when Razorpay's webhook never reaches us — never delivered,
+   * delivered while the app was down, rejected by a transient signature/env mismatch, or any
+   * other reason a webhook (an unreliable, best-effort delivery by design) can simply not arrive.
+   * Razorpay still has the truth even when we don't: this replays every PAID invoice it has
+   * recorded against the subscription (oldest first — billing order matters, each extension
+   * logically follows the previous one) through the EXACT SAME `recordRecurringCharge` path the
+   * webhook itself uses, which is already idempotent on `razorpayPaymentId` — so running this on
+   * a subscription that's already fully up to date is always a safe no-op, never a double-charge
+   * or a duplicate invoice, and running it twice is equally safe. Also brings the locally-stored
+   * `subscriptionStatus` in line with Razorpay's live status even when there's nothing to charge
+   * (e.g. the subscription was cancelled on Razorpay's side and THAT webhook also never arrived).
+   */
+  async reconcileSubscription(razorpaySubscriptionId: string): Promise<ReconcileSubscriptionResult> {
+    const membership = await partnerMembershipRepository.findByRazorpaySubscriptionId(razorpaySubscriptionId);
+    if (!membership) return { ok: false, reason: "NOT_FOUND" };
+
+    const live = await RazorpayService.fetchSubscription(razorpaySubscriptionId);
+    if (!live) return { ok: false, reason: "COULD_NOT_VERIFY" };
+
+    const paidInvoices = await RazorpayService.listSubscriptionInvoices(razorpaySubscriptionId);
+
+    let updated: PartnerMembershipDTO | null = null;
+    for (const invoice of paidInvoices) {
+      updated = await PartnerMembershipService.recordRecurringCharge(razorpaySubscriptionId, {
+        subscriptionStatus: live.status,
+        currentPeriodStart: invoice.billingStart,
+        currentPeriodEnd: invoice.billingEnd ?? invoice.paidAt,
+        razorpayPaymentId: invoice.razorpayPaymentId,
+        amount: invoice.amount,
+        paidAt: invoice.paidAt,
+      });
+    }
+
+    // No paid invoices found at all — nothing to charge-reconcile, but the subscription's status
+    // may still have drifted locally (e.g. cancelled on Razorpay's side with that webhook ALSO
+    // never delivered) — bring status in sync regardless.
+    if (!updated) {
+      updated = await partnerMembershipRepository.updateSubscriptionStatus(membership.id, live.status, {});
+    }
+
+    console.log(
+      `SUBSCRIPTION_RECONCILED userId=${membership.userId} membershipId=${membership.id} ` +
+        `razorpaySubscriptionId=${razorpaySubscriptionId} invoicesFound=${paidInvoices.length} liveStatus=${live.status}`,
+    );
+    return { ok: true, membership: updated, invoicesFound: paidInvoices.length };
+  },
 };
 
 export type StartSubscriptionResult =
@@ -348,3 +401,7 @@ export type StartSubscriptionResult =
 export type CancelSubscriptionResult =
   | { ok: true; membership: PartnerMembershipDTO }
   | { ok: false; reason: "NO_ACTIVE_SUBSCRIPTION" | "CANCEL_FAILED" };
+
+export type ReconcileSubscriptionResult =
+  | { ok: true; membership: PartnerMembershipDTO; invoicesFound: number }
+  | { ok: false; reason: "NOT_FOUND" | "COULD_NOT_VERIFY" };

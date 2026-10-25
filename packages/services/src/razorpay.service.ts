@@ -172,6 +172,45 @@ export const RazorpayService = {
     }
   },
 
+  /**
+   * Every PAID invoice Razorpay has recorded against a Subscription — the reconciliation path
+   * for when its own webhook never reached us (never delivered, delivered while the app was
+   * down, rejected by a transient signature/env mismatch, …): webhooks are a best-effort retry
+   * mechanism on Razorpay's side, not a guarantee, so this exists to replay history straight from
+   * Razorpay's own records rather than ever leave a real, successfully-charged subscription
+   * stranded with no corresponding BIKIE membership. Returns oldest-first (billing order matters:
+   * each charge's membership extension logically follows the previous one) and only `status ===
+   * "paid"` invoices — a `draft`/`issued`/`cancelled` one was never actually charged. Returns `[]`
+   * (not `null`) on failure — the caller's loop over an empty array is a safe no-op, and the
+   * error is still logged for an operator to see.
+   */
+  async listSubscriptionInvoices(razorpaySubscriptionId: string): Promise<
+    Array<{ razorpayPaymentId: string; amount: number; billingStart: Date | null; billingEnd: Date | null; paidAt: Date }>
+  > {
+    const creds = credentials();
+    if (!creds) return [];
+
+    try {
+      const result = await getClient(creds.keyId, creds.keySecret).invoices.all({
+        subscription_id: razorpaySubscriptionId,
+        count: 100,
+      });
+      return result.items
+        .filter((inv) => inv.status === "paid" && inv.payment_id)
+        .map((inv) => ({
+          razorpayPaymentId: inv.payment_id!,
+          amount: (inv.amount_paid ?? 0) / 100,
+          billingStart: typeof inv.billing_start === "number" ? new Date(inv.billing_start * 1000) : null,
+          billingEnd: typeof inv.billing_end === "number" ? new Date(inv.billing_end * 1000) : null,
+          paidAt: typeof inv.paid_at === "number" ? new Date(inv.paid_at * 1000) : new Date(inv.created_at * 1000),
+        }))
+        .sort((a, b) => a.paidAt.getTime() - b.paidAt.getTime());
+    } catch (err) {
+      console.error("[Razorpay][listSubscriptionInvoices] fetch failed:", err);
+      return [];
+    }
+  },
+
   /** `cancelAtCycleEnd: true` lets the provider keep the already-paid-for current period instead
    * of losing access immediately — the caller decides based on `currentPeriodEnd`/`endDate`,
    * this just forwards to Razorpay. Returns `null` on failure (logged), never throws. */

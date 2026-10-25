@@ -41,6 +41,7 @@ vi.mock("./razorpay.service", () => ({
     createSubscription: vi.fn(),
     cancelSubscription: vi.fn(),
     fetchSubscription: vi.fn(),
+    listSubscriptionInvoices: vi.fn(async () => []),
   },
 }));
 
@@ -71,6 +72,7 @@ const razorpay = RazorpayService as unknown as {
   createSubscription: ReturnType<typeof vi.fn>;
   cancelSubscription: ReturnType<typeof vi.fn>;
   fetchSubscription: ReturnType<typeof vi.fn>;
+  listSubscriptionInvoices: ReturnType<typeof vi.fn>;
 };
 
 const paidPlan = { id: "sp-plan", name: "Service Provider Membership", description: "", price: 99, durationDays: 30, benefits: [], isActive: true };
@@ -102,6 +104,7 @@ afterEach(() => {
   billing.createRecurringPartnerInvoice.mockResolvedValue({ id: "inv-recurring-1" });
   webhookRepo.tryClaimEvent.mockResolvedValue(true);
   razorpay.isConfigured.mockReturnValue(true);
+  razorpay.listSubscriptionInvoices.mockResolvedValue([]);
 });
 
 describe("PartnerMembershipService.purchaseMembership (ADR-069/070)", () => {
@@ -601,5 +604,91 @@ describe("PartnerMembershipService.claimWebhookEvent (idempotency)", () => {
     expect(result).toBe(false);
     expect(log.mock.calls.some((c) => String(c[0]).includes("SUBSCRIPTION_WEBHOOK_DUPLICATE"))).toBe(true);
     log.mockRestore();
+  });
+});
+
+describe("PartnerMembershipService.reconcileSubscription (admin-triggered, webhook-missed recovery)", () => {
+  it("rejects NOT_FOUND for an unknown subscription id", async () => {
+    repo.findByRazorpaySubscriptionId.mockResolvedValueOnce(null);
+
+    const result = await PartnerMembershipService.reconcileSubscription("sub_unknown");
+
+    expect(result).toEqual({ ok: false, reason: "NOT_FOUND" });
+    expect(razorpay.fetchSubscription).not.toHaveBeenCalled();
+  });
+
+  it("rejects COULD_NOT_VERIFY when Razorpay's live state can't be fetched — never guesses toward charging/activating anything", async () => {
+    repo.findByRazorpaySubscriptionId.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan));
+    razorpay.fetchSubscription.mockResolvedValueOnce(null);
+
+    const result = await PartnerMembershipService.reconcileSubscription("sub_abc123");
+
+    expect(result).toEqual({ ok: false, reason: "COULD_NOT_VERIFY" });
+    expect(razorpay.listSubscriptionInvoices).not.toHaveBeenCalled();
+  });
+
+  it("replays every paid invoice Razorpay has, oldest first, through the exact same recordRecurringCharge path the webhook itself uses", async () => {
+    repo.findByRazorpaySubscriptionId.mockResolvedValue(subscriptionMembershipOn(paidPlan));
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "active", paidCount: 2 });
+    razorpay.listSubscriptionInvoices.mockResolvedValueOnce([
+      {
+        razorpayPaymentId: "pay_1",
+        amount: 99,
+        billingStart: new Date("2026-09-25T00:00:00.000Z"),
+        billingEnd: new Date("2026-10-25T00:00:00.000Z"),
+        paidAt: new Date("2026-09-25T00:05:00.000Z"),
+      },
+      {
+        razorpayPaymentId: "pay_2",
+        amount: 99,
+        billingStart: new Date("2026-10-25T00:00:00.000Z"),
+        billingEnd: new Date("2026-11-25T00:00:00.000Z"),
+        paidAt: new Date("2026-10-25T00:05:00.000Z"),
+      },
+    ]);
+    repo.recordSubscriptionCharge
+      .mockResolvedValueOnce({ ...subscriptionMembershipOn(paidPlan), endDate: "2026-10-25T00:00:00.000Z" })
+      .mockResolvedValueOnce({ ...subscriptionMembershipOn(paidPlan), endDate: "2026-11-25T00:00:00.000Z" });
+
+    const result = await PartnerMembershipService.reconcileSubscription("sub_abc123");
+
+    expect(repo.recordSubscriptionCharge).toHaveBeenNthCalledWith(
+      1,
+      "pm-1",
+      expect.objectContaining({ lastPaymentId: "pay_1", currentPeriodEnd: new Date("2026-10-25T00:00:00.000Z") }),
+    );
+    expect(repo.recordSubscriptionCharge).toHaveBeenNthCalledWith(
+      2,
+      "pm-1",
+      expect.objectContaining({ lastPaymentId: "pay_2", currentPeriodEnd: new Date("2026-11-25T00:00:00.000Z") }),
+    );
+    expect(billing.createRecurringPartnerInvoice).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ razorpayPaymentId: "pay_1", paidAt: new Date("2026-09-25T00:05:00.000Z") }),
+    );
+    expect(billing.createRecurringPartnerInvoice).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ razorpayPaymentId: "pay_2", paidAt: new Date("2026-10-25T00:05:00.000Z") }),
+    );
+    expect(result).toEqual({
+      ok: true,
+      membership: expect.objectContaining({ endDate: "2026-11-25T00:00:00.000Z" }),
+      invoicesFound: 2,
+    });
+  });
+
+  it("is a safe no-op when no paid invoices exist, but still syncs the local status to Razorpay's own live status (e.g. a cancellation whose webhook also never arrived)", async () => {
+    const existing = subscriptionMembershipOn(paidPlan, { subscriptionStatus: "created" });
+    repo.findByRazorpaySubscriptionId.mockResolvedValueOnce(existing);
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "cancelled", paidCount: 0 });
+    razorpay.listSubscriptionInvoices.mockResolvedValueOnce([]);
+    const synced = { ...existing, subscriptionStatus: "cancelled" };
+    repo.updateSubscriptionStatus.mockResolvedValueOnce(synced);
+
+    const result = await PartnerMembershipService.reconcileSubscription("sub_abc123");
+
+    expect(repo.updateSubscriptionStatus).toHaveBeenCalledWith("pm-1", "cancelled", {});
+    expect(repo.recordSubscriptionCharge).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, membership: synced, invoicesFound: 0 });
   });
 });
