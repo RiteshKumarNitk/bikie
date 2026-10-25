@@ -61,6 +61,15 @@ export const reconcilePartnerSubscriptionSchema = z.object({
 
 export type ReconcilePartnerSubscriptionInput = z.infer<typeof reconcilePartnerSubscriptionSchema>;
 
+/** `POST /api/admin/partner-membership/subscriptions/cancel` — admin-triggered cancellation of
+ * any Service Provider's subscription (not scoped to the calling admin), identified by its
+ * Razorpay Subscription id. */
+export const adminCancelPartnerSubscriptionSchema = z.object({
+  razorpaySubscriptionId: z.string().min(1),
+});
+
+export type AdminCancelPartnerSubscriptionInput = z.infer<typeof adminCancelPartnerSubscriptionSchema>;
+
 export const createPartnerMembershipPlanSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().min(1).max(2000),

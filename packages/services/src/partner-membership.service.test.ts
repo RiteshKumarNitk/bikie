@@ -11,6 +11,7 @@ vi.mock("@bikie/database", () => ({
     findByRazorpaySubscriptionId: vi.fn(async () => null),
     recordSubscriptionCharge: vi.fn(),
     updateSubscriptionStatus: vi.fn(),
+    listAllSubscriptions: vi.fn(async () => []),
   },
   billingRepository: {
     createInvoice: vi.fn(async () => ({ id: "inv-1", confirmationSmsSentAt: null })),
@@ -60,6 +61,7 @@ const repo = partnerMembershipRepository as unknown as {
   findByRazorpaySubscriptionId: ReturnType<typeof vi.fn>;
   recordSubscriptionCharge: ReturnType<typeof vi.fn>;
   updateSubscriptionStatus: ReturnType<typeof vi.fn>;
+  listAllSubscriptions: ReturnType<typeof vi.fn>;
 };
 const billing = billingRepository as unknown as {
   createInvoice: ReturnType<typeof vi.fn>;
@@ -105,6 +107,7 @@ afterEach(() => {
   webhookRepo.tryClaimEvent.mockResolvedValue(true);
   razorpay.isConfigured.mockReturnValue(true);
   razorpay.listSubscriptionInvoices.mockResolvedValue([]);
+  repo.listAllSubscriptions.mockResolvedValue([]);
 });
 
 describe("PartnerMembershipService.purchaseMembership (ADR-069/070)", () => {
@@ -458,6 +461,54 @@ describe("PartnerMembershipService.cancelSubscription (recurring)", () => {
     razorpay.cancelSubscription.mockResolvedValueOnce(null);
 
     const result = await PartnerMembershipService.cancelSubscription("user-1");
+
+    expect(result).toEqual({ ok: false, reason: "CANCEL_FAILED" });
+    expect(repo.updateSubscriptionStatus).not.toHaveBeenCalled();
+  });
+});
+
+describe("PartnerMembershipService.listAllSubscriptions (admin)", () => {
+  it("returns whatever the repository's admin listing returns, unmodified", async () => {
+    const rows = [
+      { ...subscriptionMembershipOn(paidPlan), userName: "Ravi Kumar", userEmail: "ravi@example.com", userPhone: "+919000000000" },
+    ];
+    repo.listAllSubscriptions.mockResolvedValueOnce(rows);
+
+    const result = await PartnerMembershipService.listAllSubscriptions();
+
+    expect(result).toEqual(rows);
+  });
+});
+
+describe("PartnerMembershipService.adminCancelSubscription (admin, not scoped to a calling user)", () => {
+  it("cancels by Razorpay subscription id alone — never requires knowing which user owns it", async () => {
+    const open = subscriptionMembershipOn(paidPlan, { subscriptionStatus: "active" });
+    repo.findByRazorpaySubscriptionId.mockResolvedValueOnce(open);
+    razorpay.cancelSubscription.mockResolvedValueOnce({ id: "sub_abc123", status: "active", shortUrl: "" });
+    const updated = { ...open, cancelledAt: "2026-10-25T12:00:00.000Z" };
+    repo.updateSubscriptionStatus.mockResolvedValueOnce(updated);
+
+    const result = await PartnerMembershipService.adminCancelSubscription("sub_abc123");
+
+    expect(razorpay.cancelSubscription).toHaveBeenCalledWith("sub_abc123", true); // cancelAtCycleEnd — same as self-service
+    expect(repo.updateSubscriptionStatus).toHaveBeenCalledWith("pm-1", "active", { cancelledAt: expect.any(Date) });
+    expect(result).toEqual({ ok: true, membership: updated });
+  });
+
+  it("rejects NOT_FOUND for an unknown Razorpay subscription id", async () => {
+    repo.findByRazorpaySubscriptionId.mockResolvedValueOnce(null);
+
+    const result = await PartnerMembershipService.adminCancelSubscription("sub_unknown");
+
+    expect(result).toEqual({ ok: false, reason: "NOT_FOUND" });
+    expect(razorpay.cancelSubscription).not.toHaveBeenCalled();
+  });
+
+  it("rejects CANCEL_FAILED when Razorpay's own cancellation call fails, without touching the DB row", async () => {
+    repo.findByRazorpaySubscriptionId.mockResolvedValueOnce(subscriptionMembershipOn(paidPlan));
+    razorpay.cancelSubscription.mockResolvedValueOnce(null);
+
+    const result = await PartnerMembershipService.adminCancelSubscription("sub_abc123");
 
     expect(result).toEqual({ ok: false, reason: "CANCEL_FAILED" });
     expect(repo.updateSubscriptionStatus).not.toHaveBeenCalled();

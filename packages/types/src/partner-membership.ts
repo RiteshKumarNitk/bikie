@@ -32,3 +32,14 @@ export interface PartnerMembershipDTO {
   cancelledAt?: string | null;
   lastPaymentId?: string | null;
 }
+
+/** Admin-only — every `PartnerMembership` row that's ever been subscription-backed
+ * (`razorpaySubscriptionId != null`), with the owning user's identity joined in, so an admin can
+ * see "who's subscribed" without opening each partner's detail page one at a time. Includes a
+ * subscription that was created but never activated (no payment yet) — the exact case a webhook
+ * failure can otherwise leave invisible everywhere else in the admin panel. */
+export interface AdminPartnerSubscriptionDTO extends PartnerMembershipDTO {
+  userName: string;
+  userEmail: string;
+  userPhone: string | null;
+}

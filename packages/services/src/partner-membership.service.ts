@@ -1,5 +1,5 @@
 import { billingRepository, partnerMembershipRepository, razorpayWebhookRepository, userRepository } from "@bikie/database";
-import type { PartnerMembershipPlanDTO, PartnerMembershipDTO } from "@bikie/types";
+import type { PartnerMembershipPlanDTO, PartnerMembershipDTO, AdminPartnerSubscriptionDTO } from "@bikie/types";
 import { isRealRazorpayPaymentId } from "./billing.internal";
 import { maskPhone } from "./modules/communications/domain/phone";
 import { isTestServiceProviderAccount } from "./modules/identity-access/domain/test-otp-bypass";
@@ -262,6 +262,39 @@ export const PartnerMembershipService = {
     return { ok: true, membership: updated };
   },
 
+  /** Admin-only "who's subscribed" view — see `partnerMembershipRepository.listAllSubscriptions`'s
+   * own doc comment for why this is sourced from `PartnerMembership` rows directly rather than
+   * invoices/transactions. */
+  async listAllSubscriptions(): Promise<AdminPartnerSubscriptionDTO[]> {
+    return partnerMembershipRepository.listAllSubscriptions();
+  },
+
+  /**
+   * Admin-triggered cancellation of ANY Service Provider's subscription, identified by its
+   * Razorpay Subscription id (not scoped to the calling user — `cancelSubscription` above is the
+   * self-service version for that). Same `cancelAtCycleEnd: true` behavior: Razorpay won't
+   * attempt another charge, but the already-paid-for current period is never retroactively
+   * revoked. Used for cases the Service Provider can't or won't cancel themselves (support
+   * request, fraud, a subscription stuck in `created` with no owner-visible way to cancel it from
+   * the app, …).
+   */
+  async adminCancelSubscription(razorpaySubscriptionId: string): Promise<AdminCancelSubscriptionResult> {
+    const membership = await partnerMembershipRepository.findByRazorpaySubscriptionId(razorpaySubscriptionId);
+    if (!membership) return { ok: false, reason: "NOT_FOUND" };
+
+    const result = await RazorpayService.cancelSubscription(razorpaySubscriptionId, true);
+    if (!result) return { ok: false, reason: "CANCEL_FAILED" };
+
+    const updated = await partnerMembershipRepository.updateSubscriptionStatus(membership.id, result.status, {
+      cancelledAt: new Date(),
+    });
+    console.log(
+      `SUBSCRIPTION_CANCELLED_BY_ADMIN userId=${membership.userId} membershipId=${membership.id} ` +
+        `razorpaySubscriptionId=${razorpaySubscriptionId} status=${result.status} retainsAccessUntil=${updated.endDate}`,
+    );
+    return { ok: true, membership: updated };
+  },
+
   /**
    * Webhook-driven (`subscription.activated` with a payment, or `subscription.charged`) —
    * records a successful recurring charge: extends `endDate`/`currentPeriodEnd`, stamps
@@ -405,3 +438,7 @@ export type CancelSubscriptionResult =
 export type ReconcileSubscriptionResult =
   | { ok: true; membership: PartnerMembershipDTO; invoicesFound: number }
   | { ok: false; reason: "NOT_FOUND" | "COULD_NOT_VERIFY" };
+
+export type AdminCancelSubscriptionResult =
+  | { ok: true; membership: PartnerMembershipDTO }
+  | { ok: false; reason: "NOT_FOUND" | "CANCEL_FAILED" };

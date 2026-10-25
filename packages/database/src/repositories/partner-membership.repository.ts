@@ -256,6 +256,26 @@ export async function findByRazorpaySubscriptionId(razorpaySubscriptionId: strin
   return membership ? toMembershipDTO(membership) : null;
 }
 
+/** Admin-only "who's subscribed" view — every `PartnerMembership` row that's ever been
+ * subscription-backed, most recent first, with the owning user's identity joined in. Deliberately
+ * NOT sourced from invoices/transactions: a subscription that was created but never successfully
+ * charged (no invoice exists for it yet — exactly what a missed webhook leaves behind) would be
+ * invisible in any transaction-based view, but still needs to show up here so an admin can find
+ * and reconcile/cancel it. */
+export async function listAllSubscriptions() {
+  const rows = await prisma.partnerMembership.findMany({
+    where: { razorpaySubscriptionId: { not: null } },
+    include: { plan: true, user: { select: { name: true, email: true, phoneNumber: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  return rows.map((row) => ({
+    ...toMembershipDTO(row),
+    userName: row.user.name,
+    userEmail: row.user.email,
+    userPhone: row.user.phoneNumber,
+  }));
+}
+
 /**
  * The successful-recurring-payment path (`subscription.activated`/`subscription.charged`
  * webhook events, when a payment accompanies them): keeps `status` ACTIVE, extends `endDate` to
