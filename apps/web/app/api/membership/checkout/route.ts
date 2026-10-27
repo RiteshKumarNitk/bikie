@@ -1,14 +1,17 @@
 import { NextResponse } from "next/server";
-import { MembershipService, RazorpayService } from "@bikie/services";
+import { MembershipService } from "@bikie/services";
 import { checkoutMembershipSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
 
 /**
- * `POST /api/membership/checkout` (ADR-043) — creates a real Razorpay order for a plan, priced
- * server-side (never trusts a client-supplied amount). While Razorpay isn't configured (no live
- * keys yet), returns `{ razorpayConfigured: false }` and nothing else — the client's existing
- * simulated-checkout flow (`PaymentModal.tsx`) keeps working exactly as it did before this
- * existed, unchanged, and posts straight to `/api/membership/purchase` with a dummy `paymentId`.
+ * `POST /api/membership/checkout` (ADR-043, narrowed by the yearly-auto-debit-only change,
+ * mirroring ADR-094's Service Provider narrowing) — a free plan (server-side price 0) activates
+ * directly, never reaching Razorpay. The Rider test account (`TEST_RIDER_PHONE`) still gets the
+ * simulated checkout for a paid plan, since it can't complete a real Razorpay Subscription mandate
+ * authorization during app-store review. Every other paid-plan request is rejected outright: Rider
+ * membership only ever charges through a real Razorpay Subscription
+ * (`POST /api/membership/subscription`), never a one-time order — `/api/partner-membership/
+ * checkout` (Service Provider) is untouched and was narrowed the same way first.
  */
 export async function POST(request: Request) {
   const { session, error } = await requireSession();
@@ -19,32 +22,31 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  if (!RazorpayService.isConfigured()) {
-    // ADR-069 — in production, unconfigured Razorpay means payments are unavailable, not that
-    // the simulated (no-charge) checkout should stand in. Only dev/preview falls back.
-    if (!RazorpayService.isDevFallbackAllowed()) {
-      return NextResponse.json(
-        { error: "PAYMENTS_UNAVAILABLE", message: "Payments are temporarily unavailable. Please try again later." },
-        { status: 503 },
-      );
-    }
-    return NextResponse.json({ razorpayConfigured: false });
-  }
-
   const plan = await MembershipService.getPlanById(parsed.data.planId);
   if (!plan || !plan.isActive) {
     return NextResponse.json({ error: "PLAN_NOT_FOUND" }, { status: 404 });
   }
 
-  const order = await RazorpayService.createOrder(
-    plan.price,
-    // Razorpay caps `receipt` at 40 chars — keep it short; full ids are in `notes` below.
-    `mem_${Date.now().toString(36)}_${session.user.id.slice(-8)}`,
-    { userId: session.user.id, planId: plan.id, planName: plan.name, accountType: "RIDER" },
-  );
-  if (!order) {
-    return NextResponse.json({ error: "CHECKOUT_UNAVAILABLE", message: "Payment checkout is unavailable right now." }, { status: 503 });
+  if (plan.price === 0) {
+    return NextResponse.json({ razorpayConfigured: false, free: true });
   }
 
-  return NextResponse.json({ razorpayConfigured: true, order, plan: { id: plan.id, name: plan.name, price: plan.price } });
+  // The store-review/QA Rider test account never goes to Razorpay: it gets the simulated checkout
+  // (web shows the test card form, mobile activates directly), which `/purchase` accepts for this
+  // account only.
+  if (MembershipService.isPaymentExemptTestAccount(session.user.phoneNumber)) {
+    return NextResponse.json({ razorpayConfigured: false, testAccount: true });
+  }
+
+  // Rider membership is yearly-auto-debit-only — a real Rider never gets a one-time order for a
+  // paid plan; `POST /api/membership/subscription` (a real Razorpay Subscription + mandate) is the
+  // only paid path. Checked server-side so an old mobile build or a direct API call can't bypass
+  // the UI's "Start Yearly Membership" button either.
+  return NextResponse.json(
+    {
+      error: "ONE_TIME_CHECKOUT_DISABLED",
+      message: "Membership is yearly auto-renewing only. Use the subscription endpoint to start it.",
+    },
+    { status: 403 },
+  );
 }

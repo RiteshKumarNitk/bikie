@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-10-27 — Rider membership is now yearly-auto-debit-only for new purchases
+
+Testing on a real device surfaced the actual UX bug: the "Start Yearly Membership" subscription
+button added for Riders was a secondary button below the old "Pay once" one-time button, which
+stayed primary/default. A real Rider naturally tapped "Pay once" first and saw no auto-renewal
+messaging at all — correctly, since that path genuinely isn't a subscription, but confusing since
+the new feature looked like it wasn't there.
+
+Fixed by giving Rider the exact same treatment Service Provider membership already got on
+2026-10-24: "Pay once" is removed entirely for a real Rider account. The only paid action is now
+"Start Yearly Membership — ₹149/year", enforced both in the UI (web `/membership`, mobile
+`membership_screen.dart`) and server-side (`/api/membership/checkout` and `.../purchase` now
+return `403 ONE_TIME_CHECKOUT_DISABLED`/`ONE_TIME_PURCHASE_DISABLED` for any real Rider's paid-plan
+request, mirroring `/api/partner-membership/checkout`/`.../purchase` exactly). The store-review/QA
+Rider test account (new `TEST_RIDER_PHONE`-backed `isTestRiderAccount`/`isPaymentExemptTestAccount`,
+mirroring the SP ones) keeps the old one-time path, since it can't complete a real Razorpay mandate
+authorization. Free plans are unaffected. An existing Rider's already-active one-time membership
+is completely untouched — its `status`/`endDate` are never modified and nothing silently converts
+it into a subscription — this only changes what a *new* purchase offers.
+
+Also relaxed `purchaseMembershipSchema` to match `purchasePartnerMembershipSchema`: `planId` alone
+is now valid input (the schema previously required `paymentId` unconditionally, a leftover from
+before the subscription option existed).
+
+Tests: 2 new route test files (`membership/checkout/route.test.ts`,
+`membership/purchase/route.test.ts`) mirroring the SP ones exactly — neither existed before this
+change, matching a pre-existing test-coverage gap on the Rider side. `vitest` 575→583. `tsc
+--noEmit` clean, `next build` clean, `web lint` 0 new issues, `flutter analyze` clean, `flutter
+test` 236/236. See ADR-097.
+
 ## 2026-10-27 — Admin: global on/off per channel for SOS notifications (push, SMS)
 
 Until now, every SOS alert unconditionally sent both FCM push and SMS (plus WhatsApp/email) to

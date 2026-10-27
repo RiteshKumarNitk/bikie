@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Rider membership: yearly auto-debit only, no "Pay once" for new purchases (2026-10-27)
+
+| Task | Status |
+|---|---|
+| Root cause confirmed via real-device testing: "Start Yearly Membership" was a secondary button below the still-primary "Pay once" one-time button, so a real Rider's natural first tap showed no auto-renewal messaging | Completed |
+| New `isTestRiderAccount` (`TEST_RIDER_PHONE`) + `MembershipService.isPaymentExemptTestAccount`, mirroring the SP equivalents exactly | Completed |
+| `/api/membership/checkout` + `.../purchase` rewritten to mirror `/api/partner-membership/checkout`/`.../purchase`: free plan activates directly, Rider test account bypasses payment, every other paid-plan request gets `403 ONE_TIME_CHECKOUT_DISABLED`/`ONE_TIME_PURCHASE_DISABLED` | Completed |
+| `purchaseMembershipSchema` relaxed to allow `planId` alone (previously required `paymentId` unconditionally) | Completed |
+| Web `/membership` + mobile `membership_screen.dart`: "Pay once" removed for real Riders; single primary action "Start Yearly Membership — ₹{price}/year" + "Auto-renews automatically" label; test account still sees the old UI | Completed |
+| Existing Rider's already-active one-time membership | Untouched — confirmed by design, `status`/`endDate` never modified |
+| New `checkout/route.test.ts` + `purchase/route.test.ts` (8 tests total, mirroring the SP route tests — neither existed before) | Completed — `vitest` 575→583 |
+| `tsc --noEmit`, `next build`, `web lint`, `flutter analyze`, `flutter test` | Completed — all clean, 236/236 |
+
 ## Admin: global on/off per channel for SOS notifications, push + SMS (2026-10-27)
 
 | Task | Status |

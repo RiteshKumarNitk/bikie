@@ -1,6 +1,7 @@
 import { billingRepository, membershipRepository, userRepository } from "@bikie/database";
 import type { MembershipPlanDTO, UserMembershipDTO, AdminUserSubscriptionDTO } from "@bikie/types";
 import { maskPhone } from "./modules/communications/domain/phone";
+import { isTestRiderAccount } from "./modules/identity-access/domain/test-otp-bypass";
 import { MSG91_SMS_TEMPLATE_ENV, SMSService } from "./sms.service";
 import { isRealRazorpayPaymentId } from "./billing.internal";
 import { RazorpayService } from "./razorpay.service";
@@ -23,6 +24,15 @@ export const MembershipService = {
 
   async getPlanById(planId: string): Promise<MembershipPlanDTO | null> {
     return membershipRepository.findPlanById(planId);
+  },
+
+  /** ADR-089-equivalent for Riders — mirrors `PartnerMembershipService.isPaymentExemptTestAccount`
+   * exactly. The allowlisted store-review/QA Rider test account (`TEST_RIDER_PHONE`, only while
+   * the ADR-072 test bypass is enabled) activates a paid plan without a real payment — it can't
+   * complete a real Razorpay Subscription mandate authorization during app-store review. Never
+   * true for any other account. */
+  isPaymentExemptTestAccount(phoneNumber: string | null | undefined): boolean {
+    return isTestRiderAccount(phoneNumber);
   },
 
   /** ADR-058 — the "BIKIE_Sub" DLT SMS confirmation is a best-effort side effect fired after the

@@ -65,6 +65,15 @@ export function isTestServiceProviderAccount(phoneNumber: string | null | undefi
   return phones.length > 0 && phones.includes(toE164Phone(phoneNumber));
 }
 
+/** Mirrors `isTestServiceProviderAccount` exactly, for the Rider test account
+ * (`TEST_RIDER_PHONE`) — lets the store-review/QA Rider account activate a paid yearly membership
+ * without a real Razorpay Subscription mandate authorization. */
+export function isTestRiderAccount(phoneNumber: string | null | undefined): boolean {
+  if (!phoneNumber || !isTestOtpBypassEnabled()) return false;
+  const phones = parseTestPhones(process.env.TEST_RIDER_PHONE);
+  return phones.length > 0 && phones.includes(toE164Phone(phoneNumber));
+}
+
 export function matchesTestOtpCode(code: string): boolean {
   if (!isTestOtpBypassEnabled()) return false;
   return configuredTestOtp() === code;

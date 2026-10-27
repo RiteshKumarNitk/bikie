@@ -8,14 +8,11 @@ export const checkoutMembershipSchema = z.object({
 export type CheckoutMembershipInput = z.infer<typeof checkoutMembershipSchema>;
 
 /**
- * `POST /api/membership/purchase` accepts either shape (ADR-043):
- *  - `paymentId` alone — the pre-Razorpay simulated-checkout path, only honored by the route
- *    while `RazorpayService.isConfigured()` is false (no live keys set).
- *  - `razorpayOrderId`/`razorpayPaymentId`/`razorpaySignature` together — the real path, the
- *    route verifies the signature server-side before ever creating a membership.
- * The schema only enforces "one full shape or the other, not a partial mix"; which shape is
- * actually *acceptable* is a runtime decision the route makes based on whether Razorpay is
- * configured — not something client input should be able to opt out of once real money is live.
+ * `POST /api/membership/purchase` (narrowed by the yearly-auto-debit-only change, mirroring
+ * `purchasePartnerMembershipSchema`): `planId` alone is valid — the route's own free-plan and
+ * Rider-test-account branches need neither `paymentId` nor Razorpay fields, and every other
+ * paid-plan request is rejected by the route regardless of what's supplied here. When Razorpay
+ * fields ARE supplied (the test account may send one), all three must be present together.
  */
 export const purchaseMembershipSchema = z
   .object({
@@ -27,18 +24,12 @@ export const purchaseMembershipSchema = z
   })
   .superRefine((data, ctx) => {
     const hasRazorpayFields = data.razorpayOrderId || data.razorpayPaymentId || data.razorpaySignature;
-    if (hasRazorpayFields) {
-      if (!data.razorpayOrderId || !data.razorpayPaymentId || !data.razorpaySignature) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          path: ["razorpaySignature"],
-          message: "razorpayOrderId, razorpayPaymentId, and razorpaySignature must all be provided together",
-        });
-      }
-      return;
-    }
-    if (!data.paymentId) {
-      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ["paymentId"], message: "paymentId is required" });
+    if (hasRazorpayFields && (!data.razorpayOrderId || !data.razorpayPaymentId || !data.razorpaySignature)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["razorpaySignature"],
+        message: "razorpayOrderId, razorpayPaymentId, and razorpaySignature must all be provided together",
+      });
     }
   });
 

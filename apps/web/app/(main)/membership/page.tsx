@@ -8,6 +8,7 @@ import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { PaymentModal, prefillFromSessionUser } from "@/components/membership/PaymentModal";
 import { BillingHistory } from "@/components/membership/BillingHistory";
 import { subscriptionDisplayState } from "@/lib/subscription-display";
+import { isTestPhoneNumber } from "@/lib/test-phone";
 
 interface Plan {
   id: string;
@@ -30,15 +31,17 @@ interface ActiveMembership {
   cancelledAt?: string | null;
 }
 
-/** ADR-043/ (Rider yearly auto-renewal) — the Rider's own membership, entirely separate from the
- * Service Provider `/partner/membership` page it mirrors. A free plan activates immediately with
- * no payment step; a paid plan offers BOTH the existing one-time purchase ("Pay once" — never
- * removed; an existing Rider's active membership keeps working exactly as it always has, and
- * nothing here silently converts it into a subscription) and, alongside it, a real recurring
- * Razorpay Subscription ("Start Yearly Membership") the Rider explicitly authorizes. */
+/** ADR-043/ADR-095 (Rider yearly auto-renewal) — the Rider's own membership, entirely separate
+ * from the Service Provider `/partner/membership` page it mirrors (same narrowing as ADR-094's
+ * SP page). A free plan activates immediately with no payment step. A paid plan is
+ * yearly-auto-debit-only for a real Rider — the sole action is "Start Yearly Membership" (a real
+ * recurring Razorpay Subscription); "Pay once" only still appears for the store-review/QA test
+ * account, which can't complete a real mandate authorization. An existing Rider's already-active
+ * one-time membership is untouched either way — this only changes what a NEW purchase offers. */
 export default function MembershipPage() {
   const router = useRouter();
   const { data: session } = authClient.useSession();
+  const isTestAccount = isTestPhoneNumber(session?.user?.phoneNumber ?? "");
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
@@ -303,6 +306,15 @@ export default function MembershipPage() {
           {plans.map((plan) => {
             const isActivePlan = activeMembership?.planId === plan.id;
             const isFree = plan.price === 0;
+            // The store-review/QA Rider test account only — the sole remaining path that can
+            // still use the one-time "Pay once" flow, since it can't complete a real Razorpay
+            // mandate authorization. Every other Rider sees exactly one paid action: the real
+            // yearly subscription. The backend enforces this independently of what the UI shows
+            // (`ONE_TIME_CHECKOUT_DISABLED`/`ONE_TIME_PURCHASE_DISABLED`), so this is a UX choice,
+            // not the only thing standing between a real Rider and a one-time payment. An existing
+            // Rider's already-active one-time membership keeps working exactly as it always has —
+            // this only affects the buttons shown for a NEW purchase.
+            const showLegacyPayOnce = !isFree && isTestAccount;
             return (
               <div
                 key={plan.id}
@@ -321,6 +333,9 @@ export default function MembershipPage() {
                   <span className="text-3xl font-bold">₹{plan.price}</span>
                   <span className="text-sm text-foreground/50"> / {plan.durationDays} days</span>
                 </p>
+                {!isFree && !showLegacyPayOnce && (
+                  <p className="mt-1 text-sm font-medium text-accent-text">Auto-renews automatically</p>
+                )}
                 <ul className="mt-6 space-y-3">
                   {plan.benefits.map((benefit, i) => (
                     <li key={i} className="flex items-start gap-2 text-sm">
@@ -329,25 +344,23 @@ export default function MembershipPage() {
                     </li>
                   ))}
                 </ul>
-                <button
-                  type="button"
-                  onClick={() => handlePurchase(plan)}
-                  disabled={isActivePlan}
-                  className="mt-8 w-full rounded-xl bg-accent py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
-                >
-                  {isActivePlan ? "✓ Active" : isFree ? "Get Started" : "Pay once"}
-                </button>
 
-                {/* Recurring auto-renewing alternative to the one-time button above — only for a
-                    paid plan; the one-time path above remains available either way, and nothing
-                    here silently converts an existing one-time membership into a subscription. */}
-                {!isFree && (
+                {isFree || showLegacyPayOnce ? (
+                  <button
+                    type="button"
+                    onClick={() => handlePurchase(plan)}
+                    disabled={isActivePlan}
+                    className="mt-8 w-full rounded-xl bg-accent py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
+                  >
+                    {isActivePlan ? "✓ Active" : isFree ? "Get Started" : "Pay once"}
+                  </button>
+                ) : (
                   <>
                     <button
                       type="button"
                       onClick={() => handleStartSubscription(plan)}
                       disabled={isActivePlan || subscribingPlanId === plan.id}
-                      className="mt-2 w-full rounded-xl border border-accent py-3 text-sm font-semibold text-accent-text transition-colors hover:bg-accent/10 disabled:opacity-50"
+                      className="mt-8 w-full rounded-xl bg-accent py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
                     >
                       {isActivePlan
                         ? "✓ Active"
@@ -356,9 +369,8 @@ export default function MembershipPage() {
                           : `Start Yearly Membership — ₹${plan.price}/year`}
                     </button>
                     <p className="mt-2 text-center text-xs text-foreground/50">
-                      Auto-renews yearly. ₹{plan.price} will be automatically debited on your renewal date — not a
-                      one-time payment. By subscribing, you authorize BIKIE to automatically charge ₹{plan.price}
-                      every year until you cancel.
+                      Your payment will be automatically debited every year through your authorized Razorpay
+                      payment method.
                     </p>
                   </>
                 )}

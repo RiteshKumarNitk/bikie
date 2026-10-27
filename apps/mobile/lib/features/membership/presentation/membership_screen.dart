@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
+import '../../../core/network/app_config.dart' show isTestPhoneNumber;
 import '../../../core/payments/razorpay_checkout.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
@@ -404,6 +405,14 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   Widget build(BuildContext context) {
     final isFree = widget.plan.price == 0;
     final price = widget.plan.price.toStringAsFixed(0);
+    // Store-review/QA Rider test account only — the sole remaining path that can still use the
+    // one-time Purchase flow, since it can't complete a real Razorpay mandate authorization.
+    // Every other Rider sees exactly one paid action: the real yearly subscription. The backend
+    // enforces this independently of what this screen shows (`ONE_TIME_CHECKOUT_DISABLED`/
+    // `ONE_TIME_PURCHASE_DISABLED`), so this is a UX choice, not the only thing standing between a
+    // real Rider and a one-time payment. Mirrors `_PlanCardState.build` (Service Provider) exactly.
+    final phoneNumber = ref.watch(authControllerProvider.select((s) => s.user?.phoneNumber));
+    final showLegacyPayOnce = !isFree && isTestPhoneNumber(phoneNumber ?? '');
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -432,28 +441,35 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
               '₹$price / ${widget.plan.durationDays} days',
               style: Theme.of(context).textTheme.titleSmall,
             ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isPurchasing ? null : _purchase,
-                child: _isPurchasing
-                    ? const SizedBox(
-                        height: 16,
-                        width: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                      )
-                    : Text(isFree ? 'Get Started' : 'Pay once'),
+            if (!isFree && !showLegacyPayOnce) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Auto-renews automatically',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: AppTheme.accentTextOf(context), fontWeight: FontWeight.w600),
               ),
-            ),
-            // Recurring auto-renewing alternative to the one-time button above — only for a paid
-            // plan; the one-time path above remains available either way, and nothing here
-            // silently converts an existing one-time membership into a subscription.
-            if (!isFree) ...[
-              const SizedBox(height: 8),
+            ],
+            const SizedBox(height: 12),
+            if (isFree || showLegacyPayOnce)
               SizedBox(
                 width: double.infinity,
-                child: OutlinedButton(
+                child: ElevatedButton(
+                  onPressed: _isPurchasing ? null : _purchase,
+                  child: _isPurchasing
+                      ? const SizedBox(
+                          height: 16,
+                          width: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : Text(isFree ? 'Get Started' : 'Pay once'),
+                ),
+              )
+            else ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
                   onPressed: _isSubscribing ? null : _subscribe,
                   child: _isSubscribing
                       ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
@@ -462,8 +478,8 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Auto-renews yearly. ₹$price will be automatically debited on your renewal date — not a '
-                'one-time payment.',
+                'Your payment will be automatically debited every year through your authorized Razorpay '
+                'payment method.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],

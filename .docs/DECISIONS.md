@@ -5099,3 +5099,55 @@ than needing a third implementation to add it only for admin.
   (171 routes, +1), `web lint` 0 new issues (the one pre-existing `any` flagged on `/admin/sos/
   page.tsx` predates this change, on a line this change didn't touch). No Flutter changes — this
   feature has no mobile surface.
+
+## ADR-097: Rider membership is yearly-auto-debit-only for new purchases, mirrors the SP narrowing
+
+- **Context.** ADR-095 added a real Razorpay Subscription for Riders ("Start Yearly Membership")
+  *alongside* the existing one-time "Pay once" button, deliberately keeping both so an existing
+  Rider's active one-time membership was never forced to convert. In practice this meant "Pay
+  once" stayed the primary/first button on both web and mobile, with the new subscription option
+  a secondary button below it — a real Rider testing the live app tapped "Pay once" (the obvious
+  first action) and saw no auto-renewal messaging at all, because that path genuinely isn't a
+  subscription. Service Provider membership had already been through exactly this narrowing on
+  2026-10-24 (see the CHANGELOG/TASKS entry of that date — it predates this project's ADR numbering
+  for that specific change): "Pay once" was removed entirely for a real SP, leaving the real
+  monthly subscription as the only paid action, with the ADR-089 store-review/QA test account kept
+  on the old path since it can't complete a real Razorpay mandate authorization. Requested: give
+  Rider the identical treatment.
+- **Decision — narrow Rider to one paid action for a NEW purchase, exactly like SP; an existing
+  active one-time membership is untouched either way.**
+  1. **New `isTestRiderAccount`** (`test-otp-bypass.ts`), mirroring `isTestServiceProviderAccount`
+     exactly — checks only `TEST_RIDER_PHONE`, under the same ADR-072 enablement rule. New
+     `MembershipService.isPaymentExemptTestAccount`, mirroring `PartnerMembershipService`'s own
+     wrapper.
+  2. **`/api/membership/checkout`** rewritten to mirror `/api/partner-membership/checkout` exactly:
+     a free plan (`price === 0`) returns `{ razorpayConfigured: false, free: true }` without ever
+     reaching Razorpay; the Rider test account gets `{ razorpayConfigured: false, testAccount:
+     true }`; every other paid-plan request gets `403 ONE_TIME_CHECKOUT_DISABLED`. The previous
+     unconditional `RazorpayService.createOrder(...)` call (which notably had never special-cased
+     a free plan at all, unlike the SP route) is removed.
+  3. **`/api/membership/purchase`** rewritten the same way: free activates immediately with no
+     payment step; the test account activates without a verified payment (any client-sent
+     reference recorded, otherwise a generated `DUMMY-TEST-ACCOUNT-` one); every other paid-plan
+     request gets `403 ONE_TIME_PURCHASE_DISABLED`, including one with a *real, signature-verified*
+     Razorpay payment — one-time purchase is disabled regardless of verification, matching SP.
+  4. **`purchaseMembershipSchema` relaxed** to match `purchasePartnerMembershipSchema`: `planId`
+     alone is now valid input (previously the schema itself required `paymentId` whenever no
+     Razorpay fields were sent, a leftover from the pre-ADR-095 design where every purchase always
+     carried some payment reference) — the route's own branches decide what's actually acceptable.
+  5. **Web (`/membership`) and mobile (`membership_screen.dart`)**: both now compute
+     `showLegacyPayOnce = !isFree && isTestAccount` (via `isTestPhoneNumber`/`app_config.dart`'s
+     generic test-phone check, already shared across Rider/SP) and render either the legacy
+     "Pay once"/"Get Started" button (free plans and the test account only) or, for everyone else,
+     only "Start Yearly Membership — ₹{price}/year" plus an "Auto-renews automatically" label —
+     byte-for-byte the same conditional structure as the SP pages/screens.
+- **What is unchanged.** An existing Rider's already-active one-time `UserMembership` row — its
+  `status`/`endDate` are never touched by this change, it keeps working exactly per its original
+  expiry, and nothing here silently converts it into a subscription (ADR-095's explicit guarantee,
+  still intact — this narrowing only affects which buttons a NEW purchase offers). Free-plan
+  activation. The subscription creation/cancellation/webhook/reconciliation machinery itself
+  (ADR-095) — untouched, only reached by one more path now that it's the sole paid option.
+- **Consequences.** `vitest` 575→583 (2 new route test files mirroring the SP ones exactly —
+  `membership/checkout/route.test.ts`, `membership/purchase/route.test.ts`, neither existed before
+  this change). `tsc --noEmit` clean, `next build` clean, `web lint` 0 new issues, `flutter analyze`
+  clean, `flutter test` 236/236.
