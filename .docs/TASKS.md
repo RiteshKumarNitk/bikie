@@ -2,6 +2,18 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Fix: Rider subscription creation always failed — wrong total_count for a yearly Plan (2026-10-27)
+
+| Task | Status |
+|---|---|
+| Root cause found via production logs: Razorpay rejected every Rider subscription create call with `BAD_REQUEST_ERROR "Exceeds the maximum total_count (100) allowed for the given period and interval"` — `createSubscription` always sent the monthly value (1200), invalid for a yearly Plan (max 100) | Completed |
+| `RazorpayService.createSubscription` gains an optional `totalCount` param (default: monthly 1200, SP unaffected); new `SUBSCRIPTION_TOTAL_COUNT_YEARLY` (100) | Completed |
+| `MembershipService.startSubscription` passes `SUBSCRIPTION_TOTAL_COUNT_YEARLY` explicitly | Completed |
+| Both constants moved to module scope (fixes a `TS7022` self-reference circularity from referencing `RazorpayService.X` inside its own object-literal initializer) | Completed |
+| New regression test (`razorpay.service.test.ts`) + updated `membership.service.test.ts` assertions that would have let this bug back in silently (previously asserted only 2 of the 3 real call args) | Completed — `vitest` 583→584 |
+| `tsc --noEmit`, `next build` | Completed — both clean |
+| Confirmed NOT a Razorpay Dashboard/Plan-mode issue, despite earlier diagnosis suspecting that — the Plan ID and mode were correct the whole time | Completed |
+
 ## Rider membership: yearly auto-debit only, no "Pay once" for new purchases (2026-10-27)
 
 | Task | Status |

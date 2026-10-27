@@ -1,5 +1,35 @@
 # Changelog
 
+## 2026-10-27 — Fix: Rider subscription creation always failed with "Could not start the subscription"
+
+Real-device testing surfaced a genuine bug (not a Razorpay Dashboard configuration problem, which
+is what the first few rounds of diagnosis suspected): every attempt to start a Rider yearly
+subscription failed with the generic `SUBSCRIPTION_CREATE_FAILED` message. Production logs
+(`[Razorpay][createSubscription] subscription creation failed: ...`) showed Razorpay's real
+rejection: `BAD_REQUEST_ERROR "Exceeds the maximum total_count (100) allowed for the given period
+and interval"`.
+
+Root cause: `RazorpayService.createSubscription` always sent `total_count: 1200` — correct for the
+Service Provider's **monthly** Plan (1200 months = 100 years, the "effectively indefinite" value
+ADR-094 chose), but Razorpay caps `total_count` per billing *period and interval* combination, not
+as one global number. For a **yearly** Plan (Rider, ₹149/year), Razorpay's own maximum is 100 (100
+years) — sending 1200 for a yearly Plan means "1200 years," which Razorpay rejects outright, every
+single time, regardless of Plan ID correctness or Razorpay mode (live vs test). This had nothing to
+do with the Rider Razorpay Plan ID/mode we'd been investigating in prior rounds of diagnosis — the
+Plan itself was fine the whole time.
+
+Fixed: `createSubscription` now takes an optional `totalCount` parameter (defaulting to the
+existing monthly value, so the Service Provider path is completely unaffected) — `MembershipService
+.startSubscription` now passes the new `SUBSCRIPTION_TOTAL_COUNT_YEARLY` (100) explicitly. Both
+constants moved to module scope in `razorpay.service.ts` (a `RazorpayService.X` default-parameter
+self-reference inside the object literal's own initializer hit `TS7022`).
+
+Tests: new regression test in `razorpay.service.test.ts` locking in that a caller-supplied
+`totalCount` is honored instead of the monthly default; `membership.service.test.ts`'s existing
+`startSubscription` tests updated to assert the real call now includes `100` as the third argument
+(both tests previously only asserted 2 args, which would have silently let this exact bug back in
+future). `vitest` 583→584. `tsc --noEmit` clean, `next build` clean.
+
 ## 2026-10-27 — Rider membership is now yearly-auto-debit-only for new purchases
 
 Testing on a real device surfaced the actual UX bug: the "Start Yearly Membership" subscription

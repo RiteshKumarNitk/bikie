@@ -35,6 +35,8 @@ vi.mock("./razorpay.service", () => ({
     cancelSubscription: vi.fn(),
     fetchSubscription: vi.fn(),
     listSubscriptionInvoices: vi.fn(async () => []),
+    SUBSCRIPTION_TOTAL_COUNT: 1200,
+    SUBSCRIPTION_TOTAL_COUNT_YEARLY: 100,
   },
 }));
 
@@ -339,9 +341,13 @@ describe("MembershipService.startSubscription (recurring)", () => {
       membership: created,
       subscription: { id: "sub_rider123", status: "created", shortUrl: "https://rzp.io/i/rider123" },
     });
+    // Yearly cap (100), never the monthly default (1200) — Razorpay rejects 1200 outright for a
+    // yearly Plan ("Exceeds the maximum total_count (100) allowed for the given period and
+    // interval"), which is exactly the bug this asserts against regressing.
     expect(razorpay.createSubscription).toHaveBeenCalledWith(
       "plan_rider_yearly",
       expect.objectContaining({ userId: "user-1", planId: "rider-yearly-plan", accountType: "RIDER" }),
+      100,
     );
     expect(repo.createSubscriptionMembership).toHaveBeenCalledWith("user-1", "rider-yearly-plan", "sub_rider123", "plan_rider_yearly", "created");
     // Not yet eligible per the existing `status === ACTIVE && endDate >= now()` check.
@@ -410,7 +416,7 @@ describe("MembershipService.startSubscription (recurring)", () => {
 
     expect(razorpay.fetchSubscription).toHaveBeenCalledWith("sub_rider123");
     expect(razorpay.cancelSubscription).toHaveBeenCalledWith("sub_rider123", false);
-    expect(razorpay.createSubscription).toHaveBeenCalledWith("plan_rider_yearly", expect.objectContaining({ userId: "user-1" }));
+    expect(razorpay.createSubscription).toHaveBeenCalledWith("plan_rider_yearly", expect.objectContaining({ userId: "user-1" }), 100);
     expect(result).toEqual({
       ok: true,
       membership: created,

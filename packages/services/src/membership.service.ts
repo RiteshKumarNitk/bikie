@@ -221,12 +221,21 @@ export const MembershipService = {
     }
     if (!RazorpayService.isConfigured()) return { ok: false, reason: "NOT_CONFIGURED" };
 
-    const subscription = await RazorpayService.createSubscription(razorpayPlanId, {
-      userId,
-      planId: plan.id,
-      planName: plan.name,
-      accountType: "RIDER",
-    });
+    // Rider membership is yearly, not monthly — Razorpay caps `total_count` per billing
+    // period/interval combination, so the monthly default (1200, "100 years of months") is
+    // invalid here and gets rejected outright (`BAD_REQUEST_ERROR "Exceeds the maximum
+    // total_count (100) allowed for the given period and interval"`). 100 is Razorpay's own cap
+    // for yearly, i.e. "100 years" — the same "effectively indefinite" intent as the SP side.
+    const subscription = await RazorpayService.createSubscription(
+      razorpayPlanId,
+      {
+        userId,
+        planId: plan.id,
+        planName: plan.name,
+        accountType: "RIDER",
+      },
+      RazorpayService.SUBSCRIPTION_TOTAL_COUNT_YEARLY,
+    );
     if (!subscription) return { ok: false, reason: "SUBSCRIPTION_CREATE_FAILED" };
 
     const membership = await membershipRepository.createSubscriptionMembership(

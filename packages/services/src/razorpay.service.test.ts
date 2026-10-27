@@ -114,6 +114,29 @@ describe("RazorpayService.createSubscription / cancelSubscription", () => {
     expect(result).toEqual({ id: "sub_abc", status: "created", shortUrl: "https://rzp.io/i/abc", currentStart: null, currentEnd: null });
   });
 
+  it("createSubscription honors a caller-supplied totalCount instead of the monthly default — regression guard for the yearly-Plan total_count bug", async () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    subscriptionsCreate.mockResolvedValueOnce({
+      id: "sub_yearly",
+      status: "created",
+      short_url: "https://rzp.io/i/yearly",
+      current_start: null,
+      current_end: null,
+    });
+
+    await RazorpayService.createSubscription("plan_yearly", { accountType: "RIDER" }, RazorpayService.SUBSCRIPTION_TOTAL_COUNT_YEARLY);
+
+    // Razorpay's own documented failure for this exact bug: "Exceeds the maximum total_count
+    // (100) allowed for the given period and interval" when 1200 (the monthly default) is sent
+    // for a yearly Plan — this locks in that a yearly caller gets 100, never 1200.
+    expect(subscriptionsCreate).toHaveBeenCalledWith(
+      expect.objectContaining({ plan_id: "plan_yearly", total_count: 100 }),
+    );
+    expect(RazorpayService.SUBSCRIPTION_TOTAL_COUNT_YEARLY).toBe(100);
+    expect(RazorpayService.SUBSCRIPTION_TOTAL_COUNT_YEARLY).not.toBe(RazorpayService.SUBSCRIPTION_TOTAL_COUNT);
+  });
+
   it("createSubscription returns null (logged) when the SDK call throws", async () => {
     vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
     vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");

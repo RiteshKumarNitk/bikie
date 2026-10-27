@@ -30,6 +30,23 @@ export interface RazorpaySubscription {
   currentEnd: number | null;
 }
 
+/** A Subscription has no natural end, but Razorpay's API requires a finite `total_count` of
+ * billing cycles — 1200 months (100 years) is the conventional "effectively indefinite" value
+ * for an open-ended MONTHLY membership (Service Provider, ₹99/month); cancellation is a separate
+ * explicit action (`cancelSubscription`), never reaching this count in practice. Razorpay caps
+ * `total_count` per billing *period and interval* combination, not as one global number — a
+ * yearly Plan's cap is 100 (100 years), not 1200 (which would mean 1200 YEARS and is rejected
+ * outright: `BAD_REQUEST_ERROR "Exceeds the maximum total_count (100) allowed for the given
+ * period and interval"`). Callers on a non-monthly billing cycle must pass their own `totalCount`
+ * to `createSubscription` rather than relying on this default. Defined at module scope (not as a
+ * property on `RazorpayService` itself) so `createSubscription`'s default parameter can reference
+ * it without a `RazorpayService` self-reference in its own initializer (TS7022). */
+const SUBSCRIPTION_TOTAL_COUNT = 1200;
+
+/** Mirrors `SUBSCRIPTION_TOTAL_COUNT`'s "effectively indefinite" intent for a YEARLY Plan
+ * (Rider, ₹149/year) — Razorpay's own maximum for the yearly period/interval combination. */
+const SUBSCRIPTION_TOTAL_COUNT_YEARLY = 100;
+
 /**
  * Real order creation + payment-signature verification (ADR-043) — DEV fallback (no live
  * order, `purchase` accepts a client-supplied `paymentId` directly) preserves the pre-existing
@@ -110,21 +127,25 @@ export const RazorpayService = {
     );
   },
 
-  /** A Subscription has no natural end, but Razorpay's API requires a finite `total_count` of
-   * billing cycles — 1200 months (100 years) is the conventional "effectively indefinite" value
-   * for an open-ended monthly membership; cancellation is a separate explicit action
-   * (`cancelSubscription`), never reaching this count in practice. */
-  SUBSCRIPTION_TOTAL_COUNT: 1200,
+  /** See the module-level `SUBSCRIPTION_TOTAL_COUNT` doc comment. */
+  SUBSCRIPTION_TOTAL_COUNT,
+
+  /** See the module-level `SUBSCRIPTION_TOTAL_COUNT_YEARLY` doc comment. */
+  SUBSCRIPTION_TOTAL_COUNT_YEARLY,
 
   /**
    * Creates a Razorpay Subscription against the given Plan id (a Razorpay Plan — a different
    * object from BIKIE's own `PartnerMembershipPlan` row, configured in env, never hardcoded).
-   * Returns `null` on any Razorpay-side failure, same convention as `createOrder` — the caller
-   * turns that into a clean 503 rather than a 500.
+   * `totalCount` defaults to `SUBSCRIPTION_TOTAL_COUNT` (correct for a monthly Plan only) —
+   * callers on any other billing cycle (e.g. `SUBSCRIPTION_TOTAL_COUNT_YEARLY` for a yearly Plan)
+   * must pass the matching value explicitly; Razorpay rejects a `total_count` that exceeds its
+   * own cap for the Plan's actual period/interval. Returns `null` on any Razorpay-side failure,
+   * same convention as `createOrder` — the caller turns that into a clean 503 rather than a 500.
    */
   async createSubscription(
     planId: string,
     notes?: Record<string, string>,
+    totalCount: number = SUBSCRIPTION_TOTAL_COUNT,
   ): Promise<RazorpaySubscription | null> {
     const creds = credentials();
     if (!creds) return null;
@@ -132,7 +153,7 @@ export const RazorpayService = {
     try {
       const sub = await getClient(creds.keyId, creds.keySecret).subscriptions.create({
         plan_id: planId,
-        total_count: RazorpayService.SUBSCRIPTION_TOTAL_COUNT,
+        total_count: totalCount,
         customer_notify: true,
         ...(notes ? { notes } : {}),
       });
