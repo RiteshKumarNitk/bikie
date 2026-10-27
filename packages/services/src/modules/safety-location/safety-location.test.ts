@@ -1136,6 +1136,48 @@ describe("fan-out dispatch", () => {
     expect(summary.errors).toEqual([]);
   });
 
+  it("admin-disabled push/SMS settings stop responder push and SMS but leave WhatsApp/email untouched", async () => {
+    const sendFlow = vi.fn(async () => ok("msg91"));
+    const notify = vi.fn(async () => undefined);
+    const communications = fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow } });
+
+    const module = createSafetyLocationModule({
+      ...emptyRepos({
+        riderLocation: {
+          ...(emptyRepos().riderLocation as SafetyLocationPorts["riderLocation"]),
+          findNearbyAroundPoint: vi.fn(async () => [
+            { id: "nearby-1", name: "Nearby Rider", phone: "9876543210", email: "nearby@example.com", distanceMeters: 800 },
+          ]),
+        },
+        emergencyContacts: {
+          findByUserId: vi.fn(async () => [
+            { name: "Mom", phone: "9111111111", email: "mom@example.com", relation: "Mother" },
+          ]),
+        },
+        notifications: { notify },
+        sosNotificationSettings: {
+          get: vi.fn(async () => ({ pushEnabled: false, smsEnabled: false, updatedAt: new Date(), updatedByAdminId: "admin-1" })),
+          update: vi.fn(),
+        } as any,
+      }),
+      communications,
+    });
+
+    const summary = await module.dispatch.fanOut(sampleAlert(), {
+      idempotency: { claim: vi.fn(async () => true), remember: vi.fn(async () => undefined), recall: vi.fn(async () => null) },
+    });
+
+    expect(summary.smsAttempted).toBe(0);
+    expect(sendFlow).not.toHaveBeenCalled();
+    // Only the reporter's own "your SOS alert is live" confirmation fires (never gated by the
+    // admin push toggle — it's feedback to the reporter, not a dispatch to a responder); no
+    // responder (emergency contact / nearby rider) gets an in-app push.
+    expect(notify).toHaveBeenCalledTimes(1);
+    expect(notify.mock.calls[0]?.[0]).toBe(sampleAlert().userId);
+    expect(summary.whatsappAttempted).toBeGreaterThan(0);
+    expect(summary.emailAttempted).toBeGreaterThan(0);
+  });
+
   it("skips reporter receipt email for @bikie.local", async () => {
     const emailSend = vi.fn(async () => ok("smtp"));
     const module = createSafetyLocationModule({
@@ -1247,7 +1289,7 @@ describe("fan-out dispatch", () => {
     expect(summary.smsAttempted).toBe(1);
     expect(summary.whatsappAttempted).toBe(0);
     expect(summary.emailAttempted).toBe(0);
-    expect(summary.channels).toEqual({ sms: true, whatsapp: false, email: false });
+    expect(summary.channels).toEqual({ sms: true, whatsapp: false, email: false, push: true });
     // Unconfigured WhatsApp still yields a manual click-to-send link.
     expect(summary.whatsappClickToSend).toHaveLength(1);
   });
@@ -1347,25 +1389,53 @@ describe("channel selection", () => {
       sms: true,
       whatsapp: true,
       email: true,
+      push: true,
     });
   });
 
   it("requires both a configured provider and the matching contact detail", () => {
-    const availability = { sms: true, whatsapp: true, email: true };
+    const availability = { sms: true, whatsapp: true, email: true, push: true };
 
     expect(channelsForRecipient({ phone: "9876543210", email: null }, availability)).toEqual({
       sms: true,
       whatsapp: true,
       email: false,
+      push: true,
     });
     expect(channelsForRecipient({ phone: null, email: "a@b.com" }, availability)).toEqual({
       sms: false,
       whatsapp: false,
       email: true,
+      push: true,
     });
     expect(
-      channelsForRecipient({ phone: "9876543210", email: "a@b.com" }, { sms: false, whatsapp: true, email: true }),
-    ).toEqual({ sms: false, whatsapp: true, email: true });
+      channelsForRecipient(
+        { phone: "9876543210", email: "a@b.com" },
+        { sms: false, whatsapp: true, email: true, push: false },
+      ),
+    ).toEqual({ sms: false, whatsapp: true, email: true, push: false });
+  });
+
+  it("an admin-disabled SMS channel overrides a configured provider", () => {
+    expect(resolveChannelAvailability(fakeCommunications(), { pushEnabled: true, smsEnabled: false })).toEqual({
+      sms: false,
+      whatsapp: true,
+      email: true,
+      push: true,
+    });
+  });
+
+  it("an admin-disabled push channel is off regardless of provider configuration", () => {
+    expect(resolveChannelAvailability(fakeCommunications(), { pushEnabled: false, smsEnabled: true })).toEqual({
+      sms: true,
+      whatsapp: true,
+      email: true,
+      push: false,
+    });
+  });
+
+  it("defaults to everything enabled when no settings are supplied (today's always-on behavior)", () => {
+    expect(resolveChannelAvailability(fakeCommunications()).push).toBe(true);
   });
 });
 

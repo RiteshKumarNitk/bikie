@@ -21,6 +21,7 @@ import {
   createProviderReviewAdapter,
   createRiderLocationRepositoryAdapter,
   createSosAlertRepositoryAdapter,
+  createSosNotificationSettingsAdapter,
   createSosOfferRepositoryAdapter,
   createSosSessionRepositoryAdapter,
   createSosTimelineRepositoryAdapter,
@@ -62,6 +63,7 @@ export function createSafetyLocationModule(overrides: SafetyLocationDeps = {}): 
     geocoding: overrides.geocoding ?? createGeocodingAdapter(),
     notifications: overrides.notifications ?? createInAppNotificationAdapter(),
     communications: overrides.communications ?? communications,
+    sosNotificationSettings: overrides.sosNotificationSettings ?? createSosNotificationSettingsAdapter(),
   };
 
   return {

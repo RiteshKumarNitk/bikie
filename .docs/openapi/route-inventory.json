@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-26T15:10:46.185Z",
-  "count": 169,
+  "generatedAt": "2026-10-27T02:17:57.941Z",
+  "count": 170,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -369,6 +369,15 @@
       ],
       "auth": "admin",
       "file": "apps/web/app/api/admin/sms/route.ts"
+    },
+    {
+      "path": "/api/admin/sos/notification-settings",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "auth": "admin",
+      "file": "apps/web/app/api/admin/sos/notification-settings/route.ts"
     },
     {
       "path": "/api/admin/testimonials/{id}",

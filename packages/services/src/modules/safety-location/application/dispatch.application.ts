@@ -36,13 +36,14 @@ export function createDispatchOrchestrator(ports: SafetyLocationPorts) {
       const communications = deps.communications ?? ports.communications;
       const idempotency = deps.idempotency ?? getPlatformModule().ports.idempotency;
       const idemKey = `sos-dispatch:${alert.id}`;
+      const settings = await ports.sosNotificationSettings.get();
 
       const claimed = await idempotency.claim(idemKey, SOS_DISPATCH_IDEMPOTENCY_TTL_SECONDS);
       if (!claimed) {
         const cached = await idempotency.recall<SOSDispatchSummary>(idemKey);
         if (cached) return cached;
         // In-flight duplicate — skip side effects; return an empty accounting summary.
-        return emptySummary(resolveChannelAvailability(communications));
+        return emptySummary(resolveChannelAvailability(communications, settings));
       }
 
       const [contactsSummary, escalationResult] = await Promise.all([
@@ -54,7 +55,7 @@ export function createDispatchOrchestrator(ports: SafetyLocationPorts) {
       const respondersFound = summary.emergencyContacts + summary.emergencyServices + escalationResult.nearbyRiderCount;
 
       if (respondersFound === 0) {
-        const availability = resolveChannelAvailability(communications);
+        const availability = resolveChannelAvailability(communications, settings);
         const admins = await resolveEscalationRecipients(ports);
         const adminSummary = emptySummary(availability);
         // ADR-085 — SMS runs its own sequential loop alongside the parallel WhatsApp/email/

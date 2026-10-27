@@ -17,6 +17,7 @@ export * as razorpayWebhookRepository from "./repositories/razorpay-webhook.repo
 export * as sosRepository from "./repositories/sos.repository";
 export * as sosSessionRepository from "./repositories/sos-session.repository";
 export * as sosTimelineRepository from "./repositories/sos-timeline.repository";
+export * as sosNotificationSettingsRepository from "./repositories/sos-notification-settings.repository";
 export * as communityRepository from "./repositories/community.repository";
 export * as auditRepository from "./repositories/audit.repository";
 export * as referralRepository from "./repositories/referral.repository";

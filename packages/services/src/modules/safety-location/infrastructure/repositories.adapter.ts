@@ -4,6 +4,7 @@ import {
   partnerRepository,
   riderLocationRepository,
   riderProfileRepository,
+  sosNotificationSettingsRepository,
   sosRepository,
   sosSessionRepository,
   sosTimelineRepository,
@@ -17,12 +18,20 @@ import type {
   ProviderReviewPort,
   RiderLocationRepositoryPort,
   SosAlertRepositoryPort,
+  SosNotificationSettingsPort,
   SosOfferRepositoryPort,
   SosSessionRepositoryPort,
   SosTimelineRepositoryPort,
   UserContactPort,
 } from "../ports";
 import { AlreadyAssignedError, AlreadyOfferedError, OfferNotAvailableError } from "../ports";
+
+export function createSosNotificationSettingsAdapter(): SosNotificationSettingsPort {
+  return {
+    get: () => sosNotificationSettingsRepository.getSettings(),
+    update: (data, adminId) => sosNotificationSettingsRepository.updateSettings(data, adminId),
+  };
+}
 
 export function createSosAlertRepositoryAdapter(): SosAlertRepositoryPort {
   return {

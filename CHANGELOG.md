@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-10-27 — Admin: global on/off per channel for SOS notifications (push, SMS)
+
+Until now, every SOS alert unconditionally sent both FCM push and SMS (plus WhatsApp/email) to
+every resolved recipient — emergency contacts, nearby Riders, eligible Service Providers, and the
+platform-admin fallback — with no way to turn any of it off. Added a new admin-only global switch
+for the two channels that were requested (push, SMS); WhatsApp/email and every non-SOS
+notification (bookings, moderation, …) are untouched.
+
+New singleton `SosNotificationSettings` row (`pushEnabled`/`smsEnabled`, both default `true` — a
+fresh deployment behaves exactly as before until an admin changes something). The existing
+channel-availability gate (`resolveChannelAvailability`/`channelsForRecipient`, already the single
+choke point `dispatchToRecipient` and `sendSosSmsSequentially` both honor) now also factors in
+these settings — the three real dispatch call sites (`fan-out.application.ts`'s `fanOut`,
+`escalation.application.ts`'s `seedEscalation`/`tickEscalation`, `dispatch.application.ts`'s
+orchestrator) fetch the settings once per call and pass them through. Deliberately NOT gated: the
+reporter's own "Your SOS alert is live" confirmation push — that's feedback to the person who
+triggered the alert, not a dispatch to someone else.
+
+New `GET`/`PATCH /api/admin/sos/notification-settings` (audit-logged as
+`UPDATE_SOS_NOTIFICATION_SETTINGS`) and a `SosNotificationSettingsPanel` on `/admin/sos` — two
+toggles with live status and a last-changed line. Admin-web-only; no mobile surface for this.
+
+Tests: 5 new in `safety-location.test.ts` (settings-driven channel availability, admin-disabled
+push/SMS verified end-to-end through a real `dispatch.fanOut` run — SMS/push skipped, WhatsApp/
+email unaffected, reporter confirmation still fires), 6 new in the admin route's `route.test.ts`.
+`vitest` 574→575 (net; OpenAPI route-inventory regenerated for the new route). `tsc --noEmit`
+clean, `next build` clean (171 routes, +1), `web lint` 0 new issues. See ADR-096.
+
 ## 2026-10-26 — Rider yearly auto-renewal (₹149/year, real Razorpay Subscription)
 
 Riders can now subscribe to the yearly Membership plan via a genuine Razorpay Subscription

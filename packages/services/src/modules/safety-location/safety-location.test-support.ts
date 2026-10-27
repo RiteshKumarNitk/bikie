@@ -154,6 +154,15 @@ export function emptyRepos(overrides: Partial<SafetyLocationPorts> = {}): Partia
     places: { findNearby: vi.fn(async () => []) },
     geocoding: { reverseGeocode: vi.fn(async () => null) },
     notifications: { notify: vi.fn(async () => undefined) },
+    sosNotificationSettings: {
+      get: vi.fn(async () => ({ pushEnabled: true, smsEnabled: true, updatedAt: new Date(), updatedByAdminId: null })),
+      update: vi.fn(async (data, adminId) => ({
+        pushEnabled: data.pushEnabled ?? true,
+        smsEnabled: data.smsEnabled ?? true,
+        updatedAt: new Date(),
+        updatedByAdminId: adminId,
+      })),
+    },
     ...overrides,
   };
 }

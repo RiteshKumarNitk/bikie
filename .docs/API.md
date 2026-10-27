@@ -187,6 +187,7 @@ instant self-service flip — see `.docs/DECISIONS.md` ADR-046b.
 | `/api/sos/partners` | GET | `?city=&type=`. Backs "Share Mechanic"/"Share Fuel Contact" — verified partners of the given type, city-scoped. Now also returns `latitude`/`longitude` (ADR-036, if set) so the result renders as a map alongside the list; matching is still city-string-based, not radius-based (deliberate scope limit, see ADR-036). |
 | `/api/cron/sos-resolve` | GET | Cron-only. Requires `Authorization: Bearer <CRON_SECRET>`. Auto-resolves alerts inactive for 120+ minutes, cascade-cancelling any dangling active session first. |
 | `/api/cron/sos-escalate` | GET | Cron-only. Requires `Authorization: Bearer <CRON_SECRET>`. The staged-escalation ticker — widens radius / advances tier for alerts whose `nextEscalationAt` has passed. Schedule alongside `sos-resolve`. |
+| `/api/admin/sos/notification-settings` | GET/PATCH | Role: ADMIN. **ADR-096.** `GET` → `{ settings: { pushEnabled, smsEnabled, updatedAt, updatedByAdminId } }`. `PATCH` body: `{ pushEnabled?, smsEnabled?: boolean }` (at least one required) → global on/off for SOS push/SMS only — WhatsApp/email and every non-SOS notification type are unaffected. Audit-logged as `UPDATE_SOS_NOTIFICATION_SETTINGS`. |
 
 ## Nearby Riders (membership required, ADR-016)
 

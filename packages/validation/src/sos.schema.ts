@@ -60,3 +60,16 @@ export const sosDeclineSchema = z.object({
 export const sosAlertCancelSchema = z.object({
   reason: z.string().max(300).optional(),
 });
+
+/** Admin global on/off per channel for SOS dispatch (push/SMS only) — at least one field must be
+ * present so a bare `{}` body can't silently "succeed" without changing anything. */
+export const sosNotificationSettingsUpdateSchema = z
+  .object({
+    pushEnabled: z.boolean().optional(),
+    smsEnabled: z.boolean().optional(),
+  })
+  .refine((v) => v.pushEnabled !== undefined || v.smsEnabled !== undefined, {
+    message: "At least one of pushEnabled/smsEnabled must be provided",
+  });
+
+export type SosNotificationSettingsUpdateInput = z.infer<typeof sosNotificationSettingsUpdateSchema>;

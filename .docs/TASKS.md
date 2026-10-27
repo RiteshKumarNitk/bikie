@@ -2,6 +2,21 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Admin: global on/off per channel for SOS notifications, push + SMS (2026-10-27)
+
+| Task | Status |
+|---|---|
+| New singleton `SosNotificationSettings` row (`pushEnabled`/`smsEnabled`, both default true) | Completed — migration `20261027000000_sos_notification_settings`, applied to dev/staging |
+| `resolveChannelAvailability`/`channelsForRecipient` (`channel-selection.ts`) gain a `push` field and an optional `settings` param, defaulting to today's always-on behavior when omitted | Completed |
+| All 3 real dispatch call sites (`fan-out.application.ts` `fanOut`, `escalation.application.ts` `seedEscalation`/`tickEscalation`, `dispatch.application.ts` orchestrator) fetch settings and thread them through | Completed |
+| `dispatchToRecipient`'s responder push gated on `channels.push`; reporter's own "alert is live" confirmation push deliberately left ungated (feedback to the reporter, not a dispatch to others) | Completed |
+| New `SosNotificationSettingsPort`/adapter/repository, wired into the safety-location module's ports | Completed |
+| New `GET`/`PATCH /api/admin/sos/notification-settings` (role: ADMIN, audit-logged) + `SosNotificationSettingsPanel` on `/admin/sos` | Completed |
+| WhatsApp/email, every non-SOS notification type, MSG91 OTP/auth SMS, SOS escalation tiers/radius/severity gating | Untouched — confirmed by design and by test |
+| Tests: settings-driven availability, admin-disabled push/SMS verified end-to-end through `dispatch.fanOut`, admin route auth/validation/audit-log | Completed — `vitest` 574→575 |
+| `tsc --noEmit`, `next build`, `web lint` (changed files) | Completed — all clean |
+| Apply the migration to production, verify the admin panel toggle | **Not done** — same sandboxed production-read restriction as every other production step this session; VPS deploy covers this once pushed |
+
 ## Rider yearly auto-renewal: real Razorpay Subscription at ₹149/year (2026-10-26)
 
 | Task | Status |

@@ -357,7 +357,7 @@ export async function dispatchToRecipient(
     );
   }
 
-  if (recipient.userId) {
+  if (recipient.userId && channels.push) {
     summary.inAppNotified += 1;
     // ADR-044 — partners get purpose-built copy (category + distance + city, no generic
     // "Red/Amber Alert" framing) since they land on the partner request-details screen, not the
@@ -426,7 +426,8 @@ export function createFanOutApplication(ports: SafetyLocationPorts) {
     // every alert creation and a retried request must not double-notify either one.
     async fanOut(alert: RawSOSAlertDTO, deps: FanOutDeps = {}): Promise<SOSDispatchSummary> {
       const communications = deps.communications ?? ports.communications;
-      const availability = resolveChannelAvailability(communications);
+      const settings = await ports.sosNotificationSettings.get();
+      const availability = resolveChannelAvailability(communications, settings);
       const [emergencyContacts, emergencyServices] = await Promise.all([
         resolveEmergencyContacts(alert.userId, ports),
         Promise.resolve(resolveEmergencyServices()),

@@ -68,4 +68,15 @@ export const SOSService = {
   async getProfileWarning(userId: string): Promise<string | null> {
     return getSafetyLocationModule().sos.getProfileWarning(userId);
   },
+
+  /** Admin-facing global on/off per channel for SOS dispatch (push/SMS only — see
+   * domain/channel-selection.ts). Read by every SOS fan-out/escalation call before it decides
+   * which channels to use; never affects WhatsApp/email or any other notification type. */
+  async getNotificationSettings() {
+    return getSafetyLocationModule().ports.sosNotificationSettings.get();
+  },
+
+  async updateNotificationSettings(data: { pushEnabled?: boolean; smsEnabled?: boolean }, adminId: string) {
+    return getSafetyLocationModule().ports.sosNotificationSettings.update(data, adminId);
+  },
 };

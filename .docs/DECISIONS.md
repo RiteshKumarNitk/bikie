@@ -5041,3 +5041,61 @@ than needing a third implementation to add it only for admin.
   real Razorpay Plan billing ₹149/yearly, separate from the SP's plan, on the Razorpay Dashboard
   and the production env) — unverified from this sandbox, same class of gap ADR-094 shipped with
   for the SP side. Not committed/pushed pending that gap being closed.
+
+## ADR-096: Admin-controlled global on/off per channel for SOS notifications (push + SMS only)
+
+- **Context.** SOS dispatch always sends FCM push AND SMS (plus WhatsApp/email) unconditionally to
+  every resolved recipient — there was no admin control over this at all, anywhere. Requested: the
+  ability to turn push and/or SMS off globally for SOS from the admin panel, without touching the
+  shared FCM/MSG91 infrastructure every other notification type (bookings, moderation, …) also
+  uses, and without touching WhatsApp/email (not asked for).
+- **Decision — a new singleton settings row, read once per dispatch call and AND-ed into the
+  existing channel-availability gate that `dispatchToRecipient`/`sendSosSmsSequentially` already
+  honor, rather than inventing a second gating mechanism.**
+  1. **Schema (additive).** New `SosNotificationSettings` — one fixed-id (`"singleton"`) row,
+     `pushEnabled`/`smsEnabled` (both default `true`, matching today's always-on behavior so a
+     fresh deployment with no row yet behaves exactly as before), `updatedAt`, `updatedByAdminId`.
+     Migration `20261027000000_sos_notification_settings`, applied to dev/staging.
+  2. **Domain (`channel-selection.ts`).** `ChannelAvailability` gains a `push` field, alongside the
+     existing `sms`/`whatsapp`/`email`. `resolveChannelAvailability` takes a new, optional
+     `settings` param (`{ pushEnabled, smsEnabled }`) defaulting to `{ true, true }` when omitted —
+     deliberately backward-compatible so none of the ~15 existing direct test call sites across
+     `safety-location.test.ts` needed touching; only the exact-shape `.toEqual` assertions did
+     (they now include `push`). `sms` becomes `settings.smsEnabled && isChannelConfigured(...)`;
+     `push` is simply `settings.pushEnabled` (push has no "provider configured" concept the way
+     SMS/WhatsApp/email do). `channelsForRecipient` passes `push` through unchanged — its gate is
+     the recipient having a `userId` at all, already checked at the one call site.
+  3. **Application layer.** The three real call sites that build `availability`
+     (`fan-out.application.ts`'s `fanOut`, `escalation.application.ts`'s `seedEscalation` and
+     `tickEscalation`, `dispatch.application.ts`'s `fanOut` orchestrator — both its idempotent-
+     duplicate short-circuit and its zero-recipients admin-escalation leg) now fetch
+     `ports.sosNotificationSettings.get()` once and pass it into `resolveChannelAvailability`.
+     `dispatchToRecipient`'s in-app-push branch changed from `if (recipient.userId)` to
+     `if (recipient.userId && channels.push)` — the one place push is actually sent to a
+     *responder* (emergency contact, nearby rider, service provider, admin fallback).
+     **Deliberately NOT gated**: the reporter's own "Your SOS alert is live" confirmation push
+     (`dispatch.application.ts`, sent via `ports.notifications.notify` directly, not through
+     `dispatchToRecipient`) — that's feedback to the person who just triggered the alert, not a
+     dispatch to someone else, and the admin toggle's purpose is controlling whether *others* get
+     notified, not whether the reporter learns their own alert went out.
+  4. **Port + adapter.** New `SosNotificationSettingsPort` (`get`/`update`) on `SafetyLocationPorts`,
+     backed by `sos-notification-settings.repository.ts` (upsert-on-read, so the first ever read
+     materializes the defaults row) and wired into the module's composition root
+     (`public.ts`) exactly like every other port.
+  5. **Admin surface.** `GET`/`PATCH /api/admin/sos/notification-settings` (role: ADMIN,
+     `zod`-validated, audit-logged as `UPDATE_SOS_NOTIFICATION_SETTINGS`), and a new
+     `SosNotificationSettingsPanel` client component on `/admin/sos` — two toggles (push, SMS)
+     with live status dots and a "last changed by/when" line. No mobile UI — admin-web-only, as
+     scoped.
+  6. **What is unchanged.** WhatsApp/email channels (never admin-controlled — not requested);
+     every non-SOS notification type's FCM push (`NotificationService.notify` itself is untouched;
+     only the SOS-specific call site in `dispatchToRecipient` is gated); MSG91 for OTP/auth/non-SOS
+     SMS; the reporter's own confirmation push (see above); SOS escalation tiers/radius/severity
+     gating; everything about *who* gets dispatched — this only controls *how*.
+- **Consequences.** `vitest` 575→575 (net same count after the OpenAPI route-inventory regen that
+  a new route always requires — the actual new/changed tests: 5 in `safety-location.test.ts`
+  covering settings-driven availability and a full `dispatch.fanOut` run with both channels off,
+  plus 6 new in `route.test.ts` for the admin endpoint). `tsc --noEmit` clean, `next build` clean
+  (171 routes, +1), `web lint` 0 new issues (the one pre-existing `any` flagged on `/admin/sos/
+  page.tsx` predates this change, on a line this change didn't touch). No Flutter changes — this
+  feature has no mobile surface.

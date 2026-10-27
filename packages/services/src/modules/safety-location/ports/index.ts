@@ -376,6 +376,21 @@ export interface EscalationPort {
   findAdminContacts(take?: number): Promise<EscalationContactRow[]>;
 }
 
+export interface SosNotificationSettingsRow {
+  pushEnabled: boolean;
+  smsEnabled: boolean;
+  updatedAt: Date;
+  updatedByAdminId: string | null;
+}
+
+/** Admin-controlled global on/off per channel for SOS dispatch only (see
+ * domain/channel-selection.ts) — never the shared FCM/MSG91 infrastructure every other
+ * notification type uses, and never WhatsApp/email. */
+export interface SosNotificationSettingsPort {
+  get(): Promise<SosNotificationSettingsRow>;
+  update(data: { pushEnabled?: boolean; smsEnabled?: boolean }, adminId: string): Promise<SosNotificationSettingsRow>;
+}
+
 export interface InAppNotificationPort {
   notify(
     userId: string,
@@ -435,6 +450,7 @@ export interface SafetyLocationPorts {
   geocoding: ReverseGeocodingPort;
   notifications: InAppNotificationPort;
   communications: CommunicationsPorts;
+  sosNotificationSettings: SosNotificationSettingsPort;
 }
 
 export type { SOSRecipient };

@@ -226,7 +226,8 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
     deps: EscalationDeps = {},
   ): Promise<{ summary: SOSDispatchSummary; nearbyRiderCount: number }> {
     const communications = deps.communications ?? ports.communications;
-    const availability = resolveChannelAvailability(communications);
+    const settings = await ports.sosNotificationSettings.get();
+    const availability = resolveChannelAvailability(communications, settings);
 
     const [nearby, providers] = await Promise.all([
       resolveNearbyRiders(alert, ports, INITIAL_RADIUS_METERS),
@@ -281,7 +282,8 @@ export function createEscalationApplication(ports: SafetyLocationPorts) {
     if (!claimed) return;
 
     const communications = deps.communications ?? ports.communications;
-    const availability = resolveChannelAvailability(communications);
+    const settings = await ports.sosNotificationSettings.get();
+    const availability = resolveChannelAvailability(communications, settings);
 
     // COMMUNITY is a one-shot window, not its own radius-widening cycle — once it times out,
     // advance straight to GENERAL and notify the full nearby-rider pool, minus whoever community
