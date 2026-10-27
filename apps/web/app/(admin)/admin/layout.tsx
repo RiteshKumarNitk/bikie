@@ -40,7 +40,7 @@ const navGroups = [
   {
     label: "Growth",
     items: [
-      { label: "Membership Plans", href: "/admin/membership" },
+      { label: "Rider Membership", href: "/admin/membership" },
       { label: "Service Provider Membership", href: "/admin/partner-membership" },
       { label: "Testimonials", href: "/admin/testimonials" },
     ],

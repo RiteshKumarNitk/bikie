@@ -249,6 +249,7 @@ mirrors the same mapping client-side for the foreground case (`push_channels.dar
 | `/api/membership/purchase` | POST | **ADR-097** (narrowed the same way). A free plan activates immediately with no payment step. The Rider test account activates without a verified payment (any client-sent `paymentId`/`razorpayPaymentId` is recorded; otherwise a generated `DUMMY-TEST-ACCOUNT-` one). Every other paid-plan request — even a real, signature-verified Razorpay payment — returns `403 { error: "ONE_TIME_PURCHASE_DISABLED" }`; a paid Rider membership only ever activates via the subscription webhook (`MembershipService.recordRecurringCharge`). **ADR-058**: on a successful free/test-account activation, fires the DLT-approved "BIKIE_Sub" SMS confirmation (fire-and-forget) — Rider-only, never sent for a Service Provider membership purchase. |
 | `/api/admin/membership/plans` | GET/POST | Role: ADMIN. Same shape as above but includes inactive plans and allows creation. |
 | `/api/admin/membership/plans/[id]` | PATCH/DELETE | Role: ADMIN |
+| `/api/admin/membership/subscriptions` | GET | Role: ADMIN. Every Rider who has (or has ever had) a Razorpay-backed yearly subscription, most recent first — mirrors `/api/admin/partner-membership/subscriptions`. Sourced from `UserMembership` rows directly, not invoices, so a subscription created but never charged (a missed webhook) still shows up. Cancelling a row uses the existing `/api/admin/partner-membership/subscriptions/cancel` (account-type-agnostic). |
 
 ## Partner (Service Provider) Membership — ADR-051, separate from Rider Membership above
 
@@ -399,6 +400,7 @@ There is no dedicated "members" route — the room's real member list is the sam
 | Route | Method | Notes |
 |---|---|---|
 | `/api/user/phone` | PATCH | `{ phone }` — update the caller's phone number (used for SOS profile completeness). `{ success: true }` |
+| `/api/user/delete-account` | POST | **ADR-098.** Self-service deletion, always scoped to the caller (`session.user.id`, never a client-supplied id). Blocked `409 { error: "ACTIVE_SUBSCRIPTION" }` while a Rider or Service Provider Razorpay Subscription is still genuinely auto-renewing (verified live against Razorpay, not just the local flag) — cancel auto-renewal first. `503 { error: "COULD_NOT_VERIFY_SUBSCRIPTION" }` if that live check itself fails. On success: `{ ok: true, anonymized: boolean }` — hard-deleted if nothing else references the account, anonymized in place otherwise (same mechanics `DELETE /api/admin/users/[id]` uses). |
 | `/api/trips/mine` | GET | `{ organized: TripSummaryDTO[], joined: TripSummaryDTO[] }` |
 
 ## Admin (role: ADMIN)
@@ -407,7 +409,7 @@ There is no dedicated "members" route — the room's real member list is the sam
 |---|---|---|
 | `/api/admin/overview` | GET | `{ stats: AdminOverviewStatsDTO }` |
 | `/api/admin/users` | GET | |
-| `/api/admin/users/[id]` | PATCH/DELETE | Update role / delete user |
+| `/api/admin/users/[id]` | PATCH/DELETE | Update role / delete user. **ADR-098**: `DELETE` now best-effort cancels (immediately, not cycle-end) any open Rider/Service Provider Razorpay Subscription before deleting — a cancel failure never blocks the deletion itself, only logged. |
 | `/api/admin/partners` | GET | `{ partners: AdminPartnerRowDTO[] }` — now includes `verificationStatus` (ADR-046b), not a boolean. |
 | `/api/admin/partners/[id]` | GET | ADR-046b. `AdminPartnerDetailDTO` — full profile, owning user, and `AuditLog`-backed verification history. |
 | `/api/admin/partners/[id]` | PATCH | ADR-046b, **replaces** the old `{isVerified: boolean}` toggle. Body: `{ action: "APPROVE" \| "REJECT" \| "REQUEST_INFO" \| "SUSPEND" \| "RESTORE", reason? }` (`reason` required for every action except `APPROVE`). Validated state transition — `409 { error: "INVALID_TRANSITION" }` if illegal for the current status. Notifies the applicant (`NotificationService`) and audit-logs (`{action}_PARTNER_APPLICATION`). |

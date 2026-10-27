@@ -5151,3 +5151,62 @@ than needing a third implementation to add it only for admin.
   `membership/checkout/route.test.ts`, `membership/purchase/route.test.ts`, neither existed before
   this change). `tsc --noEmit` clean, `next build` clean, `web lint` 0 new issues, `flutter analyze`
   clean, `flutter test` 236/236.
+
+## ADR-098: Self-service account deletion, gated on live Razorpay subscription state
+
+- **Context.** Requested rule: a user cannot delete their own account while a recurring Razorpay
+  Subscription (Rider or Service Provider) is still actively auto-renewing — they must cancel
+  auto-renewal first; the already-paid membership period stays usable either way, only *deletion*
+  is blocked. Auditing the existing deletion paths before building this found there was nowhere to
+  attach the rule: the mobile "Delete Account" button (ADR-072) only ever signed the user out and
+  explicitly never touched server-side data (deferred to "contact support" by design); the web
+  `/delete-account` page was pure static instructions to email support. The only real deletion
+  logic that existed was `AdminService.deleteUser` → `adminRepository.deleteUser`, callable only by
+  an admin on someone else's account — and it had its own gap: it flips an `ACTIVE` membership's
+  `status` to `CANCELLED` **locally only**, never calling Razorpay, so an admin-deleted user with a
+  live mandate would keep being auto-debited with no BIKIE account left to show for it, and no way
+  to self-cancel it either (the account is already banned/scrubbed by then).
+- **Decision — a new self-service path with its own subscription gate, reusing (and fixing) the
+  existing deletion mechanics rather than duplicating them.**
+  1. **New `AccountService.deleteOwnAccount(userId)`** (`account.service.ts`) — checks both
+     `membershipRepository.findOpenSubscriptionForUser`/`partnerMembershipRepository`'s equivalent.
+     A subscription whose `cancelledAt` is already set is trusted without a live re-check (it's
+     only ever set after a real, confirmed Razorpay cancel call succeeded — see ADR-094/095's
+     `cancelSubscription`). An open, not-yet-cancelled subscription is verified against Razorpay's
+     own live state via `RazorpayService.fetchSubscription` (never the possibly-stale local row
+     alone, per the explicit requirement) — genuinely non-terminal there blocks deletion
+     (`ACTIVE_SUBSCRIPTION`); a verification failure fails toward blocking too
+     (`COULD_NOT_VERIFY_SUBSCRIPTION`), never toward risking an account vanishing while Razorpay
+     could still be charging it. Once clear, delegates to `AdminService.deleteUser` — the exact
+     same deletion mechanics an admin-initiated delete already uses, not a second implementation.
+  2. **`AdminService.deleteUser` gains a pre-delete step**: best-effort, immediate (not cycle-end —
+     there's no "use out the paid period" once the account is gone) Razorpay cancellation of any
+     open subscription of either account type, before the actual delete/anonymize runs. A cancel
+     failure never blocks the deletion itself (an admin must be able to remove an account
+     regardless of Razorpay reachability) — only logged for manual follow-up. This closes the gap
+     for BOTH the admin path and (transitively, since it delegates there) the new self-service path.
+  3. **New `POST /api/user/delete-account`** — authenticated (`requireSession`, never role-gated),
+     always acts on `session.user.id`, never a client-supplied id. Mirrors `DELETE /api/admin/
+     users/[id]`'s `invalidateCachedUserSessions` step. Maps `ACTIVE_SUBSCRIPTION` → `409`,
+     `COULD_NOT_VERIFY_SUBSCRIPTION` → `503`, `ADMIN_PROTECTED`/`NOT_FOUND` passed through from the
+     underlying result (an admin self-deleting is already impossible — `deleteUser` itself refuses
+     to remove an `ADMIN` role account).
+  4. **Web**: `/delete-account` (the existing Play Store–required public policy page) stays fully
+     reachable logged-out — a new `DeleteAccountSection` client component renders only when
+     `getServerSession()` finds a session, with its own confirm dialog (`useConfirm`) and a
+     `409`-aware error message surfaced from the route's `message` field.
+  5. **Mobile**: `_DeleteAccountButton` (`profile_screen.dart`) rewritten from "signs out only" to
+     a real call through a new `AccountRepository.deleteAccount()`, catching `ApiException` and
+     toasting its `message` on a block, otherwise signing out on success — same confirm-dialog
+     pattern already used elsewhere in this file (e.g. `_ActiveMembershipCardState._cancel`).
+- **What is unchanged.** The actual hard-delete-vs-anonymize decision and mechanics
+  (`adminRepository.deleteUser`'s fast/slow path) — untouched, only gained a pre-step.
+  Cancellation's own behavior (ADR-094/095) — already matched every requested rule exactly before
+  this change; nothing there needed modifying. An admin can still force-delete a user with a live
+  subscription (no block added to the admin path — only the Razorpay-cancel step), since blocking
+  a moderation/abuse-removal action on subscription state would be a worse outcome than the
+  (now-fixed) stale-debit risk it used to carry.
+- **Consequences.** `vitest` 583→600 (new `account.service.test.ts` — 7 tests, `admin.service.test.ts`
+  — 5 tests, neither existed before since both were pure facades until now; `route.test.ts` — 4
+  tests; OpenAPI route-inventory regenerated for the new route, 170→171). `tsc --noEmit` clean,
+  `next build` clean, `web lint` 0 new issues, `flutter analyze` clean, `flutter test` 236/236.

@@ -7,6 +7,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/push/notification_permission.dart';
 import '../../../core/widgets/notification_permission_prompt.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../account/data/account_repository.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../../auth/domain/role_provider.dart';
 import '../../notifications/domain/notification_providers.dart';
@@ -129,10 +130,12 @@ class _SignOutButtonState extends ConsumerState<_SignOutButton> {
   }
 }
 
-/// ADR-072 — "Delete Account" entry point (both account types). Google Play requires an
-/// in-app way to initiate account deletion; for now this **signs the user out only and does not
-/// remove any server-side data** — the confirm copy says so plainly. Wire it to a real deletion
-/// request endpoint when that flow is built.
+/// ADR-072 — "Delete Account" entry point (both account types). Blocked server-side
+/// (`POST /api/user/delete-account`) while a Rider or Service Provider Razorpay Subscription is
+/// still actively auto-renewing — the user must cancel auto-renewal first; their membership stays
+/// usable until the already-paid period ends either way, this only blocks *deletion*. Once
+/// allowed, deletion is real and irreversible: the account is hard-deleted if it has no history
+/// other records depend on, or anonymized in place (PII stripped, banned) otherwise.
 class _DeleteAccountButton extends ConsumerStatefulWidget {
   const _DeleteAccountButton();
 
@@ -149,9 +152,9 @@ class _DeleteAccountButtonState extends ConsumerState<_DeleteAccountButton> {
       builder: (ctx) => AlertDialog(
         title: const Text('Delete Account'),
         content: const Text(
-          'This signs you out of the app on this device. Your account and data are not deleted '
-          'and can be accessed again by signing in. To permanently delete your account and data, '
-          'contact BIKIE support.',
+          'This permanently deletes your BIKIE account and cannot be undone. If you have history '
+          'on the platform (bookings, reviews, organized rides), your data is anonymized instead '
+          'of fully erased.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -166,8 +169,14 @@ class _DeleteAccountButtonState extends ConsumerState<_DeleteAccountButton> {
     if (confirmed != true) return;
 
     setState(() => _busy = true);
-    await ref.read(authControllerProvider.notifier).signOut();
-    if (mounted) setState(() => _busy = false);
+    try {
+      await ref.read(accountRepositoryProvider).deleteAccount();
+      await ref.read(authControllerProvider.notifier).signOut();
+    } on ApiException catch (e) {
+      if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
   @override

@@ -1,5 +1,56 @@
 # Changelog
 
+## 2026-10-27 — Admin: Rider "who's subscribed" list, matching `/admin/partner-membership`
+
+The Rider membership admin page (`/admin/membership`) only ever had plan CRUD — no way to see
+which Riders actually have a recurring subscription, unlike `/admin/partner-membership`'s existing
+two-tab layout (Plans + Subscriptions). The backend side of this already existed from the Rider
+auto-renewal work (`MembershipService.listAllSubscriptions`, `AdminUserSubscriptionDTO`) but had
+no route or UI wired to it.
+
+New `GET /api/admin/membership/subscriptions`, mirroring the Service Provider route exactly.
+`PartnerSubscriptionsList` generalized via props (same pattern `MembershipPlansManager` already
+used for its own list/cancel URLs and per-type labels) rather than duplicated — both admin pages
+now share one component. The cancel action reuses the *existing* `/api/admin/partner-membership/
+subscriptions/cancel` route unchanged, since it already resolves account type per-request
+(`SubscriptionWebhookRouter`) and works for either side. New `MembershipTabs` (Rider) alongside the
+existing `PartnerMembershipTabs` (SP). Sidebar label and page title updated to "Rider Membership"
+for parity with "Service Provider Membership".
+
+Tests: new `route.test.ts` (2 tests, mirroring the SP one). `vitest` 600→602. Also fixed a
+pre-existing `any` on the same admin page while touching it. `tsc --noEmit` clean, `next build`
+clean (172 routes, +1), `web lint` 0 new issues.
+
+## 2026-10-27 — Self-service account deletion, blocked while auto-renewal is active
+
+Requested rule: a user can't delete their own account while a Razorpay Subscription (Rider or
+Service Provider) is still actively auto-renewing — they must cancel first; the already-paid
+membership period stays usable regardless, only *deletion* is blocked. Auditing the existing code
+before building this found there was nowhere to attach the rule yet: the mobile "Delete Account"
+button only ever signed the user out (explicitly, by design — ADR-072 deferred real deletion to
+"contact support"), and the web `/delete-account` page was pure static instructions. The only real
+deletion logic was admin-only, and had its own gap — it flipped a membership to `CANCELLED`
+**locally**, never actually calling Razorpay, so an admin-deleted user with a live mandate could
+keep being auto-debited with no account left to stop it from.
+
+New `AccountService.deleteOwnAccount` checks both account types' open subscriptions; one already
+cancelled locally is trusted without a re-check, an open one is verified against Razorpay's own
+live state (not just the local row, which can lag a webhook) — genuinely active blocks deletion,
+and a verification failure fails toward blocking too, never toward risking an account vanishing
+while it could still be charged. Once clear, it reuses the exact same deletion mechanics an
+admin-initiated delete already uses — `AdminService.deleteUser` now also best-effort cancels any
+open subscription (immediately, not cycle-end) before deleting, closing the admin-path gap for
+both callers at once. New `POST /api/user/delete-account`, always scoped to `session.user.id`.
+
+Web `/delete-account` (the Play Store–required public policy page) stays reachable logged-out; a
+new delete button only renders for a signed-in visitor. Mobile's "Delete Account" button now
+actually deletes instead of just signing out, surfacing the block reason via toast when applicable.
+
+Tests: new `account.service.test.ts` (7), `admin.service.test.ts` (5, neither service had its own
+test file before — both were pure facades), `route.test.ts` (4). `vitest` 583→600. `tsc --noEmit`
+clean, `next build` clean, `web lint` 0 new issues (including a pre-existing unescaped-quote lint
+error on the same page, fixed in passing), `flutter analyze` clean, `flutter test` 236/236.
+
 ## 2026-10-27 — Fix: Rider subscription creation always failed with "Could not start the subscription"
 
 Real-device testing surfaced a genuine bug (not a Razorpay Dashboard configuration problem, which

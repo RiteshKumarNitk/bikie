@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { AdminPartnerSubscriptionDTO } from "@bikie/types";
+import type { AdminPartnerSubscriptionDTO, AdminUserSubscriptionDTO } from "@bikie/types";
+
+type SubscriptionRow = AdminPartnerSubscriptionDTO | AdminUserSubscriptionDTO;
 
 function fmtDate(iso: string | null | undefined) {
   if (!iso) return "—";
@@ -19,7 +21,7 @@ type Badge = { label: string; className: string };
  * detail this list doesn't fetch). The one state this list cares most about catching is
  * "never activated" (`startDate === endDate`, i.e. created on Razorpay but never successfully
  * charged) — exactly what a missed webhook leaves behind, and the reason this view exists. */
-function badgeFor(sub: AdminPartnerSubscriptionDTO): Badge {
+function badgeFor(sub: SubscriptionRow): Badge {
   const neverActivated = sub.startDate === sub.endDate;
   if (neverActivated) return { label: "Stuck — never charged", className: "bg-red-500/10 text-red-400" };
   if (sub.cancelledAt) return { label: "Cancelled", className: "bg-white/10 text-white/50" };
@@ -29,8 +31,27 @@ function badgeFor(sub: AdminPartnerSubscriptionDTO): Badge {
   return { label: "Active", className: "bg-green-500/10 text-green-400" };
 }
 
-export function PartnerSubscriptionsList() {
-  const [rows, setRows] = useState<AdminPartnerSubscriptionDTO[]>([]);
+/**
+ * "Who's subscribed" admin list — shared between Service Provider (`/admin/partner-membership`,
+ * the original) and Rider (`/admin/membership`) via props, the same generalization pattern
+ * `MembershipPlansManager` already uses. The cancel route is the SAME one for both account
+ * types (`SubscriptionWebhookRouter.resolveAccountType` resolves which table owns a given
+ * Razorpay subscription id server-side) — only the list endpoint and labels differ per type.
+ */
+export function PartnerSubscriptionsList({
+  listUrl = "/api/admin/partner-membership/subscriptions",
+  cancelUrl = "/api/admin/partner-membership/subscriptions/cancel",
+  personLabel = "Service Provider",
+  priceSuffix = "/mo",
+  emptyMessage = "No Service Provider has ever started a subscription yet.",
+}: {
+  listUrl?: string;
+  cancelUrl?: string;
+  personLabel?: string;
+  priceSuffix?: string;
+  emptyMessage?: string;
+}) {
+  const [rows, setRows] = useState<SubscriptionRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -38,19 +59,19 @@ export function PartnerSubscriptionsList() {
   const load = useCallback(() => {
     setLoading(true);
     setError(null);
-    fetch("/api/admin/partner-membership/subscriptions")
+    fetch(listUrl)
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then((data: { subscriptions: AdminPartnerSubscriptionDTO[] }) => setRows(data.subscriptions))
+      .then((data: { subscriptions: SubscriptionRow[] }) => setRows(data.subscriptions))
       .catch(() => setError("Could not load subscriptions. Please try again."))
       .finally(() => setLoading(false));
-  }, []);
+  }, [listUrl]);
 
   useEffect(() => {
     const t = setTimeout(load, 0);
     return () => clearTimeout(t);
   }, [load]);
 
-  async function cancel(sub: AdminPartnerSubscriptionDTO) {
+  async function cancel(sub: SubscriptionRow) {
     if (!sub.razorpaySubscriptionId) return;
     if (
       !confirm(
@@ -61,7 +82,7 @@ export function PartnerSubscriptionsList() {
     }
     setCancellingId(sub.id);
     try {
-      const res = await fetch("/api/admin/partner-membership/subscriptions/cancel", {
+      const res = await fetch(cancelUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ razorpaySubscriptionId: sub.razorpaySubscriptionId }),
@@ -81,7 +102,7 @@ export function PartnerSubscriptionsList() {
   if (loading) return <div className="mt-6 h-40 animate-pulse rounded-2xl bg-white/5" />;
   if (error) return <p className="mt-6 text-sm text-red-400">{error}</p>;
   if (rows.length === 0) {
-    return <p className="mt-6 text-sm text-white/40">No Service Provider has ever started a subscription yet.</p>;
+    return <p className="mt-6 text-sm text-white/40">{emptyMessage}</p>;
   }
 
   return (
@@ -89,7 +110,7 @@ export function PartnerSubscriptionsList() {
       <table className="w-full min-w-[920px] text-sm">
         <thead>
           <tr className="text-left text-xs uppercase tracking-wide text-white/40">
-            <th className="px-4 py-3 font-medium">Service Provider</th>
+            <th className="px-4 py-3 font-medium">{personLabel}</th>
             <th className="px-4 py-3 font-medium">Plan</th>
             <th className="px-4 py-3 font-medium">Status</th>
             <th className="px-4 py-3 font-medium">Next debit / paid through</th>
@@ -108,7 +129,7 @@ export function PartnerSubscriptionsList() {
                   <p className="font-medium text-white">{sub.userName}</p>
                   <p className="text-xs text-white/40">{sub.userEmail}{sub.userPhone ? ` · ${sub.userPhone}` : ""}</p>
                 </td>
-                <td className="px-4 py-3 text-white/70">{sub.plan.name}{sub.plan.price ? ` — ₹${sub.plan.price}/mo` : ""}</td>
+                <td className="px-4 py-3 text-white/70">{sub.plan.name}{sub.plan.price ? ` — ₹${sub.plan.price}${priceSuffix}` : ""}</td>
                 <td className="px-4 py-3">
                   <span className={`rounded-full px-2 py-1 text-xs font-medium ${badge.className}`}>{badge.label}</span>
                 </td>

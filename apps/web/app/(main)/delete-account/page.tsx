@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
+import { DeleteAccountSection } from "@/components/account/DeleteAccountSection";
+import { getServerSession } from "@/lib/get-session";
 
 export const metadata: Metadata = {
   title: "Delete Your BIKIE Account",
   description: "Learn how to request deletion of your BIKIE account and what happens to your data.",
 };
 
-export default function DeleteAccountPage() {
+export default async function DeleteAccountPage() {
+  // This page must stay reachable without an account (Google Play requires the deletion policy
+  // itself to work logged-out) — the self-service button only renders for a signed-in visitor;
+  // everyone else still sees the full "email support" instructions above/below it.
+  const session = await getServerSession();
   return (
     <div className="pb-24">
       <Breadcrumbs items={[{ label: "Home", href: "/" }, { label: "Delete Account" }]} />
@@ -67,10 +73,10 @@ export default function DeleteAccountPage() {
               </p>
               <ul className="list-disc pl-5 space-y-3">
                 <li>
-                  <strong className="text-foreground">Data Deleted / Anonymized:</strong> All Personally Identifiable Information (PII) is stripped. Your name becomes "Deleted User", and your email address, phone number, and profile image are permanently erased. Your active sessions, connected accounts, push subscriptions, and memberships are completely removed.
+                  <strong className="text-foreground">Data Deleted / Anonymized:</strong> All Personally Identifiable Information (PII) is stripped. Your name becomes &quot;Deleted User&quot;, and your email address, phone number, and profile image are permanently erased. Your active sessions, connected accounts, push subscriptions, and memberships are completely removed.
                 </li>
                 <li>
-                  <strong className="text-foreground">Data Retained & Retention Period:</strong> The anonymous shell of your account remains indefinitely, solely to serve as an attribution for past history (e.g., a "Deleted User" booking or review). This retention is required for safety, audit history, and to prevent corruption of other users' records.
+                  <strong className="text-foreground">Data Retained & Retention Period:</strong> The anonymous shell of your account remains indefinitely, solely to serve as an attribution for past history (e.g., a &quot;Deleted User&quot; booking or review). This retention is required for safety, audit history, and to prevent corruption of other users&apos; records.
                 </li>
                 <li>
                   <strong className="text-foreground">Access:</strong> The account is permanently banned, meaning it can never be authenticated or accessed again.
@@ -78,6 +84,8 @@ export default function DeleteAccountPage() {
               </ul>
             </div>
           </section>
+
+          {session && <DeleteAccountSection />}
 
           <section>
             <h2 className="text-2xl font-semibold">Contact Us</h2>

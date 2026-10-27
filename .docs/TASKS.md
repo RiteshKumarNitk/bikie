@@ -2,6 +2,32 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Admin: Rider "who's subscribed" list, matching Service Provider's admin page (2026-10-27)
+
+| Task | Status |
+|---|---|
+| New `GET /api/admin/membership/subscriptions`, mirroring the SP route exactly, backed by the already-existing `MembershipService.listAllSubscriptions` | Completed |
+| `PartnerSubscriptionsList` generalized via props (listUrl/cancelUrl/personLabel/priceSuffix/emptyMessage) instead of duplicated — one shared component for both admin pages now | Completed |
+| Cancel action reuses the existing `/api/admin/partner-membership/subscriptions/cancel` route unchanged — already account-type-agnostic | Completed — no new route needed |
+| New `MembershipTabs` (Rider), alongside the existing `PartnerMembershipTabs` (SP); `/admin/membership` now has Plans + Subscriptions tabs | Completed |
+| Sidebar label + page title renamed "Membership Plans" → "Rider Membership" for parity with "Service Provider Membership" | Completed |
+| New `route.test.ts` (2 tests) | Completed — `vitest` 600→602 |
+| `tsc --noEmit`, `next build`, `web lint` | Completed — all clean |
+
+## Self-service account deletion, blocked while auto-renewal is active (2026-10-27)
+
+| Task | Status |
+|---|---|
+| Audited existing deletion paths before building: mobile "Delete Account" only signed out (no real deletion), web page was static "email support" text, only admin-initiated deletion was real | Completed |
+| Found + fixed a related gap: admin deletion flipped memberships to `CANCELLED` locally only, never calling Razorpay — an admin-deleted user with a live mandate could keep being auto-debited | Completed |
+| New `AccountService.deleteOwnAccount` — blocks only while a subscription is open AND not yet locally cancelled AND Razorpay's own live state confirms it's genuinely non-terminal; a verify failure fails toward blocking | Completed |
+| `AdminService.deleteUser` now best-effort cancels (immediately, not cycle-end) any open subscription before deleting — benefits both the admin path and the self-service path that delegates to it | Completed |
+| New `POST /api/user/delete-account` — authenticated, always scoped to the caller's own id | Completed |
+| Web `/delete-account`: stays reachable logged-out (Play Store policy requirement); new delete button only for a signed-in visitor | Completed |
+| Mobile `_DeleteAccountButton`: rewritten from "signs out only" to a real deletion call, toasts the block reason when applicable | Completed |
+| Tests: `account.service.test.ts` (7), `admin.service.test.ts` (5), `route.test.ts` (4) | Completed — `vitest` 583→600 |
+| `tsc --noEmit`, `next build`, `web lint`, `flutter analyze`, `flutter test` | Completed — all clean, 236/236 |
+
 ## Fix: Rider subscription creation always failed — wrong total_count for a yearly Plan (2026-10-27)
 
 | Task | Status |

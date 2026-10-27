@@ -8,6 +8,7 @@ export { ReviewService } from "./review.service";
 export { WishlistService } from "./wishlist.service";
 export { PartnerService } from "./partner.service";
 export { AdminService } from "./admin.service";
+export { AccountService, type DeleteOwnAccountResult } from "./account.service";
 export { MessageService } from "./message.service";
 export { MembershipService } from "./membership.service";
 export { PartnerMembershipService } from "./partner-membership.service";

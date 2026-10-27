@@ -1,5 +1,28 @@
+import { membershipRepository, partnerMembershipRepository } from "@bikie/database";
 import { getAdministrationModule } from "./modules/administration/public";
+import { RazorpayService } from "./razorpay.service";
 import type { AdminOverviewStatsDTO } from "@bikie/types";
+
+/** Best-effort — an admin-deleted (or anonymized) account must never keep auto-debiting a
+ * subscription nobody can see or cancel through the app anymore. Cancels immediately (not
+ * cycle-end: there's no "use out the paid period" once the account itself is gone/scrubbed).
+ * A cancel failure never blocks the deletion itself — an admin needs to be able to remove an
+ * account regardless of Razorpay reachability — it's only logged for manual follow-up. A row
+ * with no `razorpaySubscriptionId`, or whose cycle-end cancellation is already in flight
+ * (`cancelledAt` set), is skipped — nothing left to cancel. */
+async function cancelOpenSubscriptionsBeforeDelete(userId: string): Promise<void> {
+  const [riderSub, partnerSub] = await Promise.all([
+    membershipRepository.findOpenSubscriptionForUser(userId),
+    partnerMembershipRepository.findOpenSubscriptionForUser(userId),
+  ]);
+  for (const sub of [riderSub, partnerSub]) {
+    if (!sub?.razorpaySubscriptionId || sub.cancelledAt) continue;
+    const cancelled = await RazorpayService.cancelSubscription(sub.razorpaySubscriptionId, false).catch(() => null);
+    if (!cancelled) {
+      console.error(`ADMIN_DELETE_USER_SUBSCRIPTION_CANCEL_FAILED userId=${userId} razorpaySubscriptionId=${sub.razorpaySubscriptionId}`);
+    }
+  }
+}
 
 /** Compatibility facade — routes keep importing AdminService. */
 export const AdminService = {
@@ -15,7 +38,8 @@ export const AdminService = {
   updateUserAccountType(userId: string, accountType: "RIDER" | "SERVICE_PROVIDER") {
     return getAdministrationModule().admin.updateUserAccountType(userId, accountType);
   },
-  deleteUser(userId: string) {
+  async deleteUser(userId: string) {
+    await cancelOpenSubscriptionsBeforeDelete(userId);
     return getAdministrationModule().admin.deleteUser(userId);
   },
   getAllPartners() {
