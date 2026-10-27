@@ -38,16 +38,20 @@ import { POST } from "./route";
 
 afterEach(() => vi.resetAllMocks());
 
-function webhookRequest(body: object, signature = "valid-sig") {
-  return new Request("http://localhost/api/webhooks/razorpay", {
-    method: "POST",
-    headers: signature ? { "x-razorpay-signature": signature } : {},
-    body: JSON.stringify(body),
-  });
+// `eventId` defaults to a real `x-razorpay-event-id` header — Razorpay's actual webhook JSON
+// body never carries an `id` field (shape: `{ entity, account_id, event, contains, payload,
+// created_at }`), only the HTTP header does. Every payload literal below is deliberately built
+// WITHOUT a body `id` to model a real delivery faithfully; a regression back to reading only
+// `body.id` (the original bug — every real webhook call failed `MISSING_EVENT_ID`, forever, for
+// both account types, until fixed) would fail this entire file.
+function webhookRequest(body: object, signature = "valid-sig", eventId: string | null = "evt_1") {
+  const headers: Record<string, string> = {};
+  if (signature) headers["x-razorpay-signature"] = signature;
+  if (eventId) headers["x-razorpay-event-id"] = eventId;
+  return new Request("http://localhost/api/webhooks/razorpay", { method: "POST", headers, body: JSON.stringify(body) });
 }
 
 const subscriptionPayload = (overrides: Partial<{ id: string; status: string }> = {}) => ({
-  id: "evt_1",
   event: "subscription.charged",
   payload: {
     subscription: { entity: { id: overrides.id ?? "sub_abc123", status: overrides.status ?? "active", current_start: 1700000000, current_end: 1702592000 } },
@@ -81,10 +85,19 @@ describe("POST /api/webhooks/razorpay — transport", () => {
     expect(res.status).toBe(400);
   });
 
-  it("400s when the (validly signed) payload has no event id", async () => {
-    const res = await POST(webhookRequest({ event: "subscription.charged" }));
+  it("400s when the (validly signed) request has no event id, in the header or the body", async () => {
+    const res = await POST(webhookRequest({ event: "subscription.charged" }, "valid-sig", null));
     expect(res.status).toBe(400);
     expect(claimWebhookEvent).not.toHaveBeenCalled();
+  });
+
+  it("still claims and processes when the event id is ONLY in the body (defensive fallback, never relied on by a real delivery)", async () => {
+    resolveAccountType.mockResolvedValueOnce("RIDER");
+
+    const res = await POST(webhookRequest({ id: "evt_body_only", ...subscriptionPayload() }, "valid-sig", null));
+
+    expect(res.status).toBe(200);
+    expect(claimWebhookEvent).toHaveBeenCalledWith("evt_body_only", "subscription.charged");
   });
 
   it("200s as a duplicate without resolving the account type or processing, on a replayed event id", async () => {
@@ -99,7 +112,7 @@ describe("POST /api/webhooks/razorpay — transport", () => {
   });
 
   it("200s with no processing when the payload has no subscription entity", async () => {
-    const res = await POST(webhookRequest({ id: "evt_1", event: "subscription.charged", payload: {} }));
+    const res = await POST(webhookRequest({ event: "subscription.charged", payload: {} }));
     expect(res.status).toBe(200);
     expect(resolveAccountType).not.toHaveBeenCalled();
   });
@@ -162,7 +175,6 @@ describe("POST /api/webhooks/razorpay — routes to the correct service by accou
   it("subscription.activated WITHOUT a payment is status-only, routed to the resolved service", async () => {
     resolveAccountType.mockResolvedValueOnce("SERVICE_PROVIDER");
     const payload = {
-      id: "evt_1",
       event: "subscription.activated",
       payload: { subscription: { entity: { id: "sub_abc123", status: "authenticated" } } },
     };
@@ -177,7 +189,7 @@ describe("POST /api/webhooks/razorpay — routes to the correct service by accou
     "%s is status-only, routed to the resolved service, never stamps cancelledAt",
     async (eventType) => {
       resolveAccountType.mockResolvedValueOnce("RIDER");
-      const payload = { id: "evt_1", event: eventType, payload: { subscription: { entity: { id: "sub_rider1", status: "halted" } } } };
+      const payload = { event: eventType, payload: { subscription: { entity: { id: "sub_rider1", status: "halted" } } } };
 
       await POST(webhookRequest(payload));
 
@@ -187,7 +199,7 @@ describe("POST /api/webhooks/razorpay — routes to the correct service by accou
 
   it("subscription.cancelled stamps cancelledAt, routed to the resolved service", async () => {
     resolveAccountType.mockResolvedValueOnce("SERVICE_PROVIDER");
-    const payload = { id: "evt_1", event: "subscription.cancelled", payload: { subscription: { entity: { id: "sub_abc123", status: "cancelled" } } } };
+    const payload = { event: "subscription.cancelled", payload: { subscription: { entity: { id: "sub_abc123", status: "cancelled" } } } };
 
     await POST(webhookRequest(payload));
 

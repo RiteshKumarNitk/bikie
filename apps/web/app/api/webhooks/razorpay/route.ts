@@ -71,12 +71,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "INVALID_BODY" }, { status: 400 });
   }
 
-  const eventId = body.id ?? null;
+  // Razorpay's webhook JSON body has NO `id` field of its own (its shape is `{ entity, account_id,
+  // event, contains, payload, created_at }`) — the real per-delivery unique identifier is sent in
+  // the `X-Razorpay-Event-Id` HTTP header instead. `body.id` is kept as a defensive fallback only
+  // (never actually populated by a real delivery); relying on it alone meant every single webhook
+  // call, for every event type, failed `MISSING_EVENT_ID` before anything else ran — the root
+  // cause of memberships never auto-activating and always needing manual reconciliation.
+  const eventId = request.headers.get("x-razorpay-event-id") ?? body.id ?? null;
   const eventType = body.event;
   if (!eventId) {
-    // Every real Razorpay webhook delivery carries an `id` — this should never happen with a
-    // genuinely signed payload, but idempotency has nothing to key on without it.
-    console.error(`[Webhook][Razorpay] event has no id, cannot dedupe — eventType=${eventType}`);
+    console.error(`[Webhook][Razorpay] event has no id (header or body), cannot dedupe — eventType=${eventType}`);
     return NextResponse.json({ error: "MISSING_EVENT_ID" }, { status: 400 });
   }
 

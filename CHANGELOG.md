@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-10-27 — Fix: Razorpay webhook never activated any subscription, ever (wrong event-id field)
+
+Root cause of "membership never auto-activates, I have to manually reconcile every single
+purchase" — a complaint spanning both Rider and Service Provider, going back to when the
+recurring-subscription feature first shipped. Diagnosed from production logs after the user
+captured three real webhook deliveries (`subscription.cancelled`, `.activated`, `.charged`), all
+rejected identically: `[Webhook][Razorpay] event has no id, cannot dedupe`.
+
+The webhook handler read the event's unique id from `body.id` — but Razorpay's actual webhook JSON
+body has no `id` field at all (`{ entity, account_id, event, contains, payload, created_at }`); the
+real per-delivery id is only ever sent via the `X-Razorpay-Event-Id` HTTP header. `body.id` was
+always `undefined`, so every webhook call, for every event type, for both account types, was
+rejected with `400 MISSING_EVENT_ID` before idempotency claiming — let alone activation — ever ran.
+Nothing was wrong with the Razorpay Dashboard configuration, the webhook secret, signature
+verification, or the plan/mode setup investigated earlier; the request never got that far.
+
+Fixed to read `X-Razorpay-Event-Id` first, falling back to `body.id` only defensively (a real
+delivery never populates it). Test file rewritten to model Razorpay's real payload shape — every
+payload literal now omits a body `id` and relies on the header instead, so a regression back to
+the original bug would fail the whole suite; added an explicit fallback-still-works test and a
+no-id-anywhere-still-400s test.
+
+Tests: `route.test.ts` — 17 tests (2 new, all rewritten to the real payload shape). `vitest`
+602→603. `tsc --noEmit` clean, `next build` clean, `web lint` 0 new issues.
+
 ## 2026-10-27 — Admin: Rider "who's subscribed" list, matching `/admin/partner-membership`
 
 The Rider membership admin page (`/admin/membership`) only ever had plan CRUD — no way to see

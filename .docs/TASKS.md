@@ -2,6 +2,18 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Fix: Razorpay webhook never activated any subscription — wrong event-id field (2026-10-27)
+
+| Task | Status |
+|---|---|
+| Diagnosed from production logs (user-captured real webhook deliveries): `[Webhook][Razorpay] event has no id, cannot dedupe` for `subscription.cancelled`/`.activated`/`.charged` — every delivery, both account types | Completed |
+| Root cause: handler read the event id from `body.id`, but Razorpay's real webhook body has no `id` field at all — it's only ever sent via the `X-Razorpay-Event-Id` HTTP header | Completed |
+| Ruled out first: Dashboard webhook config (URL/events/enabled all correct), Live vs Test mode (confirmed Live), signature/secret (never even reached that check in the failing path) | Completed — real diagnostic work, not guesswork |
+| Fixed: reads `X-Razorpay-Event-Id` header first, `body.id` kept only as a defensive fallback (never populated by a real delivery) | Completed |
+| Test file rewritten to model Razorpay's real payload shape (no body `id` anywhere) — a regression back to the original bug now fails the whole file | Completed — `vitest` 602→603 (17 tests, 2 new) |
+| `tsc --noEmit`, `next build`, `web lint` | Completed — all clean |
+| **Deploy this** — every webhook delivery to production has failed since this feature existed; high priority | **Not done** — awaiting push |
+
 ## Admin: Rider "who's subscribed" list, matching Service Provider's admin page (2026-10-27)
 
 | Task | Status |
