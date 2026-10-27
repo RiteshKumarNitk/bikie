@@ -2,6 +2,24 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Rider yearly auto-renewal: real Razorpay Subscription at ₹149/year (2026-10-26)
+
+| Task | Status |
+|---|---|
+| `UserMembership` gains 7 nullable subscription fields, identical shape to `PartnerMembership`'s; `MembershipInvoice.userMembershipId` changed from unique 1:1 to plain indexed FK | Completed — migration `20261026000000_user_membership_subscription`, applied to dev/staging |
+| `MembershipService.startSubscription`/`cancelSubscription`/`reconcileSubscription`/`adminCancelSubscription` — reuses the SP's Razorpay-`paid_count`-verified stale-subscription retry logic exactly | Completed |
+| New `SubscriptionWebhookRouter.resolveAccountType` — one shared `/api/webhooks/razorpay` handler now routes to `MembershipService` or `PartnerMembershipService` by looking up which table owns the Razorpay subscription id | Completed |
+| Reconcile/cancel admin routes (`/api/admin/partner-membership/subscriptions/{reconcile,cancel}`) generalized to resolve + support both account types; `ReconcileSubscriptionTool` UI shows which type was synced | Completed |
+| Fixed pre-existing bug: `billing.repository.ts`'s subscription-aware payment-type derivation was Service-Provider-only — would have silently misclassified every Rider subscription invoice | Completed |
+| Fixed pre-existing bug: web receipt + mobile invoice-detail screen hardcoded "Monthly Auto-Renewal" regardless of actual billing cadence | Completed — now derived from `durationDays` |
+| Web `/membership`: Auto-Renewal status card (ON/cancelled/payment-problem) with explicit backend-sourced dates; new "Start Yearly Membership — ₹{price}/year" button alongside the existing one-time "Pay once" (not test-account-gated — existing Riders keep the one-time option, not forced to convert) | Completed |
+| Mobile `membership_screen.dart`: same UI, same two-button pattern; `membership_model.freezed.dart`/`.g.dart` hand-patched (project's `build_runner` currently crashes on an unrelated Dart SDK 3.13.0/`analyzer` 3.9.0 incompatibility) | Completed — verified via `flutter analyze` (0 issues) + whole-project `getDiagnostics` |
+| New `RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID` env var, separate from the SP's; amount never hardcoded in frontend, sourced from the plan catalog | Completed in code — **not confirmed set in production** |
+| `patch-rider-membership-price.ts` — one-off idempotent 99→149 price patch | Completed, applied to dev — **not yet run against production** |
+| Tests: subscription start (all 4 retry scenarios), initial payment, yearly renewal, duplicate-webhook idempotency, failed payment, cancellation, reconciliation (missing-webhook recovery + run-twice idempotency), webhook routing, UI display states both platforms | Completed — `vitest` 565/565, `flutter test` 236/236 |
+| `pnpm --filter web run typecheck`/`build`, `flutter analyze`/`build apk --debug` | Completed — all clean |
+| Verify `RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID` is set on the VPS to a real ₹149/yearly Razorpay Plan, confirm no new webhook registration is needed, run the price patch against production | **Not done** — blocked by the same sandboxed production-read restriction noted in the 2026-10-24 SP entry below; must be confirmed before this ships |
+
 ## Admin: reconcile a Service Provider subscription straight from Razorpay (2026-10-25)
 
 | Task | Status |

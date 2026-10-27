@@ -4967,3 +4967,77 @@ than needing a third implementation to add it only for admin.
   registered; both env vars set locally. **Migration not yet applied to any database; nothing
   deployed to production yet** — `startSubscription` will error against a live DB until the
   migration runs there.
+
+## ADR-095: Recurring Razorpay Subscriptions for Rider membership (₹149/year), mirrors ADR-094
+
+- **Context.** Supersedes ADR-094's "What is unchanged" claim that Riders stay one-time-only.
+  Riders requested the same real-AutoPay subscription Service Providers got in ADR-094, but on
+  their own plan/cycle — ₹149/**year**, not ₹99/month — and the two must never cross-contaminate
+  (no shared Razorpay Plan, no mixed billing interval, no silent conversion of an existing
+  one-time `UserMembership` into a subscription).
+- **Decision — extend `UserMembership` exactly as ADR-094 extended `PartnerMembership`, then share
+  what was already generic and generalize what turned out not to be.**
+  1. **Schema (additive).** `UserMembership` gains the same 7 nullable fields as `PartnerMembership`
+     did; `MembershipInvoice.userMembershipId` loses its `@unique` the same way `partnerMembershipId`
+     did in ADR-094, for the same reason (a subscription accumulates one invoice per cycle).
+     Migration `20261026000000_user_membership_subscription`, hand-authored for the same reason as
+     ADR-094's (unrelated Prisma-diff drift from the PostGIS indexes, ADR-016) — applied to
+     dev/staging in this change, unlike ADR-094's which shipped unapplied.
+  2. **Services.** `MembershipService` gains `startSubscription`/`cancelSubscription`/
+     `recordRecurringCharge`/`recordSubscriptionStatusChange`/`reconcileSubscription`/
+     `adminCancelSubscription` — line-for-line the same logic as `PartnerMembershipService`'s,
+     including the stale-subscription Razorpay-`paid_count`-verified retry safety that was added to
+     the SP side *after* ADR-094 shipped (2026-10-25, see the "Fix: failed/abandoned subscription
+     authorization" entry) — the Rider side gets that fix from day one rather than needing its own
+     follow-up. Reads `RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID`, a separate env var from the SP's, into a
+     separate Razorpay Plan — never shared, never mixed cycles.
+  3. **One webhook handler for both account types.** ADR-094's `/api/webhooks/razorpay` hardcoded
+     `PartnerMembershipService`. Rather than fork the handler, new `SubscriptionWebhookRouter.
+     resolveAccountType(razorpaySubscriptionId)` looks up which table (`UserMembership` or
+     `PartnerMembership`) owns the id and the handler dispatches to the matching service. Same
+     pattern applied to the admin reconcile/cancel routes (`/api/admin/partner-membership/
+     subscriptions/{reconcile,cancel}` — URL unchanged, now account-type-agnostic underneath).
+     `claimWebhookEvent`/`RazorpayWebhookEvent` stay on `PartnerMembershipService` — always were
+     generic (keyed by Razorpay event id, not account type), never needed duplicating.
+  4. **Found, while making this generic, that it wasn't yet.** `billing.repository.ts`'s
+     subscription-aware payment-type derivation (`paymentTypeFor`/`subscriptionStateFor`/
+     `paymentTypesFor`) only ever read `inv.partnerMembership` — correct while only the SP had
+     subscriptions, silently wrong (would show every Rider recurring invoice as a one-time payment)
+     the moment Riders got one. Generalized via a `subscriptionLinkFor` helper that checks whichever
+     of `partnerMembership`/`userMembership` is present; `paymentTypesFor` now runs the same
+     `groupBy`-earliest-invoice query against both FK columns and merges by membership id (cuids are
+     globally unique, so no collision risk). `createRecurringPartnerInvoice` renamed
+     `createRecurringInvoice` (body unchanged — it only ever took whichever FK was passed).
+     Also found and fixed: the web receipt and the mobile invoice-detail screen both hardcoded
+     "Monthly Auto-Renewal" on every subscription invoice; now derived from `durationDays`.
+  5. **New routes**: `POST /api/membership/subscription`, `POST /api/membership/subscription/
+     cancel` — same shapes as ADR-094's SP routes.
+  6. **UI (additive, one-time flow untouched — Riders are explicitly never forced to convert).**
+     Web `/membership` and Flutter's `membership_screen.dart` both keep the existing "Pay once"/
+     "Get Started" one-time button unconditionally and add a new "Start Yearly Membership —
+     ₹{price}/year" button alongside it for every non-free plan — unlike ADR-094's SP page, no
+     test-account gating, since forcing existing Riders onto AutoPay was explicitly out of scope.
+     Status display reuses `subscription-display.ts` (renamed from `partner-subscription-display.ts`,
+     `git mv`, no logic change — the module was already generic behind a narrow structural-typing
+     interface) and a new mirrored `membership_subscription_display.dart` on mobile (Dart's nominal
+     typing can't reuse the SP module directly the way TypeScript's structural typing could).
+  7. **New env var**: `RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID` — separate from
+     `RAZORPAY_SP_MEMBERSHIP_PLAN_ID`, never hardcoded in frontend. No new webhook registration
+     needed — ADR-094's webhook already covers the same six `subscription.*` events for any
+     subscription, regardless of which account type owns it.
+- **What is unchanged.** SOS, FCM, push notifications, SMS/MSG91, Firebase, authentication, Rider
+  profile/account, the Service Provider subscription architecture ADR-094 built, SP reconciliation,
+  and the admin notification system — none of this feature's changes touched any of it.
+- **Consequences.** `vitest` 480→565 (membership.service.test.ts gains the full
+  startSubscription/cancelSubscription/listAllSubscriptions/adminCancelSubscription/
+  recordRecurringCharge/recordSubscriptionStatusChange/reconcileSubscription suites, including
+  duplicate-webhook and run-twice reconciliation idempotency tests not present verbatim in the SP
+  file; new `subscription-webhook-router.service.test.ts`, `webhooks/razorpay/route.test.ts`,
+  `receipt-html.test.ts`); `flutter test` 225→236 (new
+  `membership_subscription_display_test.dart`). `pnpm --filter web run typecheck`/`build` clean,
+  `web lint` 0 new issues, `flutter analyze` clean, `flutter build apk --debug` succeeded.
+  `patch-rider-membership-price.ts` (99→149) applied to dev DB only. **Not yet applied to
+  production**: the migration, the price patch, and `RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID` (must be a
+  real Razorpay Plan billing ₹149/yearly, separate from the SP's plan, on the Razorpay Dashboard
+  and the production env) — unverified from this sandbox, same class of gap ADR-094 shipped with
+  for the SP side. Not committed/pushed pending that gap being closed.

@@ -16,7 +16,7 @@ vi.mock("@bikie/database", () => ({
   billingRepository: {
     createInvoice: vi.fn(async () => ({ id: "inv-1", confirmationSmsSentAt: null })),
     markConfirmationSmsSent: vi.fn(async () => undefined),
-    createRecurringPartnerInvoice: vi.fn(async () => ({ id: "inv-recurring-1" })),
+    createRecurringInvoice: vi.fn(async () => ({ id: "inv-recurring-1" })),
   },
   razorpayWebhookRepository: {
     tryClaimEvent: vi.fn(async () => true),
@@ -66,7 +66,7 @@ const repo = partnerMembershipRepository as unknown as {
 const billing = billingRepository as unknown as {
   createInvoice: ReturnType<typeof vi.fn>;
   markConfirmationSmsSent: ReturnType<typeof vi.fn>;
-  createRecurringPartnerInvoice: ReturnType<typeof vi.fn>;
+  createRecurringInvoice: ReturnType<typeof vi.fn>;
 };
 const webhookRepo = razorpayWebhookRepository as unknown as { tryClaimEvent: ReturnType<typeof vi.fn> };
 const razorpay = RazorpayService as unknown as {
@@ -103,7 +103,7 @@ afterEach(() => {
   repo.findOpenSubscriptionForUser.mockResolvedValue(null);
   repo.findByRazorpaySubscriptionId.mockResolvedValue(null);
   billing.createInvoice.mockResolvedValue({ id: "inv-1", confirmationSmsSentAt: null });
-  billing.createRecurringPartnerInvoice.mockResolvedValue({ id: "inv-recurring-1" });
+  billing.createRecurringInvoice.mockResolvedValue({ id: "inv-recurring-1" });
   webhookRepo.tryClaimEvent.mockResolvedValue(true);
   razorpay.isConfigured.mockReturnValue(true);
   razorpay.listSubscriptionInvoices.mockResolvedValue([]);
@@ -553,7 +553,7 @@ describe("PartnerMembershipService.recordRecurringCharge (webhook: subscription.
     expect(result!.status).toBe("ACTIVE");
     expect(new Date(result!.endDate).getTime()).toBeGreaterThan(Date.now());
 
-    expect(billing.createRecurringPartnerInvoice).toHaveBeenCalledWith(
+    expect(billing.createRecurringInvoice).toHaveBeenCalledWith(
       expect.objectContaining({
         accountType: "SERVICE_PROVIDER",
         partnerMembershipId: "pm-1",
@@ -583,8 +583,8 @@ describe("PartnerMembershipService.recordRecurringCharge (webhook: subscription.
       amount: 99,
     });
 
-    expect(billing.createRecurringPartnerInvoice).toHaveBeenCalledTimes(2);
-    const [[firstCall], [secondCall]] = billing.createRecurringPartnerInvoice.mock.calls;
+    expect(billing.createRecurringInvoice).toHaveBeenCalledTimes(2);
+    const [[firstCall], [secondCall]] = billing.createRecurringInvoice.mock.calls;
     expect(firstCall.razorpayPaymentId).toBe("pay_month_1");
     expect(secondCall.razorpayPaymentId).toBe("pay_month_2");
     expect(firstCall.razorpayPaymentId).not.toBe(secondCall.razorpayPaymentId);
@@ -604,7 +604,7 @@ describe("PartnerMembershipService.recordRecurringCharge (webhook: subscription.
 
     expect(result).toBeNull();
     expect(repo.recordSubscriptionCharge).not.toHaveBeenCalled();
-    expect(billing.createRecurringPartnerInvoice).not.toHaveBeenCalled();
+    expect(billing.createRecurringInvoice).not.toHaveBeenCalled();
     err.mockRestore();
   });
 });
@@ -713,11 +713,11 @@ describe("PartnerMembershipService.reconcileSubscription (admin-triggered, webho
       "pm-1",
       expect.objectContaining({ lastPaymentId: "pay_2", currentPeriodEnd: new Date("2026-11-25T00:00:00.000Z") }),
     );
-    expect(billing.createRecurringPartnerInvoice).toHaveBeenNthCalledWith(
+    expect(billing.createRecurringInvoice).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({ razorpayPaymentId: "pay_1", paidAt: new Date("2026-09-25T00:05:00.000Z") }),
     );
-    expect(billing.createRecurringPartnerInvoice).toHaveBeenNthCalledWith(
+    expect(billing.createRecurringInvoice).toHaveBeenNthCalledWith(
       2,
       expect.objectContaining({ razorpayPaymentId: "pay_2", paidAt: new Date("2026-10-25T00:05:00.000Z") }),
     );

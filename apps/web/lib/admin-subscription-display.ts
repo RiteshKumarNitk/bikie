@@ -2,12 +2,14 @@ import type { AdminTransactionDTO } from "@bikie/types";
 
 /**
  * Pure display logic for the admin Transactions drawer/list's "Auto-Renewal" / subscription
- * section — the admin-facing counterpart to `partner-subscription-display.ts` (the Service
- * Provider's own view). Deliberately a separate module, not a reuse of that one: the admin needs
- * more raw detail (the literal Razorpay status word, how many renewals have happened, a
- * cancellation date) that the SP-facing copy intentionally simplifies away. Every date/amount
- * here is read straight off `AdminTransactionDTO` (ultimately `PartnerMembership` + the invoice's
- * own snapshot columns) — nothing is computed or guessed in this module.
+ * section — the admin-facing counterpart to `subscription-display.ts` (the Rider's/Service
+ * Provider's own view of their own subscription). Deliberately a separate module, not a reuse of
+ * that one: the admin needs more raw detail (the literal Razorpay status word, how many renewals
+ * have happened, a cancellation date) that the member-facing copy intentionally simplifies away.
+ * Works for either account type already — every date/amount here is read straight off
+ * `AdminTransactionDTO` (ultimately `UserMembership`/`PartnerMembership` + the invoice's own
+ * snapshot columns, generalized across both in `billing.repository.ts`) — nothing is computed or
+ * guessed in this module.
  */
 
 const HEALTHY_SUBSCRIPTION_STATUSES = new Set(["created", "authenticated", "active"]);

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PartnerMembershipService, RazorpayService } from "@bikie/services";
+import { MembershipService, PartnerMembershipService, RazorpayService, SubscriptionWebhookRouter } from "@bikie/services";
 
 /** Terminal/informational Razorpay Subscription statuses — `status`/`endDate` are deliberately
  * NOT touched for these: "do not incorrectly mark an otherwise valid active period as expired
@@ -39,12 +39,18 @@ function toDate(unixSeconds: number | null | undefined): Date | null {
 }
 
 /**
- * `POST /api/webhooks/razorpay` — Razorpay Subscriptions webhook (recurring SP membership).
- * Reads the RAW body (required for signature verification — Razorpay signs the exact bytes it
- * sent, not a re-serialized object), verifies `X-Razorpay-Signature` against
- * `RAZORPAY_WEBHOOK_SECRET` (never `RAZORPAY_KEY_SECRET` — a different secret, by Razorpay's own
- * design), and makes processing idempotent by the event's own id (`PartnerMembershipService.
- * claimWebhookEvent`) before touching anything — a replayed/duplicate delivery is a no-op 200.
+ * `POST /api/webhooks/razorpay` — Razorpay Subscriptions webhook, shared by BOTH recurring
+ * membership types: Rider (₹149/year, `UserMembership`) and Service Provider (₹99/month,
+ * `PartnerMembership`) — one webhook URL/secret registered once in the Razorpay Dashboard,
+ * `SubscriptionWebhookRouter.resolveAccountType` decides which service a given event belongs to
+ * by looking up the subscription id against both tables (their `razorpaySubscriptionId` columns
+ * are independently unique, so at most one matches). Reads the RAW body (required for signature
+ * verification — Razorpay signs the exact bytes it sent, not a re-serialized object), verifies
+ * `X-Razorpay-Signature` against `RAZORPAY_WEBHOOK_SECRET` (never `RAZORPAY_KEY_SECRET` — a
+ * different secret, by Razorpay's own design), and makes processing idempotent by the event's own
+ * id (`PartnerMembershipService.claimWebhookEvent` — shared/generic despite living on that
+ * service, not SP-specific) before touching anything — a replayed/duplicate delivery is a no-op
+ * 200.
  *
  * Every branch returns 200 once the event is understood (even "nothing to do" ones) so Razorpay
  * doesn't retry forever; only a bad signature or a malformed body get a non-200.
@@ -87,13 +93,25 @@ export async function POST(request: Request) {
   }
 
   try {
+    const accountType = await SubscriptionWebhookRouter.resolveAccountType(subscription.id);
+    if (!accountType) {
+      // A genuinely signed Razorpay event referencing a subscription id neither table has —
+      // shouldn't normally happen, but there's nothing to update either way. Still 200s so
+      // Razorpay doesn't retry forever.
+      console.error(
+        `SUBSCRIPTION_WEBHOOK_UNKNOWN_SUBSCRIPTION razorpayEventId=${eventId} eventType=${eventType} razorpaySubscriptionId=${subscription.id}`,
+      );
+      return NextResponse.json({ ok: true });
+    }
+    const service = accountType === "RIDER" ? MembershipService : PartnerMembershipService;
+
     if (eventType === "subscription.charged") {
       const payment = body.payload?.payment?.entity;
       if (!payment) {
         console.error(`SUBSCRIPTION_WEBHOOK_FAILED razorpayEventId=${eventId} eventType=${eventType} reason=NO_PAYMENT_ENTITY`);
         return NextResponse.json({ ok: true });
       }
-      await PartnerMembershipService.recordRecurringCharge(subscription.id, {
+      await service.recordRecurringCharge(subscription.id, {
         subscriptionStatus: subscription.status,
         currentPeriodStart: toDate(subscription.current_start),
         currentPeriodEnd: toDate(subscription.current_end) ?? new Date(),
@@ -106,7 +124,7 @@ export async function POST(request: Request) {
       // a later `charged` for the same payment is a safe no-op). Otherwise, status-only.
       const payment = body.payload?.payment?.entity;
       if (payment) {
-        await PartnerMembershipService.recordRecurringCharge(subscription.id, {
+        await service.recordRecurringCharge(subscription.id, {
           subscriptionStatus: subscription.status,
           currentPeriodStart: toDate(subscription.current_start),
           currentPeriodEnd: toDate(subscription.current_end) ?? new Date(),
@@ -114,10 +132,10 @@ export async function POST(request: Request) {
           amount: payment.amount / 100,
         });
       } else {
-        await PartnerMembershipService.recordSubscriptionStatusChange(subscription.id, subscription.status);
+        await service.recordSubscriptionStatusChange(subscription.id, subscription.status);
       }
     } else if (STATUS_ONLY_EVENTS.has(eventType)) {
-      await PartnerMembershipService.recordSubscriptionStatusChange(subscription.id, subscription.status, {
+      await service.recordSubscriptionStatusChange(subscription.id, subscription.status, {
         // Only Razorpay-initiated cancellation stamps `cancelledAt` here — this app's own
         // `/subscription/cancel` already stamped it at request time.
         ...(eventType === "subscription.cancelled" ? { cancelledAt: new Date() } : {}),

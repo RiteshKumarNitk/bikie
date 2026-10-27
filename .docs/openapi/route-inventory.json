@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-25T05:03:27.884Z",
-  "count": 167,
+  "generatedAt": "2026-10-26T15:10:46.185Z",
+  "count": 169,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -707,6 +707,22 @@
       ],
       "auth": "session",
       "file": "apps/web/app/api/membership/purchase/route.ts"
+    },
+    {
+      "path": "/api/membership/subscription/cancel",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/membership/subscription/cancel/route.ts"
+    },
+    {
+      "path": "/api/membership/subscription",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/membership/subscription/route.ts"
     },
     {
       "path": "/api/messages/{id}/react",

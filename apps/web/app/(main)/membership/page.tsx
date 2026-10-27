@@ -6,6 +6,8 @@ import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { Breadcrumbs } from "@/components/shared/Breadcrumbs";
 import { PaymentModal, prefillFromSessionUser } from "@/components/membership/PaymentModal";
+import { BillingHistory } from "@/components/membership/BillingHistory";
+import { subscriptionDisplayState } from "@/lib/subscription-display";
 
 interface Plan {
   id: string;
@@ -18,11 +20,22 @@ interface Plan {
 
 interface ActiveMembership {
   planId: string;
-  plan: { name: string };
+  plan: { name: string; price: number };
   daysLeft: number;
   endDate: string;
+  razorpaySubscriptionId?: string | null;
+  subscriptionStatus?: string | null;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  cancelledAt?: string | null;
 }
 
+/** ADR-043/ (Rider yearly auto-renewal) — the Rider's own membership, entirely separate from the
+ * Service Provider `/partner/membership` page it mirrors. A free plan activates immediately with
+ * no payment step; a paid plan offers BOTH the existing one-time purchase ("Pay once" — never
+ * removed; an existing Rider's active membership keeps working exactly as it always has, and
+ * nothing here silently converts it into a subscription) and, alongside it, a real recurring
+ * Razorpay Subscription ("Start Yearly Membership") the Rider explicitly authorizes. */
 export default function MembershipPage() {
   const router = useRouter();
   const { data: session } = authClient.useSession();
@@ -40,6 +53,10 @@ export default function MembershipPage() {
   // checkout on *this* visit; an existing membership from a previous visit shouldn't re-show
   // "activated!" every time the page loads.
   const [justPurchased, setJustPurchased] = useState(false);
+
+  const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [subscriptionNotice, setSubscriptionNotice] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/membership/plans")
@@ -68,12 +85,74 @@ export default function MembershipPage() {
   function handleCheckoutSuccess(plan: Plan) {
     setActiveMembership({
       planId: plan.id,
-      plan: { name: plan.name },
+      plan: { name: plan.name, price: plan.price },
       daysLeft: plan.durationDays,
       endDate: new Date(Date.now() + plan.durationDays * 24 * 60 * 60 * 1000).toISOString(),
     });
     setJustPurchased(true);
     setCheckoutPlan(null);
+  }
+
+  /** Starts a recurring ₹149/year Razorpay Subscription — distinct from `handlePurchase` above
+   * (the existing one-time purchase flow, kept exactly as-is, never removed). Opens Razorpay's
+   * hosted authorization page in a new tab; the membership only actually activates once
+   * Razorpay's webhook confirms the first charge, so this reloads the active-membership state
+   * afterward rather than assuming success. */
+  async function handleStartSubscription(plan: Plan) {
+    if (!session) {
+      router.push("/login?next=/membership");
+      return;
+    }
+    setPurchaseError(null);
+    setSubscribingPlanId(plan.id);
+    try {
+      const res = await fetch("/api/membership/subscription", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ planId: plan.id }),
+      });
+      const data = await res
+        .json()
+        .catch(() => ({}) as { error?: string; message?: string; subscription?: { shortUrl: string } });
+      if (!res.ok) {
+        throw new Error(
+          typeof data.message === "string"
+            ? data.message
+            : typeof data.error === "string"
+              ? data.error
+              : "Could not start the subscription. Please try again.",
+        );
+      }
+      if (data.subscription?.shortUrl) {
+        window.open(data.subscription.shortUrl, "_blank", "noopener,noreferrer");
+      }
+      setSubscriptionNotice(
+        "Complete the payment authorization in the new tab. Your membership activates once the first payment is confirmed — refresh this page afterward.",
+      );
+    } catch (err) {
+      setPurchaseError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setSubscribingPlanId(null);
+    }
+  }
+
+  /** Stops future recurring charges (`cancelAtCycleEnd`). The already-paid-for current period is
+   * never retroactively revoked — membership stays active until `endDate` naturally passes. */
+  async function handleCancelSubscription() {
+    setIsCancelling(true);
+    setPurchaseError(null);
+    try {
+      const res = await fetch("/api/membership/subscription/cancel", { method: "POST" });
+      const data = await res.json().catch(() => ({}) as { error?: string; membership?: ActiveMembership });
+      if (!res.ok) {
+        throw new Error(typeof data.error === "string" ? data.error : "Could not cancel the subscription.");
+      }
+      setActiveMembership(data.membership ?? null);
+    } catch (err) {
+      setPurchaseError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setIsCancelling(false);
+    }
   }
 
   if (loading) {
@@ -105,9 +184,112 @@ export default function MembershipPage() {
         )}
 
         {!justPurchased && activeMembership && (
-          <div className="mx-auto mt-6 max-w-md rounded-2xl bg-success/10 px-6 py-4 text-sm text-success">
-            ✓ Your {activeMembership.plan.name} membership is active — {activeMembership.daysLeft} day
-            {activeMembership.daysLeft === 1 ? "" : "s"} left.
+          <div className="mx-auto mt-6 max-w-md rounded-2xl bg-success/10 px-6 py-4 text-left text-sm text-success">
+            <p>
+              ✓ Your {activeMembership.plan.name} membership is active — {activeMembership.daysLeft} day
+              {activeMembership.daysLeft === 1 ? "" : "s"} left.
+            </p>
+            {(() => {
+              const state = subscriptionDisplayState(activeMembership);
+
+              if (state.kind === "none") return null;
+
+              if (state.kind === "cancelled") {
+                return (
+                  <div className="mt-3 border-t border-success/20 pt-3 text-foreground/70">
+                    <p className="font-medium">
+                      Auto-renewal cancelled. No further automatic payment will be taken.
+                    </p>
+                    <dl className="mt-2 space-y-1">
+                      <div>
+                        <dt className="inline text-foreground/50">Membership remains active until: </dt>
+                        <dd className="inline font-medium">{state.validUntilDate}</dd>
+                      </div>
+                      <div>
+                        <dt className="inline text-foreground/50">Next automatic payment: </dt>
+                        <dd className="inline font-medium">Cancelled</dd>
+                      </div>
+                    </dl>
+                  </div>
+                );
+              }
+
+              if (state.kind === "payment_problem") {
+                return (
+                  <div className="mt-3 border-t border-success/20 pt-3">
+                    <div className="rounded-xl bg-red-500/10 px-3 py-2 text-red-400">
+                      <p className="font-semibold">⚠️ There is a problem with your yearly membership renewal</p>
+                      <p className="mt-0.5">
+                        We couldn&apos;t collect your ₹{activeMembership.plan.price} membership renewal payment.
+                        Please check your payment method to keep your membership active.
+                      </p>
+                    </div>
+                    <dl className="mt-2 space-y-1 text-foreground/70">
+                      <div>
+                        <dt className="inline text-foreground/50">Subscription status: </dt>
+                        <dd className="inline font-medium text-red-400">{state.statusLabel}</dd>
+                      </div>
+                      <div>
+                        <dt className="inline text-foreground/50">Membership valid until: </dt>
+                        <dd className="inline font-medium">{state.validUntilDate}</dd>
+                      </div>
+                    </dl>
+                    <button
+                      type="button"
+                      onClick={handleCancelSubscription}
+                      disabled={isCancelling}
+                      className="mt-2 text-red-400 underline disabled:opacity-50"
+                    >
+                      {isCancelling ? "Cancelling…" : "Cancel Auto-Renewal"}
+                    </button>
+                  </div>
+                );
+              }
+
+              // kind === "active"
+              return (
+                <div className="mt-3 border-t border-success/20 pt-3 text-foreground/70">
+                  <p className="font-semibold text-foreground">Auto-Renewal: ON</p>
+                  <dl className="mt-2 space-y-1">
+                    <div>
+                      <dt className="inline text-foreground/50">Amount: </dt>
+                      <dd className="inline font-medium">₹{activeMembership.plan.price}/year</dd>
+                    </div>
+                    <div>
+                      <dt className="inline text-foreground/50">Next automatic payment: </dt>
+                      <dd className="inline font-medium">{state.nextPaymentDate}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline text-foreground/50">Membership valid until: </dt>
+                      <dd className="inline font-medium">{state.validUntilDate}</dd>
+                    </div>
+                    <div>
+                      <dt className="inline text-foreground/50">Subscription status: </dt>
+                      <dd className="inline font-medium">Active</dd>
+                    </div>
+                  </dl>
+                  <p className="mt-2">
+                    ₹{activeMembership.plan.price} will be automatically debited on <strong>{state.nextPaymentDate}</strong>.
+                    Your membership will renew for another year after the successful payment.
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleCancelSubscription}
+                    disabled={isCancelling}
+                    className="mt-3 text-red-400 underline disabled:opacity-50"
+                  >
+                    {isCancelling ? "Cancelling…" : "Cancel Auto-Renewal"}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        {subscriptionNotice && (
+          <div className="mx-auto mt-6 max-w-md rounded-2xl bg-accent/10 px-6 py-4 text-sm text-accent-text">
+            {subscriptionNotice}
           </div>
         )}
 
@@ -120,6 +302,7 @@ export default function MembershipPage() {
         <div className="mt-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
           {plans.map((plan) => {
             const isActivePlan = activeMembership?.planId === plan.id;
+            const isFree = plan.price === 0;
             return (
               <div
                 key={plan.id}
@@ -152,8 +335,33 @@ export default function MembershipPage() {
                   disabled={isActivePlan}
                   className="mt-8 w-full rounded-xl bg-accent py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:opacity-50"
                 >
-                  {isActivePlan ? "✓ Active" : "Get Started"}
+                  {isActivePlan ? "✓ Active" : isFree ? "Get Started" : "Pay once"}
                 </button>
+
+                {/* Recurring auto-renewing alternative to the one-time button above — only for a
+                    paid plan; the one-time path above remains available either way, and nothing
+                    here silently converts an existing one-time membership into a subscription. */}
+                {!isFree && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleStartSubscription(plan)}
+                      disabled={isActivePlan || subscribingPlanId === plan.id}
+                      className="mt-2 w-full rounded-xl border border-accent py-3 text-sm font-semibold text-accent-text transition-colors hover:bg-accent/10 disabled:opacity-50"
+                    >
+                      {isActivePlan
+                        ? "✓ Active"
+                        : subscribingPlanId === plan.id
+                          ? "Starting…"
+                          : `Start Yearly Membership — ₹${plan.price}/year`}
+                    </button>
+                    <p className="mt-2 text-center text-xs text-foreground/50">
+                      Auto-renews yearly. ₹{plan.price} will be automatically debited on your renewal date — not a
+                      one-time payment. By subscribing, you authorize BIKIE to automatically charge ₹{plan.price}
+                      every year until you cancel.
+                    </p>
+                  </>
+                )}
               </div>
             );
           })}
@@ -164,6 +372,15 @@ export default function MembershipPage() {
             <Link href="/login?next=/membership" className="text-accent-text hover:underline">Log in</Link> to purchase a membership.
           </p>
         )}
+      </div>
+
+      <div className="mx-auto mt-12 max-w-5xl px-6">
+        <section>
+          <h2 className="text-lg font-semibold">Payment history</h2>
+          <div className="mt-4">
+            <BillingHistory />
+          </div>
+        </section>
       </div>
 
       {checkoutPlan && (

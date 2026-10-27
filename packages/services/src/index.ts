@@ -11,6 +11,7 @@ export { AdminService } from "./admin.service";
 export { MessageService } from "./message.service";
 export { MembershipService } from "./membership.service";
 export { PartnerMembershipService } from "./partner-membership.service";
+export { SubscriptionWebhookRouter, type SubscriptionAccountType } from "./subscription-webhook-router.service";
 export { BillingService } from "./billing.service";
 export { AdminBillingService, type AdminTransactionQuery } from "./admin-billing.service";
 export { AccountTypeRequestService } from "./account-type-request.service";

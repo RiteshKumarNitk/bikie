@@ -265,6 +265,31 @@ Membership routes above, mirrored against `PartnerMembershipPlan`/`PartnerMember
 | `/api/admin/partner-membership/plans` | GET/POST | Role: ADMIN. |
 | `/api/admin/partner-membership/plans/[id]` | PATCH/DELETE | Role: ADMIN. |
 
+## Recurring Subscriptions (real Razorpay Subscription, AutoPay mandate)
+
+Alongside the one-time checkout/purchase routes above, both account types can also start a real
+Razorpay Subscription instead: Rider ₹149/**year** (`RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID`), Service
+Provider ₹99/**month** (`RAZORPAY_SP_MEMBERSHIP_PLAN_ID`) — two separate Razorpay Plans, never
+shared, never mixed billing cycles. A membership only activates on the webhook-confirmed
+`subscription.charged`/`activated` event, never on subscription creation alone. One shared
+`/api/webhooks/razorpay` handler processes both account types' events (`subscription.activated`/
+`charged`/`pending`/`halted`/`cancelled`/`completed`), routing to `UserMembership` or
+`PartnerMembership` via `SubscriptionWebhookRouter.resolveAccountType` (looks up which table owns
+the Razorpay subscription id). `startSubscription` on both services shares the same stale-
+subscription retry logic: an existing open subscription is only replaced if Razorpay itself
+confirms (live `paid_count`) zero charges and a non-terminal status; a verify failure fails safe
+(blocks, touches nothing) rather than guessing.
+
+| Route | Method | Notes |
+|---|---|---|
+| `/api/membership/subscription` | POST | Body: `{ planId }`. Rider-only. Creates a Razorpay Subscription against `RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID`; returns the hosted AutoPay authorization page URL. Existing one-time `UserMembership` rows are untouched — this is an additive option, never an automatic conversion. |
+| `/api/membership/subscription/cancel` | POST | Rider-only. Cycle-end cancellation — the mandate stops renewing but the current paid period runs out normally; never an immediate/retroactive cancel. |
+| `/api/partner-membership/subscription` | POST | Same shape, Service-Provider-only, against `RAZORPAY_SP_MEMBERSHIP_PLAN_ID`. |
+| `/api/partner-membership/subscription/cancel` | POST | Same cycle-end semantics, Service-Provider-only. |
+| `/api/admin/partner-membership/subscriptions/reconcile` | POST | Role: ADMIN. Body: `{ razorpaySubscriptionId }`. Account-type-agnostic (despite the URL, which predates the Rider side) — resolves which account type owns the id, replays any paid invoices BIKIE is missing through the same `recordRecurringCharge` path the webhook uses. Idempotent, safe to re-run. Response includes `accountType`. |
+| `/api/admin/partner-membership/subscriptions/cancel` | POST | Role: ADMIN. Same account-type resolution as reconcile above; admin-initiated cycle-end cancellation. |
+| `/api/admin/partner-membership/subscriptions` | GET | Role: ADMIN. **Service-Provider-only, not yet generalized to Riders** — listing Rider subscriptions wasn't part of the scope that added the Rider side. |
+
 ## Membership billing / invoices — ADR-070
 
 One immutable `MembershipInvoice` per membership activation (both account types), with a

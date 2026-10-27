@@ -1,14 +1,24 @@
 /**
  * Transport coverage for the admin webhook-recovery endpoint: auth gating, request validation,
- * and that a successful reconcile is audit-logged. `PartnerMembershipService.reconcileSubscription`'s
- * own logic is covered in packages/services/src/partner-membership.service.test.ts.
+ * that it's routed to the correct service by account type, and that a successful reconcile is
+ * audit-logged. `MembershipService`/`PartnerMembershipService`'s own `reconcileSubscription`
+ * logic is covered in their respective *.service.test.ts files; `SubscriptionWebhookRouter`'s
+ * own resolution logic is covered in subscription-webhook-router.service.test.ts.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-const { reconcileSubscription } = vi.hoisted(() => ({ reconcileSubscription: vi.fn() }));
+const { riderReconcileSubscription, partnerReconcileSubscription, resolveAccountType } = vi.hoisted(() => ({
+  riderReconcileSubscription: vi.fn(),
+  partnerReconcileSubscription: vi.fn(),
+  resolveAccountType: vi.fn(),
+}));
 const { logAdminAction } = vi.hoisted(() => ({ logAdminAction: vi.fn() }));
 
-vi.mock("@bikie/services", () => ({ PartnerMembershipService: { reconcileSubscription } }));
+vi.mock("@bikie/services", () => ({
+  MembershipService: { reconcileSubscription: riderReconcileSubscription },
+  PartnerMembershipService: { reconcileSubscription: partnerReconcileSubscription },
+  SubscriptionWebhookRouter: { resolveAccountType },
+}));
 vi.mock("@/lib/require-role", () => ({ requireRole: vi.fn() }));
 vi.mock("@/lib/audit", () => ({ logAdminAction }));
 
@@ -27,7 +37,7 @@ function request(body: object) {
 }
 
 describe("POST /api/admin/partner-membership/subscriptions/reconcile", () => {
-  it("401s without an admin session and never touches the service", async () => {
+  it("401s without an admin session and never resolves the account type", async () => {
     mockedRequireRole.mockResolvedValueOnce({
       session: null,
       error: new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401 }),
@@ -36,7 +46,7 @@ describe("POST /api/admin/partner-membership/subscriptions/reconcile", () => {
     const res = await POST(request({ razorpaySubscriptionId: "sub_abc123" }));
 
     expect(res.status).toBe(401);
-    expect(reconcileSubscription).not.toHaveBeenCalled();
+    expect(resolveAccountType).not.toHaveBeenCalled();
   });
 
   it("400s on a missing razorpaySubscriptionId", async () => {
@@ -45,46 +55,70 @@ describe("POST /api/admin/partner-membership/subscriptions/reconcile", () => {
     const res = await POST(request({}));
 
     expect(res.status).toBe(400);
-    expect(reconcileSubscription).not.toHaveBeenCalled();
+    expect(resolveAccountType).not.toHaveBeenCalled();
   });
 
-  it("404s for an unknown subscription id", async () => {
+  it("404s when the subscription id matches neither account type", async () => {
     mockedRequireRole.mockResolvedValueOnce({ session: { user: { id: "admin-1" } }, error: null });
-    reconcileSubscription.mockResolvedValueOnce({ ok: false, reason: "NOT_FOUND" });
+    resolveAccountType.mockResolvedValueOnce(null);
 
     const res = await POST(request({ razorpaySubscriptionId: "sub_unknown" }));
 
     expect(res.status).toBe(404);
+    expect(riderReconcileSubscription).not.toHaveBeenCalled();
+    expect(partnerReconcileSubscription).not.toHaveBeenCalled();
+  });
+
+  it("routes a SERVICE_PROVIDER subscription id to PartnerMembershipService, never MembershipService", async () => {
+    mockedRequireRole.mockResolvedValueOnce({ session: { user: { id: "admin-1" } }, error: null });
+    resolveAccountType.mockResolvedValueOnce("SERVICE_PROVIDER");
+    partnerReconcileSubscription.mockResolvedValueOnce({ ok: true, membership: { id: "pm-1" }, invoicesFound: 1 });
+
+    const res = await POST(request({ razorpaySubscriptionId: "sub_abc123" }));
+
+    expect(res.status).toBe(200);
+    expect(partnerReconcileSubscription).toHaveBeenCalledWith("sub_abc123");
+    expect(riderReconcileSubscription).not.toHaveBeenCalled();
+  });
+
+  it("routes a RIDER subscription id to MembershipService, never PartnerMembershipService", async () => {
+    mockedRequireRole.mockResolvedValueOnce({ session: { user: { id: "admin-1" } }, error: null });
+    resolveAccountType.mockResolvedValueOnce("RIDER");
+    riderReconcileSubscription.mockResolvedValueOnce({ ok: true, membership: { id: "um-1" }, invoicesFound: 2 });
+
+    const res = await POST(request({ razorpaySubscriptionId: "sub_rider1" }));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(riderReconcileSubscription).toHaveBeenCalledWith("sub_rider1");
+    expect(partnerReconcileSubscription).not.toHaveBeenCalled();
+    expect(body).toEqual({ membership: { id: "um-1" }, invoicesFound: 2, accountType: "RIDER" });
   });
 
   it("503s when Razorpay's live state could not be verified", async () => {
     mockedRequireRole.mockResolvedValueOnce({ session: { user: { id: "admin-1" } }, error: null });
-    reconcileSubscription.mockResolvedValueOnce({ ok: false, reason: "COULD_NOT_VERIFY" });
+    resolveAccountType.mockResolvedValueOnce("RIDER");
+    riderReconcileSubscription.mockResolvedValueOnce({ ok: false, reason: "COULD_NOT_VERIFY" });
 
-    const res = await POST(request({ razorpaySubscriptionId: "sub_abc123" }));
+    const res = await POST(request({ razorpaySubscriptionId: "sub_rider1" }));
 
     expect(res.status).toBe(503);
   });
 
-  it("on success, returns the updated membership and audit-logs the admin action with the subscription id", async () => {
+  it("on success, audit-logs the admin action with the account type and entity", async () => {
     mockedRequireRole.mockResolvedValueOnce({ session: { user: { id: "admin-1" } }, error: null });
-    reconcileSubscription.mockResolvedValueOnce({
-      ok: true,
-      membership: { id: "pm-1", endDate: "2026-11-25T00:00:00.000Z" },
-      invoicesFound: 2,
-    });
+    resolveAccountType.mockResolvedValueOnce("RIDER");
+    riderReconcileSubscription.mockResolvedValueOnce({ ok: true, membership: { id: "um-1" }, invoicesFound: 2 });
 
-    const res = await POST(request({ razorpaySubscriptionId: "sub_abc123" }));
-    const body = await res.json();
+    await POST(request({ razorpaySubscriptionId: "sub_rider1" }));
 
-    expect(res.status).toBe(200);
-    expect(body).toEqual({ membership: { id: "pm-1", endDate: "2026-11-25T00:00:00.000Z" }, invoicesFound: 2 });
     expect(logAdminAction).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "admin-1",
-        action: "RECONCILE_PARTNER_SUBSCRIPTION",
-        entityId: "pm-1",
-        metadata: { razorpaySubscriptionId: "sub_abc123", invoicesFound: 2 },
+        action: "RECONCILE_SUBSCRIPTION",
+        entity: "UserMembership",
+        entityId: "um-1",
+        metadata: { razorpaySubscriptionId: "sub_rider1", invoicesFound: 2, accountType: "RIDER" },
       }),
     );
   });

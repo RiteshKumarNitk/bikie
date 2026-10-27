@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { PartnerMembershipService } from "@bikie/services";
+import { MembershipService, PartnerMembershipService, SubscriptionWebhookRouter } from "@bikie/services";
 import { reconcilePartnerSubscriptionSchema } from "@bikie/validation";
 import { requireRole } from "@/lib/require-role";
 import { logAdminAction } from "@/lib/audit";
@@ -16,7 +16,13 @@ const ERROR_STATUS: Record<string, number> = {
  * every PAID invoice Razorpay has recorded against the given subscription through the exact same
  * code path the webhook itself uses. Idempotent — running this on an already-up-to-date
  * subscription, or running it twice, is always a safe no-op, never a double charge or duplicate
- * invoice (`createRecurringPartnerInvoice` is keyed on `razorpayPaymentId` alone).
+ * invoice (`createRecurringInvoice` is keyed on `razorpayPaymentId` alone).
+ *
+ * Shared across BOTH recurring membership types (the URL still says "partner-membership" for
+ * backward compatibility with the existing UI, but the underlying tool now handles either):
+ * `SubscriptionWebhookRouter.resolveAccountType` looks up the given subscription id against both
+ * `UserMembership` (Rider, ₹149/year) and `PartnerMembership` (Service Provider, ₹99/month)
+ * before delegating to the matching service.
  */
 export async function POST(request: Request) {
   const { session, error } = await requireRole("ADMIN");
@@ -27,18 +33,25 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
-  const result = await PartnerMembershipService.reconcileSubscription(parsed.data.razorpaySubscriptionId);
+  const { razorpaySubscriptionId } = parsed.data;
+  const accountType = await SubscriptionWebhookRouter.resolveAccountType(razorpaySubscriptionId);
+  if (!accountType) {
+    return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
+  }
+
+  const service = accountType === "RIDER" ? MembershipService : PartnerMembershipService;
+  const result = await service.reconcileSubscription(razorpaySubscriptionId);
   if (!result.ok) {
     return NextResponse.json({ error: result.reason }, { status: ERROR_STATUS[result.reason] ?? 400 });
   }
 
   await logAdminAction({
     userId: session.user.id,
-    action: "RECONCILE_PARTNER_SUBSCRIPTION",
-    entity: "PartnerMembership",
+    action: "RECONCILE_SUBSCRIPTION",
+    entity: accountType === "RIDER" ? "UserMembership" : "PartnerMembership",
     entityId: result.membership.id,
-    metadata: { razorpaySubscriptionId: parsed.data.razorpaySubscriptionId, invoicesFound: result.invoicesFound },
+    metadata: { razorpaySubscriptionId, invoicesFound: result.invoicesFound, accountType },
   });
 
-  return NextResponse.json({ membership: result.membership, invoicesFound: result.invoicesFound });
+  return NextResponse.json({ membership: result.membership, invoicesFound: result.invoicesFound, accountType });
 }

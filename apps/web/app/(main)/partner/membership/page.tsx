@@ -5,7 +5,7 @@ import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
 import { PaymentModal, prefillFromSessionUser } from "@/components/membership/PaymentModal";
 import { BillingHistory } from "@/components/membership/BillingHistory";
-import { subscriptionDisplayState } from "@/lib/partner-subscription-display";
+import { subscriptionDisplayState } from "@/lib/subscription-display";
 import { isTestPhoneNumber } from "@/lib/test-phone";
 
 interface Plan {

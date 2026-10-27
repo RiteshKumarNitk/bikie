@@ -39,10 +39,19 @@ class _Receipt extends StatelessWidget {
     return d == null ? iso : DateFormat('d MMM y').format(d);
   }
 
-  String _paymentTypeLabel(InvoicePaymentType type) {
+  /// "Monthly" for the Service Provider's 30-day plan, "Yearly" for the Rider's 365-day plan,
+  /// "Every N days" otherwise — never hardcoded to one account type's cadence. Mirrors
+  /// `apps/web/lib/receipt-html.ts`'s identical `billingCadenceLabel`.
+  String _billingCadenceLabel(int durationDays) {
+    if (durationDays == 30) return 'Monthly';
+    if (durationDays == 365) return 'Yearly';
+    return 'Every $durationDays days';
+  }
+
+  String _paymentTypeLabel(InvoicePaymentType type, int durationDays) {
     switch (type) {
       case InvoicePaymentType.initialSubscription:
-        return 'Monthly Auto-Renewal';
+        return '${_billingCadenceLabel(durationDays)} Auto-Renewal';
       case InvoicePaymentType.autoRenewal:
         return 'Automatic Renewal';
       case InvoicePaymentType.oneTime:
@@ -65,7 +74,7 @@ class _Receipt extends StatelessWidget {
       if (inv.customerPhone != null) ('Mobile', inv.customerPhone!),
       ('Account type', s.accountType == 'SERVICE_PROVIDER' ? 'Service Provider' : 'Rider'),
       ('Plan', s.planName),
-      if (isSubscriptionInvoice) ('Payment type', _paymentTypeLabel(s.paymentType)),
+      if (isSubscriptionInvoice) ('Payment type', _paymentTypeLabel(s.paymentType, inv.durationDays)),
       if (isSubscriptionInvoice) ('Auto-debited', s.paymentType == InvoicePaymentType.autoRenewal ? 'Yes' : 'No'),
       ('Membership term', '${inv.durationDays} days'),
       ('Membership start', _date(s.membershipStartDate)),

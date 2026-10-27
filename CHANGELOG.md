@@ -1,5 +1,70 @@
 # Changelog
 
+## 2026-10-26 — Rider yearly auto-renewal (₹149/year, real Razorpay Subscription)
+
+Riders can now subscribe to the yearly Membership plan via a genuine Razorpay Subscription
+(AutoPay mandate) instead of only the existing one-time ₹149 purchase. Mirrors the Service
+Provider subscription architecture exactly — same retry-safety logic, same webhook event set,
+same reconciliation tool, same idempotency guarantees — kept on its own plan/env var so Rider
+(₹149/year) and Service Provider (₹99/month) billing can never cross-contaminate.
+
+Schema: `UserMembership` gains 7 nullable subscription fields (`razorpaySubscriptionId` unique,
+`razorpayPlanId`, `subscriptionStatus`, `currentPeriodStart`, `currentPeriodEnd`, `cancelledAt`,
+`lastPaymentId`) — identical shape to `PartnerMembership`'s existing fields. `MembershipInvoice.
+userMembershipId` changed from a unique 1:1 FK to a plain indexed FK (`UserMembership.invoice` →
+`invoices[]`) since a subscription now has one invoice per billing cycle, not one ever. Hand-
+written migration `20261026000000_user_membership_subscription`, applied to dev/staging; a
+patch script (`patch-rider-membership-price.ts`) updates the live plan's price 99→149 — written,
+applied to dev, **not yet run against production**.
+
+Backend: `MembershipService.startSubscription`/`cancelSubscription`/`reconcileSubscription`/
+`adminCancelSubscription` — same Razorpay-`paid_count`-verified stale-subscription retry logic as
+the SP (`paidCount > 0` never auto-cancelled; `paidCount === 0` + non-terminal → safe replace;
+verify-failure fails safe, never guesses). New `SubscriptionWebhookRouter.resolveAccountType`
+looks up which table (`UserMembership` vs `PartnerMembership`) owns a given Razorpay subscription
+id so one shared webhook handler (`/api/webhooks/razorpay`) and the existing reconcile/cancel
+admin routes can serve both account types without duplicating the handler. Generalized
+`billing.repository.ts`'s subscription-aware payment-type derivation, which was Service-Provider-
+only before this change — a real pre-existing gap that would have silently misclassified every
+Rider subscription invoice had it shipped as-is. Renamed `createRecurringPartnerInvoice` →
+`createRecurringInvoice` (same body, now explicitly generic) and `partner-subscription-display.ts`
+→ `subscription-display.ts` (`git mv`, no logic change — it was already generic).
+
+Also fixed two pre-existing bugs surfaced while building this: (1) the billing-repository gap
+above, and (2) both the web receipt and the mobile invoice-detail screen hardcoded "Monthly
+Auto-Renewal" on every subscription invoice regardless of actual billing cadence — now computed
+from `durationDays` (`Yearly Auto-Renewal` for 365-day plans, `Monthly Auto-Renewal` for 30-day).
+
+Web (`/membership`): active-membership card shows Auto-Renewal ON/cancelled/payment-problem state
+with explicit backend-sourced dates (never a client-computed "+365 days"), reusing
+`subscriptionDisplayState`. Every non-free plan now shows both the existing one-time "Pay once"
+button and a new "Start Yearly Membership — ₹{price}/year" button (unlike the SP page, no
+test-account gating — the one-time path stays available for existing Riders by design, per the
+"don't force conversion" requirement). Mobile: same UI mirrored in `membership_screen.dart`,
+including hand-patched `membership_model.freezed.dart`/`.g.dart` (the project's `build_runner`
+currently crashes on an unrelated Dart SDK 3.13.0 / `analyzer` 3.9.0 incompatibility — pre-existing
+toolchain issue, worked around by transforming the already-correct `partner_membership_model.
+freezed.dart` by hand, verified via `flutter analyze`/`getDiagnostics` showing zero issues).
+
+Admin: `ReconcileSubscriptionTool` and the reconcile/cancel routes now resolve and display account
+type (Rider vs Service Provider) so one tool/button covers both.
+
+Tests: 565 vitest (42 files, all passing) + 236 flutter (all passing), including new coverage for
+subscription start (all 4 retry scenarios), initial payment, yearly renewal, duplicate-webhook
+idempotency, failed payment, cancellation, reconciliation (missing-webhook recovery + run-twice
+idempotency), webhook routing to the correct account-type service, and UI display states on both
+platforms. `pnpm --filter web run typecheck`/`build` clean; `flutter analyze`/`build apk --debug`
+clean. Confirmed by design and by test: no monthly/30-day billing logic anywhere in the Rider
+subscription path.
+
+**Not done, flagged as a blocker before relying on this in production**: `RAZORPAY_RIDER_
+MEMBERSHIP_PLAN_ID` (new env var, must be a real Razorpay Plan billing ₹149/yearly, separate from
+`RAZORPAY_SP_MEMBERSHIP_PLAN_ID`) is not confirmed configured on the production VPS — this
+sandbox cannot read production environment or the Razorpay Dashboard. The price-patch script has
+not been run against production (dev DB only). No new webhook registration should be needed (same
+6 subscription events already registered per the earlier SP audit), but this is also unconfirmed
+from here. Not committed/pushed — held per explicit instruction pending this gap being closed.
+
 ## 2026-10-25 — Admin: reconcile a Service Provider subscription straight from Razorpay
 
 A production incident surfaced the gap this closes: a Service Provider's Razorpay mandate was

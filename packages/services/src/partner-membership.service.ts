@@ -299,7 +299,7 @@ export const PartnerMembershipService = {
    * Webhook-driven (`subscription.activated` with a payment, or `subscription.charged`) —
    * records a successful recurring charge: extends `endDate`/`currentPeriodEnd`, stamps
    * `lastPaymentId`, and writes a NEW invoice (never modifying a prior one — every recurring
-   * charge gets its own receipt, via `createRecurringPartnerInvoice`, which is idempotent on
+   * charge gets its own receipt, via `createRecurringInvoice`, which is idempotent on
    * `razorpayPaymentId` alone, never on the membership id). Returns `null` (logged) if no
    * `PartnerMembership` row has this subscription id — the caller (the webhook route) must still
    * ack the event so Razorpay doesn't retry forever; there's simply nothing more to do.
@@ -333,7 +333,7 @@ export const PartnerMembershipService = {
     });
 
     const user = await userRepository.findById(membership.userId);
-    await billingRepository.createRecurringPartnerInvoice({
+    await billingRepository.createRecurringInvoice({
       userId: membership.userId,
       accountType: "SERVICE_PROVIDER",
       partnerMembershipId: membership.id,

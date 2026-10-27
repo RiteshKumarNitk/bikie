@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMembershipDate, subscriptionDisplayState } from "./partner-subscription-display";
+import { formatMembershipDate, subscriptionDisplayState } from "./subscription-display";
 
 const base = {
   endDate: "2026-11-15T00:00:00.000Z",

@@ -15,7 +15,9 @@ final _privateConstructorUsedError = UnsupportedError(
   'It seems like you constructed your class using `MyClass._()`. This constructor is only meant to be used by freezed and you are not supposed to need it nor use it.\nPlease check the documentation here for more information: https://github.com/rrousselGit/freezed#adding-getters-and-methods-to-our-models',
 );
 
-MembershipPlan _$MembershipPlanFromJson(Map<String, dynamic> json) {
+MembershipPlan _$MembershipPlanFromJson(
+  Map<String, dynamic> json,
+) {
   return _MembershipPlan.fromJson(json);
 }
 
@@ -58,7 +60,10 @@ abstract class $MembershipPlanCopyWith<$Res> {
 }
 
 /// @nodoc
-class _$MembershipPlanCopyWithImpl<$Res, $Val extends MembershipPlan>
+class _$MembershipPlanCopyWithImpl<
+  $Res,
+  $Val extends MembershipPlan
+>
     implements $MembershipPlanCopyWith<$Res> {
   _$MembershipPlanCopyWithImpl(this._value, this._then);
 
@@ -138,7 +143,8 @@ abstract class _$$MembershipPlanImplCopyWith<$Res>
 
 /// @nodoc
 class __$$MembershipPlanImplCopyWithImpl<$Res>
-    extends _$MembershipPlanCopyWithImpl<$Res, _$MembershipPlanImpl>
+    extends
+        _$MembershipPlanCopyWithImpl<$Res, _$MembershipPlanImpl>
     implements _$$MembershipPlanImplCopyWith<$Res> {
   __$$MembershipPlanImplCopyWithImpl(
     _$MembershipPlanImpl _value,
@@ -270,7 +276,8 @@ class _$MembershipPlanImpl implements _MembershipPlan {
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   @pragma('vm:prefer-inline')
-  _$$MembershipPlanImplCopyWith<_$MembershipPlanImpl> get copyWith =>
+  _$$MembershipPlanImplCopyWith<_$MembershipPlanImpl>
+  get copyWith =>
       __$$MembershipPlanImplCopyWithImpl<_$MembershipPlanImpl>(
         this,
         _$identity,
@@ -315,8 +322,8 @@ abstract class _MembershipPlan implements MembershipPlan {
   /// with the given fields replaced by the non-null parameter values.
   @override
   @JsonKey(includeFromJson: false, includeToJson: false)
-  _$$MembershipPlanImplCopyWith<_$MembershipPlanImpl> get copyWith =>
-      throw _privateConstructorUsedError;
+  _$$MembershipPlanImplCopyWith<_$MembershipPlanImpl>
+  get copyWith => throw _privateConstructorUsedError;
 }
 
 UserMembership _$UserMembershipFromJson(Map<String, dynamic> json) {
@@ -333,6 +340,13 @@ mixin _$UserMembership {
   String get endDate => throw _privateConstructorUsedError;
   String get status => throw _privateConstructorUsedError;
   int get daysLeft => throw _privateConstructorUsedError;
+  String? get razorpaySubscriptionId => throw _privateConstructorUsedError;
+  String? get razorpayPlanId => throw _privateConstructorUsedError;
+  String? get subscriptionStatus => throw _privateConstructorUsedError;
+  String? get currentPeriodStart => throw _privateConstructorUsedError;
+  String? get currentPeriodEnd => throw _privateConstructorUsedError;
+  String? get cancelledAt => throw _privateConstructorUsedError;
+  String? get lastPaymentId => throw _privateConstructorUsedError;
 
   /// Serializes this UserMembership to a JSON map.
   Map<String, dynamic> toJson() => throw _privateConstructorUsedError;
@@ -360,6 +374,13 @@ abstract class $UserMembershipCopyWith<$Res> {
     String endDate,
     String status,
     int daysLeft,
+    String? razorpaySubscriptionId,
+    String? razorpayPlanId,
+    String? subscriptionStatus,
+    String? currentPeriodStart,
+    String? currentPeriodEnd,
+    String? cancelledAt,
+    String? lastPaymentId,
   });
 
   $MembershipPlanCopyWith<$Res> get plan;
@@ -388,6 +409,13 @@ class _$UserMembershipCopyWithImpl<$Res, $Val extends UserMembership>
     Object? endDate = null,
     Object? status = null,
     Object? daysLeft = null,
+    Object? razorpaySubscriptionId = null,
+    Object? razorpayPlanId = null,
+    Object? subscriptionStatus = null,
+    Object? currentPeriodStart = null,
+    Object? currentPeriodEnd = null,
+    Object? cancelledAt = null,
+    Object? lastPaymentId = null,
   }) {
     return _then(
       _value.copyWith(
@@ -423,6 +451,34 @@ class _$UserMembershipCopyWithImpl<$Res, $Val extends UserMembership>
                 ? _value.daysLeft
                 : daysLeft // ignore: cast_nullable_to_non_nullable
                       as int,
+            razorpaySubscriptionId: null == razorpaySubscriptionId
+                ? _value.razorpaySubscriptionId
+                : razorpaySubscriptionId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            razorpayPlanId: null == razorpayPlanId
+                ? _value.razorpayPlanId
+                : razorpayPlanId // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            subscriptionStatus: null == subscriptionStatus
+                ? _value.subscriptionStatus
+                : subscriptionStatus // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            currentPeriodStart: null == currentPeriodStart
+                ? _value.currentPeriodStart
+                : currentPeriodStart // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            currentPeriodEnd: null == currentPeriodEnd
+                ? _value.currentPeriodEnd
+                : currentPeriodEnd // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            cancelledAt: null == cancelledAt
+                ? _value.cancelledAt
+                : cancelledAt // ignore: cast_nullable_to_non_nullable
+                      as String?,
+            lastPaymentId: null == lastPaymentId
+                ? _value.lastPaymentId
+                : lastPaymentId // ignore: cast_nullable_to_non_nullable
+                      as String?,
           )
           as $Val,
     );
@@ -457,6 +513,13 @@ abstract class _$$UserMembershipImplCopyWith<$Res>
     String endDate,
     String status,
     int daysLeft,
+    String? razorpaySubscriptionId,
+    String? razorpayPlanId,
+    String? subscriptionStatus,
+    String? currentPeriodStart,
+    String? currentPeriodEnd,
+    String? cancelledAt,
+    String? lastPaymentId,
   });
 
   @override
@@ -485,6 +548,13 @@ class __$$UserMembershipImplCopyWithImpl<$Res>
     Object? endDate = null,
     Object? status = null,
     Object? daysLeft = null,
+    Object? razorpaySubscriptionId = null,
+    Object? razorpayPlanId = null,
+    Object? subscriptionStatus = null,
+    Object? currentPeriodStart = null,
+    Object? currentPeriodEnd = null,
+    Object? cancelledAt = null,
+    Object? lastPaymentId = null,
   }) {
     return _then(
       _$UserMembershipImpl(
@@ -520,6 +590,34 @@ class __$$UserMembershipImplCopyWithImpl<$Res>
             ? _value.daysLeft
             : daysLeft // ignore: cast_nullable_to_non_nullable
                   as int,
+        razorpaySubscriptionId: null == razorpaySubscriptionId
+            ? _value.razorpaySubscriptionId
+            : razorpaySubscriptionId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        razorpayPlanId: null == razorpayPlanId
+            ? _value.razorpayPlanId
+            : razorpayPlanId // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        subscriptionStatus: null == subscriptionStatus
+            ? _value.subscriptionStatus
+            : subscriptionStatus // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        currentPeriodStart: null == currentPeriodStart
+            ? _value.currentPeriodStart
+            : currentPeriodStart // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        currentPeriodEnd: null == currentPeriodEnd
+            ? _value.currentPeriodEnd
+            : currentPeriodEnd // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        cancelledAt: null == cancelledAt
+            ? _value.cancelledAt
+            : cancelledAt // ignore: cast_nullable_to_non_nullable
+                  as String?,
+        lastPaymentId: null == lastPaymentId
+            ? _value.lastPaymentId
+            : lastPaymentId // ignore: cast_nullable_to_non_nullable
+                  as String?,
       ),
     );
   }
@@ -537,6 +635,13 @@ class _$UserMembershipImpl implements _UserMembership {
     required this.endDate,
     required this.status,
     required this.daysLeft,
+    this.razorpaySubscriptionId,
+    this.razorpayPlanId,
+    this.subscriptionStatus,
+    this.currentPeriodStart,
+    this.currentPeriodEnd,
+    this.cancelledAt,
+    this.lastPaymentId,
   });
 
   factory _$UserMembershipImpl.fromJson(Map<String, dynamic> json) =>
@@ -558,10 +663,24 @@ class _$UserMembershipImpl implements _UserMembership {
   final String status;
   @override
   final int daysLeft;
+  @override
+  final String? razorpaySubscriptionId;
+  @override
+  final String? razorpayPlanId;
+  @override
+  final String? subscriptionStatus;
+  @override
+  final String? currentPeriodStart;
+  @override
+  final String? currentPeriodEnd;
+  @override
+  final String? cancelledAt;
+  @override
+  final String? lastPaymentId;
 
   @override
   String toString() {
-    return 'UserMembership(id: $id, userId: $userId, planId: $planId, plan: $plan, startDate: $startDate, endDate: $endDate, status: $status, daysLeft: $daysLeft)';
+    return 'UserMembership(id: $id, userId: $userId, planId: $planId, plan: $plan, startDate: $startDate, endDate: $endDate, status: $status, daysLeft: $daysLeft, razorpaySubscriptionId: $razorpaySubscriptionId, razorpayPlanId: $razorpayPlanId, subscriptionStatus: $subscriptionStatus, currentPeriodStart: $currentPeriodStart, currentPeriodEnd: $currentPeriodEnd, cancelledAt: $cancelledAt, lastPaymentId: $lastPaymentId)';
   }
 
   @override
@@ -578,7 +697,21 @@ class _$UserMembershipImpl implements _UserMembership {
             (identical(other.endDate, endDate) || other.endDate == endDate) &&
             (identical(other.status, status) || other.status == status) &&
             (identical(other.daysLeft, daysLeft) ||
-                other.daysLeft == daysLeft));
+                other.daysLeft == daysLeft) &&
+            (identical(other.razorpaySubscriptionId, razorpaySubscriptionId) ||
+                other.razorpaySubscriptionId == razorpaySubscriptionId) &&
+            (identical(other.razorpayPlanId, razorpayPlanId) ||
+                other.razorpayPlanId == razorpayPlanId) &&
+            (identical(other.subscriptionStatus, subscriptionStatus) ||
+                other.subscriptionStatus == subscriptionStatus) &&
+            (identical(other.currentPeriodStart, currentPeriodStart) ||
+                other.currentPeriodStart == currentPeriodStart) &&
+            (identical(other.currentPeriodEnd, currentPeriodEnd) ||
+                other.currentPeriodEnd == currentPeriodEnd) &&
+            (identical(other.cancelledAt, cancelledAt) ||
+                other.cancelledAt == cancelledAt) &&
+            (identical(other.lastPaymentId, lastPaymentId) ||
+                other.lastPaymentId == lastPaymentId));
   }
 
   @JsonKey(includeFromJson: false, includeToJson: false)
@@ -593,6 +726,13 @@ class _$UserMembershipImpl implements _UserMembership {
     endDate,
     status,
     daysLeft,
+    razorpaySubscriptionId,
+    razorpayPlanId,
+    subscriptionStatus,
+    currentPeriodStart,
+    currentPeriodEnd,
+    cancelledAt,
+    lastPaymentId,
   );
 
   /// Create a copy of UserMembership
@@ -622,6 +762,13 @@ abstract class _UserMembership implements UserMembership {
     required String endDate,
     required String status,
     required int daysLeft,
+    final String? razorpaySubscriptionId,
+    final String? razorpayPlanId,
+    final String? subscriptionStatus,
+    final String? currentPeriodStart,
+    final String? currentPeriodEnd,
+    final String? cancelledAt,
+    final String? lastPaymentId,
   }) = _$UserMembershipImpl;
 
   factory _UserMembership.fromJson(Map<String, dynamic> json) =
@@ -643,6 +790,20 @@ abstract class _UserMembership implements UserMembership {
   String get status;
   @override
   int get daysLeft;
+  @override
+  String? get razorpaySubscriptionId;
+  @override
+  String? get razorpayPlanId;
+  @override
+  String? get subscriptionStatus;
+  @override
+  String? get currentPeriodStart;
+  @override
+  String? get currentPeriodEnd;
+  @override
+  String? get cancelledAt;
+  @override
+  String? get lastPaymentId;
 
   /// Create a copy of UserMembership
   /// with the given fields replaced by the non-null parameter values.

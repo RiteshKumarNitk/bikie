@@ -1,20 +1,21 @@
 /**
- * Pure display logic for the Service Provider monthly subscription (ADR-056's recurring
- * Razorpay Subscriptions addendum) — kept separate from `page.tsx`'s JSX specifically so the
- * date/status decisions are unit-testable without a component-rendering setup (this app has none
- * — no `@testing-library/react`, no `.test.tsx` anywhere — matching its existing convention of
+ * Pure display logic for a recurring Razorpay Subscription — shared by BOTH the Rider (₹149/year,
+ * `UserMembership`) and Service Provider (₹99/month, `PartnerMembership`) membership pages, since
+ * the subscription fields are identically shaped on both DTOs and the date/status decisions don't
+ * depend on which one it is. Kept separate from either `page.tsx`'s JSX specifically so the
+ * decisions are unit-testable without a component-rendering setup (this app has none — no
+ * `@testing-library/react`, no `.test.tsx` anywhere — matching its existing convention of
  * factoring display/branching logic into plain functions rather than adding new test
- * infrastructure for one page).
+ * infrastructure for these pages).
  *
- * Every date shown here comes straight from the server's `PartnerMembership` row
+ * Every date shown here comes straight from the server's membership row
  * (`currentPeriodStart`/`currentPeriodEnd`/`endDate`, all ultimately written by
  * `recordSubscriptionCharge` from Razorpay's own webhook payload) — never computed/guessed on
- * the client. `getActiveMembership` was the one gap (it silently dropped these columns); that's
- * fixed in `partner-membership.repository.ts` alongside this file.
+ * the client.
  */
 
-/** Subset of `PartnerMembershipDTO` this module actually needs — kept narrow so `page.tsx`'s own
- * `ActiveMembership` interface (unchanged) satisfies it structurally. */
+/** Subset of `UserMembershipDTO`/`PartnerMembershipDTO` this module actually needs — kept narrow
+ * so either page's own `ActiveMembership` interface (unchanged) satisfies it structurally. */
 export interface SubscriptionFields {
   endDate: string;
   razorpaySubscriptionId?: string | null;

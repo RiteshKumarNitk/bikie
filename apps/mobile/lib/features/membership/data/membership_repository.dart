@@ -66,4 +66,35 @@ class MembershipRepository {
       return UserMembership.fromJson(res.data['membership'] as Map<String, dynamic>);
     });
   }
+
+  /// `POST /api/membership/subscription` — starts a ₹149/year recurring Razorpay Subscription.
+  /// Does NOT activate the membership — that only happens once Razorpay's webhook confirms the
+  /// first charge; the `shortUrl` is Razorpay's own hosted authorization page. Mirrors
+  /// `PartnerMembershipRepository.startSubscription` exactly (Service Provider ₹99/month).
+  Future<StartMembershipSubscriptionResult> startSubscription({required String planId}) {
+    return apiGuard(() async {
+      final res = await _dio.post('/api/membership/subscription', data: {'planId': planId});
+      final data = res.data as Map<String, dynamic>;
+      return StartMembershipSubscriptionResult(
+        membership: UserMembership.fromJson(data['membership'] as Map<String, dynamic>),
+        shortUrl: (data['subscription'] as Map<String, dynamic>)['shortUrl'] as String,
+      );
+    });
+  }
+
+  /// `POST /api/membership/subscription/cancel` — stops future recurring charges
+  /// (`cancelAtCycleEnd`); the already-paid-for current period is retained until it naturally
+  /// ends.
+  Future<UserMembership> cancelSubscription() {
+    return apiGuard(() async {
+      final res = await _dio.post('/api/membership/subscription/cancel');
+      return UserMembership.fromJson(res.data['membership'] as Map<String, dynamic>);
+    });
+  }
+}
+
+class StartMembershipSubscriptionResult {
+  const StartMembershipSubscriptionResult({required this.membership, required this.shortUrl});
+  final UserMembership membership;
+  final String shortUrl;
 }

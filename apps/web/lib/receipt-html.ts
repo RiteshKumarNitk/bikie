@@ -21,10 +21,20 @@ function date(iso: string): string {
   return new Date(iso).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-/** "Monthly Auto-Renewal" for the authorization charge, "Automatic Renewal" for a later recurring
- * charge, "One-time payment" otherwise — matches the mobile receipt's identical labeling. */
-function paymentTypeLabel(paymentType: InvoiceDetailDTO["paymentType"]): string {
-  if (paymentType === "INITIAL_SUBSCRIPTION") return "Monthly Auto-Renewal";
+/** "Monthly" for the Service Provider's 30-day plan, "Yearly" for the Rider's 365-day plan,
+ * "Every N days" for anything else — never hardcoded to one account type's cadence. Mirrors
+ * `admin-subscription-display.ts`'s identical `renewalPeriodLabel`. */
+function billingCadenceLabel(durationDays: number): string {
+  if (durationDays === 30) return "Monthly";
+  if (durationDays === 365) return "Yearly";
+  return `Every ${durationDays} days`;
+}
+
+/** "<cadence> Auto-Renewal" for the authorization charge, "Automatic Renewal" for a later
+ * recurring charge, "One-time payment" otherwise — matches the mobile receipt's identical
+ * labeling, generalized across both account types' billing cadence. */
+function paymentTypeLabel(paymentType: InvoiceDetailDTO["paymentType"], durationDays: number): string {
+  if (paymentType === "INITIAL_SUBSCRIPTION") return `${billingCadenceLabel(durationDays)} Auto-Renewal`;
   if (paymentType === "AUTO_RENEWAL") return "Automatic Renewal";
   return "One-time payment";
 }
@@ -40,7 +50,7 @@ export function renderReceiptHtml(inv: InvoiceDetailDTO): string {
     ...(inv.customerPhone ? [["Mobile", esc(inv.customerPhone)] as [string, string]] : []),
     ["Account type", accountLabel],
     ["Plan", esc(inv.planName)],
-    ...(isSubscriptionInvoice ? [["Payment type", paymentTypeLabel(inv.paymentType)] as [string, string]] : []),
+    ...(isSubscriptionInvoice ? [["Payment type", paymentTypeLabel(inv.paymentType, inv.durationDays)] as [string, string]] : []),
     ...(isSubscriptionInvoice
       ? [["Auto-debited", inv.paymentType === "AUTO_RENEWAL" ? "Yes" : "No"] as [string, string]]
       : []),

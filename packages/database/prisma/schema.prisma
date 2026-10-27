@@ -1037,8 +1037,28 @@ model UserMembership {
   // ADR-069: also `@unique` — one Razorpay order can activate at most one membership.
   razorpayOrderId String? @unique
   createdAt DateTime         @default(now())
-  // ADR-070 — the immutable billing receipt for this activation (at most one).
-  invoice   MembershipInvoice?
+
+  // --- Recurring subscription (Razorpay Subscriptions) — Rider ₹149/year auto-renewal. All
+  // nullable: NULL on every existing one-time/free/legacy row, exactly as before. `status`/
+  // `startDate`/`endDate` above remain the ONLY fields membership-eligibility checks read — a
+  // recurring charge keeps this same row and simply extends `endDate`, so neither needs to know a
+  // subscription exists. `subscriptionStatus` is Razorpay's own lifecycle string
+  // (created/authenticated/active/pending/halted/cancelled/completed), deliberately a different
+  // concept from `MembershipStatus` above. Mirrors `PartnerMembership`'s identical fields
+  // (Service Provider ₹99/month) exactly — same shape, entirely separate rows/table.
+  razorpaySubscriptionId String?   @unique
+  razorpayPlanId         String?
+  subscriptionStatus     String?
+  currentPeriodStart     DateTime?
+  currentPeriodEnd       DateTime?
+  cancelledAt            DateTime?
+  lastPaymentId          String?
+
+  // ADR-070 — immutable billing receipts for this membership. One for a one-time/free activation;
+  // one PER successful recurring charge for a subscription (never mutated after creation) — so
+  // this is a list, not the single optional relation it used to be (mirrors
+  // `PartnerMembership.invoices`).
+  invoices  MembershipInvoice[]
 
   @@index([userId])
   @@index([status])
@@ -1128,13 +1148,15 @@ model MembershipInvoice {
   user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   accountType AccountType
 
-  userMembershipId    String?            @unique
+  // Not @unique on either membership id (as of the Rider ₹149/year auto-renewal addition): a
+  // one-time/free/legacy membership still gets exactly one invoice in practice, but a
+  // subscription-backed one (Rider or Service Provider) accumulates a new invoice per recurring
+  // charge against the SAME membership row — see UserMembership.invoices /
+  // PartnerMembership.invoices. Invoice idempotency is unaffected either way: it was always
+  // enforced by paymentId/razorpayPaymentId's own @unique constraints below, never by these
+  // columns.
+  userMembershipId    String?
   userMembership      UserMembership?    @relation(fields: [userMembershipId], references: [id], onDelete: SetNull)
-  // Not @unique (unlike userMembershipId above): a one-time/free/test Partner membership still
-  // gets exactly one invoice in practice, but a subscription-backed one accumulates a new invoice
-  // per recurring charge against the SAME PartnerMembership row (ADR-093-style additive change —
-  // see PartnerMembership.invoices). Invoice idempotency is unaffected: it was always enforced by
-  // paymentId/razorpayPaymentId's own @unique constraints below, never by this column.
   partnerMembershipId String?
   partnerMembership   PartnerMembership? @relation(fields: [partnerMembershipId], references: [id], onDelete: SetNull)
 
@@ -1164,6 +1186,7 @@ model MembershipInvoice {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+  @@index([userMembershipId])
   @@index([partnerMembershipId])
   @@map("membership_invoice")
 }

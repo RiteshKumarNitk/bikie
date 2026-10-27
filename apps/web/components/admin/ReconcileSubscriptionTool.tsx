@@ -5,17 +5,20 @@ import { useState } from "react";
 interface ReconcileResult {
   membership: { id: string; endDate: string; subscriptionStatus: string | null };
   invoicesFound: number;
+  accountType: "RIDER" | "SERVICE_PROVIDER";
 }
 
 /**
  * Manual safety net for when Razorpay's `subscription.charged`/`subscription.activated` webhook
- * never reaches BIKIE — webhooks are best-effort delivery, not a guarantee, so a Service Provider
- * can be genuinely charged and have an active mandate on Razorpay's side while BIKIE never finds
- * out. Takes the Razorpay Subscription id (visible in the Razorpay Dashboard URL for that
- * subscription, or on the SP's own Razorpay "Set AutoPay" confirmation screen) and replays every
- * paid invoice Razorpay has recorded against it through the exact same code path the webhook
- * itself uses — idempotent, so running it on an already-up-to-date subscription, or running it
- * twice, is always a safe no-op.
+ * never reaches BIKIE — webhooks are best-effort delivery, not a guarantee, so a Rider or Service
+ * Provider can be genuinely charged and have an active mandate on Razorpay's side while BIKIE
+ * never finds out. Works for either recurring membership type (Rider ₹149/year, Service Provider
+ * ₹99/month) — the backend resolves which one a given subscription id belongs to. Takes the
+ * Razorpay Subscription id (visible in the Razorpay Dashboard URL for that subscription, or on
+ * the member's own Razorpay "Set AutoPay" confirmation screen) and replays every paid invoice
+ * Razorpay has recorded against it through the exact same code path the webhook itself uses —
+ * idempotent, so running it on an already-up-to-date subscription, or running it twice, is
+ * always a safe no-op.
  */
 export function ReconcileSubscriptionTool({ onReconciled }: { onReconciled?: () => void }) {
   const [open, setOpen] = useState(false);
@@ -76,10 +79,11 @@ export function ReconcileSubscriptionTool({ onReconciled }: { onReconciled?: () 
           >
             <p className="text-lg font-semibold text-white">Sync Subscription from Razorpay</p>
             <p className="mt-1 text-sm text-white/50">
-              Use this when a Service Provider&apos;s Razorpay mandate/payment succeeded (their autopay screen shows
-              &quot;active&quot; with a real next-due date) but nothing shows up here — the webhook that tells BIKIE
-              about a charge may not have arrived. Paste the Razorpay Subscription id (from the Razorpay Dashboard
-              URL for this subscription) to pull its real payment history directly.
+              Use this when a Rider&apos;s or Service Provider&apos;s Razorpay mandate/payment succeeded (their
+              autopay screen shows &quot;active&quot; with a real next-due date) but nothing shows up here — the
+              webhook that tells BIKIE about a charge may not have arrived. Paste the Razorpay Subscription id (from
+              the Razorpay Dashboard URL for this subscription) to pull its real payment history directly — works for
+              either membership type, BIKIE figures out which one it is.
             </p>
 
             <label className="mt-4 block text-xs font-medium text-white/60" htmlFor="razorpay-subscription-id">
@@ -98,9 +102,10 @@ export function ReconcileSubscriptionTool({ onReconciled }: { onReconciled?: () 
             {result && (
               <div className="mt-3 rounded-lg bg-green-500/10 px-3 py-2 text-sm text-green-400">
                 <p className="font-medium">
+                  {result.accountType === "RIDER" ? "Rider" : "Service Provider"} subscription —{" "}
                   {result.invoicesFound === 0
-                    ? "Nothing new to record — this subscription had no paid invoices on Razorpay's side yet, but its status was synced."
-                    : `Recorded ${result.invoicesFound} paid invoice${result.invoicesFound === 1 ? "" : "s"} from Razorpay.`}
+                    ? "nothing new to record (no paid invoices on Razorpay's side yet, but its status was synced)."
+                    : `recorded ${result.invoicesFound} paid invoice${result.invoicesFound === 1 ? "" : "s"} from Razorpay.`}
                 </p>
                 <p className="mt-1 text-white/70">
                   Membership now valid until {new Date(result.membership.endDate).toLocaleDateString("en-IN", { dateStyle: "medium" })}.
