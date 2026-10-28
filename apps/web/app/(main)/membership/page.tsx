@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authClient } from "@/lib/auth-client";
@@ -51,6 +51,12 @@ export default function MembershipPage() {
   // reload or repeat visit — so someone who'd already paid, then came back to this page later,
   // saw every plan offering "Get Started" again as if nothing had ever been purchased.
   const [activeMembership, setActiveMembership] = useState<ActiveMembership | null>(null);
+  // A subscription that's been created (Razorpay authorization started or finished) but hasn't
+  // been webhook-confirmed charged yet — distinct from `activeMembership`, which is only ever set
+  // once Razorpay has actually confirmed a charge. Never treated as activation by itself; see
+  // `handleStartSubscription` and the polling effect below — only a later refresh that returns a
+  // real `activeMembership` (webhook-driven) ever flips the UI to "active".
+  const [pendingSubscription, setPendingSubscription] = useState<ActiveMembership | null>(null);
   const [checkoutPlan, setCheckoutPlan] = useState<Plan | null>(null);
   // Distinct from `activeMembership` — only true for the celebratory banner right after a
   // checkout on *this* visit; an existing membership from a previous visit shouldn't re-show
@@ -68,11 +74,33 @@ export default function MembershipPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Single source of truth for "what does the server say right now" — called on load, on
+  // tab-return, and by the bounded poller below. Never guesses: `activeMembership` only ever
+  // becomes non-null when the server itself says so (webhook-driven), never from the mere fact
+  // that this was just called.
+  const refreshMembership = useCallback(async () => {
+    try {
+      const res = await fetch("/api/membership/active");
+      const data = await res.json();
+      setActiveMembership(data.membership ?? null);
+      setPendingSubscription(data.pendingSubscription ?? null);
+    } catch {
+      // Transient — the next poll tick or tab-focus retries; never surface a fetch blip as an error.
+    }
+  }, []);
+
   useEffect(() => {
     if (!session) return;
+    // Inline (not a call to the shared `refreshMembership`) to match this file's existing
+    // plans-fetch effect's shape — satisfies `react-hooks/set-state-in-effect`, which flags an
+    // effect body whose own top-level statement is a direct call to a function reference that
+    // sets state, but not an inline promise chain like this one.
     fetch("/api/membership/active")
       .then((r) => r.json())
-      .then((data) => setActiveMembership(data.membership ?? null))
+      .then((data) => {
+        setActiveMembership(data.membership ?? null);
+        setPendingSubscription(data.pendingSubscription ?? null);
+      })
       .catch(() => {});
   }, [session]);
 
@@ -86,10 +114,7 @@ export default function MembershipPage() {
     if (!session) return;
     function refreshOnReturn() {
       if (document.visibilityState !== "visible") return;
-      fetch("/api/membership/active")
-        .then((r) => r.json())
-        .then((data) => setActiveMembership(data.membership ?? null))
-        .catch(() => {});
+      refreshMembership();
     }
     document.addEventListener("visibilitychange", refreshOnReturn);
     window.addEventListener("focus", refreshOnReturn);
@@ -97,7 +122,27 @@ export default function MembershipPage() {
       document.removeEventListener("visibilitychange", refreshOnReturn);
       window.removeEventListener("focus", refreshOnReturn);
     };
-  }, [session]);
+  }, [session, refreshMembership]);
+
+  // Bounded polling while a subscription exists but hasn't been webhook-confirmed yet (just
+  // started, or the Rider returned from Razorpay before the webhook landed) — catches a webhook
+  // that arrives a few seconds after return without the Rider needing to manually refresh. Capped
+  // (12 tries, 5s apart = 1 minute) rather than indefinite: if it's still pending after a minute,
+  // the tab-focus refresh above and the existing stale-subscription retry logic (on the next
+  // "Start Yearly Membership" tap) take over — this is only for catching the common fast case.
+  const pollAttemptsRef = useRef(0);
+  useEffect(() => {
+    if (!pendingSubscription) {
+      pollAttemptsRef.current = 0;
+      return;
+    }
+    if (pollAttemptsRef.current >= 12) return;
+    const timer = setTimeout(() => {
+      pollAttemptsRef.current += 1;
+      refreshMembership();
+    }, 5000);
+    return () => clearTimeout(timer);
+  }, [pendingSubscription, refreshMembership]);
 
   function handlePurchase(plan: Plan) {
     if (!session) {
@@ -153,8 +198,11 @@ export default function MembershipPage() {
         window.open(data.subscription.shortUrl, "_blank", "noopener,noreferrer");
       }
       setSubscriptionNotice(
-        "Complete the payment authorization in the new tab. Your membership activates once the first payment is confirmed — refresh this page afterward.",
+        "Complete the payment authorization in the new tab. This page will update automatically once it's confirmed.",
       );
+      // Picks up the new pending subscription right away (rather than waiting for the next tab
+      // focus or poll tick) so the "payment pending" card below appears immediately.
+      await refreshMembership();
     } catch (err) {
       setPurchaseError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -206,6 +254,21 @@ export default function MembershipPage() {
           <div className="mx-auto mt-6 max-w-md rounded-2xl bg-success/10 px-6 py-4 text-sm text-success">
             🎉 Membership activated! You now have access to all premium benefits.
             <Link href="/dashboard" className="ml-2 font-medium underline">Go to Dashboard</Link>
+          </div>
+        )}
+
+        {/* Not yet webhook-confirmed — never shown as active. Razorpay's own AutoPay
+            authorization step can genuinely take a while (or the Rider may need to retry); this
+            is the honest "we don't know the final result yet" state, kept distinct from both
+            "active" and "failed" per spec — never faked to either. */}
+        {!justPurchased && !activeMembership && pendingSubscription && (
+          <div className="mx-auto mt-6 max-w-md rounded-2xl bg-accent/10 px-6 py-4 text-left text-sm text-accent-text">
+            <p className="font-semibold">⏳ Payment processing</p>
+            <p className="mt-1 text-foreground/70">
+              We&apos;re waiting for Razorpay to confirm your ₹{pendingSubscription.plan.price}/year payment. This
+              page checks automatically — no need to keep refreshing. If this doesn&apos;t resolve in a few
+              minutes, you can safely try again below.
+            </p>
           </div>
         )}
 

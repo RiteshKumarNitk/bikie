@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-10-28 — Rider membership: an honest "payment pending" state, with bounded auto-polling
+
+Between starting a subscription and the webhook confirming it, the Rider previously saw... nothing
+— no active-membership card (correctly, since nothing's confirmed yet) and no indication a payment
+was even attempted; the page just looked exactly like no purchase had ever happened. Combined with
+Razorpay Subscriptions having no redirect mechanism back to the app (confirmed yesterday — not a
+Checkout.js concept), this made it genuinely impossible to tell "still processing" from "nothing
+happened" from "silently failed."
+
+`GET /api/membership/active` now also returns `pendingSubscription` — a subscription that's been
+created but not yet webhook-confirmed charged (new `MembershipService.getPendingSubscription`,
+reusing the existing `findOpenSubscriptionForUser` query; only populated when `membership` is
+`null`, never implying activation). Web and mobile both show a distinct "⏳ Payment processing"
+card for this state — explicitly separate from "active" and from any failure state, never faked to
+either, per spec. Starting a subscription now also triggers an immediate refresh so the card
+appears right away instead of waiting for the next poll/focus tick.
+
+Added bounded polling (12 tries, 5s apart = 1 minute) while a subscription is pending — catches a
+webhook that lands a few seconds after the Rider returns to the app, without needing a manual pull-
+to-refresh, on top of yesterday's resume/focus-triggered refresh. Capped rather than indefinite:
+after a minute, the existing resume refresh and the stale-subscription retry logic (on retry) take
+over, so the page never polls forever in the background.
+
+Everything in the original "do not fake success" requirement was already true architecturally
+(membership only ever activates via the webhook-confirmed `recordRecurringCharge` path, never on
+subscription creation, a client return, or a local record alone) — this change is about *surfacing*
+that honestly in the UI, not changing the activation logic itself.
+
+Tests: new `MembershipService.getPendingSubscription` tests, new `active/route.test.ts` (4 tests —
+this route had no test file before). `vitest` 605→611. `tsc --noEmit` clean, `next build` clean,
+`web lint` 0 new issues (including a genuinely new `react-hooks/set-state-in-effect` this change
+introduced, fixed by matching the file's existing inline-fetch pattern rather than ignored),
+`flutter analyze` clean, `flutter test` 236/236.
+
+Rider-only, per standing scope. The repeated real UPI AutoPay failures seen during testing today
+(`payment_timed_out`, then an indefinite "waiting for autopay confirmation" hang) are Razorpay/UPI-
+network-side, not something any of today's or yesterday's fixes can resolve — recommended escalating
+directly to Razorpay support with the specific payment IDs.
+
 ## 2026-10-28 — Fix: retrying a subscription while still mid-authorization cancelled it out from under the Rider
 
 Real-world failure, caught live: a Rider's payment got stuck on "processing" after approving the

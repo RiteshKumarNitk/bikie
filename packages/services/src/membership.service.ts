@@ -29,6 +29,19 @@ export const MembershipService = {
     return membershipRepository.getActiveMembership(userId);
   },
 
+  /** A subscription that's been created (Rider is mid-Razorpay-authorization, or finished it but
+   * the webhook hasn't landed yet) but was never webhook-confirmed charged — distinct from
+   * `getActiveMembership`, which only ever returns a genuinely paid/active row (its `endDate >=
+   * now()` check excludes this placeholder entirely, by design). Lets the UI show "payment
+   * pending" honestly instead of silently looking exactly like no purchase was ever attempted.
+   * `null` whenever there's nothing open — no attempt at all, or a genuinely active one
+   * (`getActiveMembership`'s job), or a terminal one (cancelled/completed/expired, excluded by
+   * `findOpenSubscriptionForUser` itself). Never returns anything already reflected as `active`
+   * — a caller should only check this when `getActiveMembership` returned `null`. */
+  async getPendingSubscription(userId: string): Promise<UserMembershipDTO | null> {
+    return membershipRepository.findOpenSubscriptionForUser(userId);
+  },
+
   async getPlanById(planId: string): Promise<MembershipPlanDTO | null> {
     return membershipRepository.findPlanById(planId);
   },

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -33,6 +35,9 @@ class MembershipScreen extends ConsumerStatefulWidget {
 }
 
 class _MembershipScreenState extends ConsumerState<MembershipScreen> with WidgetsBindingObserver {
+  Timer? _pollTimer;
+  int _pollAttempts = 0;
+
   @override
   void initState() {
     super.initState();
@@ -41,6 +46,7 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> with Widget
 
   @override
   void dispose() {
+    _pollTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -49,20 +55,51 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> with Widget
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.invalidate(activeMembershipProvider);
+      ref.invalidate(pendingSubscriptionProvider);
     }
+  }
+
+  /// Bounded polling while a subscription exists but hasn't been webhook-confirmed yet — catches
+  /// a webhook that lands a few seconds after the Rider returns from Razorpay, without them
+  /// needing to pull-to-refresh. Capped (12 tries, 5s apart = 1 minute): if still pending after
+  /// that, `didChangeAppLifecycleState`'s resume refresh and the existing stale-subscription
+  /// retry logic (on the next "Start Yearly Membership" tap) take over.
+  void _schedulePoll() {
+    _pollTimer?.cancel();
+    if (_pollAttempts >= 12) return;
+    _pollTimer = Timer(const Duration(seconds: 5), () {
+      _pollAttempts += 1;
+      if (mounted) {
+        ref.invalidate(activeMembershipProvider);
+        ref.invalidate(pendingSubscriptionProvider);
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final active = ref.watch(activeMembershipProvider);
+    final pending = ref.watch(pendingSubscriptionProvider);
     final plans = ref.watch(membershipPlansProvider);
     final hasActiveMembership = active.valueOrNull != null;
+
+    ref.listen<AsyncValue<UserMembership?>>(pendingSubscriptionProvider, (previous, next) {
+      final hadPending = previous?.valueOrNull != null;
+      final hasPending = next.valueOrNull != null;
+      if (hasPending && !hadPending) _pollAttempts = 0;
+      if (hasPending) {
+        _schedulePoll();
+      } else {
+        _pollTimer?.cancel();
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Membership')),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(activeMembershipProvider);
+          ref.invalidate(pendingSubscriptionProvider);
           ref.invalidate(membershipPlansProvider);
         },
         child: ListView(
@@ -80,6 +117,10 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> with Widget
               loading: () => const SizedBox.shrink(),
               error: (_, __) => const SizedBox.shrink(),
             ),
+            // Not yet webhook-confirmed — never shown as active. Razorpay's own AutoPay
+            // authorization step can genuinely take a while, or the Rider may need to retry; this
+            // is the honest "we don't know the final result yet" state, never faked to "active".
+            if (!hasActiveMembership && pending.valueOrNull != null) _PendingSubscriptionCard(pending: pending.valueOrNull!),
             hasActiveMembership
                 ? const SizedBox.shrink()
                 : Column(
@@ -105,6 +146,48 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> with Widget
               title: const Text('Payment history'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push('/billing'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Not yet webhook-confirmed — the honest "we don't know the final result yet" state, kept
+/// distinct from both "active" and "failed". Never implies activation by itself.
+class _PendingSubscriptionCard extends StatelessWidget {
+  const _PendingSubscriptionCard({required this.pending});
+
+  final UserMembership pending;
+
+  @override
+  Widget build(BuildContext context) {
+    final price = pending.plan.price.toStringAsFixed(0);
+    return Card(
+      color: Theme.of(context).colorScheme.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 10),
+                Text('Payment processing', style: Theme.of(context).textTheme.titleSmall),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "We're waiting for Razorpay to confirm your ₹$price/year payment. This refreshes "
+              "automatically — no need to keep checking. If this doesn't resolve in a few minutes, "
+              'you can safely try again below.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
         ),
@@ -362,10 +445,13 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
       if (mounted) {
         showAppToast(
           context,
-          'Complete the payment authorization, then pull to refresh here once done.',
+          'Complete the payment authorization. This screen updates automatically once confirmed.',
           variant: AppToastVariant.success,
         );
       }
+      // Picks up the new pending subscription right away (rather than waiting for the next app
+      // resume or poll tick) so the "payment processing" card appears immediately.
+      ref.invalidate(pendingSubscriptionProvider);
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
     } finally {

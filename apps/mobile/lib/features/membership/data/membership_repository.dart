@@ -23,6 +23,19 @@ class MembershipRepository {
     });
   }
 
+  /// A subscription that's been created (Razorpay authorization started or finished) but hasn't
+  /// been webhook-confirmed charged yet — distinct from [getActive], which only ever returns a
+  /// genuinely paid/active row. Lets the UI show "payment pending" honestly instead of looking
+  /// exactly like no purchase was ever attempted. `null` whenever there's nothing open, or
+  /// [getActive] already has it (the server never populates both at once).
+  Future<UserMembership?> getPendingSubscription() {
+    return apiGuard(() async {
+      final res = await _dio.get('/api/membership/active');
+      final pending = res.data['pendingSubscription'];
+      return pending == null ? null : UserMembership.fromJson(pending as Map<String, dynamic>);
+    });
+  }
+
   Future<List<MembershipPlan>> getPlans() {
     return apiGuard(() async {
       final res = await _dio.get('/api/membership/plans');

@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Rider membership: honest "payment pending" state + bounded auto-polling (2026-10-28)
+
+| Task | Status |
+|---|---|
+| New `MembershipService.getPendingSubscription`, `GET /api/membership/active` now also returns `pendingSubscription` (only when `membership` is null) | Completed |
+| Web + mobile both show a distinct "Payment processing" card — never shown as active, never shown as failed, honest "we don't know yet" | Completed |
+| Starting a subscription triggers an immediate refresh so the card appears right away | Completed |
+| Bounded polling (12 × 5s = 1 min) while pending, on top of the resume/focus refresh from yesterday | Completed |
+| Confirmed: activation logic itself was already correct (webhook-only, never faked) — this was a UI-surfacing gap, not an activation-logic bug | Completed — verified by reading, not assumed |
+| New `MembershipService.getPendingSubscription` tests + new `active/route.test.ts` (route had no tests before) | Completed — `vitest` 605→611 |
+| `tsc --noEmit`, `next build`, `web lint` (incl. fixing a new `react-hooks/set-state-in-effect` this change introduced), `flutter analyze`, `flutter test` | Completed — all clean, 236/236 |
+| Real UPI AutoPay failures during testing (`payment_timed_out`, then an indefinite mandate-confirmation hang) | **Not fixable here** — Razorpay/UPI-network-side; recommended escalating to Razorpay support with the specific payment IDs |
+
 ## Fix: retrying mid-authorization cancelled the Rider's in-flight subscription (2026-10-28)
 
 | Task | Status |

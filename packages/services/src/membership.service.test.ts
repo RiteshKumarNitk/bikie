@@ -322,6 +322,26 @@ describe("MembershipService — dynamic plan config", () => {
 // reconciliation replays missing charges idempotently, and a real subscription is never silently
 // replaced. ---
 
+describe("MembershipService.getPendingSubscription", () => {
+  it("returns the open (not-yet-charged) subscription row as-is", async () => {
+    const open = subscriptionMembershipOn(yearlyPlan);
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(open);
+
+    const result = await MembershipService.getPendingSubscription("user-1");
+
+    expect(result).toBe(open);
+    expect(repo.findOpenSubscriptionForUser).toHaveBeenCalledWith("user-1");
+  });
+
+  it("returns null when there is nothing open", async () => {
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(null);
+
+    const result = await MembershipService.getPendingSubscription("user-1");
+
+    expect(result).toBeNull();
+  });
+});
+
 describe("MembershipService.startSubscription (recurring)", () => {
   it("creates a Razorpay Subscription and a placeholder UserMembership row, never activating it", async () => {
     repo.findPlanById.mockResolvedValueOnce(yearlyPlan);
