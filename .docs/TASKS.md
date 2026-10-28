@@ -2,6 +2,19 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Fix: findability toggle silently ate errors; auto-refresh Rider membership on return (2026-10-28)
+
+| Task | Status |
+|---|---|
+| Traced "findability toggle doesn't work" end-to-end (not assumed): membership-gated backend route (403 for a Rider with an inactive subscription, explained by the webhook bug) + a genuine missing `catch (ApiException)` on both `_LocationSharingRowState._toggle` and `NearbyRidersScreen._toggleSharing` | Completed |
+| Fixed both toggles to catch and show the real error, matching their sibling `_toggleReceiveSosAlerts` pattern | Completed |
+| Researched (web search + Razorpay SDK types) whether Subscriptions supports a redirect/callback_url — confirmed it does not; Razorpay's own docs say not to rely on one | Completed |
+| Implemented the achievable alternative: Rider membership page re-fetches status on tab focus (web) / `AppLifecycleState.resumed` (mobile) | Completed |
+| Re-confirmed renewal-date display has no client-side date math anywhere — already fully backend-derived; "wrong due date" reports explained by the (already-fixed) webhook bug, not a display bug | Completed |
+| Scope: Rider-only per explicit instruction; SP's equivalent screens untouched | Completed — confirmed by diff |
+| `flutter analyze`, `flutter test`, `tsc --noEmit`, `next build`, `web lint` | Completed — all clean, 236/236 |
+| New widget-interaction test for the toggle error-display fix itself | **Not done** — flagged as a gap, not silently skipped |
+
 ## Fix: Razorpay webhook never activated any subscription — wrong event-id field (2026-10-27)
 
 | Task | Status |

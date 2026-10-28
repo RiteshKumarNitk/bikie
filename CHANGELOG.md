@@ -1,5 +1,45 @@
 # Changelog
 
+## 2026-10-28 — Fix: findability toggle silently ate errors; auto-refresh Rider membership on return
+
+Two real-device reports investigated end-to-end (traced Flutter → backend → Razorpay, not just the
+UI) rather than assumed:
+
+**"Be findable in an emergency" doesn't turn on / snaps back / doesn't respond.** Traced to two
+independent causes. (1) `rider_location.sharingEnabled`'s backend routes (`/api/rider-location/
+consent`, `/api/rider-location`) are membership-gated — a Rider whose subscription never actually
+activated (the webhook bug fixed yesterday) gets a `403 MEMBERSHIP_REQUIRED` on every attempt,
+which fully explains "can't turn it on." (2) A genuine, independent bug on top of that: both
+`_LocationSharingRowState._toggle` (`home_screen.dart`) and `NearbyRidersScreen._toggleSharing`
+had `try { ... } finally { ... }` with **no `catch` block** — any backend rejection (that 403, or
+anything else) was silently swallowed; the switch snapped back with zero explanation. Their sibling
+toggle right next to each (`_toggleReceiveSosAlerts`) already caught `ApiException` and showed the
+message — this exact pattern was just missing on the sharing toggle. Fixed both to match.
+
+**Razorpay doesn't reliably return to BIKIE after subscription authorization.** Confirmed (web
+search + Razorpay's own SDK types) that Subscriptions has no `callback_url`/redirect mechanism at
+all — that's a Checkout.js (one-time payment) concept only; Razorpay's own documentation explicitly
+tells integrators not to rely on a redirect for this reason and to use webhooks/polling instead.
+There's no code fix that makes Razorpay auto-redirect here. Implemented the achievable alternative:
+the Rider membership page now re-fetches membership status on tab `visibilitychange`/`focus` (web)
+and `AppLifecycleState.resumed` (mobile) — covers switching back from the Razorpay tab/external
+browser without requiring a manual refresh, mirroring the pattern `RiderFindabilityGate` already
+uses for the same reason.
+
+Also re-confirmed (independent of this fix): the renewal-date display logic (`subscription-
+display.ts` / `membership_subscription_display.dart`) has no client-side date math anywhere — every
+date shown is already backend/Razorpay-derived, never computed from `today + 365 days`. The "wrong
+due date" reports are consistent with the same underlying webhook bug (membership stuck
+un-activated) rather than a display bug.
+
+Scope: Rider-only, per explicit instruction — Service Provider's equivalent toggle/pages were not
+touched, though the same two fixes would apply there too if wanted later.
+
+`flutter analyze` clean, `flutter test` 236/236, `tsc --noEmit` clean, `next build` clean, `web
+lint` 0 new issues. No new automated test added for the toggle error-display fix itself (UI-layer
+only — the underlying service/repository behavior these toggles call was already covered); flagged
+as a gap rather than silently skipped.
+
 ## 2026-10-27 — Fix: Razorpay webhook never activated any subscription, ever (wrong event-id field)
 
 Root cause of "membership never auto-activates, I have to manually reconcile every single

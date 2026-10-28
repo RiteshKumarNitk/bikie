@@ -17,11 +17,43 @@ import '../data/membership_repository.dart';
 import '../domain/membership_providers.dart';
 import '../domain/membership_subscription_display.dart';
 
-class MembershipScreen extends ConsumerWidget {
+/// Razorpay's hosted Subscription authorization page has no `callback_url`/redirect mechanism
+/// (unlike one-time Checkout) — `_subscribe` below opens it externally (Chrome Custom Tab /
+/// browser / UPI app) and there is no reliable way for Razorpay to hand control back to this
+/// screen. Razorpay's own guidance is not to rely on a redirect at all; the nearest achievable
+/// "auto-refresh on return" is re-fetching on `AppLifecycleState.resumed` — covers the Rider
+/// switching back to BIKIE after completing (or abandoning) authorization in the external
+/// browser/UPI app, same reasoning as the web page's tab-focus refresh and
+/// `RiderFindabilityGate`'s existing resume handling.
+class MembershipScreen extends ConsumerStatefulWidget {
   const MembershipScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<MembershipScreen> createState() => _MembershipScreenState();
+}
+
+class _MembershipScreenState extends ConsumerState<MembershipScreen> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.invalidate(activeMembershipProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final active = ref.watch(activeMembershipProvider);
     final plans = ref.watch(membershipPlansProvider);
     final hasActiveMembership = active.valueOrNull != null;

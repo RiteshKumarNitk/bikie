@@ -76,6 +76,29 @@ export default function MembershipPage() {
       .catch(() => {});
   }, [session]);
 
+  // Razorpay's hosted Subscription authorization page has no `callback_url`/redirect mechanism
+  // (unlike their one-time Checkout) — opening it in a new tab leaves this tab with no way to know
+  // when the Rider is done. Razorpay's own guidance is not to rely on a redirect at all; the
+  // nearest thing to "auto-refresh on return" achievable here is re-fetching whenever this tab
+  // regains focus (covers switching back from the Razorpay tab, or closing it) — same reasoning as
+  // the mobile app's `AppLifecycleState.resumed` refresh.
+  useEffect(() => {
+    if (!session) return;
+    function refreshOnReturn() {
+      if (document.visibilityState !== "visible") return;
+      fetch("/api/membership/active")
+        .then((r) => r.json())
+        .then((data) => setActiveMembership(data.membership ?? null))
+        .catch(() => {});
+    }
+    document.addEventListener("visibilitychange", refreshOnReturn);
+    window.addEventListener("focus", refreshOnReturn);
+    return () => {
+      document.removeEventListener("visibilitychange", refreshOnReturn);
+      window.removeEventListener("focus", refreshOnReturn);
+    };
+  }, [session]);
+
   function handlePurchase(plan: Plan) {
     if (!session) {
       router.push("/login?next=/membership");

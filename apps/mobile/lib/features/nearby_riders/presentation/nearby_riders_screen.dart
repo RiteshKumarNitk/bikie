@@ -41,6 +41,11 @@ class _NearbyRidersScreenState extends ConsumerState<NearbyRidersScreen> {
       }
       ref.invalidate(sharingEnabledProvider);
       ref.invalidate(riderLocationPermissionStateProvider);
+    } on ApiException catch (e) {
+      // Was previously uncaught here — a backend rejection (e.g. 403 MEMBERSHIP_REQUIRED) silently
+      // snapped the switch back with zero explanation, indistinguishable from the toggle "just not
+      // working." Mirrors `_toggleReceiveSosAlerts` just below.
+      _showMessage(e.message);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

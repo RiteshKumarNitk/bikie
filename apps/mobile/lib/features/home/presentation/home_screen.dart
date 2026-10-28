@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/network/api_exception.dart';
 import '../../nearby_riders/domain/nearby_riders_providers.dart';
 import '../../nearby_riders/domain/rider_findability_service.dart';
 import '../../nearby_riders/domain/rider_location_permission.dart';
@@ -258,6 +259,13 @@ class _LocationSharingRowState extends ConsumerState<_LocationSharingRow> {
       }
       ref.invalidate(sharingEnabledProvider);
       ref.invalidate(riderLocationPermissionStateProvider);
+    } on ApiException catch (e) {
+      // Was previously uncaught here — a backend rejection (e.g. 403 MEMBERSHIP_REQUIRED) silently
+      // snapped the switch back with zero explanation, indistinguishable from the toggle "just not
+      // working." Mirrors `nearby_riders_screen.dart`'s `_toggleReceiveSosAlerts`.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
