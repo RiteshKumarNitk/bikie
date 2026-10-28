@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-10-28 — Fix: retrying a subscription while still mid-authorization cancelled it out from under the Rider
+
+Real-world failure, caught live: a Rider's payment got stuck on "processing" after approving the
+UPI AutoPay mandate — production logs showed their own retry had triggered the stale-subscription
+retry logic (`startSubscription`'s "cancel an abandoned attempt and start fresh" safety logic) to
+cancel the subscription they were still actively authorizing, because that logic only checked
+Razorpay's live `status`/`paid_count`, never how recently the attempt had actually started. A row
+created 10 seconds ago and a row abandoned 3 days ago both read identically as "non-terminal,
+paidCount 0" — the exact case this logic is supposed to clean up, and the exact case it must never
+touch, looked the same.
+
+Fixed: `startSubscription` now also checks how long ago the open subscription was created before
+treating it as eligible for cancel-and-replace — a row inside a 5-minute grace period (longer than
+Razorpay's own typical UPI AutoPay authorization window) blocks the retry instead, with a new
+`SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS` (`409`) telling the Rider to finish the one already in
+progress or wait a few minutes, rather than silently cancelling a mandate they may still be
+approving right now. Only a row older than the grace period is still eligible for the existing
+transparent cancel-and-replace behavior, unchanged.
+
+Rider-only for now — the identical retry logic exists in `PartnerMembershipService.
+startSubscription` (same bug class, same risk for Service Providers) but wasn't touched here per
+explicit scope; flagged for a follow-up decision.
+
+Tests: new grace-period test in `membership.service.test.ts` (asserts no cancel/create call at
+all while inside the window) + a new case in the subscription route's error-mapping table test.
+`vitest` 603→605. `tsc --noEmit` clean, `next build` clean, `web lint` 0 new issues.
+
 ## 2026-10-28 — Fix: findability toggle silently ate errors; auto-refresh Rider membership on return
 
 Two real-device reports investigated end-to-end (traced Flutter → backend → Razorpay, not just the

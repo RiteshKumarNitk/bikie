@@ -13,6 +13,13 @@ export type PurchaseMembershipResult =
   | { ok: true; membership: UserMembershipDTO }
   | { ok: false; reason: "ALREADY_ACTIVE" };
 
+/** How long a just-created, never-charged subscription is protected from the stale-retry
+ * cancel-and-replace logic in `startSubscription` — longer than Razorpay's own typical UPI
+ * AutoPay authorization window (its `payment_timed_out` failures have been observed taking a
+ * couple of minutes to surface), so a genuinely in-flight mandate is never cancelled out from
+ * under the Rider by their own retry. */
+const SUBSCRIPTION_RETRY_GRACE_PERIOD_MS = 5 * 60 * 1000;
+
 export const MembershipService = {
   async getPlans(): Promise<MembershipPlanDTO[]> {
     return membershipRepository.findAllActivePlans();
@@ -194,6 +201,20 @@ export const MembershipService = {
         // even if our local row hasn't caught up yet. Never silently replace this; the Rider must
         // cancel it explicitly (the existing Cancel Auto-Renewal flow) before starting another.
         return { ok: false, reason: "SUBSCRIPTION_ALREADY_EXISTS" };
+      }
+
+      // A row created only moments ago is NOT yet "abandoned" even if its own state is
+      // created/non-terminal — the Rider may be mid-authorization RIGHT NOW (UPI app, bank 2FA,
+      // Razorpay's own "processing your payment" step can genuinely take a couple of minutes).
+      // Without this, a Rider who returns to the membership screen and taps the button again
+      // while their first attempt is still in flight would have this code silently cancel that
+      // in-flight mandate out from under them (real, observed failure mode — the retry logic
+      // treating "created 10 seconds ago" the same as "abandoned 3 days ago"). Only a row older
+      // than this grace period is eligible to be replaced; a too-recent one blocks instead, with
+      // a message telling the Rider to wait rather than another generic "already exists."
+      const ageMs = Date.now() - new Date(openSubscription.startDate).getTime();
+      if (ageMs < SUBSCRIPTION_RETRY_GRACE_PERIOD_MS) {
+        return { ok: false, reason: "SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS" };
       }
 
       const TERMINAL_SUBSCRIPTION_STATUSES = new Set(["cancelled", "completed", "expired"]);
@@ -440,7 +461,16 @@ export const MembershipService = {
 
 export type StartMembershipSubscriptionResult =
   | { ok: true; membership: UserMembershipDTO; subscription: { id: string; status: string; shortUrl: string } }
-  | { ok: false; reason: "PLAN_NOT_FOUND" | "ALREADY_ACTIVE" | "SUBSCRIPTION_ALREADY_EXISTS" | "NOT_CONFIGURED" | "SUBSCRIPTION_CREATE_FAILED" };
+  | {
+      ok: false;
+      reason:
+        | "PLAN_NOT_FOUND"
+        | "ALREADY_ACTIVE"
+        | "SUBSCRIPTION_ALREADY_EXISTS"
+        | "SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS"
+        | "NOT_CONFIGURED"
+        | "SUBSCRIPTION_CREATE_FAILED";
+    };
 
 export type CancelMembershipSubscriptionResult =
   | { ok: true; membership: UserMembershipDTO }

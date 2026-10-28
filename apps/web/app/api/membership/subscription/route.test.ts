@@ -64,6 +64,7 @@ describe("POST /api/membership/subscription", () => {
     ["PLAN_NOT_FOUND", 404],
     ["ALREADY_ACTIVE", 409],
     ["SUBSCRIPTION_ALREADY_EXISTS", 409],
+    ["SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS", 409],
     ["NOT_CONFIGURED", 503],
     ["SUBSCRIPTION_CREATE_FAILED", 503],
   ])("maps %s to HTTP %i with a real message, never the bare error code", async (reason, status) => {

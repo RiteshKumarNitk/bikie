@@ -7,6 +7,7 @@ const ERROR_STATUS: Record<string, number> = {
   PLAN_NOT_FOUND: 404,
   ALREADY_ACTIVE: 409,
   SUBSCRIPTION_ALREADY_EXISTS: 409,
+  SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS: 409,
   NOT_CONFIGURED: 503,
   SUBSCRIPTION_CREATE_FAILED: 503,
 };
@@ -20,6 +21,8 @@ const ERROR_MESSAGE: Record<string, string> = {
   PLAN_NOT_FOUND: "This plan is no longer available.",
   ALREADY_ACTIVE: "You already have an active membership.",
   SUBSCRIPTION_ALREADY_EXISTS: "You already have an active subscription. Cancel it first if you want to start a new one.",
+  SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS:
+    "A payment authorization for this membership is already in progress. Please finish it in the other tab/app, or wait a few minutes before trying again.",
   NOT_CONFIGURED: "Subscriptions are temporarily unavailable. Please try again later.",
   SUBSCRIPTION_CREATE_FAILED: "Could not start the subscription. Please try again.",
 };

@@ -398,6 +398,21 @@ describe("MembershipService.startSubscription (recurring)", () => {
     expect(razorpay.createSubscription).not.toHaveBeenCalled();
   });
 
+  it("blocks (never cancels) a just-created open subscription still inside the grace period, even if Razorpay already reports it non-terminal and unpaid — the Rider may be mid-authorization right now", async () => {
+    repo.findPlanById.mockResolvedValueOnce(yearlyPlan);
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(
+      subscriptionMembershipOn(yearlyPlan, { startDate: new Date(Date.now() - 30_000).toISOString() }),
+    );
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "created", paidCount: 0 });
+    vi.stubEnv("RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID", "plan_rider_yearly");
+
+    const result = await MembershipService.startSubscription("user-1", "rider-yearly-plan");
+
+    expect(result).toEqual({ ok: false, reason: "SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS" });
+    expect(razorpay.cancelSubscription).not.toHaveBeenCalled();
+    expect(razorpay.createSubscription).not.toHaveBeenCalled();
+  });
+
   it("a genuinely STALE open subscription (Razorpay confirms paidCount 0, status still non-terminal) is cancelled and replaced", async () => {
     repo.findPlanById.mockResolvedValueOnce(yearlyPlan);
     repo.findOpenSubscriptionForUser.mockResolvedValueOnce(subscriptionMembershipOn(yearlyPlan));

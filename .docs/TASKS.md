@@ -2,6 +2,17 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Fix: retrying mid-authorization cancelled the Rider's in-flight subscription (2026-10-28)
+
+| Task | Status |
+|---|---|
+| Caught live via production logs during real testing: stale-subscription retry logic cancelled a subscription the Rider was still actively authorizing (UPI mandate approval in progress) because it only checked Razorpay's live status, never the row's age | Completed |
+| `startSubscription` now blocks (new `SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS`, 409) instead of cancelling when the open subscription is younger than a 5-minute grace period | Completed |
+| New test: asserts zero cancel/create calls while inside the grace period | Completed — `vitest` 603→605 |
+| New route-level error-mapping test case | Completed |
+| `tsc --noEmit`, `next build`, `web lint` | Completed — all clean |
+| Apply the same fix to `PartnerMembershipService.startSubscription` (identical bug class, same risk for Service Providers) | **Not done** — Rider-only per explicit scope instruction; awaiting a decision on whether to extend it |
+
 ## Fix: findability toggle silently ate errors; auto-refresh Rider membership on return (2026-10-28)
 
 | Task | Status |
