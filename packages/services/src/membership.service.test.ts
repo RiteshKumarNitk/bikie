@@ -35,7 +35,7 @@ vi.mock("./razorpay.service", () => ({
     cancelSubscription: vi.fn(),
     fetchSubscription: vi.fn(),
     listSubscriptionInvoices: vi.fn(async () => []),
-    SUBSCRIPTION_TOTAL_COUNT: 1200,
+    SUBSCRIPTION_TOTAL_COUNT: 240,
     SUBSCRIPTION_TOTAL_COUNT_YEARLY: 20,
   },
 }));

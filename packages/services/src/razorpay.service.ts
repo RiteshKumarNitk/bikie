@@ -31,24 +31,24 @@ export interface RazorpaySubscription {
 }
 
 /** A Subscription has no natural end, but Razorpay's API requires a finite `total_count` of
- * billing cycles — 1200 months (100 years) is the conventional "effectively indefinite" value
- * for an open-ended MONTHLY membership (Service Provider, ₹99/month); cancellation is a separate
- * explicit action (`cancelSubscription`), never reaching this count in practice. Razorpay caps
- * `total_count` per billing *period and interval* combination, not as one global number — a
- * yearly Plan's cap is 100 (100 years), not 1200 (which would mean 1200 YEARS and is rejected
- * outright: `BAD_REQUEST_ERROR "Exceeds the maximum total_count (100) allowed for the given
- * period and interval"`). Callers on a non-monthly billing cycle must pass their own `totalCount`
- * to `createSubscription` rather than relying on this default. Defined at module scope (not as a
- * property on `RazorpayService` itself) so `createSubscription`'s default parameter can reference
- * it without a `RazorpayService` self-reference in its own initializer (TS7022). */
-const SUBSCRIPTION_TOTAL_COUNT = 1200;
+ * billing cycles — this used to be 1200 months (100 years), the conventional "effectively
+ * indefinite" value for an open-ended MONTHLY membership (Service Provider, ₹99/month);
+ * cancellation is a separate explicit action (`cancelSubscription`), never reaching this count in
+ * practice. Razorpay's raw API cap for `total_count` is per billing *period and interval*
+ * combination (1200 is valid for monthly, rejected outright for yearly — see
+ * `SUBSCRIPTION_TOTAL_COUNT_YEARLY`) — but Razorpay Support confirmed a separate, lower ceiling
+ * specific to UPI AutoPay: a maximum mandate duration of 25 years, regardless of the raw API cap.
+ * 1200 months (100 years) silently exceeded that (card-based authorization isn't subject to it,
+ * which is why card mandates succeeded on this same Plan while every UPI one failed with
+ * `auth_attempts: 0`). 240 months = 20 years keeps a margin under the confirmed 25-year ceiling.
+ * Defined at module scope (not as a property on `RazorpayService` itself) so
+ * `createSubscription`'s default parameter can reference it without a `RazorpayService`
+ * self-reference in its own initializer (TS7022). */
+const SUBSCRIPTION_TOTAL_COUNT = 240;
 
-/** Mirrors `SUBSCRIPTION_TOTAL_COUNT`'s "effectively indefinite" intent for a YEARLY Plan
- * (Rider, ₹149/year). Razorpay's API-level cap for the yearly period/interval is 100, but
- * Razorpay Support confirmed UPI AutoPay specifically supports a maximum mandate duration of
- * 25 years regardless of that API cap — 100 was silently exceeding UPI's real limit (card-based
- * authorization isn't subject to it, which is why card mandates on this same Plan succeeded while
- * every UPI one failed). 20 keeps a margin under the confirmed 25-year ceiling. */
+/** Mirrors `SUBSCRIPTION_TOTAL_COUNT`'s reasoning for a YEARLY Plan (Rider, ₹149/year). Razorpay's
+ * raw API-level cap for the yearly period/interval is 100, but the confirmed UPI AutoPay ceiling
+ * is 25 years regardless — 20 keeps the same margin under it as `SUBSCRIPTION_TOTAL_COUNT` does. */
 const SUBSCRIPTION_TOTAL_COUNT_YEARLY = 20;
 
 /**
