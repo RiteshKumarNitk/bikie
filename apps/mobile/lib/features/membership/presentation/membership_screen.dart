@@ -156,14 +156,35 @@ class _MembershipScreenState extends ConsumerState<MembershipScreen> with Widget
 
 /// Not yet webhook-confirmed — the honest "we don't know the final result yet" state, kept
 /// distinct from both "active" and "failed". Never implies activation by itself.
-class _PendingSubscriptionCard extends StatelessWidget {
+class _PendingSubscriptionCard extends ConsumerStatefulWidget {
   const _PendingSubscriptionCard({required this.pending});
 
   final UserMembership pending;
 
   @override
+  ConsumerState<_PendingSubscriptionCard> createState() => _PendingSubscriptionCardState();
+}
+
+class _PendingSubscriptionCardState extends ConsumerState<_PendingSubscriptionCard> {
+  bool _checking = false;
+
+  /// Same refresh the resume handler and the bounded poll already use — this just gives the
+  /// Rider an explicit, visible way to trigger it on demand instead of only relying on those.
+  /// The short fixed delay is purely so the button's own loading state is visible/debounced;
+  /// the real result still only ever comes from `pendingSubscriptionProvider`/
+  /// `activeMembershipProvider` re-resolving, never from anything local to this widget.
+  Future<void> _checkStatus() async {
+    if (_checking) return;
+    setState(() => _checking = true);
+    ref.invalidate(activeMembershipProvider);
+    ref.invalidate(pendingSubscriptionProvider);
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) setState(() => _checking = false);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final price = pending.plan.price.toStringAsFixed(0);
+    final price = widget.pending.plan.price.toStringAsFixed(0);
     return Card(
       color: Theme.of(context).colorScheme.secondaryContainer,
       child: Padding(
@@ -185,9 +206,20 @@ class _PendingSubscriptionCard extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               "We're waiting for Razorpay to confirm your ₹$price/year payment. This refreshes "
-              "automatically — no need to keep checking. If this doesn't resolve in a few minutes, "
-              'you can safely try again below.',
+              'automatically — no need to keep checking.',
               style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                key: const Key('pending-subscription-check-status'),
+                onPressed: _checking ? null : _checkStatus,
+                icon: _checking
+                    ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh, size: 18),
+                label: Text(_checking ? 'Checking…' : 'Check status'),
+              ),
             ),
           ],
         ),
@@ -425,6 +457,29 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   bool _isPurchasing = false;
   bool _isSubscribing = false;
 
+  /// Gate in front of [_subscribe] — explains what's about to happen (external redirect to
+  /// Razorpay, no automatic way back) before it happens, rather than only after. Declining here
+  /// never calls the backend at all, so there's no orphaned "created" subscription row to clean
+  /// up on a later retry.
+  Future<void> _confirmAndSubscribe() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Set up AutoPay'),
+        content: const Text(
+          "You'll be taken to Razorpay to approve AutoPay for your ₹149/year membership. After "
+          'approving, return to BIKIE — this screen updates automatically once confirmed.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Continue')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await _subscribe();
+  }
+
   /// Starts a recurring ₹149/year Razorpay Subscription (distinct from [_purchase]'s one-time
   /// flow — both remain available side by side; nothing here silently converts an existing
   /// one-time membership into a subscription). Membership does NOT activate here: the server
@@ -588,7 +643,7 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isSubscribing ? null : _subscribe,
+                  onPressed: _isSubscribing ? null : _confirmAndSubscribe,
                   child: _isSubscribing
                       ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                       : Text('Start Yearly Membership — ₹$price/year'),

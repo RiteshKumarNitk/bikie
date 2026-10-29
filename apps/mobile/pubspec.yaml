@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.0.0+11
+version: 2.0.0+12
 
 environment:
   sdk: ^3.9.0
@@ -107,6 +107,8 @@ dev_dependencies:
 
   # Mocking for unit tests (auth/booking/SOS repository + provider tests).
   mocktail: ^1.0.4
+  # Faking the launchUrl platform channel in membership_screen_test.dart (Set up AutoPay flow).
+  url_launcher_platform_interface: ^2.3.2
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
