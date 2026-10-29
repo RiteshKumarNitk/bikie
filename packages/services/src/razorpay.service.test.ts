@@ -127,13 +127,14 @@ describe("RazorpayService.createSubscription / cancelSubscription", () => {
 
     await RazorpayService.createSubscription("plan_yearly", { accountType: "RIDER" }, RazorpayService.SUBSCRIPTION_TOTAL_COUNT_YEARLY);
 
-    // Razorpay's own documented failure for this exact bug: "Exceeds the maximum total_count
-    // (100) allowed for the given period and interval" when 1200 (the monthly default) is sent
-    // for a yearly Plan — this locks in that a yearly caller gets 100, never 1200.
+    // Razorpay's API-level cap for yearly is 100 ("Exceeds the maximum total_count (100) allowed
+    // for the given period and interval" when 1200, the monthly default, is sent for a yearly
+    // Plan) — but Razorpay Support confirmed UPI AutoPay specifically supports at most 25 years
+    // regardless of that API cap, so the yearly constant stays well under both ceilings at 20.
     expect(subscriptionsCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ plan_id: "plan_yearly", total_count: 100 }),
+      expect.objectContaining({ plan_id: "plan_yearly", total_count: 20 }),
     );
-    expect(RazorpayService.SUBSCRIPTION_TOTAL_COUNT_YEARLY).toBe(100);
+    expect(RazorpayService.SUBSCRIPTION_TOTAL_COUNT_YEARLY).toBe(20);
     expect(RazorpayService.SUBSCRIPTION_TOTAL_COUNT_YEARLY).not.toBe(RazorpayService.SUBSCRIPTION_TOTAL_COUNT);
   });
 

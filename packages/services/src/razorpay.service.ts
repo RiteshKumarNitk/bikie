@@ -44,8 +44,12 @@ export interface RazorpaySubscription {
 const SUBSCRIPTION_TOTAL_COUNT = 1200;
 
 /** Mirrors `SUBSCRIPTION_TOTAL_COUNT`'s "effectively indefinite" intent for a YEARLY Plan
- * (Rider, ₹149/year) — Razorpay's own maximum for the yearly period/interval combination. */
-const SUBSCRIPTION_TOTAL_COUNT_YEARLY = 100;
+ * (Rider, ₹149/year). Razorpay's API-level cap for the yearly period/interval is 100, but
+ * Razorpay Support confirmed UPI AutoPay specifically supports a maximum mandate duration of
+ * 25 years regardless of that API cap — 100 was silently exceeding UPI's real limit (card-based
+ * authorization isn't subject to it, which is why card mandates on this same Plan succeeded while
+ * every UPI one failed). 20 keeps a margin under the confirmed 25-year ceiling. */
+const SUBSCRIPTION_TOTAL_COUNT_YEARLY = 20;
 
 /**
  * Real order creation + payment-signature verification (ADR-043) — DEV fallback (no live
