@@ -1,3 +1,7 @@
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
+
+import 'package:flutter/foundation.dart' show TargetPlatform, defaultTargetPlatform, kIsWeb;
+
 /// API base URL, supplied at build/run time:
 ///
 ///   flutter run --dart-define=API_BASE_URL=http://10.0.2.2:3000        # Android emulator against local dev server

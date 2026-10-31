@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-10-31 — iOS: first App Store build (2.0.0+12), iPhone-only; production OTP template fixed
+
+First iOS build uploaded to App Store Connect (bundle `com.bikie.mobile`, team `3CN9327FP4`). Two
+iOS project changes made for submission: `TARGETED_DEVICE_FAMILY` is now `1` (iPhone-only — was
+`"1,2"`; avoids required iPad screenshots and iPad review of a phone layout for this first release,
+and must be decided before the first release since a published universal app can't drop iPad), and
+`Info.plist` declares `ITSAppUsesNonExemptEncryption = false` (HTTPS only) so App Store Connect
+stops asking export compliance per upload. Built without a registered device: `flutter build ipa
+--no-codesign`, then `xcodebuild -exportArchive -allowProvisioningUpdates` with `method:
+app-store-connect` signs with a cloud-managed Apple Distribution certificate (App Store profiles
+need no devices; automatic signing at archive time needs a development profile, which does).
+
+Separately, iOS-simulator OTP sends were failing with MSG91's "Template ID Missing or Invalid
+Template": debug builds use the backend-proxied native OTP path (ADR-034), and production's
+`MSG91_OTP_TEMPLATE_ID` in `/opt/bikie/apps/.env` held a stale ID. Corrected to the DLT-approved
+`BIKIE_Reg` template and the `web` container recreated — env-only, no code change. The WebView
+widget path (release builds) was confirmed to initialize cleanly on iOS (no WKWebView storage
+errors).
+
+iOS push notifications remain unimplemented (ADR-035 is Android-only; no `aps-environment`
+entitlement or `remote-notification` background mode yet).
+
 ## 2026-10-28 — Rider membership: an honest "payment pending" state, with bounded auto-polling
 
 Between starting a subscription and the webhook confirming it, the Rider previously saw... nothing
