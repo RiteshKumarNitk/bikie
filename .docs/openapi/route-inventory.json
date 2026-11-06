@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-27T16:17:24.157Z",
-  "count": 172,
+  "generatedAt": "2026-11-04T02:38:21.444Z",
+  "count": 186,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -670,6 +670,58 @@
       "file": "apps/web/app/api/firebase-config/route.ts"
     },
     {
+      "path": "/api/groups/{id}/join",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/groups/[id]/join/route.ts"
+    },
+    {
+      "path": "/api/groups/{id}/leave",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/groups/[id]/leave/route.ts"
+    },
+    {
+      "path": "/api/groups/{id}/members/{userId}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/groups/[id]/members/[userId]/route.ts"
+    },
+    {
+      "path": "/api/groups/{id}/members",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/groups/[id]/members/route.ts"
+    },
+    {
+      "path": "/api/groups/{id}",
+      "methods": [
+        "GET",
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/groups/[id]/route.ts"
+    },
+    {
+      "path": "/api/groups",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/groups/route.ts"
+    },
+    {
       "path": "/api/legal/accept",
       "methods": [
         "POST"
@@ -692,6 +744,40 @@
       ],
       "auth": "session",
       "file": "apps/web/app/api/legal/status/route.ts"
+    },
+    {
+      "path": "/api/mechanic-requests/{id}",
+      "methods": [
+        "GET",
+        "PATCH"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/mechanic-requests/[id]/route.ts"
+    },
+    {
+      "path": "/api/mechanic-requests",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/mechanic-requests/route.ts"
+    },
+    {
+      "path": "/api/mechanics/{listingId}",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/mechanics/[listingId]/route.ts"
+    },
+    {
+      "path": "/api/mechanics/nearby",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/mechanics/nearby/route.ts"
     },
     {
       "path": "/api/membership/active",
@@ -758,6 +844,14 @@
       ],
       "auth": "session",
       "file": "apps/web/app/api/messages/[id]/route.ts"
+    },
+    {
+      "path": "/api/my-groups",
+      "methods": [
+        "GET"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/my-groups/route.ts"
     },
     {
       "path": "/api/notifications/push-token",
@@ -905,6 +999,32 @@
       ],
       "auth": "partner",
       "file": "apps/web/app/api/partner/dashboard/route.ts"
+    },
+    {
+      "path": "/api/partner/mechanic-listings/{id}",
+      "methods": [
+        "PATCH",
+        "DELETE"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/mechanic-listings/[id]/route.ts"
+    },
+    {
+      "path": "/api/partner/mechanic-listings",
+      "methods": [
+        "GET",
+        "POST"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/mechanic-listings/route.ts"
+    },
+    {
+      "path": "/api/partner/mechanic-requests",
+      "methods": [
+        "GET"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner/mechanic-requests/route.ts"
     },
     {
       "path": "/api/partner/profile",

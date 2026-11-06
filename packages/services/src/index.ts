@@ -137,6 +137,23 @@ export type {
   RideRoomRole,
 } from "./modules/rides-community/public";
 export {
+  createMechanicMarketplaceModule,
+  getMechanicMarketplaceModule,
+  setMechanicMarketplaceModuleForTests,
+} from "./modules/mechanic-marketplace/public";
+export type {
+  MechanicMarketplaceModule,
+  MechanicMarketplacePorts,
+  MechanicListingRow,
+  MechanicRequestRow,
+} from "./modules/mechanic-marketplace/public";
+export {
+  createCommunityModule,
+  getCommunityModule,
+  setCommunityModuleForTests,
+} from "./modules/community/public";
+export type { CommunityModule, CommunityPorts, GroupSummary, GroupMembershipRow } from "./modules/community/public";
+export {
   createMessagingModule,
   getMessagingModule,
   isAccountMuted,

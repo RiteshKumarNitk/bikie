@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -13,6 +12,7 @@ import '../../../core/payments/razorpay_checkout.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/in_app_payment_webview_screen.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../data/membership_model.dart';
 import '../data/membership_repository.dart';
@@ -457,18 +457,17 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   bool _isPurchasing = false;
   bool _isSubscribing = false;
 
-  /// Gate in front of [_subscribe] — explains what's about to happen (external redirect to
-  /// Razorpay, no automatic way back) before it happens, rather than only after. Declining here
-  /// never calls the backend at all, so there's no orphaned "created" subscription row to clean
-  /// up on a later retry.
+  /// Gate in front of [_subscribe] — explains what's about to happen before it happens, rather
+  /// than only after. Declining here never calls the backend at all, so there's no orphaned
+  /// "created" subscription row to clean up on a later retry.
   Future<void> _confirmAndSubscribe() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Set up AutoPay'),
         content: const Text(
-          "You'll be taken to Razorpay to approve AutoPay for your ₹149/year membership. After "
-          'approving, return to BIKIE — this screen updates automatically once confirmed.',
+          "You'll approve AutoPay for your ₹149/year membership right here in BIKIE. Once "
+          'confirmed, close that screen to come back — this one updates automatically.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -484,23 +483,32 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   /// flow — both remain available side by side; nothing here silently converts an existing
   /// one-time membership into a subscription). Membership does NOT activate here: the server
   /// only stores the Razorpay subscription id against a placeholder row; a webhook-confirmed
-  /// charge is what actually grants eligibility. Opens Razorpay's hosted authorization page
-  /// externally (no native-SDK subscription flow yet) — the user completes authorization there
-  /// and returns to the app, where pull-to-refresh (or the next launch) picks up the activated
-  /// state once the webhook has run. Mirrors `_PlanCardState._subscribe` (Service Provider) exactly.
+  /// charge is what actually grants eligibility. Opens Razorpay's hosted authorization page inside
+  /// BIKIE (`InAppPaymentWebViewScreen`, unchanged `short_url`, no external browser) — the user
+  /// completes authorization there and closes it to return, where the refresh below (and the
+  /// existing resume/poll machinery) picks up the real, webhook-confirmed outcome; nothing here
+  /// ever infers success/failure from the WebView itself. Mirrors `_PlanCardState._subscribe`
+  /// (Service Provider) exactly.
   Future<void> _subscribe() async {
     setState(() => _isSubscribing = true);
     try {
       final repo = ref.read(membershipRepositoryProvider);
       final result = await repo.startSubscription(planId: widget.plan.id);
-      final uri = Uri.tryParse(result.shortUrl);
-      if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (mounted) {
+        // Opens unchanged inside BIKIE (no external browser) — pops back here on its own when
+        // the Rider taps close/back; this screen's own refresh below (and the existing resume/
+        // poll machinery) is what picks up the real, webhook-verified outcome, never anything
+        // read from the WebView itself.
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => InAppPaymentWebViewScreen(url: result.shortUrl, title: 'Set up AutoPay'),
+          ),
+        );
       }
       if (mounted) {
         showAppToast(
           context,
-          'Complete the payment authorization. This screen updates automatically once confirmed.',
+          'Checking your payment status…',
           variant: AppToastVariant.success,
         );
       }

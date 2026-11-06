@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../core/network/api_exception.dart';
 import '../../nearby_riders/domain/nearby_riders_providers.dart';
-import '../../nearby_riders/domain/rider_findability_service.dart';
-import '../../nearby_riders/domain/rider_location_permission.dart';
 import '../../sos/data/sos_model.dart';
 import '../../sos/domain/sos_providers.dart';
 import '../../sos/presentation/send_sos_sheet.dart';
@@ -71,7 +68,6 @@ class HomeScreen extends ConsumerWidget {
                       padding: const EdgeInsets.symmetric(vertical: 24),
                       child: _SosHero(size: buttonSize, onPressed: () => _openSos(context, ref)),
                     ),
-                    const _LocationSharingRow(),
                   ],
                 ),
               ),
@@ -226,127 +222,3 @@ class _MyActiveSosAlertBanner extends ConsumerWidget {
   }
 }
 
-/// Compact form of Home's `rider_location.sharingEnabled` switch — kept on Home because SOS's
-/// nearby-rider dispatch tier depends on it, framed around what it buys the rider in an
-/// emergency. The persisted preference (`sharingEnabledProvider`) is the only source of truth for
-/// whether this reads on/off — `RiderFindabilityService` (restored on every login and app resume,
-/// via `AuthController`/`RiderFindabilityGate`) is what keeps that preference actually true in
-/// practice by refreshing the location fix in the background, instead of this row's toggle being
-/// the only thing that ever pushes one.
-class _LocationSharingRow extends ConsumerStatefulWidget {
-  const _LocationSharingRow();
-
-  @override
-  ConsumerState<_LocationSharingRow> createState() => _LocationSharingRowState();
-}
-
-class _LocationSharingRowState extends ConsumerState<_LocationSharingRow> {
-  bool _busy = false;
-
-  Future<void> _toggle(bool value) async {
-    setState(() => _busy = true);
-    try {
-      final service = ref.read(riderFindabilityServiceProvider);
-      if (value) {
-        final permission = await service.enable();
-        if (mounted && permission != RiderLocationPermissionState.granted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Location permission is required to turn this on.')),
-          );
-        }
-      } else {
-        await service.disable();
-      }
-      ref.invalidate(sharingEnabledProvider);
-      ref.invalidate(riderLocationPermissionStateProvider);
-    } on ApiException catch (e) {
-      // Was previously uncaught here — a backend rejection (e.g. 403 MEMBERSHIP_REQUIRED) silently
-      // snapped the switch back with zero explanation, indistinguishable from the toggle "just not
-      // working." Mirrors `nearby_riders_screen.dart`'s `_toggleReceiveSosAlerts`.
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.message)));
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  /// Persisted preference says on, but Android's permission has since been revoked (e.g. turned
-  /// off from Settings while the app wasn't running) — a persisted `true` must never be read as
-  /// license to bypass that. Tapping here fixes the permission specifically; it never re-asks the
-  /// Rider to turn the BIKIE setting back on, since it's already on.
-  Future<void> _fixPermission() async {
-    setState(() => _busy = true);
-    try {
-      final permissionService = ref.read(riderLocationPermissionServiceProvider);
-      final current = await permissionService.check();
-      if (current == RiderLocationPermissionState.blocked) {
-        await permissionService.openSystemSettings();
-      } else {
-        await ref.read(riderFindabilityServiceProvider).enable();
-      }
-      ref.invalidate(riderLocationPermissionStateProvider);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = ref.watch(sharingEnabledProvider).valueOrNull ?? false;
-    final permission = ref.watch(riderLocationPermissionStateProvider).valueOrNull;
-    final needsPermission = enabled && permission != null && permission != RiderLocationPermissionState.granted;
-    final accent = needsPermission ? Theme.of(context).colorScheme.error : Theme.of(context).colorScheme.primary;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        color: accent.withValues(alpha: 0.08),
-        border: Border.all(color: accent.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            needsPermission
-                ? Icons.location_disabled_outlined
-                : (enabled ? Icons.location_on : Icons.location_off_outlined),
-            size: 20,
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Be findable in an emergency',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  needsPermission
-                      ? "On, but location permission was turned off — tap Fix to restore it."
-                      : (enabled
-                          ? 'On — nearby riders are alerted if you send an SOS, and you if they do.'
-                          : "Off — nearby riders won't be alerted if you send an SOS."),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          SizedBox(
-            width: 56,
-            child: Center(
-              child: _busy
-                  ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                  : (needsPermission
-                      ? TextButton(onPressed: _fixPermission, child: const Text('Fix'))
-                      : Switch(value: enabled, onChanged: _toggle)),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

@@ -66,7 +66,9 @@ void main() {
 
         expect(find.text('SOS'), findsOneWidget);
         expect(find.text('Your SOS alert is active'), findsOneWidget);
-        expect(find.text('Be findable in an emergency'), findsOneWidget);
+        // The findability toggle moved to RiderFindabilityBanner, persistent in AppShell
+        // (mirrors PartnerAvailabilityBanner's placement) — no longer part of HomeScreen itself,
+        // covered by that widget's own tests instead.
         expect(tester.takeException(), isNull);
       });
 

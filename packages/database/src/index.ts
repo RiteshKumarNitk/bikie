@@ -19,6 +19,8 @@ export * as sosSessionRepository from "./repositories/sos-session.repository";
 export * as sosTimelineRepository from "./repositories/sos-timeline.repository";
 export * as sosNotificationSettingsRepository from "./repositories/sos-notification-settings.repository";
 export * as communityRepository from "./repositories/community.repository";
+export * as mechanicListingRepository from "./repositories/mechanic-listing.repository";
+export * as mechanicRequestRepository from "./repositories/mechanic-request.repository";
 export * as auditRepository from "./repositories/audit.repository";
 export * as referralRepository from "./repositories/referral.repository";
 export * as notificationRepository from "./repositories/notification.repository";

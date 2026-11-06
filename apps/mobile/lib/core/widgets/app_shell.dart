@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../features/auth/domain/auth_controller.dart';
 import '../../features/auth/domain/role_provider.dart';
+import '../../features/home/presentation/widgets/rider_findability_banner.dart';
 import '../../features/partner_dashboard/presentation/widgets/partner_availability_banner.dart';
 import 'notification_permission_prompt.dart';
 import 'rider_findability_gate.dart';
@@ -73,7 +74,7 @@ class AppShell extends ConsumerWidget {
               bottom: false,
               child: Column(
                 children: [
-                  if (isPartner) const PartnerAvailabilityBanner(),
+                  if (isPartner) const PartnerAvailabilityBanner() else const RiderFindabilityBanner(),
                   Expanded(child: child),
                 ],
               ),
