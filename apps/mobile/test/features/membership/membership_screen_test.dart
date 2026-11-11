@@ -2,11 +2,15 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mobile/core/widgets/in_app_payment_webview_screen.dart';
 import 'package:mobile/features/membership/data/membership_repository.dart';
 import 'package:mobile/features/membership/presentation/membership_screen.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
+import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
+
+import '../../core/widgets/fake_webview_platform.dart';
 
 class _MockDio extends Mock implements Dio {}
 
@@ -58,12 +62,17 @@ void main() {
   late _MockDio dio;
   late _FakeUrlLauncherPlatform fakeLauncher;
   late UrlLauncherPlatform originalLauncher;
+  late FakeWebViewPlatform fakeWebView;
+  late WebViewPlatform? originalWebViewPlatform;
 
   setUp(() {
     dio = _MockDio();
     fakeLauncher = _FakeUrlLauncherPlatform();
     originalLauncher = UrlLauncherPlatform.instance;
     UrlLauncherPlatform.instance = fakeLauncher;
+    fakeWebView = FakeWebViewPlatform();
+    originalWebViewPlatform = WebViewPlatform.instance;
+    WebViewPlatform.instance = fakeWebView;
 
     when(() => dio.get('/api/membership/plans')).thenAnswer(
       (_) async => _ok('/api/membership/plans', {
@@ -74,6 +83,7 @@ void main() {
 
   tearDown(() {
     UrlLauncherPlatform.instance = originalLauncher;
+    if (originalWebViewPlatform != null) WebViewPlatform.instance = originalWebViewPlatform!;
   });
 
   Future<void> pumpScreen(WidgetTester tester, {bool settle = true}) async {
@@ -108,7 +118,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Set up AutoPay'), findsOneWidget);
-      expect(find.textContaining("You'll be taken to Razorpay"), findsOneWidget);
+      expect(find.textContaining("You'll approve AutoPay"), findsOneWidget);
       expect(fakeLauncher.lastLaunchedUrl, isNull);
       verifyNever(() => dio.post('/api/membership/subscription', data: any(named: 'data')));
     });
@@ -126,7 +136,8 @@ void main() {
       verifyNever(() => dio.post('/api/membership/subscription', data: any(named: 'data')));
     });
 
-    testWidgets('Continue starts the subscription and launches the existing short_url unchanged', (tester) async {
+    testWidgets('Continue starts the subscription and opens the in-app payment screen with the existing short_url',
+        (tester) async {
       when(() => dio.post('/api/membership/subscription', data: {'planId': 'plan-rider-yearly'})).thenAnswer(
         (_) async => _ok('/api/membership/subscription', {
           'membership': _membershipJson(status: 'PENDING'),
@@ -138,10 +149,27 @@ void main() {
       await tester.tap(find.text('Start Yearly Membership — ₹149/year'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Continue'));
-      await tester.pumpAndSettle();
+      // Not pumpAndSettle(): the fake platform never fires onPageFinished, so the WebView
+      // screen's loading spinner animates indefinitely by design — same reasoning as the
+      // pending-subscription card elsewhere in this file.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
 
-      expect(fakeLauncher.lastLaunchedUrl, 'https://rzp.io/rzp/testlink');
+      // Never launches an external browser — the whole point of this change.
+      expect(fakeLauncher.lastLaunchedUrl, isNull);
       verify(() => dio.post('/api/membership/subscription', data: {'planId': 'plan-rider-yearly'})).called(1);
+      final webview = tester.widget<InAppPaymentWebViewScreen>(find.byType(InAppPaymentWebViewScreen));
+      expect(webview.url, 'https://rzp.io/rzp/testlink');
+      expect(fakeWebView.loadedUrls, contains('https://rzp.io/rzp/testlink'));
+
+      // Close it — exercises the "returns and refreshes" path the same way a real Rider closing
+      // the payment screen would.
+      await tester.tap(find.byIcon(Icons.close));
+      await tester.pump();
+      // Lets the pop's page-transition animation finish (bounded, not pumpAndSettle — the
+      // destination screen's own pending-card spinner can still be live).
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(InAppPaymentWebViewScreen), findsNothing);
     });
   });
 

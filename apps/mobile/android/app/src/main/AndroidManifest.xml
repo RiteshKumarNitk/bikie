@@ -6,6 +6,17 @@
          notification — including FCM push — can be shown (ADR-035). -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Rider "Be findable" background location tracking (flutter_foreground_task) — a real
+         Android foreground service, started only from an explicit foreground action (toggle ON,
+         or restoring the saved preference on app launch/login), never from a background trigger.
+         Deliberately does NOT request ACCESS_BACKGROUND_LOCATION: an already-running foreground
+         service's own location work is exempt from that restriction, and nothing here starts
+         the service without the app itself being in the foreground — see RiderFindabilityService.
+         WAKE_LOCK keeps the device CPU awake while the service runs so the periodic location push
+         isn't silently dropped by Doze. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <application
         android:label="BIKIE"
         android:name="${applicationName}"
@@ -53,6 +64,16 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_accent" />
+
+        <!-- flutter_foreground_task — do not rename, the plugin hardcodes this class name.
+             foregroundServiceType="location" (not dataSync, which 6-hour-timeouts on Android 15
+             and can't restart after boot) + FOREGROUND_SERVICE_LOCATION above are both required
+             for Android 14+ to allow startForeground() to succeed at all. -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:foregroundServiceType="location"
+            android:stopWithTask="true"
+            android:exported="false" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

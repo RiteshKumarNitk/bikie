@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
@@ -11,6 +10,7 @@ import '../../../core/payments/razorpay_checkout.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/in_app_payment_webview_screen.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../data/partner_membership_model.dart';
 import '../data/partner_membership_repository.dart';
@@ -341,23 +341,27 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   /// Starts a recurring ₹99/month Razorpay Subscription (distinct from [_purchase]'s one-time
   /// flow — both remain available side by side). Membership does NOT activate here: the server
   /// only stores the Razorpay subscription id against a placeholder row; a webhook-confirmed
-  /// charge is what actually grants eligibility. Opens Razorpay's hosted authorization page
-  /// externally (no native-SDK subscription flow yet) — the user completes authorization there
-  /// and returns to the app, where pull-to-refresh (or the next launch) picks up the activated
-  /// state once the webhook has run.
+  /// charge is what actually grants eligibility. Opens Razorpay's hosted authorization page inside
+  /// BIKIE (`InAppPaymentWebViewScreen`, unchanged `short_url`, no external browser) — the user
+  /// completes authorization there and closes it to return, where pull-to-refresh (or the next
+  /// launch) picks up the real, webhook-confirmed state; nothing here ever infers success/failure
+  /// from the WebView itself.
   Future<void> _subscribe() async {
     setState(() => _isSubscribing = true);
     try {
       final repo = ref.read(partnerMembershipRepositoryProvider);
       final result = await repo.startSubscription(planId: widget.plan.id);
-      final uri = Uri.tryParse(result.shortUrl);
-      if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (mounted) {
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => InAppPaymentWebViewScreen(url: result.shortUrl, title: 'Set up AutoPay'),
+          ),
+        );
       }
       if (mounted) {
         showAppToast(
           context,
-          'Complete the payment authorization, then pull to refresh here once done.',
+          'Checking your payment status — pull to refresh here if needed.',
           variant: AppToastVariant.success,
         );
       }

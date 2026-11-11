@@ -293,6 +293,15 @@ enum NotificationType {
   ACCOUNT_TYPE_CHANGE_APPROVED
   ACCOUNT_TYPE_CHANGE_REJECTED
   ACCOUNT_TYPE_CHANGE_INFO_REQUESTED
+  // --- Mechanic marketplace ---
+  MECHANIC_REQUEST_RECEIVED
+  MECHANIC_REQUEST_ACCEPTED
+  MECHANIC_REQUEST_REJECTED
+  MECHANIC_REQUEST_STATUS_CHANGED
+  // --- Rider community join requests (GROUP_JOIN_APPROVED above already existed pre-Milestone 1) ---
+  GROUP_JOIN_REQUESTED
+  GROUP_JOIN_REJECTED
+  GROUP_MEMBER_REMOVED
 }
 
 // --- Better Auth core models ---
@@ -362,6 +371,7 @@ model User {
   referrals     User[]    @relation("Referrals")
   groupsOwned         Group[]            @relation("GroupOwner")
   groupMemberships    GroupMember[]
+  mechanicServiceRequests MechanicServiceRequest[]
   announcements       Announcement[]
   reportsFiled        Report[]           @relation("ReportsFiled")
   reportsReviewed     Report[]           @relation("ReportsReviewed")
@@ -646,6 +656,7 @@ model Partner {
   // a FUEL_DELIVERY partner receiving a MEDICAL emergency) — see partner-mapping.ts.
   isGeneralResponder Boolean @default(false)
   createdAt    DateTime    @default(now())
+  mechanicListings MechanicListing[]
 
   @@index([city])
   @@index([latitude, longitude])
@@ -910,11 +921,86 @@ model GroupMember {
   user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   role     GroupMemberRole   @default(MEMBER)
   status   GroupMemberStatus @default(APPROVED)
-  joinedAt DateTime          @default(now())
+  // Optional note a Rider attaches when requesting to join a private community — mirrors
+  // TripParticipant.message exactly. Null for public-community joins (no request step) and for
+  // every pre-existing admin-seeded row.
+  message   String?
+  joinedAt  DateTime          @default(now())
+  decidedAt DateTime?
 
+  // `@@unique([groupId, userId])` is also what makes leave→rejoin safe: leaving/removal never
+  // deletes this row (status becomes REMOVED), and rejoining upserts the SAME row by this key
+  // instead of inserting a second one — see CommunityRepositoryPort.upsertMembership.
   @@unique([groupId, userId])
   @@index([userId])
   @@map("group_member")
+}
+
+// --- Mechanic Marketplace ---
+// Listings belong to a MECHANIC-type Partner (enforced in the application layer, not here — the
+// schema doesn't know about PartnerType). Deliberately no onDelete: Cascade from Partner to
+// MechanicListing, and listings are never hard-deleted by the application (deactivated only, via
+// `isActive`) — both exist so a MechanicServiceRequest's history survives a listing being pulled.
+model MechanicListing {
+  id              String   @id @default(cuid())
+  partnerId       String
+  partner         Partner  @relation(fields: [partnerId], references: [id])
+  title           String
+  description     String
+  // Free-text sub-category ("Oil change", "Puncture repair", ...) — mirrors Partner.workingHours's
+  // existing precedent (honest free text over a schema nobody's validated yet) rather than a new
+  // enum for something this product hasn't needed to constrain before.
+  category        String
+  price           Decimal  @db.Decimal(10, 2)
+  imageUrls       String[] @default([])
+  latitude        Float?
+  longitude       Float?
+  serviceRadiusKm Int      @default(5)
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  requests        MechanicServiceRequest[]
+
+  @@index([partnerId])
+  @@index([isActive])
+  @@index([latitude, longitude])
+  @@map("mechanic_listing")
+}
+
+enum MechanicRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model MechanicServiceRequest {
+  id        String                @id @default(cuid())
+  listingId String
+  listing   MechanicListing       @relation(fields: [listingId], references: [id])
+  riderId   String
+  rider     User                  @relation(fields: [riderId], references: [id])
+  status    MechanicRequestStatus @default(PENDING)
+  // Snapshot of MechanicListing.price at request time — the listing's live price can change
+  // (or the listing can be deactivated) without ever altering what an existing request is for.
+  quotedPrice Decimal             @db.Decimal(10, 2)
+  message     String?
+  // The Rider's location at request time, so the Mechanic can navigate to them — precise
+  // coordinates, so access is restricted at the DTO/query layer to exactly two people: the Rider
+  // who owns this request, and the Partner who owns `listing`. Never included in any list/read
+  // path scoped to anyone else. See CommunityRepositoryPort-style visibility note in
+  // mechanic-marketplace/domain/visibility.ts.
+  latitude    Float?
+  longitude   Float?
+  requestedAt DateTime  @default(now())
+  decidedAt   DateTime?
+  completedAt DateTime?
+
+  @@index([riderId])
+  @@index([listingId, status])
+  @@map("mechanic_service_request")
 }
 
 model Report {

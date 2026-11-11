@@ -91,6 +91,14 @@ export async function findPartnerByUserId(userId: string) {
   return partner ? toPartnerDTO(partner) : null;
 }
 
+/** Partner.id → the owning User's id — for callers (e.g. mechanic-marketplace notifications)
+ * that only have a `partnerId` on hand and need the actual `User.id` to notify
+ * (`Notification.userId` points at `User`, never at `Partner`). */
+export async function findUserIdByPartnerId(partnerId: string): Promise<string | null> {
+  const partner = await prisma.partner.findUnique({ where: { id: partnerId }, select: { userId: true } });
+  return partner?.userId ?? null;
+}
+
 export type PartnerProfileWriteInput = {
   businessName: string;
   type: string;

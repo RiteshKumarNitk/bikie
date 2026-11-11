@@ -82,5 +82,33 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
+	<true/>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
+	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>BIKIE uses your location to attach accurate coordinates to SOS emergency alerts, and to show nearby Riders when Be Findable is on.</string>
+	<!-- Rider "Be findable" background location tracking (opt-in toggle) — the "Always" grant is
+	what lets BIKIE keep alerting nearby Riders during an SOS even while the app is in the
+	background; never requested unless the Rider has already turned Be Findable on. -->
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>With Be Findable on, BIKIE keeps sharing your location in the background so nearby Riders can be alerted and find you if you or they send an SOS.</string>
+	<!-- Keeps the app process alive to continue Be Findable's background location updates;
+	flutter_foreground_task (used for the Android foreground service) is iOS-irrelevant here —
+	the iOS path uses geolocator's own background-capable position stream instead (see
+	RiderBackgroundTrackingService), gated entirely on this permission + the Rider's own toggle. -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+	<!-- Lets Razorpay Checkout detect installed UPI apps for the UPI-intent payment option. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>tez</string>
+		<string>phonepe</string>
+		<string>paytmmp</string>
+		<string>bhim</string>
+		<string>credpay</string>
+	</array>
 </dict>
 </plist>

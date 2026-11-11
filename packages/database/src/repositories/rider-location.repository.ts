@@ -140,13 +140,22 @@ export async function findNearbyAroundPoint(
   `;
 }
 
-/** Cron-only: flips sharing off for anyone whose fix has gone stale, so opting in doesn't
- * silently persist consent forever after the client stops reporting. */
-export async function autoDisableStaleSharing(minutes: number): Promise<number> {
-  return prisma.$executeRaw`
-    UPDATE "rider_location"
-    SET "sharingEnabled" = false
-    WHERE "sharingEnabled" = true
-      AND "updatedAt" < now() - (${minutes} || ' minutes')::interval
-  `;
+/** Cron-only, now a deliberate no-op (root cause of a real bug: a Rider's "Be findable"
+ * preference silently flipped to OFF any time the app stayed closed past `minutes`, since this
+ * used to overwrite the same `sharingEnabled` column the Flutter toggle reads as the user's saved
+ * preference — indistinguishable, from the Rider's side, from the setting never having persisted
+ * at all). `sharingEnabled` must mean exactly one thing: whether the Rider wants to be findable,
+ * set only by their own explicit toggle (`setSharingEnabled` above) — mirrors how Service
+ * Provider's `Partner.isAvailable` already works (packages/database/src/repositories/
+ * partner.repository.ts's `setAvailability`), with no equivalent auto-reset.
+ *
+ * "Stale" is a separate, already-solved concept, enforced independently at query time wherever it
+ * actually matters: `findNearby` and `findNearbyAroundPoint` below both already filter on
+ * `"updatedAt" > now() - staleMinutes` directly, so a Rider whose app has been closed for a while
+ * is correctly excluded from nearby/SOS-dispatch results without this function ever needing to
+ * touch their saved preference. Kept as a function (not deleted) so the existing cron route/
+ * schedule/tests stay valid — intentionally does nothing now that writes would conflict with the
+ * invariant above. Returns 0 to match its old "rows affected" contract. */
+export async function autoDisableStaleSharing(_minutes: number): Promise<number> {
+  return 0;
 }
