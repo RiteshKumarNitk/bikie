@@ -5,19 +5,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/payments/razorpay_checkout.dart';
 import 'package:mobile/core/payments/razorpay_subscription_checkout.dart';
 import 'package:mobile/features/partner_membership/data/partner_membership_repository.dart';
+import 'package:mobile/core/widgets/in_app_payment_webview_screen.dart';
 import 'package:mobile/features/partner_membership/presentation/partner_membership_screen.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:url_launcher_platform_interface/link.dart';
 import 'package:url_launcher_platform_interface/url_launcher_platform_interface.dart';
+import 'package:webview_flutter_platform_interface/webview_flutter_platform_interface.dart';
+
+import '../../core/widgets/fake_webview_platform.dart';
 
 class _MockDio extends Mock implements Dio {}
 
-/// Records launches without a real platform channel. `succeed: false` simulates a device that
-/// can't open the page in any mode.
+/// Records launches without a real platform channel (the hosted page must never use one).
 class _FakeUrlLauncherPlatform extends UrlLauncherPlatform {
-  _FakeUrlLauncherPlatform({this.succeed = true});
-
-  final bool succeed;
   final List<(String, PreferredLaunchMode)> launches = [];
 
   @override
@@ -26,7 +26,7 @@ class _FakeUrlLauncherPlatform extends UrlLauncherPlatform {
   @override
   Future<bool> launchUrl(String url, LaunchOptions options) async {
     launches.add((url, options.mode));
-    return succeed;
+    return true;
   }
 }
 
@@ -59,10 +59,15 @@ void main() {
 
   late _MockDio dio;
   late UrlLauncherPlatform originalLauncher;
+  late FakeWebViewPlatform fakeWebView;
+  late WebViewPlatform? originalWebViewPlatform;
 
   setUp(() {
     dio = _MockDio();
     originalLauncher = UrlLauncherPlatform.instance;
+    fakeWebView = FakeWebViewPlatform();
+    originalWebViewPlatform = WebViewPlatform.instance;
+    WebViewPlatform.instance = fakeWebView;
     when(() => dio.get('/api/partner-membership/plans')).thenAnswer(
       (_) async => _ok('/api/partner-membership/plans', {'plans': [_planJson()]}),
     );
@@ -77,7 +82,29 @@ void main() {
     );
   });
 
-  tearDown(() => UrlLauncherPlatform.instance = originalLauncher);
+  tearDown(() {
+    UrlLauncherPlatform.instance = originalLauncher;
+    if (originalWebViewPlatform != null) WebViewPlatform.instance = originalWebViewPlatform!;
+  });
+
+  /// The hosted page opens in `InAppPaymentWebViewScreen`, whose loading spinner never settles
+  /// with the fake platform — bounded pumps instead of pumpAndSettle().
+  Future<void> pumpFrames(WidgetTester tester) async {
+    // Long enough for the dialog to close, the request to return and the page transition to
+    // finish (taps are ignored while a route is still animating in).
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
+
+  Future<void> closePaymentPage(WidgetTester tester) async {
+    await tester.tap(find.byIcon(Icons.close));
+    await tester.pump();
+    // The default Android page transition outlasts 400ms — wait for the route to fully close.
+    for (var i = 0; i < 12; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+  }
 
   Future<void> pumpScreen(WidgetTester tester, {SubscriptionCheckoutLauncher? launcher}) async {
     await tester.pumpWidget(
@@ -123,13 +150,14 @@ void main() {
 
     expect(find.text('Set up AutoPay'), findsOneWidget);
     await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
+    await pumpFrames(tester);
 
     verify(() => dio.post('/api/partner-membership/subscription', data: {'planId': 'plan-sp-monthly'})).called(1);
-    expect(launcher.launches, hasLength(1));
+    expect(find.byType(InAppPaymentWebViewScreen), findsOneWidget);
+    expect(fakeWebView.loadedUrls.where((u) => u == 'https://rzp.io/rzp/sptestlink'), hasLength(1));
   });
 
-  testWidgets('Continue opens the unchanged short_url in an in-app browser tab', (tester) async {
+  testWidgets('Continue opens the unchanged short_url inside BIKIE (no external browser), then checks status on close', (tester) async {
     final launcher = _FakeUrlLauncherPlatform();
     UrlLauncherPlatform.instance = launcher;
     await pumpScreen(tester);
@@ -137,26 +165,15 @@ void main() {
     await tester.tap(find.text('Start Membership — ₹99/month'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
+    await pumpFrames(tester);
 
-    expect(launcher.launches.single.$1, 'https://rzp.io/rzp/sptestlink');
-    expect(launcher.launches.single.$2, PreferredLaunchMode.inAppBrowserView);
-    expect(find.textContaining('updates automatically'), findsOneWidget);
-  });
+    final webview = tester.widget<InAppPaymentWebViewScreen>(find.byType(InAppPaymentWebViewScreen));
+    expect(webview.url, 'https://rzp.io/rzp/sptestlink');
+    expect(launcher.launches, isEmpty);
 
-  testWidgets('tells the user when the Razorpay page could not be opened', (tester) async {
-    final launcher = _FakeUrlLauncherPlatform(succeed: false);
-    UrlLauncherPlatform.instance = launcher;
-    await pumpScreen(tester);
-
-    await tester.tap(find.text('Start Membership — ₹99/month'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Continue'));
-    await tester.pumpAndSettle();
-
-    // In-app tab first, then the external-browser fallback.
-    expect(launcher.launches.map((l) => l.$2), [PreferredLaunchMode.inAppBrowserView, PreferredLaunchMode.externalApplication]);
-    expect(find.textContaining("Couldn't open the Razorpay payment page"), findsOneWidget);
+    await closePaymentPage(tester);
+    expect(find.byType(InAppPaymentWebViewScreen), findsNothing);
+    expect(find.textContaining('Checking your payment status'), findsOneWidget);
   });
 
   testWidgets('returning to the app re-fetches membership status from the backend', (tester) async {
@@ -249,9 +266,14 @@ void main() {
       await pumpScreen(tester, launcher: ({required keyId, required subscriptionId, required planName, RazorpayPrefill? prefill}) async =>
           const SubscriptionCheckoutUnavailable());
 
-      await startAndContinue(tester);
+      await tester.tap(find.text('Start Membership — ₹99/month'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Continue'));
+      await pumpFrames(tester);
 
-      expect(launcher.launches.single.$1, 'https://rzp.io/rzp/sptestlink');
+      // Same subscription's hosted page, inside BIKIE — and no second subscription request.
+      expect(tester.widget<InAppPaymentWebViewScreen>(find.byType(InAppPaymentWebViewScreen)).url, 'https://rzp.io/rzp/sptestlink');
+      expect(launcher.launches, isEmpty);
       verify(() => dio.post('/api/partner-membership/subscription', data: {'planId': 'plan-sp-monthly'})).called(1);
     });
   });

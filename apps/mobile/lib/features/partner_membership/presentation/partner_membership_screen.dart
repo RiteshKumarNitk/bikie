@@ -14,6 +14,7 @@ import '../../../core/payments/subscription_authorization.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/in_app_payment_webview_screen.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../data/partner_membership_model.dart';
 import '../data/partner_membership_repository.dart';
@@ -404,15 +405,19 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   /// without showing a spinner for a request that hasn't been made yet.
   bool _isConfirming = false;
 
-  /// Starts a recurring ₹99/month Razorpay Subscription (distinct from [_purchase]'s one-time
-  /// flow — both remain available side by side). Membership does NOT activate here: the server
-  /// only stores the Razorpay subscription id against a placeholder row; a webhook-confirmed
-  /// charge is what actually grants eligibility. Opens Razorpay's hosted authorization page
-  /// externally (no native-SDK subscription flow yet) — the user completes authorization there
-  /// and returns to the app, where pull-to-refresh (or the next launch) picks up the activated
-  /// state once the webhook has run.
-  /// Explains the Razorpay step before leaving the app (mirrors the Rider screen). The button is
-  /// disabled before the dialog opens so a double-tap can't start two subscription requests.
+  /// Opens Razorpay's hosted AutoPay page (unchanged `short_url`) inside BIKIE and waits until the
+  /// member closes it. Never infers a payment outcome from the WebView — the caller re-reads the
+  /// backend-verified membership afterwards.
+  Future<bool> _openHostedPaymentPage(String shortUrl) async {
+    if (!mounted) return false;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => InAppPaymentWebViewScreen(url: shortUrl, title: 'Set up AutoPay')),
+    );
+    return true;
+  }
+
+  /// Explains the AutoPay step first (mirrors the Rider screen). The button is disabled before the
+  /// dialog opens so a double-tap can't start two subscription requests.
   Future<void> _confirmAndSubscribe() async {
     if (_isSubscribing || _isConfirming) return;
     setState(() => _isConfirming = true);
@@ -422,9 +427,8 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
       builder: (ctx) => AlertDialog(
         title: const Text('Set up AutoPay'),
         content: Text(
-          "Razorpay will open so you can approve AutoPay for your ₹$price/month membership. Choose "
-          'UPI AutoPay or a card and approve it — this screen updates automatically once Razorpay '
-          'confirms.',
+          "You'll approve AutoPay for your ₹$price/month membership right here in BIKIE — choose "
+          'UPI AutoPay or a card. This screen updates automatically once Razorpay confirms.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -438,6 +442,12 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
     await _subscribe();
   }
 
+  /// Starts (or reuses) the Service Provider's ₹99/month Razorpay Subscription and collects AutoPay
+  /// authorization via [authorizeSubscription]: Razorpay's in-app Checkout when the server enables
+  /// it, otherwise the hosted page inside BIKIE (`InAppPaymentWebViewScreen`, unchanged
+  /// `short_url`, no external browser). Membership activation only ever comes from the backend's
+  /// webhook-/Razorpay-confirmed state; nothing here infers success/failure from Checkout or the
+  /// WebView.
   Future<void> _subscribe() async {
     setState(() => _isSubscribing = true);
     try {
@@ -454,6 +464,7 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
           razorpaySubscriptionId: success.subscriptionId,
           razorpaySignature: success.signature,
         ),
+        openHostedPage: _openHostedPaymentPage,
       );
       // Membership status is always re-read from the server, never inferred from Checkout.
       ref.invalidate(activePartnerMembershipProvider);

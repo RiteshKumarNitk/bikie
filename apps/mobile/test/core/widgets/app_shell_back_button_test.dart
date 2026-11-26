@@ -11,6 +11,7 @@ import 'package:mobile/features/auth/data/auth_repository.dart';
 import 'package:mobile/features/auth/data/user_model.dart';
 import 'package:mobile/features/auth/domain/auth_controller.dart';
 import 'package:mobile/features/auth/domain/auth_state.dart';
+import 'package:mobile/features/membership/domain/membership_providers.dart';
 import 'package:mobile/features/nearby_riders/domain/rider_findability_service.dart';
 import 'package:mobile/features/nearby_riders/domain/rider_location_permission.dart';
 import 'package:mocktail/mocktail.dart';
@@ -85,6 +86,10 @@ void main() {
         pushRegistrationServiceProvider.overrideWithValue(push),
         riderFindabilityServiceProvider.overrideWithValue(findability),
         riderLocationPermissionServiceProvider.overrideWithValue(locationPermission),
+        // RiderFindabilityBanner (now persistent in AppShell) needs this resolved so it settles —
+        // null (no membership) renders its simple, non-animating locked state; unrelated to what
+        // this file actually tests (the back-button flow).
+        activeMembershipProvider.overrideWith((ref) async => null),
         authControllerProvider.overrideWith(
           (ref) => AuthController(authRepository, push, findability)..state = AuthState.authenticated(_rider),
         ),

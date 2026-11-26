@@ -2,6 +2,8 @@ export * from "./query.schema";
 export * from "./auth.schema";
 export * from "./search.schema";
 export * from "./booking.schema";
+export * from "./mechanic-marketplace.schema";
+export * from "./community.schema";
 export * from "./review.schema";
 export * from "./trip.schema";
 export * from "./message.schema";

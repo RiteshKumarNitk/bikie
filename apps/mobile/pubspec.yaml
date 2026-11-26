@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.0.0+12
+version: 12.0.1+13
 
 environment:
   sdk: ^3.9.0
@@ -84,6 +84,11 @@ dependencies:
   image_picker: ^1.1.2
   flutter_map: ^8.3.1
   latlong2: ^0.10.1
+  # Rider "Be findable" background location tracking — real Android foreground service (required
+  # foregroundServiceType="location" + persistent notification) + its own Dart engine/entrypoint,
+  # so the location push loop survives the UI being backgrounded/screen-locked. Paired with the
+  # existing `geolocator` dependency above for the actual position reads, not a replacement for it.
+  flutter_foreground_task: ^11.0.3
 
 dev_dependencies:
   flutter_test:
@@ -109,6 +114,10 @@ dev_dependencies:
   mocktail: ^1.0.4
   # Faking the launchUrl platform channel in membership_screen_test.dart (Set up AutoPay flow).
   url_launcher_platform_interface: ^2.3.2
+  # Faking the WebView platform channel so InAppPaymentWebViewScreen can mount in widget tests
+  # without a real platform view (webview_flutter_platform_interface's own docs call this the
+  # supported way to unit-test a WebViewWidget-embedding screen).
+  webview_flutter_platform_interface: ^2.10.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

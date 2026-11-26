@@ -90,7 +90,11 @@ final String _widgetHtml = '''
   function _log(msg) { try { console.log(msg); } catch (e) {} }
   function _post(result) { Msg91Bridge.postMessage(JSON.stringify(result)); }
   function _ok(data) { _post({ ok: true, message: (data && data.message) || '' }); }
-  function _fail(err) { _post({ ok: false, message: (err && err.message) || 'MSG91 request failed' }); }
+  function _fail(err) {
+    var msg = (err && (err.message || err.description || err.error)) || (typeof err === 'string' ? err : 'MSG91 request failed');
+    _log('[MSG91] failure callback: ' + JSON.stringify(err));
+    _post({ ok: false, message: msg });
+  }
 
   function _guardedCall(fnName, args) {
     if (typeof window[fnName] !== 'function') {
@@ -134,11 +138,37 @@ final String _widgetHtml = '''
     }
   };
 </script>
-<script
-  src="https://verify.msg91.com/otp-provider.js"
-  onload="_log('[MSG91] otp-provider.js loaded'); initSendOTP(configuration); _log('[MSG91] initSendOTP called, window.sendOtp is ' + typeof window.sendOtp); setTimeout(function() { _log('[MSG91] 3s after init, window.sendOtp is ' + typeof window.sendOtp); }, 3000);"
-  onerror="_log('[MSG91] otp-provider.js FAILED TO LOAD')"
-></script>
+<script type="text/javascript">
+(function loadOtpScript(urls) {
+    var i = 0;
+    function attempt() {
+        var s = document.createElement('script');
+        s.src = urls[i];
+        s.async = true;
+        s.onload = function() {
+            _log('[MSG91] script loaded from: ' + urls[i]);
+            if (typeof window.initSendOTP === 'function') {
+                window.initSendOTP(configuration);
+                _log('[MSG91] initSendOTP called');
+            }
+        };
+        s.onerror = function() {
+            _log('[MSG91] failed to load script from: ' + urls[i]);
+            i++;
+            if (i < urls.length) {
+                attempt();
+            } else {
+                _log('[MSG91] all script URLs failed to load');
+            }
+        };
+        document.head.appendChild(s);
+    }
+    attempt();
+})([
+    'https://verify.msg91.com/otp-provider.js',
+    'https://verify.phone91.com/otp-provider.js'
+]);
+</script>
 </body>
 </html>
 ''';

@@ -1,12 +1,15 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/features/nearby_riders/data/nearby_riders_repository.dart';
+import 'package:mobile/features/nearby_riders/domain/rider_background_tracking_service.dart';
 import 'package:mobile/features/nearby_riders/domain/rider_findability_service.dart';
 import 'package:mobile/features/nearby_riders/domain/rider_location_permission.dart';
 import 'package:mocktail/mocktail.dart';
 
 class _MockRepository extends Mock implements NearbyRidersRepository {}
 
-/// Scriptable stand-in for the Android plugin calls — mirrors
+class _MockBackgroundTracking extends Mock implements RiderBackgroundTrackingService {}
+
+/// Scriptable stand-in for the platform plugin calls — mirrors
 /// `notification_permission_test.dart`'s `_FakePermissionService`.
 class _FakePermissionService implements RiderLocationPermissionService {
   _FakePermissionService(this.current, {this.afterRequest});
@@ -14,6 +17,7 @@ class _FakePermissionService implements RiderLocationPermissionService {
   RiderLocationPermissionState current;
   RiderLocationPermissionState? afterRequest;
   int requests = 0;
+  int alwaysRequests = 0;
   int settingsOpened = 0;
 
   @override
@@ -27,25 +31,35 @@ class _FakePermissionService implements RiderLocationPermissionService {
   }
 
   @override
+  Future<RiderLocationPermissionState> requestAlways() async {
+    alwaysRequests++;
+    return current;
+  }
+
+  @override
   Future<void> openSystemSettings() async => settingsOpened++;
 }
 
 void main() {
   late _MockRepository repository;
+  late _MockBackgroundTracking backgroundTracking;
 
   Future<({double latitude, double longitude})?> fakeFix() async => (latitude: 12.9, longitude: 77.6);
 
   RiderFindabilityService buildService(RiderLocationPermissionService permission) =>
-      RiderFindabilityService(repository, permission, captureFix: fakeFix);
+      RiderFindabilityService(repository, permission, backgroundTracking, captureFix: fakeFix);
 
   setUp(() {
     repository = _MockRepository();
+    backgroundTracking = _MockBackgroundTracking();
     when(() => repository.setSharingEnabled(any())).thenAnswer((_) async {});
     when(() => repository.updateLocation(any(), any())).thenAnswer((_) async {});
+    when(() => backgroundTracking.start()).thenAnswer((_) async {});
+    when(() => backgroundTracking.stop()).thenAnswer((_) async {});
   });
 
   group('enable()', () {
-    test('requests permission, persists true, pushes a fix, and starts the periodic refresh', () async {
+    test('requests permission, persists true, pushes a fix, and starts background tracking', () async {
       final permission = _FakePermissionService(RiderLocationPermissionState.canRequest,
           afterRequest: RiderLocationPermissionState.granted);
       final service = buildService(permission);
@@ -55,7 +69,8 @@ void main() {
       expect(result, RiderLocationPermissionState.granted);
       expect(permission.requests, 1);
       verify(() => repository.setSharingEnabled(true)).called(1);
-      expect(service.isTimerActive, isTrue);
+      verify(() => backgroundTracking.start()).called(1);
+      expect(service.isTrackingActive, isTrue);
     });
 
     test('does not persist or start tracking when permission is denied', () async {
@@ -67,7 +82,8 @@ void main() {
 
       expect(result, RiderLocationPermissionState.canRequest);
       verifyNever(() => repository.setSharingEnabled(any()));
-      expect(service.isTimerActive, isFalse);
+      verifyNever(() => backgroundTracking.start());
+      expect(service.isTrackingActive, isFalse);
     });
 
     test('never shows the dialog when permission is already granted', () async {
@@ -81,16 +97,17 @@ void main() {
   });
 
   group('disable()', () {
-    test('persists false and stops the periodic refresh', () async {
+    test('persists false and stops background tracking', () async {
       final permission = _FakePermissionService(RiderLocationPermissionState.granted);
       final service = buildService(permission);
       await service.enable();
-      expect(service.isTimerActive, isTrue);
+      expect(service.isTrackingActive, isTrue);
 
       await service.disable();
 
       verify(() => repository.setSharingEnabled(false)).called(1);
-      expect(service.isTimerActive, isFalse);
+      verify(() => backgroundTracking.stop()).called(1);
+      expect(service.isTrackingActive, isFalse);
     });
   });
 
@@ -102,8 +119,9 @@ void main() {
 
       await service.restore();
 
-      expect(service.isTimerActive, isTrue);
+      expect(service.isTrackingActive, isTrue);
       verify(() => repository.updateLocation(any(), any())).called(1);
+      verify(() => backgroundTracking.start()).called(1);
       expect(permission.requests, 0, reason: 'restore must never request permission itself');
     });
 
@@ -114,9 +132,10 @@ void main() {
 
       await service.restore();
 
-      expect(service.isTimerActive, isFalse);
+      expect(service.isTrackingActive, isFalse);
       expect(permission.requests, 0);
       verifyNever(() => repository.updateLocation(any(), any()));
+      verifyNever(() => backgroundTracking.start());
     });
 
     test('persisted false: tracking stays off, no fix pushed', () async {
@@ -126,7 +145,7 @@ void main() {
 
       await service.restore();
 
-      expect(service.isTimerActive, isFalse);
+      expect(service.isTrackingActive, isFalse);
       verifyNever(() => repository.updateLocation(any(), any()));
     });
 
@@ -137,36 +156,53 @@ void main() {
 
       await service.restore();
 
-      expect(service.isTimerActive, isFalse);
+      expect(service.isTrackingActive, isFalse);
     });
 
-    test('never starts a second timer if restore runs again while already tracking', () async {
+    test('never starts a second background-tracking instance if restore runs again while already tracking',
+        () async {
       when(() => repository.getSharingEnabled()).thenAnswer((_) async => true);
       final permission = _FakePermissionService(RiderLocationPermissionState.granted);
       final service = buildService(permission);
 
       await service.restore();
-      expect(service.isTimerActive, isTrue);
+      expect(service.isTrackingActive, isTrue);
       await service.restore(); // simulates a second app-resume
       await service.restore(); // and a third
 
-      // Exactly one fix per restore call (3 total) — not a growing number from duplicate timers.
+      // Exactly one fix per restore call (3 total) — not a growing number from duplicate pushes.
       verify(() => repository.updateLocation(any(), any())).called(3);
-      expect(service.isTimerActive, isTrue);
+      // But `start()` itself is only called once — the re-entrancy guard (`_trackingActive`)
+      // must stop every later restore() from asking RiderBackgroundTrackingService to start a
+      // second instance.
+      verify(() => backgroundTracking.start()).called(1);
+      expect(service.isTrackingActive, isTrue);
+    });
+
+    test('network/permission failure mid-restore never changes the saved preference', () async {
+      when(() => repository.getSharingEnabled()).thenAnswer((_) async => throw Exception('network down'));
+      final permission = _FakePermissionService(RiderLocationPermissionState.granted);
+      final service = buildService(permission);
+
+      await service.restore();
+
+      verifyNever(() => repository.setSharingEnabled(any()));
+      expect(service.isTrackingActive, isFalse);
     });
   });
 
   group('stop() — logout', () {
-    test('cancels the periodic refresh', () async {
+    test('stops background tracking', () async {
       when(() => repository.getSharingEnabled()).thenAnswer((_) async => true);
       final permission = _FakePermissionService(RiderLocationPermissionState.granted);
       final service = buildService(permission);
       await service.restore();
-      expect(service.isTimerActive, isTrue);
+      expect(service.isTrackingActive, isTrue);
 
       service.stop();
 
-      expect(service.isTimerActive, isFalse);
+      expect(service.isTrackingActive, isFalse);
+      verify(() => backgroundTracking.stop()).called(1);
     });
   });
 
@@ -176,18 +212,18 @@ void main() {
       final permission = _FakePermissionService(RiderLocationPermissionState.granted);
       final service = buildService(permission);
       await service.restore();
-      expect(service.isTimerActive, isTrue);
+      expect(service.isTrackingActive, isTrue);
 
       // Logout.
       service.stop();
-      expect(service.isTimerActive, isFalse);
+      expect(service.isTrackingActive, isFalse);
 
       // A different account logs in on the same device/service instance — its own setting (off)
       // must be read fresh from the backend, never inherit the previous account's `true`.
       when(() => repository.getSharingEnabled()).thenAnswer((_) async => false);
       await service.restore();
 
-      expect(service.isTimerActive, isFalse);
+      expect(service.isTrackingActive, isFalse);
     });
   });
 }

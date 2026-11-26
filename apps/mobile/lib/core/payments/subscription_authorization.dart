@@ -68,7 +68,8 @@ class SubscriptionAuthorizationResult {
       case SubscriptionAuthorizationOutcome.confirming:
         return 'Payment received. Your membership will activate as soon as Razorpay confirms it.';
       case SubscriptionAuthorizationOutcome.hostedOpened:
-        return 'Approve AutoPay on Razorpay. This screen updates automatically once it is confirmed.';
+        // The hosted page has been shown (and closed) — the outcome comes from the backend.
+        return 'Checking your payment status… This screen updates automatically once Razorpay confirms.';
       case SubscriptionAuthorizationOutcome.cancelled:
         return 'Payment cancelled. You can try again anytime.';
       case SubscriptionAuthorizationOutcome.failed:

@@ -14,6 +14,7 @@ import '../../../core/payments/subscription_authorization.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/app_toast.dart';
+import '../../../core/widgets/in_app_payment_webview_screen.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../data/membership_model.dart';
 import '../data/membership_repository.dart';
@@ -463,10 +464,20 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   /// without showing a spinner for a request that hasn't been made yet.
   bool _isConfirming = false;
 
-  /// Gate in front of [_subscribe] — explains what's about to happen (external redirect to
-  /// Razorpay, no automatic way back) before it happens, rather than only after. Declining here
-  /// never calls the backend at all, so there's no orphaned "created" subscription row to clean
-  /// up on a later retry.
+  /// Opens Razorpay's hosted AutoPay page (unchanged `short_url`) inside BIKIE and waits until the
+  /// member closes it. Never infers a payment outcome from the WebView — the caller re-reads the
+  /// backend-verified membership afterwards.
+  Future<bool> _openHostedPaymentPage(String shortUrl) async {
+    if (!mounted) return false;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => InAppPaymentWebViewScreen(url: shortUrl, title: 'Set up AutoPay')),
+    );
+    return true;
+  }
+
+  /// Gate in front of [_subscribe] — explains what's about to happen before it happens, rather
+  /// than only after. Declining here never calls the backend at all, so there's no orphaned
+  /// "created" subscription row to clean up on a later retry.
   Future<void> _confirmAndSubscribe() async {
     // Disable the button before the dialog opens, not after: a quick double-tap used to open two
     // dialogs and send two subscription requests (the server's in-progress guard rejected the
@@ -479,9 +490,8 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
       builder: (ctx) => AlertDialog(
         title: const Text('Set up AutoPay'),
         content: Text(
-          "Razorpay will open so you can approve AutoPay for your ₹$price/year membership. Choose "
-          'UPI AutoPay or a card and approve it — this screen updates automatically once Razorpay '
-          'confirms.',
+          "You'll approve AutoPay for your ₹$price/year membership right here in BIKIE — choose "
+          'UPI AutoPay or a card. This screen updates automatically once Razorpay confirms.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -501,8 +511,11 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   /// only stores the Razorpay subscription id against a placeholder row; a webhook-confirmed
   /// charge is what actually grants eligibility. Authorization is collected by
   /// [authorizeSubscription]: Razorpay's in-app Checkout (prefilled name, mobile and email) when
-  /// the server enables it, otherwise the hosted page — always for the same subscription the
-  /// server created or reused. Mirrors `_PlanCardState._subscribe` (Service Provider) exactly.
+  /// the server enables it, otherwise Razorpay's hosted page opened inside BIKIE
+  /// (`InAppPaymentWebViewScreen`, unchanged `short_url`, no external browser) — always for the
+  /// same subscription the server created or reused. Nothing here infers success/failure from
+  /// Checkout or the WebView; the refresh below (and the resume/poll machinery) reads the real,
+  /// webhook-confirmed outcome. Mirrors `_PlanCardState._subscribe` (Service Provider) exactly.
   Future<void> _subscribe() async {
     setState(() => _isSubscribing = true);
     try {
@@ -519,6 +532,9 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
           razorpaySubscriptionId: success.subscriptionId,
           razorpaySignature: success.signature,
         ),
+        // Hosted path: Razorpay's page opens unchanged inside BIKIE (`InAppPaymentWebViewScreen`,
+        // no external browser) and returns here when the Rider closes it.
+        openHostedPage: _openHostedPaymentPage,
       );
       if (mounted) {
         showAppToast(
