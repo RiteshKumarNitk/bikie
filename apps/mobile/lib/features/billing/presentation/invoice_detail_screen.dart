@@ -75,7 +75,7 @@ class _Receipt extends StatelessWidget {
       ('Account type', s.accountType == 'SERVICE_PROVIDER' ? 'Service Provider' : 'Rider'),
       ('Plan', s.planName),
       if (isSubscriptionInvoice) ('Payment type', _paymentTypeLabel(s.paymentType, inv.durationDays)),
-      if (isSubscriptionInvoice) ('Auto-debited', s.paymentType == InvoicePaymentType.autoRenewal ? 'Yes' : 'No'),
+      if (isSubscriptionInvoice) ('Paid via AutoPay', s.paymentType == InvoicePaymentType.autoRenewal ? 'Yes' : 'No'),
       ('Membership term', '${inv.durationDays} days'),
       ('Membership start', _date(s.membershipStartDate)),
       ('Membership expiry', _date(s.membershipEndDate)),

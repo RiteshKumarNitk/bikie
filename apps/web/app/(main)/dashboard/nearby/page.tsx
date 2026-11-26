@@ -113,7 +113,7 @@ export default function NearbyRidersPage() {
         <div className="mt-6 rounded-2xl border border-foreground/10 bg-card p-8 text-center">
           <p className="font-semibold">Turn on location sharing to see nearby riders</p>
           <p className="mx-auto mt-1 max-w-sm text-sm text-foreground/50">
-            You need to share your own live location to find other riders nearby — it's a two-way
+            You need to share your own live location to find other riders nearby — it&apos;s a two-way
             street.
           </p>
           <Link

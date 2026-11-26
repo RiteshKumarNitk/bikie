@@ -104,7 +104,7 @@ class _SosHero extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          'Tap SOS to alert nearby riders, service providers and your emergency contacts.',
+          'Tap SOS to alert nearby riders, Service Providers and your emergency contacts.',
           textAlign: TextAlign.center,
           style: textTheme.bodyMedium,
         ),
@@ -319,7 +319,7 @@ class _LocationSharingRowState extends ConsumerState<_LocationSharingRow> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Be findable in an emergency',
+                  'Be Findable in an emergency',
                   style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 2),

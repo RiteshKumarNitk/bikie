@@ -108,7 +108,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Set up AutoPay'), findsOneWidget);
-      expect(find.textContaining("You'll be taken to Razorpay"), findsOneWidget);
+      expect(find.textContaining('Razorpay will open so you can approve AutoPay'), findsOneWidget);
       expect(fakeLauncher.lastLaunchedUrl, isNull);
       verifyNever(() => dio.post('/api/membership/subscription', data: any(named: 'data')));
     });
@@ -142,6 +142,36 @@ void main() {
 
       expect(fakeLauncher.lastLaunchedUrl, 'https://rzp.io/rzp/testlink');
       verify(() => dio.post('/api/membership/subscription', data: {'planId': 'plan-rider-yearly'})).called(1);
+    });
+  });
+
+  group('duplicate-payment protection', () {
+    testWidgets('a double tap opens only one AutoPay dialog', (tester) async {
+      when(() => dio.get('/api/membership/active')).thenAnswer(
+        (_) async => _ok('/api/membership/active', {'membership': null, 'pendingSubscription': null}),
+      );
+      await pumpScreen(tester);
+
+      final start = find.text('Start Yearly Membership — ₹149/year');
+      await tester.tap(start);
+      await tester.tap(start, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Set up AutoPay'), findsOneWidget);
+    });
+
+    testWidgets('while a payment is pending the action reads as a retry, pointing to Check status', (tester) async {
+      when(() => dio.get('/api/membership/active')).thenAnswer(
+        (_) async => _ok('/api/membership/active', {
+          'membership': null,
+          'pendingSubscription': _membershipJson(status: 'PENDING'),
+        }),
+      );
+      await pumpScreen(tester, settle: false);
+
+      expect(find.text('Retry Payment — ₹149/year'), findsOneWidget);
+      expect(find.text('Start Yearly Membership — ₹149/year'), findsNothing);
+      expect(find.textContaining('Tap Check status above instead of paying again'), findsOneWidget);
     });
   });
 

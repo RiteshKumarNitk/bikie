@@ -125,7 +125,7 @@ class _NearbyRidersScreenState extends ConsumerState<NearbyRidersScreen> {
                     ],
                   ),
                   const Text(
-                    'You must share your own location to see other riders nearby — reciprocity, not just a toggle.',
+                    'Share your own location to see other riders nearby.',
                     style: TextStyle(fontSize: 12),
                   ),
                   const SizedBox(height: 8),
@@ -155,8 +155,8 @@ class _NearbyRidersScreenState extends ConsumerState<NearbyRidersScreen> {
                     ],
                   ),
                   const Text(
-                    'Temporarily stop receiving nearby-rider SOS pings without turning off location '
-                    'sharing — you stay findable, you just won\'t be paged for assistance requests.',
+                    'Pause SOS assistance requests from nearby riders without turning off location '
+                    'sharing. You stay findable, but you won\'t be asked to help.',
                     style: TextStyle(fontSize: 12),
                   ),
                 ],
@@ -164,18 +164,19 @@ class _NearbyRidersScreenState extends ConsumerState<NearbyRidersScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
+          // Wrap, not Row: three chips plus the label don't fit one line on small phones or
+          // with larger system font sizes.
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text('Radius:'),
-              const SizedBox(width: 8),
               for (final km in [5, 10, 20])
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text('${km}km'),
-                    selected: radiusKm == km,
-                    onSelected: (_) => ref.read(radiusKmProvider.notifier).state = km,
-                  ),
+                ChoiceChip(
+                  label: Text('$km km'),
+                  selected: radiusKm == km,
+                  onSelected: (_) => ref.read(radiusKmProvider.notifier).state = km,
                 ),
             ],
           ),

@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/app_config.dart' show isTestPhoneNumber;
 import '../../../core/payments/razorpay_checkout.dart';
+import '../../../core/payments/razorpay_subscription_checkout.dart';
+import '../../../core/payments/subscription_authorization.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/app_toast.dart';
@@ -20,8 +21,9 @@ import '../domain/membership_providers.dart';
 import '../domain/membership_subscription_display.dart';
 
 /// Razorpay's hosted Subscription authorization page has no `callback_url`/redirect mechanism
-/// (unlike one-time Checkout) — `_subscribe` below opens it externally (Chrome Custom Tab /
-/// browser / UPI app) and there is no reliable way for Razorpay to hand control back to this
+/// (unlike one-time Checkout) — `_subscribe` below opens it in an in-app browser tab (Chrome
+/// Custom Tab, falling back to the browser; UPI apps still open from it) and there is no reliable
+/// way for Razorpay to hand control back to this
 /// screen. Razorpay's own guidance is not to rely on a redirect at all; the nearest achievable
 /// "auto-refresh on return" is re-fetching on `AppLifecycleState.resumed` — covers the Rider
 /// switching back to BIKIE after completing (or abandoning) authorization in the external
@@ -255,7 +257,7 @@ class _ActiveMembershipCardState extends ConsumerState<_ActiveMembershipCard> {
           '₹${widget.membership.plan.price.toStringAsFixed(0)} automatic payment will be taken.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Subscription')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Auto-Renewal')),
           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel Auto-Renewal')),
         ],
       ),
@@ -457,18 +459,29 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   bool _isPurchasing = false;
   bool _isSubscribing = false;
 
+  /// True while the "Set up AutoPay" dialog is open — disables the button (no double dialogs)
+  /// without showing a spinner for a request that hasn't been made yet.
+  bool _isConfirming = false;
+
   /// Gate in front of [_subscribe] — explains what's about to happen (external redirect to
   /// Razorpay, no automatic way back) before it happens, rather than only after. Declining here
   /// never calls the backend at all, so there's no orphaned "created" subscription row to clean
   /// up on a later retry.
   Future<void> _confirmAndSubscribe() async {
+    // Disable the button before the dialog opens, not after: a quick double-tap used to open two
+    // dialogs and send two subscription requests (the server's in-progress guard rejected the
+    // second, but the Rider still saw an error toast).
+    if (_isSubscribing || _isConfirming) return;
+    setState(() => _isConfirming = true);
+    final price = widget.plan.price.toStringAsFixed(0);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Set up AutoPay'),
-        content: const Text(
-          "You'll be taken to Razorpay to approve AutoPay for your ₹149/year membership. After "
-          'approving, return to BIKIE — this screen updates automatically once confirmed.',
+        content: Text(
+          "Razorpay will open so you can approve AutoPay for your ₹$price/year membership. Choose "
+          'UPI AutoPay or a card and approve it — this screen updates automatically once Razorpay '
+          'confirms.',
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
@@ -476,7 +489,9 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
+    if (!mounted) return;
+    setState(() => _isConfirming = false);
+    if (confirmed != true) return;
     await _subscribe();
   }
 
@@ -484,28 +499,44 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   /// flow — both remain available side by side; nothing here silently converts an existing
   /// one-time membership into a subscription). Membership does NOT activate here: the server
   /// only stores the Razorpay subscription id against a placeholder row; a webhook-confirmed
-  /// charge is what actually grants eligibility. Opens Razorpay's hosted authorization page
-  /// externally (no native-SDK subscription flow yet) — the user completes authorization there
-  /// and returns to the app, where pull-to-refresh (or the next launch) picks up the activated
-  /// state once the webhook has run. Mirrors `_PlanCardState._subscribe` (Service Provider) exactly.
+  /// charge is what actually grants eligibility. Authorization is collected by
+  /// [authorizeSubscription]: Razorpay's in-app Checkout (prefilled name, mobile and email) when
+  /// the server enables it, otherwise the hosted page — always for the same subscription the
+  /// server created or reused. Mirrors `_PlanCardState._subscribe` (Service Provider) exactly.
   Future<void> _subscribe() async {
     setState(() => _isSubscribing = true);
     try {
       final repo = ref.read(membershipRepositoryProvider);
       final result = await repo.startSubscription(planId: widget.plan.id);
-      final uri = Uri.tryParse(result.shortUrl);
-      if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      final user = ref.read(authControllerProvider).user;
+      final outcome = await authorizeSubscription(
+        checkout: result.checkout,
+        launcher: ref.read(subscriptionCheckoutLauncherProvider),
+        planName: widget.plan.name,
+        prefill: RazorpayPrefill(name: user?.name, email: user?.email, contact: user?.phoneNumber),
+        confirm: (success) => repo.confirmCheckout(
+          razorpayPaymentId: success.paymentId,
+          razorpaySubscriptionId: success.subscriptionId,
+          razorpaySignature: success.signature,
+        ),
+      );
       if (mounted) {
         showAppToast(
           context,
-          'Complete the payment authorization. This screen updates automatically once confirmed.',
-          variant: AppToastVariant.success,
+          outcome.userMessage,
+          variant: switch (outcome.outcome) {
+            SubscriptionAuthorizationOutcome.activated ||
+            SubscriptionAuthorizationOutcome.confirming ||
+            SubscriptionAuthorizationOutcome.hostedOpened =>
+              AppToastVariant.success,
+            SubscriptionAuthorizationOutcome.cancelled => AppToastVariant.info,
+            _ => AppToastVariant.error,
+          },
         );
       }
-      // Picks up the new pending subscription right away (rather than waiting for the next app
-      // resume or poll tick) so the "payment processing" card appears immediately.
+      // Always re-read from the server: the membership card (or the "payment processing" card,
+      // which starts bounded polling) reflects only backend-verified state.
+      ref.invalidate(activeMembershipProvider);
       ref.invalidate(pendingSubscriptionProvider);
     } on ApiException catch (e) {
       if (mounted) showAppToast(context, e.message, variant: AppToastVariant.error);
@@ -586,6 +617,9 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
     // real Rider and a one-time payment. Mirrors `_PlanCardState.build` (Service Provider) exactly.
     final phoneNumber = ref.watch(authControllerProvider.select((s) => s.user?.phoneNumber));
     final showLegacyPayOnce = !isFree && isTestPhoneNumber(phoneNumber ?? '');
+    // While an AutoPay approval is still unconfirmed, the action is a retry, not a new purchase —
+    // the server reuses or safely replaces the open subscription, never stacks a second one.
+    final hasPendingPayment = ref.watch(pendingSubscriptionProvider).valueOrNull != null;
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -643,16 +677,22 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isSubscribing ? null : _confirmAndSubscribe,
+                  onPressed: _isSubscribing || _isConfirming ? null : _confirmAndSubscribe,
                   child: _isSubscribing
                       ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text('Start Yearly Membership — ₹$price/year'),
+                      : Text(
+                          hasPendingPayment
+                              ? 'Retry Payment — ₹$price/year'
+                              : 'Start Yearly Membership — ₹$price/year',
+                          textAlign: TextAlign.center,
+                        ),
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'Your payment will be automatically debited every year through your authorized Razorpay '
-                'payment method.',
+                hasPendingPayment
+                    ? 'Already approved AutoPay on Razorpay? Tap Check status above instead of paying again.'
+                    : 'Renews every year with AutoPay through Razorpay. You can cancel auto-renewal anytime.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],

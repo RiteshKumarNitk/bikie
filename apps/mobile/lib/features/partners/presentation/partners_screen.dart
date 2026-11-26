@@ -8,6 +8,7 @@ import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../data/partner_model.dart';
 import '../data/partners_repository.dart';
+import '../../../core/widgets/osm_attribution.dart';
 
 /// "Find a service provider" — public "which BIKIE partners are near me" (ADR-036), mirroring
 /// web's `NearbyPartnersPanel.tsx`. No session/membership required, unlike `NearbyRidersScreen`
@@ -56,7 +57,7 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
         permission = await Geolocator.requestPermission();
       }
       if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
-        setState(() => _error = 'Location permission is required to find nearby service providers.');
+        setState(() => _error = 'Location permission is required to find nearby Service Providers.');
         return;
       }
       final position = await Geolocator.getCurrentPosition();
@@ -107,7 +108,7 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
             ),
             const SizedBox(height: 4),
             Text(
-              p.isAvailable ? '🟢 Available' : '⚫ Offline',
+              p.isAvailable ? '🟢 Available' : '⚫ Unavailable',
               style: TextStyle(color: p.isAvailable ? Colors.green : Colors.grey, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 10),
@@ -129,20 +130,20 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           Text(
-            "See BIKIE's currently available mechanics, fuel delivery, and rental partners on a map — each with its verification status, so you know exactly who's been checked by BIKIE. Markers show each provider's registered business location, not a live GPS position.",
+            "See BIKIE's currently available mechanics, fuel delivery and rental Service Providers on a map — each with its verification status, so you know exactly who's been checked by BIKIE. Markers show each provider's registered business location, not a live GPS position.",
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           const SizedBox(height: 12),
           ElevatedButton.icon(
             onPressed: _loading ? null : _findNearby,
             icon: const Icon(Icons.my_location, size: 18),
-            label: Text(_loading ? 'Finding nearby partners…' : 'Find service providers near me'),
+            label: Text(_loading ? 'Finding nearby Service Providers…' : 'Find Service Providers near me'),
           ),
           const SizedBox(height: 16),
           if (_error != null)
             EmptyState(
               icon: Icons.error_outline,
-              title: "Couldn't load nearby partners",
+              title: "Couldn't load nearby Service Providers",
               message: _error,
               actionLabel: 'Retry',
               onAction: _findNearby,
@@ -150,7 +151,7 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
           if (_partners != null && _partners!.isEmpty)
             const EmptyState(
               icon: Icons.storefront_outlined,
-              title: 'No available service providers found nearby right now',
+              title: 'No available Service Providers found nearby right now',
             ),
           if (_partners != null && _partners!.isNotEmpty) ...[
             ClipRRect(
@@ -182,7 +183,7 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
                           ),
                         ),
                     ]),
-                    const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+                    const OsmAttribution(),
                   ],
                 ),
               ),
@@ -225,7 +226,7 @@ class _PartnersScreenState extends ConsumerState<PartnersScreen> {
                         style: Theme.of(context).textTheme.labelMedium,
                       ),
                       Text(
-                        p.isAvailable ? '🟢 Available' : '⚫ Offline',
+                        p.isAvailable ? '🟢 Available' : '⚫ Unavailable',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: p.isAvailable ? Colors.green : null,
                             ),

@@ -6,6 +6,7 @@ import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../data/trip_models.dart';
 import '../domain/trip_providers.dart';
+import '../../../core/widgets/app_network_image.dart';
 
 /// `/dashboard/trips` on mobile — "My Rides": organized / joined / requested,
 /// plus the reputation stat tiles from `RideStatsDTO` (`GET /api/trips/mine`).
@@ -73,30 +74,37 @@ class _StatsRow extends StatelessWidget {
       ('Approved', '${stats.requestsApproved}'),
       ('Approval rate', stats.approvalRate == null ? '—' : '${stats.approvalRate}%'),
     ];
-    return SizedBox(
-      height: 88,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.all(16),
-        itemCount: tiles.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (context, index) {
-          final (label, value) = tiles[index];
-          return Container(
-            width: 120,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).cardColor,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(value, style: Theme.of(context).textTheme.titleLarge),
-                const SizedBox(height: 2),
-                Text(label, style: Theme.of(context).textTheme.bodySmall, maxLines: 1, overflow: TextOverflow.ellipsis),
-              ],
-            ),
+    // A wrapping grid (2 per row on phones, 4 on wider screens) instead of a fixed 88px-tall
+    // horizontal strip: the fixed height clipped the tiles at larger system font sizes.
+    const spacing = 10.0;
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final perRow = constraints.maxWidth >= 520 ? 4 : 2;
+          final tileWidth = (constraints.maxWidth - spacing * (perRow - 1)) / perRow;
+          return Wrap(
+            spacing: spacing,
+            runSpacing: spacing,
+            children: [
+              for (final (label, value) in tiles)
+                Container(
+                  width: tileWidth,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).cardColor,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(value, style: Theme.of(context).textTheme.titleLarge),
+                      const SizedBox(height: 2),
+                      Text(label, style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
+                ),
+            ],
           );
         },
       ),
@@ -126,7 +134,7 @@ class _RideList extends StatelessWidget {
             onTap: () => context.push('/trips/${trip.slug}'),
             leading: ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.network(trip.imageUrl, width: 52, height: 52, fit: BoxFit.cover),
+              child: AppNetworkImage(trip.imageUrl, width: 52, height: 52, fit: BoxFit.cover),
             ),
             title: Text(trip.title, maxLines: 1, overflow: TextOverflow.ellipsis),
             subtitle: Text('${trip.startDate.split('T').first} · ${trip.seatsLeft}/${trip.seatsTotal} seats'),

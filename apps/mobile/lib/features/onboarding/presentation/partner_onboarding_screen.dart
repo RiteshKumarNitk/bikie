@@ -117,7 +117,7 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
       case 'PENDING_VERIFICATION':
         return 'Verification status: pending';
       default:
-        return 'Verification status: unverified (fully operational)';
+        return 'Verification status: not yet verified (all features available)';
     }
   }
 
@@ -280,7 +280,7 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isEditMode ? 'Business Profile' : 'Complete your Partner Profile'),
+        title: Text(_isEditMode ? 'Business Profile' : 'Complete your Service Provider profile'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -291,7 +291,7 @@ class _PartnerOnboardingScreenState extends ConsumerState<PartnerOnboardingScree
               Text(
                 _isEditMode
                     ? 'Update your business details. Riders and the SOS dispatch system see this information.'
-                    : 'Tell us about your business. This helps us set up your fleet and payouts.',
+                    : 'Tell us about your business so riders and BIKIE\'s SOS system can reach you.',
                 style: Theme.of(context).textTheme.bodyMedium,
               ),
               if (_isEditMode && widget.initialProfile != null) ...[

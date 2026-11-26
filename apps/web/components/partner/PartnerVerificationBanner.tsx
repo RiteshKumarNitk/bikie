@@ -102,7 +102,7 @@ export function PartnerVerificationBanner() {
           <div>
             <p className="text-sm font-semibold">⚠ Unverified Service Provider</p>
             <p className="mt-0.5 text-xs text-foreground/60">
-              Your profile is live and you're fully operational. Get verified anytime to earn the
+              Your profile is live and you&apos;re fully operational. Get verified anytime to earn the
               ✓ BIKIE Verified badge and build rider trust.
             </p>
           </div>

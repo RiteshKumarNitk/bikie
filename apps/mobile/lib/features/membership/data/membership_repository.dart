@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/network/api_guard.dart';
 import '../../../core/network/dio_client.dart';
 import '../../../core/payments/razorpay_checkout.dart';
+import '../../../core/payments/razorpay_subscription_checkout.dart';
 import 'membership_model.dart';
 
 final membershipRepositoryProvider = Provider<MembershipRepository>((ref) {
@@ -88,9 +89,11 @@ class MembershipRepository {
     return apiGuard(() async {
       final res = await _dio.post('/api/membership/subscription', data: {'planId': planId});
       final data = res.data as Map<String, dynamic>;
+      final checkout = SubscriptionCheckoutInfo.fromJson(data['subscription'] as Map<String, dynamic>);
       return StartMembershipSubscriptionResult(
         membership: UserMembership.fromJson(data['membership'] as Map<String, dynamic>),
-        shortUrl: (data['subscription'] as Map<String, dynamic>)['shortUrl'] as String,
+        shortUrl: checkout.shortUrl,
+        checkout: checkout,
       );
     });
   }
@@ -104,10 +107,31 @@ class MembershipRepository {
       return UserMembership.fromJson(res.data['membership'] as Map<String, dynamic>);
     });
   }
+
+  /// `POST /api/membership/subscription/verify` — sends Razorpay's in-app Checkout callback fields to the server, which
+  /// verifies the signature and confirms the charge with Razorpay directly. Returns `true` only when
+  /// Razorpay has recorded the payment; the membership itself is always re-read from the server.
+  Future<bool> confirmCheckout({
+    required String razorpayPaymentId,
+    required String razorpaySubscriptionId,
+    required String razorpaySignature,
+  }) {
+    return apiGuard(() async {
+      final res = await _dio.post('/api/membership/subscription/verify', data: {
+        'razorpayPaymentId': razorpayPaymentId,
+        'razorpaySubscriptionId': razorpaySubscriptionId,
+        'razorpaySignature': razorpaySignature,
+      });
+      return (res.data as Map<String, dynamic>)['active'] == true;
+    });
+  }
 }
 
 class StartMembershipSubscriptionResult {
-  const StartMembershipSubscriptionResult({required this.membership, required this.shortUrl});
+  const StartMembershipSubscriptionResult({required this.membership, required this.shortUrl, required this.checkout});
+
+  /// Subscription id, public key id, checkout mode and reuse flag for opening Razorpay.
+  final SubscriptionCheckoutInfo checkout;
   final UserMembership membership;
   final String shortUrl;
 }

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/widgets/async_value_view.dart';
 import '../domain/destination_providers.dart';
+import '../../../core/widgets/app_network_image.dart';
 
 class DestinationsListScreen extends ConsumerWidget {
   const DestinationsListScreen({super.key});
@@ -34,7 +35,7 @@ class DestinationsListScreen extends ConsumerWidget {
                       SizedBox(
                         width: 100,
                         height: 90,
-                        child: Image.network(d.imageUrl, fit: BoxFit.cover),
+                        child: AppNetworkImage(d.imageUrl, fit: BoxFit.cover),
                       ),
                       Expanded(
                         child: Padding(

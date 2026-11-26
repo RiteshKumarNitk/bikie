@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../bikes/presentation/widgets/bike_card.dart';
 import '../domain/destination_providers.dart';
+import '../../../core/widgets/app_network_image.dart';
 
 class DestinationDetailScreen extends ConsumerWidget {
   const DestinationDetailScreen({super.key, required this.slug});
@@ -25,7 +26,7 @@ class DestinationDetailScreen extends ConsumerWidget {
               pinned: true,
               flexibleSpace: FlexibleSpaceBar(
                 title: Text(destination.name),
-                background: Image.network(destination.imageUrl, fit: BoxFit.cover),
+                background: AppNetworkImage(destination.imageUrl, fit: BoxFit.cover),
               ),
             ),
             SliverPadding(
@@ -48,13 +49,7 @@ class DestinationDetailScreen extends ConsumerWidget {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                  // Two columns on phones, more on tablets / landscape.
-                  maxCrossAxisExtent: 240,
-                  mainAxisSpacing: 16,
-                  crossAxisSpacing: 16,
-                  childAspectRatio: 0.68,
-                ),
+                gridDelegate: bikeCardGridDelegate(context),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => BikeCard(bike: destination.bikes[index]),
                   childCount: destination.bikes.length,

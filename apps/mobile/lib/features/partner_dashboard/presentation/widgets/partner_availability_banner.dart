@@ -65,7 +65,7 @@ class _PartnerAvailabilityBannerState extends ConsumerState<PartnerAvailabilityB
                         style: Theme.of(context).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       Text(
-                        'Activate ₹99/month membership to go available',
+                        'Activate your ₹99/month membership to become Available',
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
                     ],

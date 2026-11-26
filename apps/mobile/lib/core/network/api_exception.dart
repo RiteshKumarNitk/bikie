@@ -1,3 +1,5 @@
+import 'api_error_messages.dart';
+
 /// Maps the API's `{ error: string }` / `{ error: ZodFlattenedError }`
 /// envelope (see `.docs/API.md` Conventions) into a typed exception every
 /// repository can catch uniformly.
@@ -14,7 +16,7 @@ class ApiException implements Exception {
         final apiMessage = data['message'];
         return ApiException(
           statusCode: statusCode,
-          message: apiMessage is String ? apiMessage : error,
+          message: apiMessage is String && apiMessage.isNotEmpty ? apiMessage : friendlyApiErrorMessage(error),
           errorCode: error,
         );
       }

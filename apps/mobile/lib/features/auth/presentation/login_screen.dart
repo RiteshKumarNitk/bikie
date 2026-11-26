@@ -168,7 +168,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       }
 
       if (mounted) {
-        showAppToast(context, 'Signed in successfully', variant: AppToastVariant.success);
+        showAppToast(context, 'Logged in successfully', variant: AppToastVariant.success);
         context.go('/');
       }
     } on ApiException catch (e) {
@@ -204,7 +204,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
       }
 
       if (mounted) {
-        showAppToast(context, 'Signed in successfully', variant: AppToastVariant.success);
+        showAppToast(context, 'Logged in successfully', variant: AppToastVariant.success);
         context.go('/');
       }
     } on ApiException catch (e) {
@@ -222,7 +222,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
     return Scaffold(
       appBar: AppBar(
         actions: [
-          TextButton(onPressed: () => context.go('/welcome'), child: const Text('Change Role')),
+          TextButton(onPressed: () => context.go('/welcome'), child: const Text('Change role')),
         ],
       ),
       bottomNavigationBar: _devOtp != null ? DevOtpBanner(code: _devOtp!) : null,
@@ -244,7 +244,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                 const SizedBox(height: 6),
                 if (_step != 'mismatch')
                   Text(
-                    selectedRole == 'SERVICE_PROVIDER' ? 'Sign in to Service Provider' : 'Sign in to Rider',
+                    selectedRole == 'SERVICE_PROVIDER' ? 'Log in as a Service Provider' : 'Log in as a Rider',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).hintColor),
                   ),
@@ -295,7 +295,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                         const SizedBox(height: 12),
                         OutlinedButton(
                           onPressed: () => context.push('/account-type-request'),
-                          child: const Text('Contact Support to change account type'),
+                          child: const Text('Contact support to change your account type'),
                         ),
                       ],
                       if (_mode == 'phone' && _step == 'phone') ...[
@@ -373,7 +373,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                               const SizedBox(height: 20),
                               ElevatedButton(
                                 onPressed: _signingIn ? null : _emailSignIn,
-                                child: _signingIn ? const _Spinner() : const Text('Sign in'),
+                                child: _signingIn ? const _Spinner() : const Text('Log in'),
                               ),
                               const SizedBox(height: 8),
                               Center(
@@ -441,7 +441,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with ResendCountdownM
                         ],
                         ElevatedButton(
                           onPressed: _verifying ? null : _verify,
-                          child: _verifying ? const _Spinner() : const Text('Sign in'),
+                          child: _verifying ? const _Spinner() : const Text('Log in'),
                         ),
                       ],
                     ],

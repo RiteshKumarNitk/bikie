@@ -4,7 +4,7 @@ import Link from "next/link";
 import type { CurrentLegalDocumentsResponse } from "@bikie/types";
 
 export const LEGAL_CONSENT_REQUIRED_MESSAGE =
-  "Please accept the Terms & Conditions, Privacy Policy and Legal Terms to continue.";
+  "Please accept the Terms & Conditions, Privacy Policy and User Agreement to continue.";
 
 /** ADR-090 — the headers the server's `user.create` hook requires on the account-creating
  * request: exactly the version ids the user was shown, plus the account type they signed up as. */
@@ -18,7 +18,7 @@ export function legalConsentHeaders(versionIds: string[], accountType: string): 
 const LINKS: { key: "terms" | "privacy" | "userAgreement"; href: string; fallback: string }[] = [
   { key: "terms", href: "/terms-and-conditions", fallback: "Terms & Conditions" },
   { key: "privacy", href: "/privacy-policy", fallback: "Privacy Policy" },
-  { key: "userAgreement", href: "/user-agreement", fallback: "Legal Terms" },
+  { key: "userAgreement", href: "/user-agreement", fallback: "User Agreement" },
 ];
 
 /** Never pre-checked — the caller owns `checked`, which must start `false`. Each document name

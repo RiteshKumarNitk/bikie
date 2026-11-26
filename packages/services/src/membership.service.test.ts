@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 vi.mock("@bikie/database", () => ({
   membershipRepository: {
@@ -35,6 +35,7 @@ vi.mock("./razorpay.service", () => ({
     cancelSubscription: vi.fn(),
     fetchSubscription: vi.fn(),
     listSubscriptionInvoices: vi.fn(async () => []),
+    verifySubscriptionPaymentSignature: vi.fn(() => false),
     SUBSCRIPTION_TOTAL_COUNT: 240,
     SUBSCRIPTION_TOTAL_COUNT_YEARLY: 20,
   },
@@ -70,6 +71,7 @@ const razorpay = RazorpayService as unknown as {
   cancelSubscription: ReturnType<typeof vi.fn>;
   fetchSubscription: ReturnType<typeof vi.fn>;
   listSubscriptionInvoices: ReturnType<typeof vi.fn>;
+  verifySubscriptionPaymentSignature: ReturnType<typeof vi.fn>;
 };
 
 const plan = {
@@ -360,6 +362,7 @@ describe("MembershipService.startSubscription (recurring)", () => {
       ok: true,
       membership: created,
       subscription: { id: "sub_rider123", status: "created", shortUrl: "https://rzp.io/i/rider123" },
+      reused: false,
     });
     // Yearly constant (20, under Razorpay's confirmed 25-year UPI AutoPay limit), never the
     // monthly default (1200) — Razorpay rejects 1200 outright for a yearly Plan ("Exceeds the
@@ -418,12 +421,32 @@ describe("MembershipService.startSubscription (recurring)", () => {
     expect(razorpay.createSubscription).not.toHaveBeenCalled();
   });
 
-  it("blocks (never cancels) a just-created open subscription still inside the grace period, even if Razorpay already reports it non-terminal and unpaid — the Rider may be mid-authorization right now", async () => {
+  it("REUSES (never blocks, never cancels, never creates another) a just-created subscription Razorpay still reports as \"created\" — the Rider closed Checkout and tapped again", async () => {
+    const open = subscriptionMembershipOn(yearlyPlan, { startDate: new Date(Date.now() - 30_000).toISOString() });
+    repo.findPlanById.mockResolvedValueOnce(yearlyPlan);
+    repo.findOpenSubscriptionForUser.mockResolvedValueOnce(open);
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "created", paidCount: 0, shortUrl: "https://rzp.io/i/rider123" });
+    vi.stubEnv("RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID", "plan_rider_yearly");
+
+    const result = await MembershipService.startSubscription("user-1", "rider-yearly-plan");
+
+    expect(result).toEqual({
+      ok: true,
+      membership: open,
+      subscription: { id: open.razorpaySubscriptionId, status: "created", shortUrl: "https://rzp.io/i/rider123" },
+      reused: true,
+    });
+    expect(razorpay.cancelSubscription).not.toHaveBeenCalled();
+    expect(razorpay.createSubscription).not.toHaveBeenCalled();
+    expect(repo.createSubscriptionMembership).not.toHaveBeenCalled();
+  });
+
+  it("blocks (never cancels) a just-created open subscription whose AutoPay approval is already in progress inside the grace period — the Rider may be mid-authorization right now", async () => {
     repo.findPlanById.mockResolvedValueOnce(yearlyPlan);
     repo.findOpenSubscriptionForUser.mockResolvedValueOnce(
       subscriptionMembershipOn(yearlyPlan, { startDate: new Date(Date.now() - 30_000).toISOString() }),
     );
-    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "created", paidCount: 0 });
+    razorpay.fetchSubscription.mockResolvedValueOnce({ status: "authenticated", paidCount: 0, shortUrl: "https://rzp.io/i/rider123" });
     vi.stubEnv("RAZORPAY_RIDER_MEMBERSHIP_PLAN_ID", "plan_rider_yearly");
 
     const result = await MembershipService.startSubscription("user-1", "rider-yearly-plan");
@@ -456,6 +479,7 @@ describe("MembershipService.startSubscription (recurring)", () => {
       ok: true,
       membership: created,
       subscription: { id: "sub_rider456", status: "created", shortUrl: "https://rzp.io/i/rider456" },
+      reused: false,
     });
   });
 
@@ -605,6 +629,14 @@ describe("MembershipService.adminCancelSubscription (admin, not scoped to a call
 
 describe("MembershipService.recordRecurringCharge (webhook: subscription.charged / activated)", () => {
   it("extends endDate to currentPeriodEnd (one full year later), keeps status ACTIVE, stamps lastPaymentId, and creates a NEW invoice", async () => {
+    // Controlled clock pinned inside the fixture's billing period, so the `endDate > now`
+    // assertion below can't start failing once the hardcoded 2027-10-26 end date passes.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-01T00:00:00.000Z"));
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+
     const existing = subscriptionMembershipOn(yearlyPlan, { subscriptionStatus: "active" });
     repo.findByRazorpaySubscriptionId.mockResolvedValueOnce(existing);
     const periodStart = new Date("2026-10-26T00:00:00.000Z");
@@ -846,5 +878,68 @@ describe("MembershipService.reconcileSubscription (admin-triggered, webhook-miss
     expect(repo.updateSubscriptionStatus).toHaveBeenCalledWith("um-1", "cancelled", {});
     expect(repo.recordSubscriptionCharge).not.toHaveBeenCalled();
     expect(result).toEqual({ ok: true, membership: synced, invoicesFound: 0 });
+  });
+});
+
+describe("MembershipService.confirmCheckoutPayment (in-app Checkout success callback)", () => {
+  const input = { razorpayPaymentId: "pay_checkout_1", razorpaySubscriptionId: "sub_rider123", razorpaySignature: "a".repeat(64) };
+
+  it("rejects a subscription that belongs to another user, without verifying or reconciling", async () => {
+    (repo as unknown as { findByRazorpaySubscriptionId: ReturnType<typeof vi.fn> }).findByRazorpaySubscriptionId.mockResolvedValueOnce(
+      { ...subscriptionMembershipOn(yearlyPlan), userId: "someone-else" },
+    );
+    const reconcile = vi.spyOn(MembershipService, "reconcileSubscription");
+
+    const result = await MembershipService.confirmCheckoutPayment("user-1", input);
+
+    expect(result).toEqual({ ok: false, reason: "NOT_FOUND" });
+    expect(razorpay.verifySubscriptionPaymentSignature).not.toHaveBeenCalled();
+    expect(reconcile).not.toHaveBeenCalled();
+    reconcile.mockRestore();
+  });
+
+  it("rejects an invalid signature — client-reported success never activates anything", async () => {
+    (repo as unknown as { findByRazorpaySubscriptionId: ReturnType<typeof vi.fn> }).findByRazorpaySubscriptionId.mockResolvedValueOnce(subscriptionMembershipOn(yearlyPlan));
+    razorpay.verifySubscriptionPaymentSignature.mockReturnValueOnce(false);
+    const reconcile = vi.spyOn(MembershipService, "reconcileSubscription");
+
+    const result = await MembershipService.confirmCheckoutPayment("user-1", input);
+
+    expect(result).toEqual({ ok: false, reason: "INVALID_SIGNATURE" });
+    expect(reconcile).not.toHaveBeenCalled();
+    reconcile.mockRestore();
+  });
+
+  it("verifies against the SERVER-stored subscription id, then confirms with Razorpay via reconcile", async () => {
+    (repo as unknown as { findByRazorpaySubscriptionId: ReturnType<typeof vi.fn> }).findByRazorpaySubscriptionId.mockResolvedValueOnce(subscriptionMembershipOn(yearlyPlan));
+    razorpay.verifySubscriptionPaymentSignature.mockReturnValueOnce(true);
+    const activated = { ...subscriptionMembershipOn(yearlyPlan), status: "ACTIVE", endDate: new Date(Date.now() + 86_400_000).toISOString() };
+    const reconcile = vi
+      .spyOn(MembershipService, "reconcileSubscription")
+      .mockResolvedValueOnce({ ok: true, membership: activated, invoicesFound: 1 } as never);
+
+    const result = await MembershipService.confirmCheckoutPayment("user-1", input);
+
+    expect(razorpay.verifySubscriptionPaymentSignature).toHaveBeenCalledWith({
+      paymentId: "pay_checkout_1",
+      subscriptionId: subscriptionMembershipOn(yearlyPlan).razorpaySubscriptionId,
+      signature: "a".repeat(64),
+    });
+    expect(reconcile).toHaveBeenCalledWith(subscriptionMembershipOn(yearlyPlan).razorpaySubscriptionId);
+    expect(result).toEqual({ ok: true, membership: activated, active: true });
+    reconcile.mockRestore();
+  });
+
+  it("reports active: false when Razorpay hasn't recorded the charge yet (webhook remains the path)", async () => {
+    (repo as unknown as { findByRazorpaySubscriptionId: ReturnType<typeof vi.fn> }).findByRazorpaySubscriptionId.mockResolvedValueOnce(subscriptionMembershipOn(yearlyPlan));
+    razorpay.verifySubscriptionPaymentSignature.mockReturnValueOnce(true);
+    const reconcile = vi
+      .spyOn(MembershipService, "reconcileSubscription")
+      .mockResolvedValueOnce({ ok: true, membership: subscriptionMembershipOn(yearlyPlan), invoicesFound: 0 } as never);
+
+    const result = await MembershipService.confirmCheckoutPayment("user-1", input);
+
+    expect(result).toEqual({ ok: true, membership: subscriptionMembershipOn(yearlyPlan), active: false });
+    reconcile.mockRestore();
   });
 });

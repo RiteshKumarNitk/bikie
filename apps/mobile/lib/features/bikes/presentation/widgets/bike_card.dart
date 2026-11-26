@@ -3,6 +3,20 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../data/bike_models.dart';
+import '../../../../core/widgets/app_network_image.dart';
+
+/// Grid layout for [BikeCard]s. Two columns on phones, more on tablets / landscape — and the
+/// maximum card width grows with the system font size, so very large text drops to one wider
+/// card per row instead of overflowing the fixed-ratio card.
+SliverGridDelegate bikeCardGridDelegate(BuildContext context) {
+  final textScale = MediaQuery.textScalerOf(context).scale(1).clamp(1.0, 2.0);
+  return SliverGridDelegateWithMaxCrossAxisExtent(
+    maxCrossAxisExtent: 240 * textScale,
+    mainAxisSpacing: 16,
+    crossAxisSpacing: 16,
+    childAspectRatio: 0.68,
+  );
+}
 
 class BikeCard extends StatelessWidget {
   const BikeCard({super.key, required this.bike});
@@ -24,7 +38,7 @@ class BikeCard extends StatelessWidget {
             Expanded(
               child: SizedBox(
                 width: double.infinity,
-                child: Image.network(bike.imageUrl, fit: BoxFit.cover),
+                child: AppNetworkImage(bike.imageUrl, fit: BoxFit.cover),
               ),
             ),
             Padding(
@@ -54,9 +68,17 @@ class BikeCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        '₹${bike.pricePerDay.toStringAsFixed(0)}/day',
-                        style: Theme.of(context).textTheme.titleSmall,
+                      // The price is never truncated, but in a narrow two-column card at larger
+                      // font sizes it scales down to fit instead of overflowing the card.
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerRight,
+                          child: Text(
+                            '₹${bike.pricePerDay.toStringAsFixed(0)}/day',
+                            style: Theme.of(context).textTheme.titleSmall,
+                          ),
+                        ),
                       ),
                     ],
                   ),

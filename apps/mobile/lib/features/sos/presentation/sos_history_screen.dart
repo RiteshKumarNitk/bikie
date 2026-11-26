@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/widgets/empty_state.dart';
@@ -63,6 +64,13 @@ class SosHistoryScreen extends ConsumerWidget {
   }
 }
 
+/// The API sends an ISO timestamp — shown to riders as e.g. "20 Nov 2026, 2:30 PM" (local time)
+/// instead of the raw `2026-11-20T09:00:00.000Z` string.
+String _formatCreatedAt(String iso) {
+  final parsed = DateTime.tryParse(iso);
+  return parsed == null ? iso : DateFormat('d MMM y, h:mm a').format(parsed.toLocal());
+}
+
 class _HistoryCard extends StatelessWidget {
   const _HistoryCard({required this.entry});
 
@@ -89,7 +97,7 @@ class _HistoryCard extends StatelessWidget {
                     ),
                   ),
                   Chip(
-                    label: Text(entry.status, style: const TextStyle(fontSize: 11)),
+                    label: Text(sosStatusLabel(entry.status), style: const TextStyle(fontSize: 11)),
                     backgroundColor: isResolved
                         ? Theme.of(context).colorScheme.surfaceContainerHighest
                         : Colors.orange.withValues(alpha: 0.15),
@@ -107,8 +115,9 @@ class _HistoryCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 [
-                  entry.createdAt,
-                  if (entry.responses.isNotEmpty) '${entry.responses.length} response(s)',
+                  _formatCreatedAt(entry.createdAt),
+                  if (entry.responses.isNotEmpty)
+                    entry.responses.length == 1 ? '1 response' : '${entry.responses.length} responses',
                 ].join(' · '),
                 style: Theme.of(context).textTheme.labelSmall,
               ),

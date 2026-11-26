@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/empty_state.dart';
 import '../domain/wishlist_providers.dart';
+import '../../../core/widgets/app_network_image.dart';
 
 class WishlistScreen extends ConsumerWidget {
   const WishlistScreen({super.key});
@@ -42,7 +43,7 @@ class WishlistScreen extends ConsumerWidget {
                     onTap: () => context.push('/bikes/${item.bike.slug}'),
                     leading: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
-                      child: Image.network(item.bike.imageUrl, width: 56, height: 56, fit: BoxFit.cover),
+                      child: AppNetworkImage(item.bike.imageUrl, width: 56, height: 56, fit: BoxFit.cover),
                     ),
                     title: Text(item.bike.name),
                     subtitle: Text('${item.bike.brand} · ₹${item.bike.pricePerDay.toStringAsFixed(0)}/day'),

@@ -182,12 +182,17 @@ describe("RazorpayService.fetchSubscription", () => {
   it("returns Razorpay's live status and paid_count (renamed paidCount) for a given subscription", async () => {
     vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
     vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
-    subscriptionsFetch.mockResolvedValueOnce({ id: "sub_abc", status: "active", paid_count: 3 });
+    subscriptionsFetch.mockResolvedValueOnce({
+      id: "sub_abc",
+      status: "active",
+      paid_count: 3,
+      short_url: "https://rzp.io/i/abc",
+    });
 
     const result = await RazorpayService.fetchSubscription("sub_abc");
 
     expect(subscriptionsFetch).toHaveBeenCalledWith("sub_abc");
-    expect(result).toEqual({ status: "active", paidCount: 3 });
+    expect(result).toEqual({ status: "active", paidCount: 3, shortUrl: "https://rzp.io/i/abc" });
   });
 
   it("returns a never-charged subscription's paidCount as 0, not undefined/falsy-confused with 'unverifiable'", async () => {
@@ -300,5 +305,59 @@ describe("RazorpayService.listSubscriptionInvoices", () => {
 
     expect(result).toEqual([]);
     err.mockRestore();
+  });
+});
+
+describe("RazorpayService.verifySubscriptionPaymentSignature (in-app subscription Checkout)", () => {
+  // Razorpay's documented Subscription formula: HMAC-SHA256(`${payment_id}|${subscription_id}`,
+  // key_secret). Computed here with real crypto, not mocked.
+  const sign = (paymentId: string, subscriptionId: string, secret: string) =>
+    createHmac("sha256", secret).update(`${paymentId}|${subscriptionId}`).digest("hex");
+
+  it("accepts Razorpay's genuine signature", () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    const signature = sign("pay_1", "sub_1", "secret_x");
+
+    expect(RazorpayService.verifySubscriptionPaymentSignature({ paymentId: "pay_1", subscriptionId: "sub_1", signature })).toBe(true);
+  });
+
+  it("rejects a signature made for a different subscription (the server-stored id is what's checked)", () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    const signature = sign("pay_1", "sub_OTHER", "secret_x");
+
+    expect(RazorpayService.verifySubscriptionPaymentSignature({ paymentId: "pay_1", subscriptionId: "sub_1", signature })).toBe(false);
+  });
+
+  it("rejects the one-time order formula (order_id|payment_id) — the two must never be interchangeable", () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    const orderStyle = createHmac("sha256", "secret_x").update("sub_1|pay_1").digest("hex");
+
+    expect(
+      RazorpayService.verifySubscriptionPaymentSignature({ paymentId: "pay_1", subscriptionId: "sub_1", signature: orderStyle }),
+    ).toBe(false);
+  });
+
+  it("is false (never throws) when Razorpay isn't configured or the signature is malformed", () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "");
+    expect(RazorpayService.verifySubscriptionPaymentSignature({ paymentId: "p", subscriptionId: "s", signature: "abc" })).toBe(false);
+
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    expect(RazorpayService.verifySubscriptionPaymentSignature({ paymentId: "p", subscriptionId: "s", signature: "not-hex" })).toBe(false);
+  });
+});
+
+describe("RazorpayService.publicKeyId", () => {
+  it("returns only the public key id, and nothing when Razorpay isn't fully configured", () => {
+    vi.stubEnv("RAZORPAY_KEY_ID", "rzp_test_x");
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "secret_x");
+    expect(RazorpayService.publicKeyId()).toBe("rzp_test_x");
+
+    vi.stubEnv("RAZORPAY_KEY_SECRET", "");
+    expect(RazorpayService.publicKeyId()).toBeNull();
   });
 });

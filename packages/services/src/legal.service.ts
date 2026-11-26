@@ -24,7 +24,7 @@ export type LegalConsentCheck =
 export type AccountTypeValue = "RIDER" | "SERVICE_PROVIDER";
 
 const CONSENT_REQUIRED_MESSAGE =
-  "Please accept the Terms & Conditions, Privacy Policy and Legal Terms to continue.";
+  "Please accept the Terms & Conditions, Privacy Policy and User Agreement to continue.";
 const VERSION_OUTDATED_MESSAGE =
   "Our legal terms were updated while you were signing up. Please review and accept the latest version.";
 

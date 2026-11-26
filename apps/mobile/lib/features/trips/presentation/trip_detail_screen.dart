@@ -13,6 +13,8 @@ import '../../auth/domain/auth_state.dart';
 import '../data/trip_models.dart';
 import '../data/trip_repository.dart';
 import '../domain/trip_providers.dart';
+import '../../../core/widgets/app_network_image.dart';
+import '../../../core/widgets/osm_attribution.dart';
 
 class TripDetailScreen extends ConsumerWidget {
   const TripDetailScreen({super.key, required this.slug});
@@ -36,7 +38,7 @@ class TripDetailScreen extends ConsumerWidget {
                 pinned: true,
                 flexibleSpace: FlexibleSpaceBar(
                   title: Text(trip.title),
-                  background: Image.network(trip.imageUrl, fit: BoxFit.cover),
+                  background: AppNetworkImage(trip.imageUrl, fit: BoxFit.cover),
                 ),
               ),
               SliverPadding(
@@ -95,7 +97,7 @@ class TripDetailScreen extends ConsumerWidget {
                                     child: const Icon(Icons.location_pin, color: Colors.red, size: 40),
                                   ),
                                 ]),
-                                const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+                                const OsmAttribution(),
                               ],
                             ),
                           ),
@@ -179,7 +181,7 @@ class _RideActionsSection extends ConsumerWidget {
         width: double.infinity,
         child: ElevatedButton(
           onPressed: () => context.push('/login'),
-          child: const Text('Sign in to request a spot'),
+          child: const Text('Log in to request a spot'),
         ),
       );
     }

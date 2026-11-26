@@ -2,6 +2,26 @@
 
 Status values: Backlog, Planned, In Progress, Blocked, Review, Completed.
 
+## Mobile UI polish: wording audit, responsive fixes, AutoPay checkout UX (2026-11-25)
+
+| Task | Status |
+|---|---|
+| Wording audit of all 1,263 mobile strings + backend messages that reach the app; terminology unified (Service Provider, Log in, Available/Unavailable, AutoPay, Be Findable) | Completed |
+| "Legal Terms" → "User Agreement" in the consent error (mobile, web, backend) — the real document title | Completed |
+| SOS: readable status/escalation labels instead of raw enums; readable SOS History dates; correct plurals; no "live GPS via SMS" overclaim | Completed |
+| Raw API error codes (sent without a `message`) mapped to readable text (`api_error_messages.dart`) | Completed — `api_exception_test.dart` (6) |
+| Responsive harness: 35 screens × 6 widths (320–600 px) × 3 text scales, long content | Completed — `responsive_screens_test.dart` (630 cases) |
+| Overflow fixes: Payment History, My Rides stats, Welcome CTA, Nearby Riders chips, Create Ride dropdowns, SOS detail header, map attribution (4 maps) | Completed |
+| Network image loading/error placeholders (`AppNetworkImage`, 9 call sites) | Completed |
+| AutoPay page opens in an in-app browser tab (fallback: browser); open-failure message | Completed — **needs real-device check of UPI app handoff from the Custom Tab before release** |
+| Double-tap protection on Start Membership (Rider + Service Provider) | Completed — tested |
+| Rider: "Retry Payment" label while a payment is pending | Completed — tested |
+| Service Provider membership: "Set up AutoPay" dialog, refresh on return, 1-minute polling | Completed — `partner_membership_screen_test.dart` (5) |
+| `flutter analyze` / `flutter test` | Completed — 0 errors/warnings (79 SDK deprecation infos, 75 before); 883/883 passing |
+| Backend `vitest` / `tsc` | 610/611 — the 1 failure is pre-existing and date-dependent (`partner-membership.service.test.ts` fixture date now in the past); `@bikie/services` typecheck errors are pre-existing in 2 test files; web `tsc` + eslint clean |
+| Razorpay contact/email prefill | **Not done — awaiting approval.** Hosted `short_url` can't be prefilled (Razorpay docs); requires moving to Standard Checkout + `subscription_id` |
+| APK build / emulator / real-device testing | **Not done** — this machine's Flutter 3.50 requires Gradle ≥ 9.3.1, project uses 8.14 (not changed without approval) |
+
 ## Rider membership: honest "payment pending" state + bounded auto-polling (2026-10-28)
 
 | Task | Status |

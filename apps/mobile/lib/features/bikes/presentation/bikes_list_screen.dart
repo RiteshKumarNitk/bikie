@@ -90,13 +90,7 @@ class BikesListScreen extends ConsumerWidget {
                   onRefresh: () async => ref.invalidate(bikeSearchResultProvider),
                   child: GridView.builder(
                     padding: const EdgeInsets.all(16),
-                    gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                      // Two columns on phones, more on tablets / landscape.
-                      maxCrossAxisExtent: 240,
-                      mainAxisSpacing: 16,
-                      crossAxisSpacing: 16,
-                      childAspectRatio: 0.68,
-                    ),
+                    gridDelegate: bikeCardGridDelegate(context),
                     itemCount: data.bikes.length,
                     itemBuilder: (context, index) => BikeCard(bike: data.bikes[index]),
                   ),

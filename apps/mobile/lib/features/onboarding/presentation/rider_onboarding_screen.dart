@@ -334,7 +334,7 @@ class _RiderOnboardingScreenState extends ConsumerState<RiderOnboardingScreen> {
                   children: [
                     Text(
                       _editing
-                          ? 'A few details help partners and fellow riders reach you faster, and make '
+                          ? 'A few details help Service Providers and fellow riders reach you faster, and make '
                               'your SOS alerts more useful to whoever responds.'
                           : 'Tap Edit to update any of these.',
                       style: Theme.of(context).textTheme.bodyMedium,

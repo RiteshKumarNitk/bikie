@@ -63,7 +63,7 @@ export function TestimonialsManager({ initial }: { initial: Testimonial[] }) {
                 <span className="text-gold">{'★'.repeat(t.rating)}{'☆'.repeat(5 - t.rating)}</span>
               </div>
             </div>
-            <p className="mt-2 text-sm italic text-white/70">"{t.quote}"</p>
+            <p className="mt-2 text-sm italic text-white/70">&quot;{t.quote}&quot;</p>
             <div className="mt-3 flex gap-2">
               <button
                 onClick={() => toggleFeatured(t)}

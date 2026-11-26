@@ -74,6 +74,37 @@ String describeSosLocation({String? formattedAddress, String? placeName, String?
   return parts.isNotEmpty ? parts.join(', ') : city;
 }
 
+/// Readable alert status. Screens previously printed the raw enum (`ACTIVE`, `FALSE_ALARM`).
+String sosStatusLabel(String status) {
+  switch (status) {
+    case 'ACTIVE':
+      return 'Active';
+    case 'RESOLVED':
+      return 'Resolved';
+    case 'FALSE_ALARM':
+      return 'Closed (false alarm)';
+    case 'CANCELLED':
+      return 'Cancelled';
+    default:
+      final words = status.toLowerCase().replaceAll('_', ' ');
+      return words.isEmpty ? status : '${words[0].toUpperCase()}${words.substring(1)}';
+  }
+}
+
+/// Readable description of who an unassigned alert is currently reaching. Screens previously
+/// printed the raw escalation tier (`nearby riders general · 10km`).
+String sosSearchLabel(String escalationTier, num currentRadiusMeters) {
+  final km = (currentRadiusMeters / 1000).round();
+  switch (escalationTier) {
+    case 'NEARBY_RIDERS_COMMUNITY':
+      return 'Alerting your riding community within $km km';
+    case 'ADMIN':
+      return 'Escalated to the BIKIE support team';
+    default:
+      return 'Searching for help within $km km';
+  }
+}
+
 /// The caller's own alert history has a different (smaller) shape than
 /// `SOSAlert` — no reporter fields, since the caller already knows who they
 /// are. Was previously force-parsed as a full `SOSAlert`, which would throw

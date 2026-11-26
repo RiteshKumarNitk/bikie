@@ -112,7 +112,7 @@ class AuthController extends StateNotifier<AuthState> {
   void forceLogout() {
     unawaited(_push.unregisterCurrentDevice());
     _findability.stop();
-    state = const AuthState.unauthenticated('Your session expired. Please sign in again.');
+    state = const AuthState.unauthenticated('Your session has expired. Please log in again.');
   }
 
   /// Re-fetches the session and refreshes cached `state.user`. Needed after anything that

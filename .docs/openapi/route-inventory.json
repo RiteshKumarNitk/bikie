@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-27T16:17:24.157Z",
-  "count": 172,
+  "generatedAt": "2026-11-25T08:12:37.607Z",
+  "count": 174,
   "routes": [
     {
       "path": "/api/account-type-requests",
@@ -742,6 +742,14 @@
       "file": "apps/web/app/api/membership/subscription/route.ts"
     },
     {
+      "path": "/api/membership/subscription/verify",
+      "methods": [
+        "POST"
+      ],
+      "auth": "session",
+      "file": "apps/web/app/api/membership/subscription/verify/route.ts"
+    },
+    {
       "path": "/api/messages/{id}/react",
       "methods": [
         "POST",
@@ -840,6 +848,14 @@
       ],
       "auth": "partner",
       "file": "apps/web/app/api/partner-membership/subscription/route.ts"
+    },
+    {
+      "path": "/api/partner-membership/subscription/verify",
+      "methods": [
+        "POST"
+      ],
+      "auth": "partner",
+      "file": "apps/web/app/api/partner-membership/subscription/verify/route.ts"
     },
     {
       "path": "/api/partner/application/reapply",

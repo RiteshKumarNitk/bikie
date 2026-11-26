@@ -118,8 +118,9 @@ export default function PartnerOnboardingPage() {
       // step visible instead of leaving a brand-new provider to discover it by hitting a 403.
       toast.success("Profile created successfully");
       router.push("/partner/membership?onboarding=1");
-    } catch (err: any) {
-      const message = err.message || "Something went wrong saving your details. Please try again.";
+    } catch (err) {
+      const message =
+        (err instanceof Error && err.message) || "Something went wrong saving your details. Please try again.";
       setError(message);
       toast.error(message);
     } finally {

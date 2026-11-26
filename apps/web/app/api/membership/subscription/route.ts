@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { MembershipService } from "@bikie/services";
 import { startMembershipSubscriptionSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
+import { subscriptionCheckoutPayload } from "@/lib/subscription-checkout";
 
 const ERROR_STATUS: Record<string, number> = {
   PLAN_NOT_FOUND: 404,
@@ -50,5 +51,8 @@ export async function POST(request: Request) {
       { status: ERROR_STATUS[result.reason] ?? 400 },
     );
   }
-  return NextResponse.json({ membership: result.membership, subscription: result.subscription });
+  return NextResponse.json({
+    membership: result.membership,
+    subscription: subscriptionCheckoutPayload(result.subscription, result.reused),
+  });
 }

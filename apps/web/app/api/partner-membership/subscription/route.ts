@@ -2,11 +2,13 @@ import { NextResponse } from "next/server";
 import { PartnerMembershipService } from "@bikie/services";
 import { startPartnerSubscriptionSchema } from "@bikie/validation";
 import { requireSession } from "@/lib/require-role";
+import { subscriptionCheckoutPayload } from "@/lib/subscription-checkout";
 
 const ERROR_STATUS: Record<string, number> = {
   PLAN_NOT_FOUND: 404,
   ALREADY_ACTIVE: 409,
   SUBSCRIPTION_ALREADY_EXISTS: 409,
+  SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS: 409,
   NOT_CONFIGURED: 503,
   SUBSCRIPTION_CREATE_FAILED: 503,
 };
@@ -19,6 +21,8 @@ const ERROR_MESSAGE: Record<string, string> = {
   PLAN_NOT_FOUND: "This plan is no longer available.",
   ALREADY_ACTIVE: "You already have an active membership.",
   SUBSCRIPTION_ALREADY_EXISTS: "You already have an active subscription. Cancel it first if you want to start a new one.",
+  SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS:
+    "Your AutoPay approval is still being processed. Please wait a few minutes, then check your membership status.",
   NOT_CONFIGURED: "Subscriptions are temporarily unavailable. Please try again later.",
   SUBSCRIPTION_CREATE_FAILED: "Could not start the subscription. Please try again.",
 };
@@ -45,5 +49,8 @@ export async function POST(request: Request) {
       { status: ERROR_STATUS[result.reason] ?? 400 },
     );
   }
-  return NextResponse.json({ membership: result.membership, subscription: result.subscription });
+  return NextResponse.json({
+    membership: result.membership,
+    subscription: subscriptionCheckoutPayload(result.subscription, result.reused),
+  });
 }

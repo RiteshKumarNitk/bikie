@@ -10,6 +10,15 @@ const { startSubscription } = vi.hoisted(() => ({ startSubscription: vi.fn() }))
 
 vi.mock("@bikie/services", () => ({ MembershipService: { startSubscription } }));
 vi.mock("@/lib/require-role", () => ({ requireSession: vi.fn() }));
+// The helper itself is unit-tested in apps/web/lib/subscription-checkout.test.ts.
+vi.mock("@/lib/subscription-checkout", () => ({
+  subscriptionCheckoutPayload: (subscription: object, reused: boolean) => ({
+    ...subscription,
+    reused,
+    keyId: "rzp_test_public",
+    checkoutMode: "hosted",
+  }),
+}));
 
 import { POST } from "./route";
 import { requireSession } from "@/lib/require-role";
@@ -50,6 +59,7 @@ describe("POST /api/membership/subscription", () => {
       ok: true,
       membership: { id: "um-1" },
       subscription: { id: "sub_rider123", status: "created", shortUrl: "https://rzp.io/i/rider123" },
+      reused: false,
     });
 
     const res = await POST(request({ planId: "rider-yearly-plan" }));
@@ -58,6 +68,9 @@ describe("POST /api/membership/subscription", () => {
     expect(res.status).toBe(200);
     expect(startSubscription).toHaveBeenCalledWith("user-1", "rider-yearly-plan");
     expect(body.subscription.shortUrl).toBe("https://rzp.io/i/rider123");
+    // Additive checkout fields for the in-app SDK — public key id only, never the secret.
+    expect(body.subscription).toMatchObject({ id: "sub_rider123", reused: false, keyId: "rzp_test_public", checkoutMode: "hosted" });
+    expect(JSON.stringify(body)).not.toMatch(/secret/i);
   });
 
   it.each([

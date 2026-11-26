@@ -8,6 +8,7 @@ import '../../../core/widgets/empty_state.dart';
 import '../../auth/domain/auth_controller.dart';
 import '../../auth/domain/auth_state.dart';
 import '../domain/trip_providers.dart';
+import '../../../core/widgets/app_network_image.dart';
 
 /// Ride Feed — the mobile-first take on `/trips`+`/community`: a browsable
 /// feed of upcoming Rides, with quick access to "My Rides" and ride creation.
@@ -111,7 +112,7 @@ class TripsListScreen extends ConsumerWidget {
                                 children: [
                                   AspectRatio(
                                     aspectRatio: 16 / 9,
-                                    child: Image.network(trip.imageUrl, fit: BoxFit.cover),
+                                    child: AppNetworkImage(trip.imageUrl, fit: BoxFit.cover),
                                   ),
                                   Positioned(
                                     top: 10,

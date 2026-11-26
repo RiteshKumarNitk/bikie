@@ -92,9 +92,9 @@ export function NearbyPartnersPanel() {
     <div className="rounded-2xl border border-foreground/10 bg-card p-6">
       <p className="text-lg font-semibold">Service providers near you</p>
       <p className="mt-1 text-sm text-foreground/50">
-        See BIKIE's currently available mechanics, fuel delivery, and rental partners on a map —
-        each with its verification status, so you know exactly who's been checked by BIKIE.
-        Markers show each provider's registered business location, not a live GPS position.
+        See BIKIE&apos;s currently available mechanics, fuel delivery, and rental partners on a map —
+        each with its verification status, so you know exactly who&apos;s been checked by BIKIE.
+        Markers show each provider&apos;s registered business location, not a live GPS position.
       </p>
 
       <button
@@ -116,7 +116,7 @@ export function NearbyPartnersPanel() {
             <>
               <PartnersMap pins={pins} center={center ?? undefined} height="18rem" />
               <p className="text-xs text-foreground/40">
-                📍 Pins mark each provider's business location, not their live position. Tap a pin for details.
+                📍 Pins mark each provider&apos;s business location, not their live position. Tap a pin for details.
               </p>
               <div className="space-y-2">
                 {partners.map((p) => (

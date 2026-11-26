@@ -181,7 +181,7 @@ class _AlertCard extends ConsumerWidget {
                 [
                   alert.assignedHelperId != null
                       ? 'Helper assigned'
-                      : 'Searching: ${alert.escalationTier.replaceAll('_', ' ').toLowerCase()} · ${alert.currentRadiusMeters ~/ 1000}km',
+                      : sosSearchLabel(alert.escalationTier, alert.currentRadiusMeters),
                   if (alert.distanceMeters != null)
                     alert.distanceMeters! < 1000
                         ? '${alert.distanceMeters!.round()} m away'

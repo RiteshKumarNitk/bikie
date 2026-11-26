@@ -86,7 +86,7 @@ class _CreateBookingSheetState extends ConsumerState<CreateBookingSheet> {
         context.push('/bookings');
         showAppToast(
           context,
-          'Request submitted successfully — booking ${booking.status.toLowerCase()}',
+          'Booking request sent (${booking.status.toLowerCase()})',
           variant: AppToastVariant.success,
         );
       }

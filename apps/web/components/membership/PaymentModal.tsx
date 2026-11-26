@@ -316,7 +316,7 @@ export function PaymentModal({
               {plan.name} · ₹{plan.price} / {plan.durationDays} days
             </p>
             <p className="mt-4 text-sm text-foreground/60">
-              You&apos;ll be taken to Razorpay's secure payment window to complete this purchase.
+              You&apos;ll be taken to Razorpay&apos;s secure payment window to complete this purchase.
             </p>
             {razorpayError && <p className="mt-3 text-xs text-red-400">{razorpayError}</p>}
             <button

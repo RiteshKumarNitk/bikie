@@ -1,5 +1,12 @@
 # BIKIE — Roadmap
 
+## Mobile UI Polish: Wording, Responsive Layouts, AutoPay Checkout UX (2026-11-25)
+Consistent terminology across the Flutter app, readable SOS statuses and error messages,
+overflow fixes found by a new 35-screen responsive test (320–600 px, up to 2× text), image
+placeholders, and smoother AutoPay checkout: in-app browser tab, no double submissions, and the
+Service Provider screen now refreshes automatically like the Rider one. Razorpay contact prefill
+needs a move to SDK-based subscription checkout and is awaiting approval.
+
 ## Service Provider Test Account Can Activate Membership (2026-09-30, ADR-089)
 The store-review/QA Service Provider test account can now activate a paid membership without a
 real payment, and the checkout no longer reports every failure as "couldn't be verified" — an

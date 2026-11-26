@@ -72,17 +72,17 @@ const _themes = {
     color: _redColor,
     confirmTitle: 'RED ALERT — Are you sure?',
     confirmBody:
-        'This immediately alerts your emergency contacts and nearby BIKIE riders, sharing your live GPS via SMS.',
+        'This immediately alerts your emergency contacts and nearby BIKIE riders with your location.',
     sendLabel: 'Yes, Send Alert Now',
   ),
   _AlertKind.amber: _KindTheme(
     label: 'Amber Alert — Assistance',
     icon: '⚠️',
-    tagline: 'Non-emergency. Select your issue and BIKIE connects nearby support.',
+    tagline: 'Not an emergency? Choose your problem and BIKIE alerts nearby help.',
     categories: _amberCategories,
     color: _amberColor,
     confirmTitle: 'AMBER ALERT — What do you need?',
-    confirmBody: 'Select your situation. BIKIE alerts nearby service providers and riders with your GPS via SMS.',
+    confirmBody: 'Choose your situation. BIKIE alerts nearby Service Providers and riders with your location.',
     sendLabel: 'Send Amber Alert',
   ),
 };
@@ -551,7 +551,7 @@ class _DispatchReport extends StatelessWidget {
         children: [
           Text(
             'Your alert is live in the app, but no one could be notified — no emergency contacts are saved on '
-            'your profile, no nearby riders are sharing their location, and no service provider matched your city.'
+            'your profile, no nearby riders are sharing their location, and no Service Provider matched your location.'
             '${d.escalatedToAdmins > 0 ? ' It was escalated to ${d.escalatedToAdmins} BIKIE admin${d.escalatedToAdmins > 1 ? 's' : ''}.' : ''}',
             style: Theme.of(context).textTheme.bodySmall,
           ),

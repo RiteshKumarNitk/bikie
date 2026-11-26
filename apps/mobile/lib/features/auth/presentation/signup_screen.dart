@@ -178,7 +178,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
         return;
       }
       if (mounted) {
-        showAppToast(context, 'Signed in successfully', variant: AppToastVariant.success);
+        showAppToast(context, 'Logged in successfully', variant: AppToastVariant.success);
         context.go('/');
       }
     } on ApiException catch (e) {
@@ -210,7 +210,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
       appBar: AppBar(
         title: const Text('Create account'),
         actions: [
-          TextButton(onPressed: () => context.go('/welcome'), child: const Text('Change Role')),
+          TextButton(onPressed: () => context.go('/welcome'), child: const Text('Change role')),
         ],
       ),
       bottomNavigationBar: _devOtp != null ? DevOtpBanner(code: _devOtp!) : null,
@@ -225,7 +225,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> with ResendCountdow
                 const Center(child: AppLogo(size: 56, glow: true)),
                 const SizedBox(height: 18),
                 Text(
-                  selectedRole == 'SERVICE_PROVIDER' ? 'Create your partner account ...' : 'Create your rider account',
+                  selectedRole == 'SERVICE_PROVIDER' ? 'Create your Service Provider account' : 'Create your rider account',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),

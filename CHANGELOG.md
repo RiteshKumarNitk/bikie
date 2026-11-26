@@ -1,5 +1,45 @@
 # Changelog
 
+## 2026-11-25 — Mobile UI polish: wording audit, responsive layout fixes, AutoPay checkout UX
+
+**Wording.** A full pass over every user-facing string in the Flutter app (1,263 strings, plus
+backend messages that reach the app) found no outright misspellings but a lot of inconsistent
+terminology. "Partner"/"service provider" → "Service Provider", "Offline" → "Unavailable",
+"Sign in"/"Log in" → "Log in", "Auto-debited" → "Paid via AutoPay", "Be findable" → "Be Findable".
+The SOS sheets no longer claim your "live GPS" goes out "via SMS" (candidate responders' SMS never
+carries GPS). The signup consent error named a non-existent "Legal Terms" document; it now says
+"User Agreement" on mobile, web and the backend. The SOS screens no longer show raw internal codes
+(`Searching: nearby riders general · 10km`, `FALSE_ALARM`), SOS History no longer shows a raw ISO
+timestamp, and "1 response(s)" is now pluralised properly. API error codes sent without a
+human-readable message (e.g. `ALREADY_OFFERED`) are now mapped to readable text in the app
+(`api_error_messages.dart`) instead of being shown raw.
+
+**Responsive layout.** New `test/layout/responsive_screens_test.dart` renders 35 screens at 320,
+360, 390, 412, 430 and 600 px wide at 1.0×, 1.3× and 2.0× text, with long names/emails/titles,
+and fails on any overflow (630 cases). Fixed what it found: Payment History rows (fixed-height
+three-line ListTile), My Rides stat tiles (fixed 88 px strip), Welcome call-to-action buttons,
+Nearby Riders radius chips, Create Ride dropdowns (`isExpanded`), the SOS detail header row, and
+flutter_map's non-shrinking attribution row on all four maps (new `OsmAttribution`, still shows the
+OSM credit the tile policy requires). Network images now have a loading placeholder and a branded
+fallback instead of Flutter's error box (`AppNetworkImage`).
+
+**AutoPay checkout UX.** Razorpay's hosted subscription page now opens in an in-app browser tab
+(Android Custom Tab / iOS Safari view) instead of a separate Chrome window, falling back to the
+browser, with a clear error if neither opens. Double-tapping "Start Membership" can no longer open
+two dialogs or send two subscription requests. While a Rider's payment is still pending the button
+reads "Retry Payment" and points to "Check status". The Service Provider screen now matches the
+Rider screen: a "Set up AutoPay" explanation before leaving the app, an automatic refresh on
+return, and one minute of polling after approval starts, so nobody has to pull-to-refresh.
+Prices, plan IDs, billing cycles, webhook processing, verification, invoices and idempotency are
+unchanged; activation still comes only from the backend.
+
+**Razorpay contact prefill: investigated, needs approval.** Razorpay asks for the mobile number and
+email again because the hosted subscription link (`short_url`) cannot be prefilled. Razorpay's
+documentation says `notify_info` is used only for notifications and "will not be prefilled in the
+checkout as per the government guidelines". Prefill would require moving to Standard Checkout
+with `subscription_id` via the native SDK; that is a payment-architecture change and has not been
+made pending approval.
+
 ## 2026-10-28 — Rider membership: an honest "payment pending" state, with bounded auto-polling
 
 Between starting a subscription and the webhook confirming it, the Rider previously saw... nothing

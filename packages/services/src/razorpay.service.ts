@@ -131,6 +131,37 @@ export const RazorpayService = {
     );
   },
 
+  /**
+   * The PUBLIC Razorpay key id, for opening Checkout in the app. Never the key secret. `null`
+   * when Razorpay isn't fully configured (same rule as `isConfigured()`).
+   */
+  publicKeyId(): string | null {
+    return credentials()?.keyId ?? null;
+  },
+
+  /**
+   * Razorpay's documented Subscription Checkout callback check:
+   * HMAC-SHA256(`${paymentId}|${subscriptionId}`, keySecret) === signature, where
+   * `subscriptionId` is the id stored on OUR server, never the one echoed back by Checkout.
+   * Same safety properties as `verifyPaymentSignature`: `false` (never throws) when Razorpay
+   * isn't configured or the input is malformed, and a constant-time compare.
+   */
+  verifySubscriptionPaymentSignature(params: { paymentId: string; subscriptionId: string; signature: string }): boolean {
+    const creds = credentials();
+    if (!creds) return false;
+
+    const expected = createHmac("sha256", creds.keySecret)
+      .update(`${params.paymentId}|${params.subscriptionId}`)
+      .digest("hex");
+    const expectedBuf = Buffer.from(expected, "hex");
+    const actualBuf = Buffer.from(params.signature, "hex");
+    if (expectedBuf.length !== actualBuf.length) return false;
+    return timingSafeEqual(
+      expectedBuf as unknown as Uint8Array,
+      actualBuf as unknown as Uint8Array,
+    );
+  },
+
   /** See the module-level `SUBSCRIPTION_TOTAL_COUNT` doc comment. */
   SUBSCRIPTION_TOTAL_COUNT,
 
@@ -184,13 +215,15 @@ export const RazorpayService = {
    * Returns `null` on any failure (logged) — callers must fail toward NOT touching the
    * subscription when this can't be verified, never toward assuming it's safe.
    */
-  async fetchSubscription(razorpaySubscriptionId: string): Promise<{ status: string; paidCount: number } | null> {
+  async fetchSubscription(
+    razorpaySubscriptionId: string,
+  ): Promise<{ status: string; paidCount: number; shortUrl: string } | null> {
     const creds = credentials();
     if (!creds) return null;
 
     try {
       const sub = await getClient(creds.keyId, creds.keySecret).subscriptions.fetch(razorpaySubscriptionId);
-      return { status: sub.status, paidCount: sub.paid_count };
+      return { status: sub.status, paidCount: sub.paid_count, shortUrl: sub.short_url };
     } catch (err) {
       console.error("[Razorpay][fetchSubscription] fetch failed:", err);
       return null;

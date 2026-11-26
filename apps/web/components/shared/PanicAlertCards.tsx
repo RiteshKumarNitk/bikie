@@ -94,7 +94,7 @@ function DispatchReport({ dispatch }: { dispatch: DispatchSummary | null }) {
             ` It was escalated to ${dispatch.escalatedToAdmins} BIKIE admin${dispatch.escalatedToAdmins > 1 ? "s" : ""}.`}
         </p>
         <p className="text-sm font-semibold text-red-400">
-          Call local emergency services now — don't wait on the app.
+          Call local emergency services now — don&apos;t wait on the app.
         </p>
         <Link
           href="/dashboard/settings"

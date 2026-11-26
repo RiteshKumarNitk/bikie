@@ -12,11 +12,12 @@ import '../../messaging/presentation/conversation_thread_body.dart';
 import '../data/sos_model.dart';
 import '../data/sos_repository.dart';
 import '../domain/sos_providers.dart';
+import '../../../core/widgets/osm_attribution.dart';
 
 const _timelineLabels = {
-  'SOS_CREATED': 'SOS Created',
+  'SOS_CREATED': 'SOS created',
   'RADIUS_EXPANDED': 'Search radius expanded',
-  'ESCALATED_SERVICE_PROVIDERS': 'Escalated to service providers',
+  'ESCALATED_SERVICE_PROVIDERS': 'Escalated to Service Providers',
   'ESCALATED_ADMIN': 'Escalated to admins',
   'HELPER_OFFERED': 'Helper offered to assist',
   'HELPER_WITHDRAWN': 'Helper withdrew offer',
@@ -298,15 +299,19 @@ class _AlertHeader extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // Wrap, not Row: the chip plus category label didn't fit on small phones at larger
+            // system font sizes.
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 Chip(
                   label: Text(isEmergency ? '🔴 Emergency' : '🟠 Assistance'),
                   backgroundColor:
                       isEmergency ? Colors.red.withValues(alpha: 0.15) : Colors.orange.withValues(alpha: 0.15),
                 ),
-                const SizedBox(width: 8),
-                Expanded(child: Text(sosTypeLabels[alert.type] ?? alert.type)),
+                Text(sosTypeLabels[alert.type] ?? alert.type),
               ],
             ),
             const SizedBox(height: 8),
@@ -338,8 +343,10 @@ class _AlertHeader extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               alert.assignedHelperId != null
-                  ? 'Status: ${alert.status} · Helper assigned'
-                  : 'Status: ${alert.status} · ${alert.escalationTier.replaceAll('_', ' ').toLowerCase()} · ${alert.currentRadiusMeters ~/ 1000}km',
+                  ? 'Status: ${sosStatusLabel(alert.status)} · Helper assigned'
+                  : alert.status == 'ACTIVE'
+                      ? 'Status: Active · ${sosSearchLabel(alert.escalationTier, alert.currentRadiusMeters)}'
+                      : 'Status: ${sosStatusLabel(alert.status)}',
               style: Theme.of(context).textTheme.labelSmall,
             ),
           ],
@@ -503,7 +510,7 @@ class _SessionPanel extends StatelessWidget {
             if (partners != null) ...[
               const SizedBox(height: 8),
               if (partners!.isEmpty)
-                const Text('No matching partners found nearby.', style: TextStyle(fontSize: 12))
+                const Text('No matching Service Providers found nearby.', style: TextStyle(fontSize: 12))
               else ...[
                 if (partners!.any((p) => p.latitude != null && p.longitude != null))
                   Padding(
@@ -538,7 +545,7 @@ class _SessionPanel extends StatelessWidget {
                                     child: const Icon(Icons.location_pin, color: Colors.blue, size: 36),
                                   ),
                             ]),
-                            const SimpleAttributionWidget(source: Text('OpenStreetMap contributors')),
+                            const OsmAttribution(),
                           ],
                         ),
                       ),

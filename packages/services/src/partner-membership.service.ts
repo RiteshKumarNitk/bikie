@@ -6,6 +6,11 @@ import { isTestServiceProviderAccount } from "./modules/identity-access/domain/t
 import { RazorpayService } from "./razorpay.service";
 import { MSG91_SMS_TEMPLATE_ENV, SMSService } from "./sms.service";
 
+/** Mirrors `membership.service.ts`'s constant of the same name (Rider): how long a just-created,
+ * never-charged subscription is protected from cancel-and-replace on retry, so an AutoPay approval
+ * that's still in flight in a UPI app is never cancelled out from under the Service Provider. */
+const SUBSCRIPTION_RETRY_GRACE_PERIOD_MS = 5 * 60 * 1000;
+
 /** ADR-069 — mirrors `MembershipService`'s `PurchaseMembershipResult`. */
 export type PurchasePartnerMembershipResult =
   | { ok: true; membership: PartnerMembershipDTO }
@@ -192,6 +197,28 @@ export const PartnerMembershipService = {
         return { ok: false, reason: "SUBSCRIPTION_ALREADY_EXISTS" };
       }
 
+      // Same rule as the Rider's `MembershipService.startSubscription`: a subscription started
+      // only moments ago is never cancelled out from under the Service Provider. If Razorpay still
+      // reports "created" (AutoPay not approved yet — e.g. the in-app Checkout was closed and
+      // reopened) the SAME subscription is reused: same id and payment link, never a second
+      // subscription. Any other recent state (approval in progress) blocks with a clear message.
+      const ageMs = Date.now() - new Date(openSubscription.startDate).getTime();
+      if (ageMs < SUBSCRIPTION_RETRY_GRACE_PERIOD_MS) {
+        if (live.status === "created") {
+          console.log(
+            `SUBSCRIPTION_REUSED userId=${userId} membershipId=${openSubscription.id} ` +
+              `razorpaySubscriptionId=${openSubscription.razorpaySubscriptionId}`,
+          );
+          return {
+            ok: true,
+            membership: openSubscription,
+            subscription: { id: openSubscription.razorpaySubscriptionId, status: live.status, shortUrl: live.shortUrl },
+            reused: true,
+          };
+        }
+        return { ok: false, reason: "SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS" };
+      }
+
       const TERMINAL_SUBSCRIPTION_STATUSES = new Set(["cancelled", "completed", "expired"]);
       if (!TERMINAL_SUBSCRIPTION_STATUSES.has(live.status)) {
         // Never charged (`paidCount === 0`) and not yet terminal on Razorpay's side either — a
@@ -235,7 +262,12 @@ export const PartnerMembershipService = {
     console.log(
       `SUBSCRIPTION_STARTED userId=${userId} membershipId=${membership.id} razorpaySubscriptionId=${subscription.id} status=${subscription.status}`,
     );
-    return { ok: true, membership, subscription: { id: subscription.id, status: subscription.status, shortUrl: subscription.shortUrl } };
+    return {
+      ok: true,
+      membership,
+      subscription: { id: subscription.id, status: subscription.status, shortUrl: subscription.shortUrl },
+      reused: false,
+    };
   },
 
   /**
@@ -379,6 +411,51 @@ export const PartnerMembershipService = {
   },
 
   /**
+   * Called by the app right after Razorpay's in-app Checkout reports success for a subscription
+   * AutoPay authorization. The client's "success" is never trusted on its own:
+   *  1. the subscription must exist and belong to the caller;
+   *  2. Razorpay's documented signature, HMAC(`payment_id|subscription_id`), must verify against
+   *     the subscription id stored on OUR server (never the one echoed back by Checkout);
+   *  3. only then is Razorpay asked directly for this subscription's PAID invoices via the existing,
+   *     idempotent `reconcileSubscription` — so activation still comes solely from Razorpay's own
+   *     records, exactly as with the webhook (which keeps working unchanged and is the fallback if
+   *     Razorpay hasn't recorded the charge yet).
+   */
+  async confirmCheckoutPayment(
+    userId: string,
+    input: { razorpayPaymentId: string; razorpaySubscriptionId: string; razorpaySignature: string },
+  ): Promise<ConfirmPartnerCheckoutResult> {
+    const membership = await partnerMembershipRepository.findByRazorpaySubscriptionId(input.razorpaySubscriptionId);
+    if (!membership || membership.userId !== userId || !membership.razorpaySubscriptionId) {
+      return { ok: false, reason: "NOT_FOUND" };
+    }
+
+    const signatureValid = RazorpayService.verifySubscriptionPaymentSignature({
+      paymentId: input.razorpayPaymentId,
+      subscriptionId: membership.razorpaySubscriptionId,
+      signature: input.razorpaySignature,
+    });
+    if (!signatureValid) {
+      console.error(
+        `SUBSCRIPTION_CHECKOUT_SIGNATURE_INVALID userId=${userId} membershipId=${membership.id} ` +
+          `razorpaySubscriptionId=${membership.razorpaySubscriptionId}`,
+      );
+      return { ok: false, reason: "INVALID_SIGNATURE" };
+    }
+
+    const reconciled = await PartnerMembershipService.reconcileSubscription(membership.razorpaySubscriptionId);
+    if (!reconciled.ok) return { ok: false, reason: "COULD_NOT_VERIFY" };
+
+    const active =
+      reconciled.membership.status === "ACTIVE" && new Date(reconciled.membership.endDate).getTime() >= Date.now();
+    console.log(
+      `SUBSCRIPTION_CHECKOUT_CONFIRMED userId=${userId} membershipId=${membership.id} ` +
+        `razorpaySubscriptionId=${membership.razorpaySubscriptionId} invoicesFound=${reconciled.invoicesFound} active=${active}`,
+    );
+    return { ok: true, membership: reconciled.membership, active };
+  },
+
+  /**
    * Admin-triggered safety net for when Razorpay's webhook never reaches us — never delivered,
    * delivered while the app was down, rejected by a transient signature/env mismatch, or any
    * other reason a webhook (an unreliable, best-effort delivery by design) can simply not arrive.
@@ -428,12 +505,31 @@ export const PartnerMembershipService = {
 };
 
 export type StartSubscriptionResult =
-  | { ok: true; membership: PartnerMembershipDTO; subscription: { id: string; status: string; shortUrl: string } }
-  | { ok: false; reason: "PLAN_NOT_FOUND" | "ALREADY_ACTIVE" | "SUBSCRIPTION_ALREADY_EXISTS" | "NOT_CONFIGURED" | "SUBSCRIPTION_CREATE_FAILED" };
+  | {
+      ok: true;
+      membership: PartnerMembershipDTO;
+      subscription: { id: string; status: string; shortUrl: string };
+      /** `true` when an existing, not-yet-approved subscription was returned instead of a new one. */
+      reused: boolean;
+    }
+  | {
+      ok: false;
+      reason:
+        | "PLAN_NOT_FOUND"
+        | "ALREADY_ACTIVE"
+        | "SUBSCRIPTION_ALREADY_EXISTS"
+        | "SUBSCRIPTION_AUTHORIZATION_IN_PROGRESS"
+        | "NOT_CONFIGURED"
+        | "SUBSCRIPTION_CREATE_FAILED";
+    };
 
 export type CancelSubscriptionResult =
   | { ok: true; membership: PartnerMembershipDTO }
   | { ok: false; reason: "NO_ACTIVE_SUBSCRIPTION" | "CANCEL_FAILED" };
+
+export type ConfirmPartnerCheckoutResult =
+  | { ok: true; membership: PartnerMembershipDTO; /** `true` once Razorpay has recorded a paid charge. */ active: boolean }
+  | { ok: false; reason: "NOT_FOUND" | "INVALID_SIGNATURE" | "COULD_NOT_VERIFY" };
 
 export type ReconcileSubscriptionResult =
   | { ok: true; membership: PartnerMembershipDTO; invoicesFound: number }

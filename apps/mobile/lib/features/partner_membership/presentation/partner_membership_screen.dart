@@ -1,13 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../core/network/api_exception.dart';
 import '../../../core/network/app_config.dart' show isTestPhoneNumber;
 import '../../../core/payments/razorpay_checkout.dart';
+import '../../../core/payments/razorpay_subscription_checkout.dart';
+import '../../../core/payments/subscription_authorization.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/async_value_view.dart';
 import '../../../core/widgets/app_toast.dart';
@@ -23,14 +26,67 @@ import '../domain/partner_subscription_display.dart';
 /// ADR-056 — this is the mandatory next stop after `/partner-onboarding` (never a gate: "Skip
 /// for Now" always reaches `/`, the Partner Home). Reached from both onboarding and later,
 /// self-service, via the same route — mirrors web's `/partner/membership`.
-class PartnerMembershipScreen extends ConsumerWidget {
+///
+/// Like the Rider screen, membership activation only ever comes from the backend (webhook-confirmed
+/// Razorpay status). This screen re-fetches it when the Service Provider returns to BIKIE from
+/// Razorpay or a UPI app, and polls briefly after AutoPay approval starts, so nobody has to
+/// pull-to-refresh to see their membership turn active.
+class PartnerMembershipScreen extends ConsumerStatefulWidget {
   const PartnerMembershipScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PartnerMembershipScreen> createState() => _PartnerMembershipScreenState();
+}
+
+class _PartnerMembershipScreenState extends ConsumerState<PartnerMembershipScreen> with WidgetsBindingObserver {
+  Timer? _pollTimer;
+  int _pollAttempts = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) ref.invalidate(activePartnerMembershipProvider);
+  }
+
+  /// Bounded (12 × 5s = 1 minute) refresh after AutoPay approval starts — catches a webhook that
+  /// lands shortly after the Service Provider returns. Same cadence as the Rider screen.
+  void _startPolling() {
+    _pollTimer?.cancel();
+    _pollAttempts = 0;
+    _scheduleNextPoll();
+  }
+
+  void _scheduleNextPoll() {
+    if (_pollAttempts >= 12) return;
+    _pollTimer = Timer(const Duration(seconds: 5), () {
+      _pollAttempts += 1;
+      if (!mounted) return;
+      ref.invalidate(activePartnerMembershipProvider);
+      _scheduleNextPoll();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final active = ref.watch(activePartnerMembershipProvider);
     final plans = ref.watch(partnerMembershipPlansProvider);
     final hasActiveMembership = active.valueOrNull != null;
+
+    ref.listen<AsyncValue<PartnerMembership?>>(activePartnerMembershipProvider, (previous, next) {
+      if (next.valueOrNull != null) _pollTimer?.cancel();
+    });
 
     return Scaffold(
       appBar: AppBar(title: const Text('Service Provider Membership')),
@@ -77,14 +133,17 @@ class PartnerMembershipScreen extends ConsumerWidget {
                 value: plans,
                 onRetry: () => ref.invalidate(partnerMembershipPlansProvider),
                 data: (list) => Column(
-                  children: list.where((p) => p.isActive).map((plan) => _PlanCard(plan: plan)).toList(),
+                  children: list
+                      .where((p) => p.isActive)
+                      .map((plan) => _PlanCard(plan: plan, onAuthorizationStarted: _startPolling))
+                      .toList(),
                 ),
               ),
               const SizedBox(height: 12),
               Center(
                 child: TextButton(
                   onPressed: () => context.go('/'),
-                  child: const Text('Skip for Now — explore the dashboard first'),
+                  child: const Text('Skip for now — explore the dashboard first'),
                 ),
               ),
             ],
@@ -128,7 +187,7 @@ class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMemb
           '₹${widget.membership.plan.price.toStringAsFixed(0)} automatic payments will be taken.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Subscription')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Keep Auto-Renewal')),
           TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel Auto-Renewal')),
         ],
       ),
@@ -246,7 +305,7 @@ class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMemb
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Auto-payment failed',
+                              'AutoPay payment failed',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
@@ -255,7 +314,7 @@ class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMemb
                             const SizedBox(height: 2),
                             Text(
                               "We couldn't collect your ₹$price membership renewal payment. Please "
-                              'update/check your payment method to keep your membership active.',
+                              'check your payment method to keep your membership active.',
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.red),
                             ),
                           ],
@@ -285,7 +344,7 @@ class _ActivePartnerMembershipCardState extends ConsumerState<_ActivePartnerMemb
                           style: TextButton.styleFrom(foregroundColor: Colors.red),
                           child: _isCancelling
                               ? const SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
-                              : const Text('Cancel Subscription'),
+                              : const Text('Cancel Auto-Renewal'),
                         ),
                       ),
                     ],
@@ -326,9 +385,12 @@ String _billingPeriodLabel(int durationDays) {
 }
 
 class _PlanCard extends ConsumerStatefulWidget {
-  const _PlanCard({required this.plan});
+  const _PlanCard({required this.plan, required this.onAuthorizationStarted});
 
   final PartnerMembershipPlan plan;
+
+  /// Called once Razorpay's AutoPay page has been opened, so the screen can watch for activation.
+  final VoidCallback onAuthorizationStarted;
 
   @override
   ConsumerState<_PlanCard> createState() => _PlanCardState();
@@ -338,6 +400,10 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   bool _isPurchasing = false;
   bool _isSubscribing = false;
 
+  /// True while the "Set up AutoPay" dialog is open — disables the button (no double dialogs)
+  /// without showing a spinner for a request that hasn't been made yet.
+  bool _isConfirming = false;
+
   /// Starts a recurring ₹99/month Razorpay Subscription (distinct from [_purchase]'s one-time
   /// flow — both remain available side by side). Membership does NOT activate here: the server
   /// only stores the Razorpay subscription id against a placeholder row; a webhook-confirmed
@@ -345,20 +411,65 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
   /// externally (no native-SDK subscription flow yet) — the user completes authorization there
   /// and returns to the app, where pull-to-refresh (or the next launch) picks up the activated
   /// state once the webhook has run.
+  /// Explains the Razorpay step before leaving the app (mirrors the Rider screen). The button is
+  /// disabled before the dialog opens so a double-tap can't start two subscription requests.
+  Future<void> _confirmAndSubscribe() async {
+    if (_isSubscribing || _isConfirming) return;
+    setState(() => _isConfirming = true);
+    final price = widget.plan.price.toStringAsFixed(0);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Set up AutoPay'),
+        content: Text(
+          "Razorpay will open so you can approve AutoPay for your ₹$price/month membership. Choose "
+          'UPI AutoPay or a card and approve it — this screen updates automatically once Razorpay '
+          'confirms.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Continue')),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    setState(() => _isConfirming = false);
+    if (confirmed != true) return;
+    await _subscribe();
+  }
+
   Future<void> _subscribe() async {
     setState(() => _isSubscribing = true);
     try {
       final repo = ref.read(partnerMembershipRepositoryProvider);
       final result = await repo.startSubscription(planId: widget.plan.id);
-      final uri = Uri.tryParse(result.shortUrl);
-      if (uri != null) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      }
+      final user = ref.read(authControllerProvider).user;
+      final outcome = await authorizeSubscription(
+        checkout: result.checkout,
+        launcher: ref.read(subscriptionCheckoutLauncherProvider),
+        planName: widget.plan.name,
+        prefill: RazorpayPrefill(name: user?.name, email: user?.email, contact: user?.phoneNumber),
+        confirm: (success) => repo.confirmCheckout(
+          razorpayPaymentId: success.paymentId,
+          razorpaySubscriptionId: success.subscriptionId,
+          razorpaySignature: success.signature,
+        ),
+      );
+      // Membership status is always re-read from the server, never inferred from Checkout.
+      ref.invalidate(activePartnerMembershipProvider);
+      if (outcome.awaitingConfirmation) widget.onAuthorizationStarted();
       if (mounted) {
         showAppToast(
           context,
-          'Complete the payment authorization, then pull to refresh here once done.',
-          variant: AppToastVariant.success,
+          outcome.userMessage,
+          variant: switch (outcome.outcome) {
+            SubscriptionAuthorizationOutcome.activated ||
+            SubscriptionAuthorizationOutcome.confirming ||
+            SubscriptionAuthorizationOutcome.hostedOpened =>
+              AppToastVariant.success,
+            SubscriptionAuthorizationOutcome.cancelled => AppToastVariant.info,
+            _ => AppToastVariant.error,
+          },
         );
       }
     } on ApiException catch (e) {
@@ -504,16 +615,15 @@ class _PlanCardState extends ConsumerState<_PlanCard> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isSubscribing ? null : _subscribe,
+                  onPressed: _isSubscribing || _isConfirming ? null : _confirmAndSubscribe,
                   child: _isSubscribing
                       ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                      : Text('Start Membership — ₹$price/month'),
+                      : Text('Start Membership — ₹$price/month', textAlign: TextAlign.center),
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                'Your payment will be automatically debited every month through your authorized '
-                'Razorpay payment method.',
+                'Renews every month with AutoPay through Razorpay. You can cancel auto-renewal anytime.',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ],

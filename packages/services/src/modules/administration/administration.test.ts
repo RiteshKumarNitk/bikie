@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import type { AdministrationPorts } from "./ports";
 
 vi.mock("@bikie/database", () => ({
   adminRepository: {},
@@ -188,10 +189,12 @@ describe("Partner (Service Provider) membership plan CRUD (ADR-051)", () => {
 });
 
 describe("Admin → Notifications broadcast", () => {
+  // Typed from the module's own ports: under Vitest 4, `ReturnType<typeof vi.fn>` is a generic
+  // `Mock<Procedure | Constructable>` that TypeScript won't assign to these specific signatures.
   function moduleWithNotify(overrides: {
-    findUserIdsByAudience?: ReturnType<typeof vi.fn>;
-    findNotificationHistory?: ReturnType<typeof vi.fn>;
-    notifyMany?: ReturnType<typeof vi.fn>;
+    findUserIdsByAudience?: AdministrationPorts["admin"]["findUserIdsByAudience"];
+    findNotificationHistory?: AdministrationPorts["admin"]["findNotificationHistory"];
+    notifyMany?: AdministrationPorts["notifications"]["notifyMany"];
   }) {
     return createAdministrationModule({
       admin: {

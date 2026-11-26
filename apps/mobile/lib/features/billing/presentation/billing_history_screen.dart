@@ -52,14 +52,14 @@ class _InvoiceCard extends StatelessWidget {
 
   final InvoiceSummary invoice;
 
-  /// "Subscription payment" for the authorization charge, "Auto-debited" for every later
+  /// "Subscription payment" for the authorization charge, "Paid via AutoPay" for every later
   /// recurring charge — `null` for a plain one-time purchase, where no extra label is shown.
   String? get _paymentTypeLabel {
     switch (invoice.paymentType) {
       case InvoicePaymentType.initialSubscription:
         return 'Subscription payment';
       case InvoicePaymentType.autoRenewal:
-        return 'Auto-debited';
+        return 'Paid via AutoPay';
       case InvoicePaymentType.oneTime:
         return null;
     }
@@ -73,29 +73,49 @@ class _InvoiceCard extends StatelessWidget {
         : '${invoice.currency} ${invoice.amount.toStringAsFixed(2)}';
     final typeLabel = _paymentTypeLabel;
     final statusLabel = invoice.status == 'PAID' ? 'Paid' : 'Refunded';
+    final textTheme = Theme.of(context).textTheme;
+    // A plain Row instead of a three-line ListTile: ListTile's fixed tile height clipped the
+    // amount/label column at larger system font sizes. Here every line wraps and the card grows.
     return Card(
-      child: ListTile(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: () => context.push('/billing/${invoice.id}'),
-        title: Text(invoice.planName, style: Theme.of(context).textTheme.titleSmall),
-        subtitle: Text(
-          '${invoice.receiptNo}\n${paid == null ? '' : DateFormat('d MMM y').format(paid)}',
-          style: Theme.of(context).textTheme.bodySmall,
-        ),
-        isThreeLine: true,
-        trailing: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Text(amount, style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            Text(
-              typeLabel == null ? statusLabel : '$typeLabel · $statusLabel',
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: typeLabel == null ? null : AppTheme.accentTextOf(context),
-                    fontWeight: typeLabel == null ? null : FontWeight.w600,
-                  ),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(invoice.planName, style: textTheme.titleSmall),
+                    const SizedBox(height: 2),
+                    Text(invoice.receiptNo, style: textTheme.bodySmall),
+                    if (paid != null) Text(DateFormat('d MMM y').format(paid), style: textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(amount, style: textTheme.titleSmall),
+                    const SizedBox(height: 4),
+                    Text(
+                      typeLabel == null ? statusLabel : '$typeLabel · $statusLabel',
+                      textAlign: TextAlign.end,
+                      style: textTheme.labelSmall?.copyWith(
+                        color: typeLabel == null ? null : AppTheme.accentTextOf(context),
+                        fontWeight: typeLabel == null ? null : FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

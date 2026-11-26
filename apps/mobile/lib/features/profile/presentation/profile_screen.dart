@@ -301,7 +301,7 @@ class _PartnerProfileSectionState extends ConsumerState<_PartnerProfileSection> 
                       case 'PENDING_VERIFICATION':
                         return 'Verification pending';
                       default:
-                        return 'Unverified — fully operational';
+                        return 'Not yet verified — all features available';
                     }
                   },
                   loading: () => null,

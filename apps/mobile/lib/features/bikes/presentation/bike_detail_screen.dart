@@ -11,6 +11,7 @@ import '../../reviews/domain/review_providers.dart';
 import '../../wishlist/domain/wishlist_providers.dart';
 import '../data/bike_models.dart';
 import '../domain/bike_providers.dart';
+import '../../../core/widgets/app_network_image.dart';
 
 class BikeDetailScreen extends ConsumerWidget {
   const BikeDetailScreen({super.key, required this.slug});
@@ -48,7 +49,7 @@ class _BikeDetailBody extends ConsumerWidget {
         SliverAppBar(
           expandedHeight: 260,
           pinned: true,
-          flexibleSpace: FlexibleSpaceBar(background: Image.network(bike.imageUrl, fit: BoxFit.cover)),
+          flexibleSpace: FlexibleSpaceBar(background: AppNetworkImage(bike.imageUrl, fit: BoxFit.cover)),
           actions: [
             IconButton(
               icon: Icon(isWishlisted ? Icons.favorite : Icons.favorite_border),
@@ -124,7 +125,16 @@ class _BikeDetailBody extends ConsumerWidget {
                                     children: [
                                       Row(
                                         children: [
-                                          Text(r.author.name, style: Theme.of(context).textTheme.titleSmall),
+                                          // Flexible: a long reviewer name used to push the rating
+                                          // off-screen.
+                                          Flexible(
+                                            child: Text(
+                                              r.author.name,
+                                              style: Theme.of(context).textTheme.titleSmall,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
                                           const SizedBox(width: 8),
                                           Icon(Icons.star, size: 14, color: AppTheme.accentTextOf(context)),
                                           Text('${r.rating}'),

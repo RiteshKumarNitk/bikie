@@ -21,13 +21,13 @@ const _slides = [
   ),
   _IntroSlide(
     emoji: '🤝',
-    title: 'Ride With Community',
+    title: 'Ride With the Community',
     description: 'Create group rides, request to join ones others are leading, and chat in your own Ride Room.',
   ),
   _IntroSlide(
     emoji: '🆘',
     title: 'Stay Safe, Always',
-    description: 'One-tap SOS alerts nearby members and admins the moment something goes wrong on the road.',
+    description: 'One tap on SOS alerts nearby riders and your emergency contacts the moment something goes wrong on the road.',
   ),
 ];
 

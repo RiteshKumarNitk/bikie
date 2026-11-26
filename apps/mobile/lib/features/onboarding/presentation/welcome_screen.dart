@@ -56,7 +56,7 @@ class WelcomeScreen extends ConsumerWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'ANYTIME ANYWHERE — YOUR ONLY COMPANION',
+                          'YOUR COMPANION ON EVERY RIDE',
                           textAlign: TextAlign.center,
                           style: TextStyle(fontSize: 10, letterSpacing: 1.5, color: Colors.white.withValues(alpha: 0.6)),
                         ),
@@ -70,9 +70,9 @@ class WelcomeScreen extends ConsumerWidget {
                         _RoleCard(
                           emoji: '🏍️',
                           accent: kBrandOrange,
-                          title: "I'm a Biker",
+                          title: "I'm a Rider",
                           description:
-                              'Rent a motorbike, create group trips, connect with riders, and access the BIKIE safety panic network.',
+                              "Rent a motorbike, create group trips, connect with riders, and access BIKIE's SOS safety network.",
                           ctaLabel: 'Join as Rider',
                           onTap: () {
                             ref.read(selectedRoleProvider.notifier).state = 'RIDER';
@@ -86,7 +86,7 @@ class WelcomeScreen extends ConsumerWidget {
                           title: 'Service Provider',
                           description:
                               'List your bikes for rent, offer roadside assistance, create curated trips, and grow your business.',
-                          ctaLabel: 'Join as Provider',
+                          ctaLabel: 'Join as Service Provider',
                           onTap: () {
                             ref.read(selectedRoleProvider.notifier).state = 'SERVICE_PROVIDER';
                             context.go('/login');
@@ -179,7 +179,9 @@ class _RoleCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(ctaLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                      Flexible(
+                        child: Text(ctaLabel, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ),
                       const SizedBox(width: 8),
                       const Icon(Icons.arrow_forward, size: 14, color: Colors.white),
                     ],

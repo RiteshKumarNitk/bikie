@@ -37,7 +37,7 @@ export function Hero() {
               Join Group Road Trips Across India
             </h1>
             <p data-hero-subtitle className="mx-auto mt-6 max-w-xl text-lg text-foreground/70 md:mx-0">
-              Connect with fellow riders, form a group, and explore India's most beautiful destinations together. Ride safe with our community and SOS support.
+              Connect with fellow riders, form a group, and explore India&apos;s most beautiful destinations together. Ride safe with our community and SOS support.
             </p>
           </div>
 

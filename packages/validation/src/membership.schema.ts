@@ -44,6 +44,16 @@ export const startMembershipSubscriptionSchema = z.object({
 
 export type StartMembershipSubscriptionInput = z.infer<typeof startMembershipSubscriptionSchema>;
 
+/** `POST /api/{membership,partner-membership}/subscription/verify` — the fields Razorpay's in-app
+ * Checkout returns after a subscription AutoPay authorization. Shared by both account types. */
+export const confirmSubscriptionCheckoutSchema = z.object({
+  razorpayPaymentId: z.string().min(1).max(100),
+  razorpaySubscriptionId: z.string().min(1).max(100),
+  razorpaySignature: z.string().regex(/^[0-9a-f]{64}$/i, "Invalid payment signature"),
+});
+
+export type ConfirmSubscriptionCheckoutInput = z.infer<typeof confirmSubscriptionCheckoutSchema>;
+
 export const createMembershipPlanSchema = z.object({
   name: z.string().min(1).max(120),
   description: z.string().min(1).max(2000),

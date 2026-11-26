@@ -10,6 +10,7 @@ import '../../../core/network/api_exception.dart';
 import '../../onboarding/presentation/location_picker_field.dart';
 import '../data/trip_repository.dart';
 import '../domain/trip_providers.dart';
+import '../../../core/widgets/app_network_image.dart';
 
 /// `/trips/create` on mobile — membership-gated ride creation, posting
 /// directly to the existing `POST /api/trips` (see `createTripSchema` in
@@ -192,6 +193,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: _type,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Ride type'),
               items: rideCreationTypes
                   .map((t) => DropdownMenuItem(value: t, child: Text(t.replaceAll('_', ' '))))
@@ -201,6 +203,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
             const SizedBox(height: 16),
             DropdownButtonFormField<String>(
               initialValue: _difficulty,
+              isExpanded: true,
               decoration: const InputDecoration(labelText: 'Difficulty'),
               items: rideDifficulties.map((d) => DropdownMenuItem(value: d, child: Text(d))).toList(),
               onChanged: (v) => setState(() => _difficulty = v!),
@@ -305,7 +308,7 @@ class _CreateRideScreenState extends ConsumerState<CreateRideScreen> {
                     children: [
                       ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: Image.network(_galleryUrls[index], height: 64, width: 96, fit: BoxFit.cover),
+                        child: AppNetworkImage(_galleryUrls[index], height: 64, width: 96, fit: BoxFit.cover),
                       ),
                       Positioned(
                         right: 2,

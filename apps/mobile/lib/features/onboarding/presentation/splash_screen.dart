@@ -25,7 +25,7 @@ class SplashScreen extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              'ANYTIME ANYWHERE — YOUR ONLY COMPANION',
+              'YOUR COMPANION ON EVERY RIDE',
               style: TextStyle(fontSize: 10, letterSpacing: 1.5, color: Colors.white.withValues(alpha: 0.6)),
             ),
             const SizedBox(height: 40),

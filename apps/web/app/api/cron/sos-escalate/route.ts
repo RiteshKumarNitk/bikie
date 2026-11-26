@@ -10,10 +10,10 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const module = getSafetyLocationModule();
-  const due = await module.ports.sosAlerts.findAlertsDueForEscalation(new Date());
+  const safetyLocation = getSafetyLocationModule();
+  const due = await safetyLocation.ports.sosAlerts.findAlertsDueForEscalation(new Date());
 
-  const results = await Promise.allSettled(due.map((alert) => module.escalation.tickEscalation(alert)));
+  const results = await Promise.allSettled(due.map((alert) => safetyLocation.escalation.tickEscalation(alert)));
   const failed = results.filter((r) => r.status === "rejected").length;
   for (const r of results) {
     if (r.status === "rejected") console.error("[SOS][ESCALATE][ERROR]", r.reason);

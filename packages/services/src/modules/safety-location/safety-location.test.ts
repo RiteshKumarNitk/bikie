@@ -43,6 +43,7 @@ vi.mock("../../../push.service", () => ({
 }));
 
 import { alertKind } from "./domain/alert-kind";
+import type { SafetyLocationPorts } from "./ports";
 import {
   buildEmailHtml,
   buildSmsTemplateBody,
@@ -1138,7 +1139,9 @@ describe("fan-out dispatch", () => {
 
   it("admin-disabled push/SMS settings stop responder push and SMS but leave WhatsApp/email untouched", async () => {
     const sendFlow = vi.fn(async () => ok("msg91"));
-    const notify = vi.fn(async () => undefined);
+    // Typed parameters so `notify.mock.calls[0]?.[0]` below is the recipient user id, not an
+    // index into an empty tuple.
+    const notify = vi.fn(async (_userId: string, ..._rest: unknown[]) => undefined);
     const communications = fakeCommunications({ sms: { send: vi.fn(async () => ok("twilio")), sendFlow } });
 
     const module = createSafetyLocationModule({

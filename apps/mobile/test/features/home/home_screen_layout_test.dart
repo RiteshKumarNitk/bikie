@@ -66,7 +66,7 @@ void main() {
 
         expect(find.text('SOS'), findsOneWidget);
         expect(find.text('Your SOS alert is active'), findsOneWidget);
-        expect(find.text('Be findable in an emergency'), findsOneWidget);
+        expect(find.text('Be Findable in an emergency'), findsOneWidget);
         expect(tester.takeException(), isNull);
       });
 

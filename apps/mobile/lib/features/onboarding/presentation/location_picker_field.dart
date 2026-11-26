@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
+import '../../../core/widgets/osm_attribution.dart';
 
 /// Map location picker (ADR-036) — mirrors the web's `LocationPicker.tsx`. Uses `flutter_map` +
 /// raw OpenStreetMap tiles instead of `google_maps_flutter` — no API key, no native Android/iOS
@@ -360,8 +361,6 @@ class _OsmAttribution extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SimpleAttributionWidget(
-      source: Text('OpenStreetMap contributors'),
-    );
+    return const OsmAttribution();
   }
 }

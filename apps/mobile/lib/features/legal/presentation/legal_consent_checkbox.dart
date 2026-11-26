@@ -4,7 +4,7 @@ import '../../../core/theme/app_theme.dart';
 import '../data/legal_models.dart';
 import 'legal_document_sheet.dart';
 
-const legalConsentRequiredMessage = 'Please accept the Terms & Conditions, Privacy Policy and Legal Terms to continue.';
+const legalConsentRequiredMessage = 'Please accept the Terms & Conditions, Privacy Policy and User Agreement to continue.';
 
 /// ADR-090 — mandatory signup consent for both Rider and Service Provider accounts. Never
 /// pre-checked: the caller owns [checked] and must start it `false`. Each document name opens its

@@ -32,7 +32,7 @@ class PartnerHomeScreen extends ConsumerWidget {
     final activeAsync = ref.watch(partnerActiveSessionsProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('BIKIE Partner', style: TextStyle(fontWeight: FontWeight.bold))),
+      appBar: AppBar(title: const Text('BIKIE Service Provider', style: TextStyle(fontWeight: FontWeight.bold))),
       body: RefreshIndicator(
         onRefresh: () async {
           ref.invalidate(partnerLocationBootstrapProvider);
@@ -115,7 +115,7 @@ class _ActivationCard extends ConsumerWidget {
 
   static const _lockedFeatures = [
     'Receive & accept SOS assistance requests',
-    'Go available to riders nearby',
+    'Become Available to nearby riders',
   ];
 
   @override
